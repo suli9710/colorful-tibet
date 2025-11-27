@@ -1,0 +1,42 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: colorful-tibet-tourism
+  mvc:
+    async:
+      request-timeout: 120000  # 120秒异步请求超时，适应AI生成时间
+  datasource:
+    url: jdbc:h2:mem:tibet_tourism;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    username: sa
+    password: 
+    driver-class-name: org.h2.Driver
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+  h2:
+    console:
+      enabled: true
+
+doubao:
+  api:
+    url: https://ark.cn-beijing.volces.com/api/v3/chat/completions
+    key: e23d1e75-53b0-473d-92dc-8d70395b077b
+    model: ep-20251124231555-hdr7j
+
+# 价格定时更新配置
+price:
+  update:
+    enabled: true  # 是否启用定时更新（设为false可禁用）
+    force: false   # 是否强制更新已有价格的景点（默认false，只更新没有价格的）
+    cron: "0 0 2 * * ?"  # 每天凌晨2点执行（Cron表达式）
+    weekly:
+      cron: "0 0 3 ? * MON"  # 每周一凌晨3点强制更新
+    hourly:
+      cron: "0 0 * * * ?"  # 每小时执行一次（仅更新缺失价格的景点）

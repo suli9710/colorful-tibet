@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>后端连接测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-box {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 10px;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        .success {
+            background: #d1fae5;
+            border: 2px solid #10b981;
+            color: #065f46;
+        }
+        .error {
+            background: #fee2e2;
+            border: 2px solid #ef4444;
+            color: #991b1b;
+        }
+        .loading {
+            background: #fef3c7;
+            border: 2px solid #f59e0b;
+            color: #92400e;
+        }
+        h1 {
+            color: #1f2937;
+            margin-bottom: 10px;
+        }
+        .info {
+            color: #6b7280;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-box">
+        <h1>🔍 七彩西藏 - 后端连接测试</h1>
+        <p class="info">点击下面的按钮测试后端API是否正常工作</p>
+        
+        <button onclick="testConnection()">测试后端连接</button>
+        <button onclick="testSpots()">测试景点API</button>
+        <button onclick="window.location.href='http://localhost:8080/api/spots'">直接打开景点API</button>
+        
+        <div id="result"></div>
+    </div>
+
+    <script>
+        function showResult(message, type) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.className = 'result ' + type;
+            resultDiv.textContent = message;
+        }
+
+        async function testConnection() {
+            showResult('正在测试后端连接...', 'loading');
+            
+            try {
+                const response = await fetch('http://localhost:8080/api/spots', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    showResult(
+                        '✅ 连接成功！\n\n' +
+                        '状态码: ' + response.status + '\n' +
+                        '数据条数: ' + data.length + '\n' +
+                        '后端服务正常运行！',
+                        'success'
+                    );
+                } else {
+                    showResult(
+                        '❌ 连接失败\n\n' +
+                        '状态码: ' + response.status + '\n' +
+                        '错误: ' + response.statusText + '\n\n' +
+                        '后端可能有错误，请检查后端控制台日志',
+                        'error'
+                    );
+                }
+            } catch (error) {
+                showResult(
+                    '❌ 无法连接到后端\n\n' +
+                    '错误: ' + error.message + '\n\n' +
+                    '请确保：\n' +
+                    '1. 后端服务正在运行\n' +
+                    '2. 后端端口是8080\n' +
+                    '3. 没有防火墙阻止',
+                    'error'
+                );
+            }
+        }
+
+        async function testSpots() {
+            showResult('正在获取景点列表...', 'loading');
+            
+            try {
+                const response = await fetch('http://localhost:8080/api/spots');
+                const data = await response.json();
+                
+                if (data && data.length > 0) {
+                    let message = '✅ 成功获取景点数据！\n\n';
+                    message += '总共 ' + data.length + ' 个景点\n\n';
+                    message += '前5个景点：\n';
+                    data.slice(0, 5).forEach((spot, index) => {
+                        message += (index + 1) + '. ' + spot.name + ' - ¥' + spot.ticketPrice + '\n';
+                    });
+                    showResult(message, 'success');
+                } else {
+                    showResult(
+                        '⚠️ 后端返回空数据\n\n' +
+                        '后端已连接，但数据库中没有景点数据\n' +
+                        '请重启后端服务以重新加载数据',
+                        'error'
+                    );
+                }
+            } catch (error) {
+                showResult(
+                    '❌ 获取失败\n\n' +
+                    '错误: ' + error.message,
+                    'error'
+                );
+            }
+        }
+
+        // 页面加载时自动测试
+        window.onload = function() {
+            testConnection();
+        };
+    </script>
+</body>
+</html>
+
+
+

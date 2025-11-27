@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>七彩西藏旅游 - Colorful Tibet Tourism</title>
+    <!-- 高德地图安全密钥配置（必须在加载地图API之前） -->
+    <script type="text/javascript">
+      window._AMapSecurityConfig = {
+        securityJsCode: "745455a6d68cc4c31928c7a60fd11d0c",
+      };
+    </script>
+    <!-- 高德地图 JS API -->
+    <script
+      type="text/javascript"
+      src="https://webapi.amap.com/maps?v=2.0&key=329d4cce7166c0e9644f064f96cad55c"
+    ></script>
+    <!-- 过滤高德地图 Canvas 性能警告（开发环境） -->
+    <script type="text/javascript">
+      // 拦截 console.warn 来过滤高德地图的 Canvas 性能警告
+      if (typeof console !== 'undefined' && console.warn) {
+        const originalWarn = console.warn;
+        console.warn = function(...args) {
+          const message = args.join(' ');
+          // 过滤掉 Canvas2D willReadFrequently 相关的警告
+          if (message.includes('willReadFrequently') || 
+              message.includes('getImageData') ||
+              (message.includes('Canvas2D') && message.includes('faster'))) {
+            return; // 不输出这个警告
+          }
+          originalWarn.apply(console, args);
+        };
+      }
+    </script>
+</head>
+
+<body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+</body>
+
+</html>

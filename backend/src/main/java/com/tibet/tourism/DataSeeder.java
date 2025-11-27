@@ -1,0 +1,288 @@
+package com.tibet.tourism;
+
+import com.tibet.tourism.entity.*;
+import com.tibet.tourism.repository.*;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Component;
+
+import java.math.BigDecimal;
+import java.util.Arrays;
+import java.util.List;
+
+@Component
+public class DataSeeder implements CommandLineRunner {
+    private static final String SPOT_IMAGE_BASE = "/images/spots/";
+
+    @Autowired
+    private UserRepository userRepository;
+    @Autowired
+    private ScenicSpotRepository spotRepository;
+    @Autowired
+    private SpotTagRepository tagRepository;
+    @Autowired
+    private UserVisitHistoryRepository historyRepository;
+    @Autowired
+    private NewsRepository newsRepository;
+    @Autowired
+    private HeritageItemRepository heritageRepository;
+    
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    @Override
+    public void run(String... args) throws Exception {
+        seedUsers();
+        
+        // 清空现有景点数据并重新加载
+        long spotCount = spotRepository.count();
+        if (spotCount > 0) {
+            System.out.println("清空现有景点数据...");
+            spotRepository.deleteAll();
+        }
+        
+        System.out.println("加载新景点数据...");
+        seedSpots();
+        
+        if (newsRepository.count() == 0) {
+            seedNews();
+        }
+        if (heritageRepository.count() == 0) {
+            seedHeritage();
+        }
+        if (historyRepository.count() == 0) {
+            seedHistory();
+        }
+    }
+
+    private void seedUsers() {
+        // 创建或更新 admin 用户
+        userRepository.findByUsername("admin").ifPresentOrElse(
+            existing -> {
+                // 如果密码未加密（长度小于20，BCrypt hash通常更长），则更新
+                if (existing.getPassword().length() < 20) {
+                    existing.setPassword(passwordEncoder.encode("admin123"));
+                    userRepository.save(existing);
+                    System.out.println("已更新 admin 用户密码");
+                }
+            },
+            () -> {
+                User admin = new User();
+                admin.setUsername("admin");
+                admin.setPassword(passwordEncoder.encode("admin123"));
+                admin.setRole(User.Role.ADMIN);
+                admin.setNickname("管理员");
+                userRepository.save(admin);
+                System.out.println("已创建 admin 用户");
+            }
+        );
+
+        // 创建或更新 lzh 超级管理员
+        userRepository.findByUsername("lzh").ifPresentOrElse(
+            existing -> {
+                if (existing.getPassword().length() < 20) {
+                    existing.setPassword(passwordEncoder.encode("031224"));
+                    userRepository.save(existing);
+                    System.out.println("已更新 lzh 用户密码");
+                }
+            },
+            () -> {
+                User superAdmin = new User();
+                superAdmin.setUsername("lzh");
+                superAdmin.setPassword(passwordEncoder.encode("031224"));
+                superAdmin.setRole(User.Role.ADMIN);
+                superAdmin.setNickname("超级管理员");
+                userRepository.save(superAdmin);
+                System.out.println("已创建 lzh 用户");
+            }
+        );
+
+        // 创建或更新 user1
+        userRepository.findByUsername("user1").ifPresentOrElse(
+            existing -> {
+                if (existing.getPassword().length() < 20) {
+                    existing.setPassword(passwordEncoder.encode("123456"));
+                    userRepository.save(existing);
+                    System.out.println("已更新 user1 用户密码");
+                }
+            },
+            () -> {
+                User user1 = new User();
+                user1.setUsername("user1");
+                user1.setPassword(passwordEncoder.encode("123456"));
+                user1.setNickname("扎西");
+                userRepository.save(user1);
+                System.out.println("已创建 user1 用户");
+            }
+        );
+
+        // 创建或更新 user2
+        userRepository.findByUsername("user2").ifPresentOrElse(
+            existing -> {
+                if (existing.getPassword().length() < 20) {
+                    existing.setPassword(passwordEncoder.encode("123456"));
+                    userRepository.save(existing);
+                    System.out.println("已更新 user2 用户密码");
+                }
+            },
+            () -> {
+                User user2 = new User();
+                user2.setUsername("user2");
+                user2.setPassword(passwordEncoder.encode("123456"));
+                user2.setNickname("卓玛");
+                userRepository.save(user2);
+                System.out.println("已创建 user2 用户");
+            }
+        );
+    }
+
+    private void seedSpots() {
+        // 热门景点（点击量较高）
+        createSpot("布达拉宫", "世界海拔最高的宫堡式建筑群，藏传佛教圣地。", ScenicSpot.Category.CULTURAL, "200", "29.6578", "91.1172", spotImage("布达拉宫.jpg"), Arrays.asList("宫殿", "佛教", "世界遗产"), 15000 + 5000);
+        createSpot("大昭寺", "拉萨老城中心，藏传佛教至高殿堂。", ScenicSpot.Category.CULTURAL, "85", "29.6533", "91.1322", spotImage("大昭寺.jpg"), Arrays.asList("寺庙", "佛教", "朝圣"), 15000 + 4500);
+        createSpot("纳木错", "西藏第二大湖泊，三大圣湖之一。", ScenicSpot.Category.NATURAL, "120", "30.7667", "90.5667", spotImage("纳木错.jpg"), Arrays.asList("湖泊", "自然", "圣湖"), 15000 + 4000);
+        createSpot("羊卓雍措", "三大圣湖之一，湖水蓝如宝石。", ScenicSpot.Category.NATURAL, "60", "28.9333", "90.6833", spotImage("羊卓雍措.jpg"), Arrays.asList("湖泊", "自然", "圣湖"), 15000 + 3800);
+        createSpot("罗布林卡", "历代达赖喇嘛的夏宫。", ScenicSpot.Category.CULTURAL, "60", "29.6483", "91.1033", spotImage("罗布林卡.jpg"), Arrays.asList("园林", "世界遗产", "拉萨"), 15000 + 3500);
+        createSpot("巴松措", "林芝红教神湖。", ScenicSpot.Category.NATURAL, "120", "29.9167", "93.8667", spotImage("巴松措.jpg"), Arrays.asList("湖泊", "森林", "5A景区"), 15000 + 3200);
+        createSpot("雅鲁藏布江大峡谷", "世界最深峡谷。", ScenicSpot.Category.NATURAL, "290", "29.6000", "95.0000", spotImage("雅鲁藏布江大峡谷.jpg"), Arrays.asList("峡谷", "自然", "林芝"), 15000 + 3000);
+        createSpot("哲蚌寺", "拉萨三大寺之一，规模宏大。", ScenicSpot.Category.CULTURAL, "50", "29.6747", "91.0469", spotImage("哲蚌寺.jpg"), Arrays.asList("寺庙", "佛教", "拉萨"), 15000 + 2800);
+        createSpot("色拉寺", "以辩经闻名的寺庙。", ScenicSpot.Category.CULTURAL, "50", "29.6956", "91.1336", spotImage("色拉寺.jpg"), Arrays.asList("寺庙", "佛教", "辩经"), 15000 + 2600);
+        createSpot("羊八井地热温泉", "世界最高地热温泉。", ScenicSpot.Category.NATURAL, "98", "30.0933", "90.5267", spotImage("羊八井地热温泉.jpg"), Arrays.asList("温泉", "自然", "拉萨"), 15000 + 2400);
+        
+        // 中等热门景点
+        createSpot("珠穆朗玛峰", "世界最高峰，海拔8848米。", ScenicSpot.Category.NATURAL, "180", "28.1433", "86.8533", spotImage("珠穆朗玛峰.jpg"), Arrays.asList("雪山", "探险", "世界之巅"), 15000 + 2200);
+        createSpot("南迦巴瓦峰", "林芝最高峰，中国最美山峰。", ScenicSpot.Category.NATURAL, "0", "29.6297", "95.0503", spotImage("南迦巴瓦峰.jpg"), Arrays.asList("雪山", "林芝", "自然"), 15000 + 2000);
+        createSpot("鲁朗林海", "西藏江南，森林氧吧。", ScenicSpot.Category.NATURAL, "90", "29.7333", "94.7333", spotImage("鲁朗林海.jpg"), Arrays.asList("森林", "自然", "林芝"), 15000 + 1800);
+        createSpot("然乌湖", "西藏东部最大冰川湖。", ScenicSpot.Category.NATURAL, "0", "29.4333", "96.8167", spotImage("然乌湖.jpg"), Arrays.asList("湖泊", "自然", "昌都"), 15000 + 1600);
+        createSpot("扎什伦布寺", "日喀则最大寺庙，格鲁派四大寺之一。", ScenicSpot.Category.CULTURAL, "100", "29.2667", "88.8833", spotImage("扎什伦布寺.jpg"), Arrays.asList("寺庙", "佛教", "日喀则"), 15000 + 1500);
+        createSpot("桑耶寺", "西藏第一座寺庙。", ScenicSpot.Category.CULTURAL, "45", "29.2500", "91.5333", spotImage("桑耶寺.jpg"), Arrays.asList("寺庙", "历史", "山南"), 15000 + 1400);
+        createSpot("米堆冰川", "中国最美冰川之一。", ScenicSpot.Category.NATURAL, "50", "29.4500", "96.5000", spotImage("米堆冰川.jpg"), Arrays.asList("冰川", "自然", "波密"), 15000 + 1300);
+        createSpot("墨脱", "中国最后通公路的县。", ScenicSpot.Category.NATURAL, "160", "29.3250", "95.3333", spotImage("墨脱.png"), Arrays.asList("秘境", "热带雨林", "林芝"), 15000 + 1200);
+        createSpot("雍布拉康", "西藏第一座宫殿。", ScenicSpot.Category.HISTORICAL, "60", "29.3167", "91.7667", spotImage("雍布拉康.png"), Arrays.asList("宫殿", "历史", "山南"), 15000 + 1100);
+        createSpot("甘丹寺", "格鲁派第一座寺庙。", ScenicSpot.Category.CULTURAL, "45", "29.7567", "91.4756", spotImage("甘丹寺.jpg"), Arrays.asList("寺庙", "佛教", "格鲁派"), 15000 + 1000);
+        
+        // 较冷门景点
+        createSpot("冈仁波齐", "藏传佛教公认的神山。", ScenicSpot.Category.CULTURAL, "150", "31.0667", "81.3125", spotImage("冈仁波齐.jpg"), Arrays.asList("神山", "朝圣", "阿里"), 15000 + 900);
+        createSpot("玛旁雍措", "三大圣湖之一，透明度极高。", ScenicSpot.Category.NATURAL, "150", "30.6667", "81.4667", spotImage("玛旁雍措.jpg"), Arrays.asList("湖泊", "圣湖", "阿里"), 15000 + 800);
+        createSpot("卡若拉冰川", "距离公路最近的冰川。", ScenicSpot.Category.NATURAL, "50", "28.8867", "90.4133", spotImage("卡若拉冰川.jpg"), Arrays.asList("冰川", "自然", "日喀则"), 15000 + 700);
+        createSpot("来古冰川", "西藏最宽冰川之一。", ScenicSpot.Category.NATURAL, "30", "29.3000", "96.8333", spotImage("来古冰川.jpg"), Arrays.asList("冰川", "自然", "昌都"), 15000 + 600);
+        createSpot("拉姆拉错", "能看到前世今生的神湖。", ScenicSpot.Category.CULTURAL, "50", "29.0167", "92.9667", spotImage("拉姆拉错.png"), Arrays.asList("圣湖", "神秘", "山南"), 15000 + 500);
+        createSpot("萨迦寺", "萨迦派主寺，藏有大量经书。", ScenicSpot.Category.CULTURAL, "45", "28.9000", "88.0167", spotImage("萨迦寺.jpg"), Arrays.asList("寺庙", "佛教", "日喀则"), 15000 + 400);
+        createSpot("古格王国遗址", "神秘的古格文明遗址。", ScenicSpot.Category.HISTORICAL, "65", "31.4833", "79.8000", spotImage("古格王国遗址.jpeg"), Arrays.asList("遗址", "历史", "阿里"), 15000 + 300);
+        createSpot("扎达土林", "世界罕见的土林奇观。", ScenicSpot.Category.NATURAL, "0", "31.4833", "79.8000", spotImage("扎达土林.png"), Arrays.asList("地质奇观", "自然", "阿里"), 15000 + 200);
+        createSpot("纳木那尼峰", "海拔7694米的圣母之山。", ScenicSpot.Category.NATURAL, "0", "30.4333", "81.3000", spotImage("纳木那尼峰.png"), Arrays.asList("雪山", "阿里", "自然"), 15000 + 100);
+        createSpot("当惹雍错", "苯教崇拜的最大圣湖。", ScenicSpot.Category.NATURAL, "0", "31.0000", "86.6333", spotImage("当惹雍错.png"), Arrays.asList("湖泊", "苯教", "那曲"), 15000 + 50);
+    }
+
+    private void createSpot(String name, String desc, ScenicSpot.Category category, String price, String lat, String lng, String imgUrl, List<String> tags, int visitCount) {
+        ScenicSpot spot = new ScenicSpot();
+        spot.setName(name);
+        spot.setDescription(enrichDescription(name, desc, category));
+        spot.setCategory(category);
+        spot.setTicketPrice(new BigDecimal(price));
+        spot.setLatitude(new BigDecimal(lat));
+        spot.setLongitude(new BigDecimal(lng));
+        spot.setImageUrl(imgUrl);
+        spot.setVisitCount(visitCount);  // 使用传入的点击量值（以15000为基准+差异）
+        spot = spotRepository.save(spot);
+        
+        for (String tagName : tags) {
+            createTag(spot, tagName);
+        }
+    }
+
+    private void createTag(ScenicSpot spot, String tagName) {
+        SpotTag tag = new SpotTag();
+        tag.setSpot(spot);
+        tag.setTag(tagName);
+        tagRepository.save(tag);
+    }
+
+    private String spotImage(String filename) {
+        return SPOT_IMAGE_BASE + filename;
+    }
+
+    private String enrichDescription(String name, String baseDesc, ScenicSpot.Category category) {
+        StringBuilder builder = new StringBuilder();
+        builder.append(baseDesc).append(" ");
+        switch (category) {
+            case NATURAL:
+                builder.append(name)
+                        .append("以纯粹的自然气息著称，雪山、湖泊与草甸在同一视野里交织，云海与日照金山常在此上演，适合徒步、摄影与深度观景。 ");
+                break;
+            case CULTURAL:
+                builder.append(name)
+                        .append("承载着藏传文化的精神脉络，殿堂、壁画与法器层层铺陈，僧侣的梵音与转经的脚步在此交织，游客可静心感受信仰的力量。 ");
+                break;
+            case HISTORICAL:
+            default:
+                builder.append(name)
+                        .append("诉说着横跨数百年的历史，遗址与建筑记录着王朝更迭与民间传说，石刻与壁画仍在讲述那段璀璨的高原文明。 ");
+                break;
+        }
+        builder.append("清晨或黄昏是拍摄的黄金时刻，阳光在高原稀薄空气里折射出柔和色彩，连普通手机也能拍出电影感大片。 ");
+        builder.append("景区周边设有补给点与观景平台，慢行路线让旅人能够在不急不躁的节奏里调匀呼吸，逐步适应海拔变化。 ");
+        builder.append("建议提前预订门票或向导，并准备保暖衣物、防晒与能量补给，尊重当地生态与宗教礼仪，让这一段旅程更从容圆满。 ");
+
+        String extra = "热爱探索的你也可以延伸行程，串联周边村落与小众景观点，在真实的日常里理解西藏的烟火气。 ";
+        while (builder.length() < 220) {
+            builder.append(extra);
+        }
+        return builder.toString();
+    }
+
+    private void seedNews() {
+        createNews("西藏旅游旺季到来", "布达拉宫门票需提前预约。", News.Category.NOTICE, "https://images.unsplash.com/photo-1545569341-9eb8b30979d9?w=600&q=50");
+        createNews("林芝桃花节开幕", "漫山遍野的桃花盛开。", News.Category.EVENT, "https://images.unsplash.com/photo-1528164344705-47542687000d?w=600&q=50");
+        createNews("冬游西藏优惠政策", "A级景区免门票。", News.Category.POLICY, "https://images.unsplash.com/photo-1518020382113-a7e8fc38eac9?w=600&q=50");
+    }
+
+    private void createNews(String title, String content, News.Category category, String imgUrl) {
+        News news = new News();
+        news.setTitle(title);
+        news.setContent(content);
+        news.setCategory(category);
+        news.setImageUrl(imgUrl);
+        news.setViewCount(100 + (int)(Math.random() * 1000));
+        newsRepository.save(news);
+    }
+
+    private void seedHeritage() {
+        createHeritage("藏戏", "藏族戏剧，以面具表演为特色。", "表演艺术", "https://images.unsplash.com/photo-1514316454349-750a7fd3da3a?w=600&q=50");
+        createHeritage("唐卡", "藏族绘画艺术，色彩鲜明。", "传统美术", "https://images.unsplash.com/photo-1578320662939-563635f76451?w=600&q=50");
+    }
+
+    private void createHeritage(String name, String desc, String category, String imgUrl) {
+        HeritageItem item = new HeritageItem();
+        item.setName(name);
+        item.setDescription(desc);
+        item.setCategory(category);
+        item.setImageUrl(imgUrl);
+        heritageRepository.save(item);
+    }
+
+    private void seedHistory() {
+        User user1 = userRepository.findByUsername("user1").get();
+        List<ScenicSpot> spots = spotRepository.findAll();
+        
+        if (!spots.isEmpty()) {
+            createHistory(user1, spots.get(0), 5, 6, 240);
+            createHistory(user1, spots.get(1), 4, 3, 120);
+            
+            User user2 = userRepository.findByUsername("user2").get();
+            createHistory(user2, spots.get(2), 5, 8, 360);
+            createHistory(user2, spots.get(3), 5, 2, 90);
+        }
+    }
+
+    private void createHistory(User user, ScenicSpot spot, Integer rating, Integer clickCount, Integer dwellSeconds) {
+        UserVisitHistory history = new UserVisitHistory();
+        history.setUser(user);
+        history.setSpot(spot);
+        history.setRating(rating);
+        history.setClickCount(clickCount);
+        history.setDwellSeconds(dwellSeconds);
+        historyRepository.save(history);
+    }
+}
