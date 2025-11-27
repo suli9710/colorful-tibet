@@ -1,0 +1,78 @@
+# 生产环境配置示例
+# 使用方式：在启动时添加 -Dspring.profiles.active=prod
+
+server:
+  port: 8080
+
+spring:
+  application:
+    name: colorful-tibet-tourism
+  mvc:
+    async:
+      request-timeout: 120000
+  datasource:
+    url: jdbc:mysql://localhost:3306/tibet_tourism?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai
+    username: ${DB_USERNAME:tibet_user}
+    password: ${DB_PASSWORD:your_strong_password}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+  jpa:
+    database-platform: org.hibernate.dialect.MySQL8Dialect
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+        jdbc:
+          batch_size: 20
+        order_inserts: true
+        order_updates: true
+  h2:
+    console:
+      enabled: false
+
+# 日志配置
+logging:
+  level:
+    root: INFO
+    com.tibet.tourism: INFO
+  file:
+    name: /opt/colorful-tibet/logs/backend.log
+  pattern:
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+# 豆包API配置
+doubao:
+  api:
+    url: ${DOUBAO_API_URL:https://ark.cn-beijing.volces.com/api/v3/chat/completions}
+    key: ${DOUBAO_API_KEY:your-doubao-api-key}
+    model: ${DOUBAO_MODEL:your-model-name}
+
+# 价格定时更新配置
+price:
+  update:
+    enabled: true
+    force: false
+    cron: "0 0 2 * * ?"
+    weekly:
+      cron: "0 0 3 ? * MON"
+    hourly:
+      cron: "0 0 * * * ?"
+
+# JWT配置（如果需要）
+jwt:
+  secret: ${JWT_SECRET:your-jwt-secret-key-change-in-production}
+  expiration: 86400000  # 24小时
+
+
+
+
+
+
