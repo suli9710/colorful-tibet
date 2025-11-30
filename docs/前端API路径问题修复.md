@@ -57,17 +57,17 @@ EOF
 cd /opt/colorful-tibet
 
 # 停止服务
-docker-compose down
+docker compose down
 
 # 删除旧容器和镜像
 docker rm colorful-tibet-frontend 2>/dev/null || true
 docker rmi colorful-tibet-frontend 2>/dev/null || true
 
 # 重新构建（确保使用 .env 中的环境变量）
-docker-compose build --no-cache frontend
+docker compose build --no-cache frontend
 
 # 启动服务
-docker-compose up -d
+docker compose up -d
 
 # 等待服务启动
 sleep 5
@@ -110,8 +110,8 @@ docker exec colorful-tibet-frontend sh -c "grep -r 'baseURL' /usr/share/nginx/ht
 ### 检查环境变量传递
 
 ```bash
-# 检查 docker-compose 配置
-docker-compose config | grep VITE_API_BASE_URL
+# 检查 docker compose 配置
+docker compose config | grep VITE_API_BASE_URL
 
 # 检查构建时的环境变量（需要在构建过程中）
 # 在 Dockerfile 中添加：RUN echo "VITE_API_BASE_URL=$VITE_API_BASE_URL"
@@ -153,11 +153,11 @@ git pull
 cat .env | grep VITE_API_BASE_URL || echo "VITE_API_BASE_URL=/api" >> .env
 
 # 4. 重新构建
-docker-compose down
+docker compose down
 docker rm colorful-tibet-frontend 2>/dev/null || true
 docker rmi colorful-tibet-frontend 2>/dev/null || true
-docker-compose build --no-cache frontend
-docker-compose up -d
+docker compose build --no-cache frontend
+docker compose up -d
 
 # 5. 验证
 sleep 5
