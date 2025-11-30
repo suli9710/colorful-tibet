@@ -16,7 +16,18 @@ public class HeritageController {
     private HeritageService heritageService;
 
     @GetMapping
-    public List<HeritageItem> getAllItems() {
-        return heritageService.getAllItems();
+    public List<HeritageItem> getAllItems(@RequestParam(required = false, defaultValue = "zh") String locale) {
+        List<HeritageItem> items = heritageService.getAllItems();
+        if ("bo".equals(locale)) {
+            items.forEach(item -> {
+                if (item.getNameTibetan() != null && !item.getNameTibetan().isEmpty()) {
+                    item.setName(item.getNameTibetan());
+                }
+                if (item.getDescriptionTibetan() != null && !item.getDescriptionTibetan().isEmpty()) {
+                    item.setDescription(item.getDescriptionTibetan());
+                }
+            });
+        }
+        return items;
     }
 }

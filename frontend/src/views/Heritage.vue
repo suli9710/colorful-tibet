@@ -2,13 +2,12 @@
   <div class="min-h-screen bg-stone-50 py-12">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="text-center mb-10">
-        <h1 class="text-4xl font-bold text-stone-800 mb-4">西藏非物质文化遗产</h1>
+        <h1 class="text-4xl font-bold text-stone-800 mb-4">{{ t('heritage.title') }}</h1>
         <p class="text-lg text-stone-600 max-w-3xl mx-auto mb-3">
-          西藏非物质文化遗产是雪域高原几千年文明积淀下来的“活态记忆”，
-          既承载着独特的宗教信仰与生活方式，也见证着中华文明多元一体的发展历程。
+          {{ t('heritage.description') }}
         </p>
         <p class="text-sm text-stone-500 max-w-3xl mx-auto">
-          通过保护和传承非遗，我们不仅守护了西藏的文化根脉，也为世界了解中国、了解西藏提供了一扇独特窗口。
+          {{ t('heritage.description2') }}
         </p>
       </div>
 
@@ -19,15 +18,15 @@
           <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-8">
             <div>
               <h2 class="text-xl sm:text-2xl font-bold text-stone-900 mb-1">
-                国家级非物质文化遗产代表性项目大类
+                {{ t('heritage.categoriesTitle') }}
               </h2>
               <p class="text-sm sm:text-base text-stone-500 max-w-2xl">
-                按照国家级非遗名录的划分，将西藏相关项目归入若干大类，方便你从不同维度走近这片高原的“活态文化”。
+                {{ t('heritage.categoriesDescription') }}
               </p>
             </div>
             <div class="flex items-center gap-2">
               <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-100">
-                共 {{ heritageCategories.length }} 个大类
+                {{ t('heritage.totalCategories', { count: heritageCategories.length }) }}
               </span>
             </div>
           </div>
@@ -63,7 +62,7 @@
                     {{ category.name }}
                   </p>
                   <p class="text-xs text-stone-400 mt-0.5">
-                    点击展开，在卡片内滑动查看该大类下的国家级非遗项目
+                    {{ t('heritage.clickToExpand') }}
                   </p>
                 </div>
               </div>
@@ -74,7 +73,7 @@
                 class="mt-1 w-full rounded-xl bg-white border border-red-100/70 px-3 py-2 max-h-44 overflow-y-auto text-xs sm:text-sm text-stone-700 space-y-2"
               >
                 <p class="text-[11px] text-stone-400">
-                  国家级非遗项目 · {{ getItemsByCategory(category.name).length }} 项
+                  {{ t('heritage.nationalItems') }} · {{ getItemsByCategory(category.name).length }} {{ t('heritage.items') }}
                 </p>
                 <div
                   v-for="item in getItemsByCategory(category.name)"
@@ -92,7 +91,7 @@
                   v-if="!getItemsByCategory(category.name).length"
                   class="text-[11px] text-stone-400"
                 >
-                  这一大类在当前名录数据中暂未整理出具体项目，后续可以在后台补充。
+                  {{ t('heritage.noItemsInCategory') }}
                 </p>
               </div>
             </button>
@@ -103,9 +102,9 @@
       <!-- 代表性非遗项目：上来先展示几个可以点击的典型案例 -->
       <section v-if="!loading && heritageItems.length" class="mb-12">
         <div class="flex items-center justify-between mb-4">
-          <h2 class="text-2xl font-bold text-stone-800">代表性非遗项目</h2>
+          <h2 class="text-2xl font-bold text-stone-800">{{ t('heritage.representativeTitle') }}</h2>
           <p class="text-sm text-stone-500 hidden md:block">
-            从众多非遗中精选出几项最具代表性的项目，点击卡片即可了解它们背后的故事。
+            {{ t('heritage.representativeDescription') }}
           </p>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -127,7 +126,7 @@
               {{ item.description }}
             </p>
             <span class="inline-flex items-center text-sm font-medium text-red-600">
-              了解详情
+              {{ t('heritage.viewDetails') }}
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 class="h-4 w-4 ml-1"
@@ -179,7 +178,7 @@
             </button>
             <div class="absolute bottom-4 left-4 bg-black/45 backdrop-blur px-4 py-2 rounded-xl">
               <p class="text-xs text-red-100 font-medium mb-1">
-                {{ selectedItem.category || '代表性非遗项目' }}
+                {{ selectedItem.category || t('heritage.representativeTitle') }}
               </p>
               <h3 class="text-xl md:text-2xl font-bold text-white">
                 {{ selectedItem.name }}
@@ -191,21 +190,21 @@
           <div class="px-6 py-5 text-sm text-stone-700 space-y-5 max-h-[65vh] overflow-y-auto">
             <div class="space-y-4">
               <p class="text-[13px] text-stone-500">
-                下面的文字可以在后台按项目进行更精细的补充，这里将基础说明拆成故事性更强的段落展示。
+                {{ t('heritage.detailNote') }}
               </p>
 
               <div class="space-y-2">
                 <h4 class="text-sm font-semibold text-stone-900">
-                  基本介绍
+                  {{ t('heritage.basicIntroduction') }}
                 </h4>
                 <p class="leading-relaxed whitespace-pre-line">
-                  {{ selectedItem.description || '暂无详细介绍，后续可在后台完善这一项目的说明。' }}
+                  {{ selectedItem.description || t('heritage.noDetailedDescription') }}
                 </p>
               </div>
 
               <div v-if="selectedItem.originStory" class="space-y-2">
                 <h4 class="text-sm font-semibold text-stone-900">
-                  形成渊源与传说
+                  {{ t('heritage.originStory') }}
                 </h4>
                 <p class="leading-relaxed whitespace-pre-line">
                   {{ selectedItem.originStory }}
@@ -214,7 +213,7 @@
 
               <div v-if="selectedItem.significance" class="space-y-2 border-t border-dashed border-stone-200 pt-3">
                 <h4 class="text-sm font-semibold text-stone-900">
-                  文化价值与当代意义
+                  {{ t('heritage.culturalValue') }}
                 </h4>
                 <p class="text-stone-700 text-sm leading-relaxed whitespace-pre-line">
                   {{ selectedItem.significance }}
@@ -225,7 +224,7 @@
                 v-if="!selectedItem.originStory && !selectedItem.significance"
                 class="text-xs text-stone-400 border-t border-dashed border-stone-200 pt-3"
               >
-                当前显示的是基础简介，后续可以在后台为该项目补充更完整的“渊源故事”和“文化价值”等字段，让游客对非遗有更立体的理解。
+                {{ t('heritage.basicDescriptionNote') }}
               </p>
             </div>
 
@@ -234,14 +233,14 @@
               <div class="flex items-center justify-between gap-2 mb-3">
                 <div>
                   <h4 class="text-sm font-semibold text-stone-900">
-                    线下体验 · 西藏本地推荐打卡点
+                    {{ t('heritage.offlineExperience') }}
                   </h4>
                   <p class="text-[12px] text-stone-500 mt-0.5">
-                    找一家离你最近的体验店，现场感受 {{ selectedItem.name }} 背后的技艺与故事。
+                    {{ t('heritage.experienceDescription', { name: selectedItem.name }) }}
                   </p>
                 </div>
                 <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-red-50 text-red-700 border border-red-100">
-                  共 {{ experienceSpots.length }} 处体验点
+                  {{ t('heritage.totalExperienceSpots', { count: experienceSpots.length }) }}
                 </span>
               </div>
 
@@ -250,10 +249,17 @@
                 <div class="md:col-span-2 relative rounded-xl overflow-hidden border border-stone-200 min-h-[220px] bg-stone-100">
                   <div ref="mapContainer" class="w-full h-full min-h-[220px]"></div>
                   <!-- 地图加载提示 -->
-                  <div v-if="mapLoading" class="absolute inset-0 flex items-center justify-center bg-stone-100/90 backdrop-blur-sm z-20">
+                  <div v-if="mapLoading && !mapError" class="absolute inset-0 flex items-center justify-center bg-stone-100/90 backdrop-blur-sm z-20">
                     <div class="text-center">
                       <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-red-500 mx-auto mb-2"></div>
-                      <p class="text-xs text-stone-600">地图加载中...</p>
+                      <p class="text-xs text-stone-600">{{ t('heritage.mapLoading') }}</p>
+                    </div>
+                  </div>
+                  <!-- 地图加载失败提示 -->
+                  <div v-if="mapError" class="absolute inset-0 flex items-center justify-center bg-stone-100/90 backdrop-blur-sm z-20">
+                    <div class="text-center px-4">
+                      <p class="text-xs text-stone-600 mb-2">{{ t('heritage.mapLoadFailed') }}</p>
+                      <p class="text-xs text-stone-500">{{ t('heritage.checkRightList') }}</p>
                     </div>
                   </div>
                   <!-- 地图标题覆盖层 -->
@@ -262,7 +268,7 @@
                       Tibet Experience Map
                     </p>
                     <p class="text-sm font-semibold text-white">
-                      西藏体验店分布
+                      {{ t('heritage.experienceSpotsDistribution') }}
                     </p>
                   </div>
                   <!-- 图例 -->
@@ -270,11 +276,11 @@
                     <div class="flex items-center gap-2 text-[11px]">
                       <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-black/35 backdrop-blur text-white">
                         <span class="inline-block w-1.5 h-1.5 rounded-full bg-emerald-300"></span>
-                        体验店
+                        {{ t('heritage.experienceShop') }}
                       </span>
                       <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-black/35 backdrop-blur text-white">
                         <span class="inline-block w-1.5 h-1.5 rounded-full bg-amber-300"></span>
-                        文化空间
+                        {{ t('heritage.culturalSpace') }}
                       </span>
                     </div>
                   </div>
@@ -310,7 +316,7 @@
                         target="_blank"
                         rel="noopener"
                       >
-                        导航前往
+                        {{ t('heritage.navigate') }}
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
                           class="h-3.5 w-3.5 ml-0.5"
@@ -323,7 +329,7 @@
                       </a>
                       <span class="inline-flex items-center gap-0.5 text-[10px] text-stone-400">
                         <span class="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400/80"></span>
-                        打卡 {{ spot.highlight }}
+                        {{ t('heritage.checkIn') }} {{ spot.highlight }}
                       </span>
                     </div>
                   </div>
@@ -343,49 +349,52 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch, nextTick } from 'vue'
+import { useI18n } from 'vue-i18n'
 import api, { endpoints } from '../api'
+
+const { t, locale } = useI18n()
 
 const cardsEntered = ref(false)
 
-const heritageCategories = [
+const heritageCategories = computed(() => [
   {
-    name: '民间文学',
-    prefix: '民间文学',
+    name: t('heritage.category.folkLiterature'),
+    prefix: t('heritage.category.folkLiterature'),
     icon: '📜',
     layout: 'lg:-mt-4 lg:ml-4 z-20'
   },
   {
-    name: '传统音乐',
-    prefix: '传统音乐',
+    name: t('heritage.category.traditionalMusic'),
+    prefix: t('heritage.category.traditionalMusic'),
     icon: '🥁',
     layout: 'lg:mt-8 z-30'
   },
   {
-    name: '传统舞蹈',
-    prefix: '传统舞蹈',
+    name: t('heritage.category.traditionalDance'),
+    prefix: t('heritage.category.traditionalDance'),
     icon: '💃',
     layout: 'lg:-mt-10 lg:-mr-4 z-40'
   },
   {
-    name: '传统戏剧',
-    prefix: '传统戏剧',
+    name: t('heritage.category.traditionalDrama'),
+    prefix: t('heritage.category.traditionalDrama'),
     icon: '🎭',
     layout: 'lg:-mt-2 lg:ml-8 z-30'
   },
   {
-    name: '传统体育·游艺与杂技',
-    prefix: '传统体育·游艺与杂技',
+    name: t('heritage.category.traditionalSports'),
+    prefix: t('heritage.category.traditionalSports'),
     icon: '🏹',
     layout: 'lg:mt-10 z-20'
   },
   {
-    name: '传统技艺',
-    prefix: '传统技艺',
+    name: t('heritage.category.traditionalCraft'),
+    prefix: t('heritage.category.traditionalCraft'),
     icon: '🧶',
     layout: 'lg:-mt-6 lg:-mr-6 z-30'
   }
-]
+])
 
 interface HeritageItem {
   id: number
@@ -405,8 +414,9 @@ const selectedItem = ref<HeritageItem | null>(null)
 // 地图相关
 const mapContainer = ref<HTMLElement | null>(null)
 const mapLoading = ref(true)
-let map: L.Map | null = null
-let markers: L.Marker[] = []
+const mapError = ref(false) // 地图加载失败标志
+let map: any = null
+let markers: any[] = []
 
 interface ExperienceSpot {
   name: string
@@ -684,6 +694,7 @@ const getItemsByCategory = (categoryName: string): NationalHeritageItem[] => {
 
 const fetchHeritageItems = async () => {
   try {
+    // API拦截器会自动添加locale参数
     const response = await api.get(endpoints.heritage.list)
     heritageItems.value = response.data
   } catch (error) {
@@ -692,6 +703,11 @@ const fetchHeritageItems = async () => {
     loading.value = false
   }
 }
+
+// 监听语言变化，重新获取数据
+watch(locale, () => {
+  fetchHeritageItems()
+})
 
 const toggleCategory = (categoryName: string) => {
   activeCategory.value = activeCategory.value === categoryName ? null : categoryName
@@ -715,6 +731,191 @@ const handleImageError = (event: Event) => {
   // 如果图片加载失败，可以设置一个备用图片或隐藏图片
   img.style.display = 'none'
 }
+
+// 初始化高德地图
+const initMap = () => {
+  if (!mapContainer.value) {
+    console.warn('地图容器未找到')
+    mapLoading.value = false
+    return
+  }
+  
+  let retryCount = 0
+  const maxRetries = 20 // 最多重试20次（10秒）
+  
+  // 等待高德地图API加载完成
+  const checkAndInit = () => {
+    const AMap = (window as any).AMap
+    
+    if (!AMap) {
+      retryCount++
+      if (retryCount >= maxRetries) {
+        console.error('高德地图API加载超时，地图功能不可用')
+        mapError.value = true
+        mapLoading.value = false
+        return
+      }
+      // 如果高德地图API还没加载，等待一段时间后重试
+      setTimeout(() => {
+        checkAndInit()
+      }, 500)
+      return
+    }
+    
+    try {
+      console.log('开始初始化高德地图，容器:', mapContainer.value)
+      
+      // 创建地图实例，中心点设为拉萨
+      map = new AMap.Map(mapContainer.value, {
+        zoom: 6,
+        center: [91.117, 29.653], // 拉萨坐标 [经度, 纬度]
+        viewMode: '3D',
+        mapStyle: 'amap://styles/normal'
+      })
+      
+      console.log('地图实例创建成功')
+      
+      let mapComplete = false
+      
+      // 监听地图加载完成事件
+      map.on('complete', () => {
+        if (mapComplete) return // 防止重复触发
+        mapComplete = true
+        console.log('地图加载完成事件触发')
+        mapLoading.value = false
+        
+        // 添加体验点标记
+        try {
+          experienceSpots.forEach((spot) => {
+            try {
+              const marker = new AMap.Marker({
+                position: [spot.lng, spot.lat],
+                title: spot.name,
+                label: {
+                  content: `<div style="background: #ef4444; color: white; padding: 2px 6px; border-radius: 4px; font-size: 12px; white-space: nowrap;">${spot.tag}</div>`,
+                  direction: 'right',
+                  offset: [10, 0]
+                }
+              })
+              
+              // 添加信息窗口
+              const infoWindow = new AMap.InfoWindow({
+                content: `
+                  <div style="padding: 8px; min-width: 200px;">
+                    <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: bold;">${spot.name}</h3>
+                    <p style="margin: 4px 0; font-size: 12px; color: #666;">${spot.address}</p>
+                    <p style="margin: 4px 0; font-size: 12px; color: #666;">${spot.brief}</p>
+                    <p style="margin: 4px 0; font-size: 12px; color: #ef4444;">${spot.highlight}</p>
+                  </div>
+                `,
+                offset: [0, -30]
+              })
+              
+              marker.on('click', () => {
+                infoWindow.open(map, marker.getPosition())
+              })
+              
+              markers.push(marker)
+              map.add(marker)
+            } catch (markerError) {
+              console.error('添加标记失败:', markerError)
+            }
+          })
+          console.log('所有标记添加完成')
+        } catch (addMarkerError) {
+          console.error('添加标记过程出错:', addMarkerError)
+        }
+      })
+      
+      // 监听地图加载错误
+      map.on('error', (error: any) => {
+        console.error('地图加载错误:', error)
+        mapError.value = true
+        mapLoading.value = false
+      })
+      
+      // 检查地图状态，如果地图已经可用，立即隐藏加载提示
+      const checkMapStatus = () => {
+        try {
+          if (map && map.getStatus && map.getStatus() === 'complete') {
+            if (!mapComplete) {
+              console.log('地图状态检查：已加载完成')
+              mapComplete = true
+              mapLoading.value = false
+              // 触发添加标记
+              map.fire('complete')
+            }
+          }
+        } catch (e) {
+          // 忽略检查错误
+        }
+      }
+      
+      // 立即检查一次
+      setTimeout(checkMapStatus, 500)
+      
+      // 设置超时，如果5秒后还没加载完成，也隐藏加载提示（地图可能已经显示，只是事件没触发）
+      setTimeout(() => {
+        if (mapLoading.value && !mapComplete) {
+          console.warn('地图加载超时，但地图可能已显示，隐藏加载提示')
+          mapLoading.value = false
+          // 即使超时，也尝试添加标记
+          if (map) {
+            try {
+              experienceSpots.forEach((spot) => {
+                try {
+                  const marker = new AMap.Marker({
+                    position: [spot.lng, spot.lat],
+                    title: spot.name,
+                    label: {
+                      content: `<div style="background: #ef4444; color: white; padding: 2px 6px; border-radius: 4px; font-size: 12px; white-space: nowrap;">${spot.tag}</div>`,
+                      direction: 'right',
+                      offset: [10, 0]
+                    }
+                  })
+                  markers.push(marker)
+                  map.add(marker)
+                } catch (e) {
+                  // 忽略单个标记错误
+                }
+              })
+            } catch (e) {
+              console.error('超时后添加标记失败:', e)
+            }
+          }
+        }
+      }, 5000)
+      
+    } catch (error) {
+      console.error('地图初始化失败:', error)
+      mapError.value = true
+      mapLoading.value = false
+    }
+  }
+  
+  checkAndInit()
+}
+
+// 监听 selectedItem 变化，当地图容器出现时初始化地图
+watch(selectedItem, async (newItem) => {
+  if (newItem) {
+    // 等待DOM更新，确保地图容器已渲染
+    await nextTick()
+    // 再等待一小段时间确保容器完全渲染
+    setTimeout(() => {
+      initMap()
+    }, 100)
+  } else {
+    // 如果关闭了详情，清理地图
+    if (map) {
+      map.destroy()
+      map = null
+      markers = []
+    }
+    mapLoading.value = true
+    mapError.value = false
+  }
+})
 
 onMounted(() => {
   fetchHeritageItems()

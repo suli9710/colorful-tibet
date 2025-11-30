@@ -35,6 +35,7 @@ desktop.ini
 # Logs
 *.log
 logs/
+backend/logs/
 
 # Build outputs
 build/
@@ -46,4 +47,12 @@ out/
 *.temp
 *.bak
 *.cache
+
+# Database files (H2)
+backend/data/*.mv.db
+backend/data/*.trace.db
+backend/data/*.lock.db
+
+# FRP files (optional, can be committed if needed)
+# frp_0.65.0_windows_amd64/
 

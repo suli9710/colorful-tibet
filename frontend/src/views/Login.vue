@@ -7,23 +7,23 @@
 
     <div class="max-w-md w-full space-y-8 relative z-10 glass p-10 rounded-3xl animate-scale-in shadow-2xl gpu-accelerated">
       <div class="text-center animate-slide-up" style="animation-delay: 0.1s">
-        <h2 class="text-3xl font-bold text-white mb-2">欢迎回来</h2>
-        <p class="text-gray-200 animate-fade-in" style="animation-delay: 0.2s">登录您的七彩西藏账号</p>
+        <h2 class="text-3xl font-bold text-white mb-2">{{ t('login.welcomeBack') }}</h2>
+        <p class="text-gray-200 animate-fade-in" style="animation-delay: 0.2s">{{ t('login.subtitle') }}</p>
       </div>
       
       <form class="mt-8 space-y-6 animate-slide-up" style="animation-delay: 0.2s" @submit.prevent="handleLogin">
         <div class="rounded-md shadow-sm -space-y-px">
           <div class="mb-4 animate-slide-up" style="animation-delay: 0.3s">
-            <label for="username" class="sr-only">用户名</label>
+            <label for="username" class="sr-only">{{ t('login.username') }}</label>
             <input id="username" name="username" type="text" required v-model="form.username"
                    class="appearance-none rounded-xl relative block w-full px-4 py-3 border border-white/30 placeholder-gray-300 text-white bg-white/10 focus:outline-none focus:ring-2 focus:ring-apple-blue focus:border-transparent focus:z-10 sm:text-sm backdrop-blur-sm input-focus"
-                   placeholder="用户名">
+                   :placeholder="t('login.username')">
           </div>
           <div class="animate-slide-up" style="animation-delay: 0.4s">
-            <label for="password" class="sr-only">密码</label>
+            <label for="password" class="sr-only">{{ t('login.password') }}</label>
             <input id="password" name="password" type="password" required v-model="form.password"
                    class="appearance-none rounded-xl relative block w-full px-4 py-3 border border-white/30 placeholder-gray-300 text-white bg-white/10 focus:outline-none focus:ring-2 focus:ring-apple-blue focus:border-transparent focus:z-10 sm:text-sm backdrop-blur-sm input-focus"
-                   placeholder="密码">
+                   :placeholder="t('login.password')">
           </div>
         </div>
 
@@ -36,7 +36,7 @@
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
             </span>
-            <span class="relative z-10">{{ loading ? '登录中...' : '登录' }}</span>
+            <span class="relative z-10">{{ loading ? t('login.loggingIn') : t('common.login') }}</span>
             <span class="absolute inset-0 bg-gradient-to-r from-blue-400 to-purple-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300 ease-out-expo"></span>
           </button>
         </div>
@@ -44,9 +44,9 @@
       
       <div class="text-center mt-4 animate-fade-in" style="animation-delay: 0.6s">
         <p class="text-sm text-gray-200">
-          还没有账号？
+          {{ t('login.noAccount') }}
           <router-link to="/register" class="font-medium text-white hover:text-apple-blue transition-colors duration-300 ease-out-expo underline decoration-apple-blue/50 hover:decoration-apple-blue">
-            立即注册
+            {{ t('login.registerNow') }}
           </router-link>
         </p>
       </div>
@@ -57,7 +57,10 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import api from '../api'
+
+const { t } = useI18n()
 
 const router = useRouter()
 const loading = ref(false)
@@ -71,13 +74,36 @@ const handleLogin = async () => {
   try {
     const response = await api.post('/auth/login', form.value)
     const user = response.data
+    
+    // 确保token存在
+    if (!user.token) {
+      console.error('登录响应中缺少token:', response.data)
+      alert(t('login.loginFailed') + ' (缺少token)')
+      return
+    }
+    
+    // 保存用户信息到localStorage
     localStorage.setItem('user', JSON.stringify(user))
-    // Trigger a custom event or use a store to update NavBar state
-    window.dispatchEvent(new Event('storage')) 
-    router.push('/')
-  } catch (error) {
+    console.log('✅ 登录成功，用户信息已保存:', {
+      username: user.username,
+      role: user.role,
+      hasToken: !!user.token,
+      tokenLength: user.token?.length
+    })
+    
+    // 触发自定义事件，通知NavBar更新用户状态
+    window.dispatchEvent(new CustomEvent('user-updated'))
+    
+    // 如果是管理员，跳转到管理页面；否则跳转到首页
+    if (user.role === 'ADMIN') {
+      router.push('/admin')
+    } else {
+      router.push('/')
+    }
+  } catch (error: any) {
     console.error('Login failed:', error)
-    alert('登录失败，请检查用户名和密码')
+    const errorMsg = error.response?.data?.message || error.response?.data?.error || t('login.loginFailed')
+    alert(errorMsg)
   } finally {
     loading.value = false
   }

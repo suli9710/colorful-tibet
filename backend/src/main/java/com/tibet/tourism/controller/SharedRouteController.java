@@ -172,4 +172,18 @@ public class SharedRouteController {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
+
+    // 获取当前用户创建的路线列表
+    @GetMapping("/my-routes")
+    public ResponseEntity<?> getMyRoutes(HttpServletRequest request) {
+        try {
+            Long userId = getCurrentUserId(request);
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+            List<SharedRoute> routes = routeService.getRoutesByAuthor(user);
+            return ResponseEntity.ok(routes);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
 }

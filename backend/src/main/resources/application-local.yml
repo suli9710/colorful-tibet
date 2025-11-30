@@ -1,0 +1,73 @@
+# 本地部署配置（使用H2文件数据库，无需安装MySQL）
+# 使用方式：java -jar app.jar --spring.profiles.active=local
+
+server:
+  port: 8080
+  address: 0.0.0.0  # 允许局域网访问
+
+spring:
+  application:
+    name: colorful-tibet-tourism
+  mvc:
+    async:
+      request-timeout: 120000
+  datasource:
+    # 使用H2文件数据库，数据保存在 ./data/tibet_tourism.mv.db
+    # AUTO_SERVER=TRUE 允许多个连接同时访问
+    url: jdbc:h2:file:./data/tibet_tourism;AUTO_SERVER=TRUE;DB_CLOSE_DELAY=-1
+    username: sa
+    password: 
+    driver-class-name: org.h2.Driver
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: update  # 自动更新表结构，保留数据
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+  h2:
+    console:
+      enabled: true
+      path: /h2-console  # H2数据库控制台访问路径
+
+doubao:
+  api:
+    url: ${DOUBAO_API_URL:https://ark.cn-beijing.volces.com/api/v3/chat/completions}
+    key: ${DOUBAO_API_KEY:your-doubao-api-key}
+    model: ${DOUBAO_MODEL:your-model-name}
+
+# 价格定时更新配置
+price:
+  update:
+    enabled: true
+    force: false
+    cron: "0 0 2 * * ?"
+    weekly:
+      cron: "0 0 3 ? * MON"
+    hourly:
+      cron: "0 0 * * * ?"
+
+# JWT配置
+jwt:
+  secret: ${JWT_SECRET:tibetTourismSecretKey12345678901234567890}
+  expiration: 86400000  # 24小时
+
+# 密码加密配置
+app:
+  encryption:
+    key: ${ADMIN_ENCRYPTION_KEY:tibetTourismSecretKey12345678901234567890}
+
+# 日志配置
+logging:
+  level:
+    root: INFO
+    com.tibet.tourism: INFO
+  file:
+    name: ./logs/backend.log
+  pattern:
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+
+

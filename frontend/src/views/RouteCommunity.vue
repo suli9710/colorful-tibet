@@ -3,9 +3,9 @@
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <!-- Header -->
       <div class="text-center mb-12 animate-fade-in">
-        <h1 class="text-4xl font-bold text-apple-gray-900 mb-4">路线分享社区</h1>
+        <h1 class="text-4xl font-bold text-apple-gray-900 mb-4">{{ t('community.title') }}</h1>
         <p class="text-lg text-apple-gray-500">
-          探索其他旅行者的精彩行程，发现不一样的西藏。
+          {{ t('community.subtitle') }}
         </p>
       </div>
 
@@ -13,30 +13,30 @@
       <div class="glass rounded-2xl p-6 mb-8 flex flex-wrap gap-4 items-center justify-between animate-slide-up">
         <div class="flex flex-wrap gap-4">
           <select v-model="filters.days" @change="loadRoutes" class="px-4 py-2 rounded-xl bg-white/50 border border-gray-200 focus:border-apple-blue outline-none">
-            <option value="">全部天数</option>
-            <option value="3">3天</option>
-            <option value="5">5天</option>
-            <option value="7">7天</option>
-            <option value="10">10天+</option>
+            <option value="">{{ t('community.allDays') }}</option>
+            <option value="3">3{{ t('community.days') }}</option>
+            <option value="5">5{{ t('community.days') }}</option>
+            <option value="7">7{{ t('community.days') }}</option>
+            <option value="10">10{{ t('community.days') }}+</option>
           </select>
           <select v-model="filters.budget" @change="loadRoutes" class="px-4 py-2 rounded-xl bg-white/50 border border-gray-200 focus:border-apple-blue outline-none">
-            <option value="">全部预算</option>
-            <option value="经济型">经济型</option>
-            <option value="舒适型">舒适型</option>
-            <option value="豪华型">豪华型</option>
+            <option value="">{{ t('community.allBudget') }}</option>
+            <option value="经济型">{{ t('routePlanner.budget.economy').split(' (')[0] }}</option>
+            <option value="舒适型">{{ t('routePlanner.budget.comfort').split(' (')[0] }}</option>
+            <option value="豪华型">{{ t('routePlanner.budget.luxury').split(' (')[0] }}</option>
           </select>
           <select v-model="filters.preference" @change="loadRoutes" class="px-4 py-2 rounded-xl bg-white/50 border border-gray-200 focus:border-apple-blue outline-none">
-            <option value="">全部偏好</option>
-            <option value="自然风光">自然风光</option>
-            <option value="人文历史">人文历史</option>
-            <option value="深度摄影">深度摄影</option>
-            <option value="休闲度假">休闲度假</option>
+            <option value="">{{ t('community.allPreference') }}</option>
+            <option value="自然风光">{{ t('routePlanner.preferenceOptions.natural').split(' (')[0] }}</option>
+            <option value="人文历史">{{ t('routePlanner.preferenceOptions.cultural').split(' (')[0] }}</option>
+            <option value="深度摄影">{{ t('routePlanner.preferenceOptions.photography').split(' (')[0] }}</option>
+            <option value="休闲度假">{{ t('routePlanner.preferenceOptions.relaxation').split(' (')[0] }}</option>
           </select>
         </div>
         
         <div class="flex gap-2">
-           <button @click="router.push('/route-planner')" class="px-4 py-2.5 bg-apple-blue text-white rounded-xl hover:bg-apple-blue-hover transition-all duration-300 transform hover:scale-105 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-blue-500/30 active:scale-95 font-medium">
-             + 创建我的行程
+           <button @click="router.push('/create-route')" class="px-4 py-2.5 bg-apple-blue text-white rounded-xl hover:bg-apple-blue-hover transition-all duration-300 transform hover:scale-105 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-blue-500/30 active:scale-95 font-medium">
+             {{ t('community.createMyRoute') }}
            </button>
         </div>
       </div>
@@ -47,7 +47,7 @@
       </div>
       
       <div v-else-if="routes.length === 0" class="text-center py-12 text-gray-500">
-        暂无分享的路线，快去创建一个吧！
+        {{ t('community.noRoutes') }}
       </div>
 
       <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -60,7 +60,7 @@
               {{ route.title }}
             </h3>
             <span class="text-xs px-2.5 py-1 bg-blue-50 text-blue-600 rounded-full whitespace-nowrap font-semibold transform group-hover:scale-110 transition-transform duration-300 ml-2">
-              {{ route.days }}天
+              {{ route.days }}{{ t('community.days') }}
             </span>
           </div>
           
@@ -103,7 +103,7 @@
           :disabled="currentPage === 0"
           class="px-4 py-2 rounded-lg bg-white border border-gray-200 disabled:opacity-50 hover:bg-gray-50"
         >
-          上一页
+          {{ t('community.previousPage') }}
         </button>
         <span class="px-4 py-2">
           {{ currentPage + 1 }} / {{ totalPages }}
@@ -113,7 +113,7 @@
           :disabled="currentPage >= totalPages - 1"
           class="px-4 py-2 rounded-lg bg-white border border-gray-200 disabled:opacity-50 hover:bg-gray-50"
         >
-          下一页
+          {{ t('community.nextPage') }}
         </button>
       </div>
     </div>
@@ -123,7 +123,10 @@
 <script setup lang="ts">
 import { ref, onMounted, reactive, onActivated } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import api from '../api'
+
+const { t } = useI18n()
 
 const router = useRouter()
 const route = useRoute()
@@ -180,7 +183,8 @@ const viewRoute = (id: number) => {
 }
 
 const formatDate = (dateStr: string) => {
-  return new Date(dateStr).toLocaleDateString('zh-CN')
+  const locale = localStorage.getItem('locale') || 'zh'
+  return new Date(dateStr).toLocaleDateString(locale === 'bo' ? 'bo-CN' : 'zh-CN')
 }
 
 onMounted(() => {

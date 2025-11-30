@@ -71,6 +71,15 @@ jwt:
   secret: ${JWT_SECRET:your-jwt-secret-key-change-in-production}
   expiration: 86400000  # 24小时
 
+# 密码加密配置（仅管理员可解密）
+app:
+  encryption:
+    key: ${ADMIN_ENCRYPTION_KEY:tibetTourismSecretKey12345678901234567890}  # 生产环境请使用环境变量设置，建议使用32字符以上的随机字符串
+
+
+
+
+
 
 
 

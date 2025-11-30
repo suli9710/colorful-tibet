@@ -56,7 +56,10 @@ public class WebSecurityConfig {
             .exceptionHandling(exception -> exception.authenticationEntryPoint(unauthorizedHandler))
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> 
-                auth.requestMatchers("/api/auth/**").permitAll()
+                auth.requestMatchers("/api/auth/login").permitAll()
+                    .requestMatchers("/api/auth/register").permitAll()
+                    .requestMatchers("/api/auth/me").authenticated()
+                    .requestMatchers("/api/auth/me/**").authenticated()
                     .requestMatchers("/api/spots/**").permitAll()
                     .requestMatchers("/api/news/**").permitAll()
                     .requestMatchers("/api/heritage/**").permitAll()
@@ -78,6 +81,7 @@ public class WebSecurityConfig {
                     .requestMatchers("/api/comments/**").permitAll()
                     .requestMatchers("/api/test/**").permitAll()
                     .requestMatchers("/h2-console/**").permitAll()
+                    .requestMatchers("/api/admin/**").authenticated()
                     .anyRequest().authenticated()
             );
         

@@ -14,11 +14,17 @@ public class User {
     private String username;
 
     @Column(nullable = false)
-    private String password;
+    private String password; // BCrypt哈希，用于登录验证
+
+    @Column(name = "encrypted_password")
+    private String encryptedPassword; // AES加密的原始密码，仅管理员可解密
 
     private String nickname;
     private String avatar;
     private String phone;
+    private String city; // 用户所在城市
+    private String ipAddress; // 最后登录IP地址
+    private LocalDateTime lastLoginAt; // 最后登录时间
 
     @Enumerated(EnumType.STRING)
     private Role role = Role.USER;
@@ -94,6 +100,38 @@ public class User {
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public String getCity() {
+        return city;
+    }
+
+    public void setCity(String city) {
+        this.city = city;
+    }
+
+    public String getIpAddress() {
+        return ipAddress;
+    }
+
+    public void setIpAddress(String ipAddress) {
+        this.ipAddress = ipAddress;
+    }
+
+    public LocalDateTime getLastLoginAt() {
+        return lastLoginAt;
+    }
+
+    public void setLastLoginAt(LocalDateTime lastLoginAt) {
+        this.lastLoginAt = lastLoginAt;
+    }
+
+    public String getEncryptedPassword() {
+        return encryptedPassword;
+    }
+
+    public void setEncryptedPassword(String encryptedPassword) {
+        this.encryptedPassword = encryptedPassword;
     }
 
     public enum Role {

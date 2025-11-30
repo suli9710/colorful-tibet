@@ -9,16 +9,16 @@
         <!-- Header -->
         <div class="mb-8">
           <button @click="router.back()" class="text-gray-500 hover:text-gray-900 mb-4 flex items-center">
-            ← 返回列表
+            ← {{ t('routeDetail.backToList') }}
           </button>
           <h1 class="text-3xl font-bold text-gray-900 mb-4">{{ route.title }}</h1>
           <div class="flex items-center justify-between text-sm text-gray-500">
             <div class="flex items-center gap-4">
-              <span>作者：{{ route.author?.username || '匿名用户' }}</span>
-              <span>发布于：{{ formatDate(route.createdAt) }}</span>
+              <span>{{ t('routeDetail.author') }}：{{ route.author?.username || t('routeDetail.anonymous') }}</span>
+              <span>{{ t('routeDetail.publishedAt') }}：{{ formatDate(route.createdAt) }}</span>
             </div>
             <div class="flex gap-2">
-              <span class="px-2 py-1 bg-blue-50 text-blue-600 rounded-lg">{{ route.days }}天</span>
+              <span class="px-2 py-1 bg-blue-50 text-blue-600 rounded-lg">{{ route.days }}{{ t('routeDetail.days') }}</span>
               <span class="px-2 py-1 bg-gray-100 rounded-lg">{{ route.budget }}</span>
               <span class="px-2 py-1 bg-gray-100 rounded-lg">{{ route.preference }}</span>
             </div>
@@ -52,7 +52,7 @@
         <!-- Comments -->
         <div class="glass rounded-3xl p-8">
           <h3 class="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-            评论 <span class="text-sm font-normal text-gray-500">({{ comments.length }})</span>
+            {{ t('routeDetail.comments') }} <span class="text-sm font-normal text-gray-500">({{ comments.length }})</span>
           </h3>
           
           <!-- Add Comment -->
@@ -61,7 +61,7 @@
               v-model="newComment" 
               rows="3"
               class="w-full px-4 py-3 rounded-xl bg-white/50 border border-gray-200 focus:border-apple-blue outline-none transition-all resize-none mb-4"
-              placeholder="写下你的想法..."
+              :placeholder="t('routeDetail.commentPlaceholder')"
             ></textarea>
             <div class="flex justify-end">
               <button 
@@ -69,7 +69,7 @@
                 :disabled="!newComment.trim() || submitting"
                 class="px-6 py-2 bg-apple-blue text-white rounded-xl hover:bg-apple-blue-hover transition-colors disabled:opacity-50"
               >
-                {{ submitting ? '发送中...' : '发表评论' }}
+                {{ submitting ? t('routeDetail.submitting') : t('routeDetail.postComment') }}
               </button>
             </div>
           </div>
@@ -78,21 +78,21 @@
           <div class="space-y-6">
             <div v-for="comment in comments" :key="comment.id" class="border-b border-gray-100 last:border-0 pb-6 last:pb-0">
               <div class="flex justify-between items-start mb-2">
-                <span class="font-medium text-gray-900">{{ comment.user?.username || '匿名用户' }}</span>
+                <span class="font-medium text-gray-900">{{ comment.user?.username || t('routeDetail.anonymous') }}</span>
                 <span class="text-xs text-gray-500">{{ formatDate(comment.createdAt) }}</span>
               </div>
               <p class="text-gray-600">{{ comment.content }}</p>
             </div>
             
             <div v-if="comments.length === 0" class="text-center text-gray-400 py-4">
-              暂无评论，快来抢沙发吧！
+              {{ t('routeDetail.noComments') }}
             </div>
           </div>
         </div>
       </div>
       
       <div v-else class="text-center py-12 text-gray-500">
-        未找到该路线
+        {{ t('routeDetail.notFound') }}
       </div>
     </div>
   </div>
@@ -101,8 +101,11 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { marked } from 'marked'
 import api from '../api'
+
+const { t } = useI18n()
 
 const route = useRoute()
 const router = useRouter()
@@ -151,10 +154,10 @@ const toggleLike = async () => {
     }
   } catch (error: any) {
     if (error.response?.status === 401) {
-      alert('请先登录后再点赞')
+      alert(t('routeDetail.loginRequiredLike'))
       router.push('/login')
     } else {
-      alert('操作失败，请重试')
+      alert(t('routeDetail.operationFailed'))
     }
   }
 }
@@ -173,10 +176,10 @@ const submitComment = async () => {
     newComment.value = ''
   } catch (error: any) {
     if (error.response?.status === 401) {
-      alert('请先登录后再评论')
+      alert(t('routeDetail.loginRequiredComment'))
       router.push('/login')
     } else {
-      alert('评论失败，请重试')
+      alert(t('routeDetail.commentFailed'))
     }
   } finally {
     submitting.value = false
@@ -184,7 +187,8 @@ const submitComment = async () => {
 }
 
 const formatDate = (dateStr: string) => {
-  return new Date(dateStr).toLocaleString('zh-CN')
+  const locale = localStorage.getItem('locale') || 'zh'
+  return new Date(dateStr).toLocaleString(locale === 'bo' ? 'bo-CN' : 'zh-CN')
 }
 
 onMounted(() => {

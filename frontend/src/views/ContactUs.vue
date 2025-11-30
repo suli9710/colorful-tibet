@@ -10,8 +10,8 @@
     <div class="relative z-10 w-full max-w-4xl px-4">
       <div class="glass rounded-3xl p-8 md:p-12 animate-scale-in">
         <div class="text-center mb-10">
-          <h2 class="text-4xl font-bold text-apple-gray-900 mb-4">联系我们</h2>
-          <p class="text-lg text-apple-gray-600">有任何问题或建议？我们随时倾听您的声音。</p>
+          <h2 class="text-4xl font-bold text-apple-gray-900 mb-4">{{ t('contact.title') }}</h2>
+          <p class="text-lg text-apple-gray-600">{{ t('contact.subtitle') }}</p>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-12">
@@ -24,9 +24,9 @@
                 </svg>
               </div>
               <div>
-                <h3 class="text-lg font-semibold text-apple-gray-900">电话咨询</h3>
+                <h3 class="text-lg font-semibold text-apple-gray-900">{{ t('contact.phone') }}</h3>
                 <p class="text-apple-gray-500 mt-1">+86 891 1234 5678</p>
-                <p class="text-sm text-apple-gray-400 mt-1">周一至周日 9:00 - 18:00</p>
+                <p class="text-sm text-apple-gray-400 mt-1">{{ t('contact.phoneHours') }}</p>
               </div>
             </div>
 
@@ -37,9 +37,9 @@
                 </svg>
               </div>
               <div>
-                <h3 class="text-lg font-semibold text-apple-gray-900">电子邮件</h3>
+                <h3 class="text-lg font-semibold text-apple-gray-900">{{ t('contact.email') }}</h3>
                 <p class="text-apple-gray-500 mt-1">support@tibet-tourism.com</p>
-                <p class="text-sm text-apple-gray-400 mt-1">通常在 24 小时内回复</p>
+                <p class="text-sm text-apple-gray-400 mt-1">{{ t('contact.emailResponse') }}</p>
               </div>
             </div>
 
@@ -51,9 +51,9 @@
                 </svg>
               </div>
               <div>
-                <h3 class="text-lg font-semibold text-apple-gray-900">公司地址</h3>
-                <p class="text-apple-gray-500 mt-1">西藏自治区拉萨市城关区</p>
-                <p class="text-apple-gray-500">北京中路 100 号</p>
+                <h3 class="text-lg font-semibold text-apple-gray-900">{{ t('contact.address') }}</h3>
+                <p class="text-apple-gray-500 mt-1">{{ t('contact.addressLine1') }}</p>
+                <p class="text-apple-gray-500">{{ t('contact.addressLine2') }}</p>
               </div>
             </div>
           </div>
@@ -61,19 +61,19 @@
           <!-- Contact Form -->
           <form @submit.prevent="submitForm" class="space-y-6">
             <div>
-              <label class="block text-sm font-medium text-apple-gray-700 mb-2">姓名</label>
-              <input type="text" class="w-full px-4 py-3 rounded-xl bg-white/50 border border-white/30 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all backdrop-blur-sm" placeholder="您的称呼" required>
+              <label class="block text-sm font-medium text-apple-gray-700 mb-2">{{ t('contact.name') }}</label>
+              <input type="text" class="w-full px-4 py-3 rounded-xl bg-white/50 border border-white/30 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all backdrop-blur-sm" :placeholder="t('contact.namePlaceholder')" required>
             </div>
             <div>
-              <label class="block text-sm font-medium text-apple-gray-700 mb-2">邮箱</label>
+              <label class="block text-sm font-medium text-apple-gray-700 mb-2">{{ t('contact.emailLabel') }}</label>
               <input type="email" class="w-full px-4 py-3 rounded-xl bg-white/50 border border-white/30 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all backdrop-blur-sm" placeholder="your@email.com" required>
             </div>
             <div>
-              <label class="block text-sm font-medium text-apple-gray-700 mb-2">留言内容</label>
-              <textarea rows="4" class="w-full px-4 py-3 rounded-xl bg-white/50 border border-white/30 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all backdrop-blur-sm resize-none" placeholder="请详细描述您的需求..." required></textarea>
+              <label class="block text-sm font-medium text-apple-gray-700 mb-2">{{ t('contact.message') }}</label>
+              <textarea rows="4" class="w-full px-4 py-3 rounded-xl bg-white/50 border border-white/30 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all backdrop-blur-sm resize-none" :placeholder="t('contact.messagePlaceholder')" required></textarea>
             </div>
             <button type="submit" class="w-full bg-apple-blue hover:bg-apple-blue-hover text-white font-medium py-3 px-6 rounded-xl transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98] shadow-lg hover:shadow-blue-500/30">
-              发送消息
+              {{ t('contact.sendMessage') }}
             </button>
           </form>
         </div>
@@ -83,8 +83,12 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
+
 const submitForm = () => {
-  alert('消息已发送！我们会尽快与您联系。')
+  alert(t('contact.messageSent'))
 }
 </script>
 

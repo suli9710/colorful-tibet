@@ -13,8 +13,14 @@ public class News {
     @Column(nullable = false)
     private String title;
 
+    @Column(name = "title_tibetan")
+    private String titleTibetan;
+
     @Column(columnDefinition = "TEXT")
     private String content;
+
+    @Column(name = "content_tibetan", columnDefinition = "TEXT")
+    private String contentTibetan;
 
     @Enumerated(EnumType.STRING)
     private Category category;
@@ -53,6 +59,22 @@ public class News {
 
     public void setContent(String content) {
         this.content = content;
+    }
+
+    public String getTitleTibetan() {
+        return titleTibetan;
+    }
+
+    public void setTitleTibetan(String titleTibetan) {
+        this.titleTibetan = titleTibetan;
+    }
+
+    public String getContentTibetan() {
+        return contentTibetan;
+    }
+
+    public void setContentTibetan(String contentTibetan) {
+        this.contentTibetan = contentTibetan;
     }
 
     public Category getCategory() {
