@@ -1,0 +1,83 @@
+version: '3.8'
+
+# 生产环境 Docker Compose 配置
+# 使用方法: docker-compose -f docker-compose.prod.yml up -d
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: colorful-tibet-backend
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod  # 使用生产环境配置
+      - DOUBAO_API_KEY=${DOUBAO_API_KEY}
+      - DOUBAO_API_URL=${DOUBAO_API_URL}
+      - DOUBAO_MODEL=${DOUBAO_MODEL}
+      - JWT_SECRET=${JWT_SECRET}
+      - ADMIN_ENCRYPTION_KEY=${ADMIN_ENCRYPTION_KEY}
+      # MySQL 数据库配置（如果使用 MySQL）
+      - DB_USERNAME=${DB_USERNAME:-tibet_user}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_HOST=${DB_HOST:-mysql}
+      - DB_PORT=${DB_PORT:-3306}
+      - DB_NAME=${DB_NAME:-tibet_tourism}
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/api/spots"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - tibet-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_BASE_URL=${VITE_API_BASE_URL:-/api}
+    container_name: colorful-tibet-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - tibet-network
+
+  # MySQL 数据库（可选，如果使用 MySQL）
+  # mysql:
+  #   image: mysql:8.0
+  #   container_name: colorful-tibet-mysql
+  #   environment:
+  #     - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+  #     - MYSQL_DATABASE=tibet_tourism
+  #     - MYSQL_USER=tibet_user
+  #     - MYSQL_PASSWORD=${DB_PASSWORD}
+  #   volumes:
+  #     - mysql_data:/var/lib/mysql
+  #   ports:
+  #     - "3306:3306"
+  #   restart: unless-stopped
+  #   networks:
+  #     - tibet-network
+  #   healthcheck:
+  #     test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+
+networks:
+  tibet-network:
+    driver: bridge
+
+# volumes:
+#   mysql_data:
+

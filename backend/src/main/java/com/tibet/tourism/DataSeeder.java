@@ -49,6 +49,9 @@ public class DataSeeder implements CommandLineRunner {
         long spotCount = spotRepository.count();
         if (spotCount > 0) {
             System.out.println("清空现有景点数据...");
+            // 先删除关联数据，避免外键约束错误
+            historyRepository.deleteAll();
+            tagRepository.deleteAll();
             spotRepository.deleteAll();
         }
         
