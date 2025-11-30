@@ -71,19 +71,18 @@ install_docker() {
     log_info "Docker 安装完成"
 }
 
-# 安装 Docker Compose
-install_docker_compose() {
+# 检查 Docker Compose（V2 使用 docker compose 命令）
+check_docker_compose() {
     log_step "检查 Docker Compose 安装..."
-    if check_command docker-compose; then
-        log_info "Docker Compose 已安装"
+    if docker compose version &> /dev/null; then
+        log_info "Docker Compose V2 已安装"
         return 0
     fi
     
-    log_info "开始安装 Docker Compose..."
-    DOCKER_COMPOSE_VERSION="v2.20.0"
-    curl -L "https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-    chmod +x /usr/local/bin/docker-compose
-    log_info "Docker Compose 安装完成"
+    log_warn "Docker Compose 未安装或版本过旧"
+    log_info "Docker Compose V2 通常随 Docker 一起安装"
+    log_info "如果未安装，请运行: sudo apt-get update && sudo apt-get install docker-compose-plugin"
+    return 1
 }
 
 # 配置防火墙
@@ -167,19 +166,19 @@ update_docker_compose() {
 build_and_start() {
     log_step "构建 Docker 镜像..."
     cd /opt/colorful-tibet
-    docker-compose build
+    docker compose build
     
     log_step "启动服务..."
-    docker-compose up -d
+    docker compose up -d
     
     log_info "等待服务启动..."
     sleep 10
     
     # 检查服务状态
-    if docker-compose ps | grep -q "Up"; then
+    if docker compose ps | grep -q "Up"; then
         log_info "服务启动成功！"
     else
-        log_error "服务启动失败，请检查日志: docker-compose logs"
+        log_error "服务启动失败，请检查日志: docker compose logs"
         return 1
     fi
 }
@@ -197,10 +196,10 @@ show_deployment_info() {
     log_info "后端 API 地址: http://${SERVER_IP}:8080/api"
     echo ""
     log_info "常用命令:"
-    echo "  查看日志: docker-compose logs -f"
-    echo "  停止服务: docker-compose down"
-    echo "  重启服务: docker-compose restart"
-    echo "  查看状态: docker-compose ps"
+    echo "  查看日志: docker compose logs -f"
+    echo "  停止服务: docker compose down"
+    echo "  重启服务: docker compose restart"
+    echo "  查看状态: docker compose ps"
     echo ""
     log_warn "请确保:"
     log_warn "1. 已编辑 /opt/colorful-tibet/.env 文件，填入正确的 API 配置"
@@ -230,8 +229,8 @@ main() {
     # 安装 Docker
     install_docker
     
-    # 安装 Docker Compose
-    install_docker_compose
+    # 检查 Docker Compose
+    check_docker_compose
     
     # 配置防火墙
     configure_firewall
@@ -255,7 +254,7 @@ main() {
         log_info "已跳过构建和启动步骤"
         log_info "您可以稍后运行以下命令手动启动:"
         log_info "  cd /opt/colorful-tibet"
-        log_info "  docker-compose up -d"
+        log_info "  docker compose up -d"
     fi
 }
 
