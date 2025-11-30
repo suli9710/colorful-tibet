@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;700&family=Noto+Sans+Tibetan:wght@300;400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -17,6 +17,18 @@
   /* 优化滚动性能 */
   * {
     @apply antialiased;
+  }
+
+  /* 藏语字体支持 */
+  .tibetan-font {
+    font-family: 'Noto Sans Tibetan', 'Microsoft Himalaya', 'Kailash', 'Tibetan Machine Uni', sans-serif;
+    font-feature-settings: 'liga' 1, 'kern' 1;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* 当语言为藏语时，默认使用藏语字体 */
+  html[lang="bo"] body {
+    font-family: 'Noto Sans Tibetan', 'Microsoft Himalaya', 'Kailash', 'Tibetan Machine Uni', 'Inter', sans-serif;
   }
 }
 

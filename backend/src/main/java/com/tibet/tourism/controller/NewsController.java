@@ -16,7 +16,18 @@ public class NewsController {
     private NewsService newsService;
 
     @GetMapping
-    public List<News> getAllNews() {
-        return newsService.getAllNews();
+    public List<News> getAllNews(@RequestParam(required = false, defaultValue = "zh") String locale) {
+        List<News> newsList = newsService.getAllNews();
+        if ("bo".equals(locale)) {
+            newsList.forEach(news -> {
+                if (news.getTitleTibetan() != null && !news.getTitleTibetan().isEmpty()) {
+                    news.setTitle(news.getTitleTibetan());
+                }
+                if (news.getContentTibetan() != null && !news.getContentTibetan().isEmpty()) {
+                    news.setContent(news.getContentTibetan());
+                }
+            });
+        }
+        return newsList;
     }
 }

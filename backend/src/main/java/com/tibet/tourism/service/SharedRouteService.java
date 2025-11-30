@@ -172,4 +172,9 @@ public class SharedRouteService {
                 .orElseThrow(() -> new RuntimeException("Route not found"));
         return commentRepository.findByRouteOrderByCreatedAtDesc(route);
     }
+
+    // 获取用户创建的路线列表
+    public List<SharedRoute> getRoutesByAuthor(User author) {
+        return routeRepository.findByAuthorOrderByCreatedAtDesc(author);
+    }
 }

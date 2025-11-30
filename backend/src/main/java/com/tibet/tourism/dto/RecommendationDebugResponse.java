@@ -189,7 +189,9 @@ public class RecommendationDebugResponse {
     public static class CandidateScoreEntry {
         private Long spotId;
         private String spotName;
-        private Double collaborativeScore;
+        private Double collaborativeScore; // 混合协同过滤得分
+        private Double userBasedScore; // User-Based CF得分
+        private Double itemBasedScore; // Item-Based CF得分
         private Double tagScore;
         private Double finalScore;
         private Double normalizedCollaborativeScore; // 归一化后的协同得分
@@ -267,6 +269,22 @@ public class RecommendationDebugResponse {
 
         public void setDiversityPenalty(Double diversityPenalty) {
             this.diversityPenalty = diversityPenalty;
+        }
+
+        public Double getUserBasedScore() {
+            return userBasedScore;
+        }
+
+        public void setUserBasedScore(Double userBasedScore) {
+            this.userBasedScore = userBasedScore;
+        }
+
+        public Double getItemBasedScore() {
+            return itemBasedScore;
+        }
+
+        public void setItemBasedScore(Double itemBasedScore) {
+            this.itemBasedScore = itemBasedScore;
         }
     }
     

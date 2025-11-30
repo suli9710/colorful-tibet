@@ -1,23 +1,63 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { Menu, X, LogOut, User } from 'lucide-vue-next'
 
 const router = useRouter()
+const route = useRoute()
+const { t, locale } = useI18n()
 const isOpen = ref(false)
 const user = ref(JSON.parse(localStorage.getItem('user') || 'null'))
 const isScrolled = ref(false)
+
+// 语言切换
+const currentLocale = computed(() => locale.value)
+const switchLanguage = (lang: string) => {
+  locale.value = lang
+  localStorage.setItem('locale', lang)
+  // 更新HTML lang属性
+  document.documentElement.lang = lang
+}
+
+// 更新用户状态的函数
+const updateUser = () => {
+  const userStr = localStorage.getItem('user')
+  user.value = userStr ? JSON.parse(userStr) : null
+}
 
 const checkScroll = () => {
   isScrolled.value = window.scrollY > 20
 }
 
+// 监听路由变化，更新用户状态（处理登录后跳转的情况）
+watch(() => route.path, () => {
+  updateUser()
+})
+
+// 监听storage事件，处理跨标签页的登录状态同步
+const handleStorageChange = (e: StorageEvent) => {
+  if (e.key === 'user') {
+    updateUser()
+  }
+}
+
+// 监听自定义事件（同标签页内的登录状态更新）
+const handleUserUpdate = () => {
+  updateUser()
+}
+
 onMounted(() => {
   window.addEventListener('scroll', checkScroll)
+  window.addEventListener('storage', handleStorageChange)
+  // 监听自定义事件，用于同标签页内的登录状态更新
+  window.addEventListener('user-updated', handleUserUpdate)
 })
 
 onUnmounted(() => {
   window.removeEventListener('scroll', checkScroll)
+  window.removeEventListener('storage', handleStorageChange)
+  window.removeEventListener('user-updated', handleUserUpdate)
 })
 
 const logout = () => {
@@ -45,7 +85,8 @@ const isLoggedIn = ref(!!user.value)
               'text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600 transition-opacity',
               isScrolled ? 'opacity-100' : 'group-hover:opacity-80'
             ]">
-              七彩西藏
+              <span v-if="currentLocale === 'zh'">七彩西藏</span>
+              <span v-else class="tibetan-font">བོད་ཀྱི་རིག་གནས་</span>
             </span>
           </router-link>
         </div>
@@ -53,12 +94,13 @@ const isLoggedIn = ref(!!user.value)
         <!-- Desktop Menu -->
         <div class="hidden md:flex items-center space-x-1">
           <router-link v-for="item in [
-            { path: '/', label: '首页' },
-            { path: '/spots', label: '景点导览' },
-            { path: '/route-planner', label: 'AI行程' },
-            { path: '/community', label: '社区' },
-            { path: '/heritage', label: '非遗文化' },
-            { path: '/news', label: '资讯' },
+            { path: '/', label: t('common.home') },
+            { path: '/spots', label: t('common.spots') },
+            { path: '/route-planner', label: t('common.routePlanner') },
+            { path: '/community', label: t('common.community') },
+            { path: '/heritage', label: t('common.heritage') },
+            { path: '/news', label: t('common.news') },
+            ...(user ? [{ path: '/profile', label: t('common.profile') }] : []),
           ]" :key="item.path" :to="item.path" 
           class="relative px-4 py-2 rounded-full text-sm font-medium text-apple-gray-600 hover:text-apple-gray-900 hover:bg-white/60 transition-all duration-300 ease-out-expo active:scale-95 group will-change-transform">
             <span class="relative z-10">{{ item.label }}</span>
@@ -66,8 +108,32 @@ const isLoggedIn = ref(!!user.value)
           </router-link>
           
           <router-link v-if="user && user.role === 'ADMIN'" to="/admin" class="px-4 py-2 rounded-full text-sm font-medium text-apple-gray-600 hover:text-apple-gray-900 hover:bg-white/50 transition-all duration-200 active:scale-95">
-            管理
+            {{ t('common.admin') }}
           </router-link>
+        </div>
+        
+        <!-- Language Switcher -->
+        <div class="hidden md:flex items-center space-x-2 mr-4">
+          <button 
+            @click="switchLanguage('zh')" 
+            :class="[
+              'px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200',
+              currentLocale === 'zh' 
+                ? 'bg-apple-blue text-white shadow-md' 
+                : 'bg-white/50 text-apple-gray-600 hover:bg-white/70'
+            ]">
+            中文
+          </button>
+          <button 
+            @click="switchLanguage('bo')" 
+            :class="[
+              'px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200',
+              currentLocale === 'bo' 
+                ? 'bg-apple-blue text-white shadow-md' 
+                : 'bg-white/50 text-apple-gray-600 hover:bg-white/70'
+            ]">
+            བོད་ཡིག
+          </button>
         </div>
         
         <!-- User Menu -->
@@ -80,10 +146,10 @@ const isLoggedIn = ref(!!user.value)
           </div>
           <div v-else class="flex items-center space-x-3">
             <router-link to="/login" class="text-sm font-medium text-apple-gray-600 hover:text-apple-gray-900 transition-colors">
-              登录
+              {{ t('common.login') }}
             </router-link>
             <router-link to="/register" class="bg-apple-blue hover:bg-apple-blue-hover text-white text-sm font-medium px-4 py-2 rounded-full transition-all duration-300 ease-out-expo shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 hover:-translate-y-1 hover:scale-105 active:scale-95 relative overflow-hidden group will-change-transform">
-              <span class="relative z-10">注册</span>
+              <span class="relative z-10">{{ t('common.register') }}</span>
               <span class="absolute inset-0 bg-gradient-to-r from-blue-400 to-purple-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300 ease-out-expo"></span>
             </router-link>
           </div>
@@ -112,12 +178,13 @@ const isLoggedIn = ref(!!user.value)
     <div v-if="isOpen" class="fixed top-20 left-4 right-4 z-40 md:hidden glass rounded-3xl border border-white/20 shadow-2xl">
       <div class="px-4 pt-2 pb-6 space-y-1">
         <router-link v-for="item in [
-          { path: '/', label: '首页' },
-          { path: '/spots', label: '景点导览' },
-          { path: '/route-planner', label: 'AI行程' },
-          { path: '/community', label: '社区' },
-          { path: '/heritage', label: '非遗文化' },
-          { path: '/news', label: '资讯' },
+          { path: '/', label: t('common.home') },
+          { path: '/spots', label: t('common.spots') },
+          { path: '/route-planner', label: t('common.routePlanner') },
+          { path: '/community', label: t('common.community') },
+          { path: '/heritage', label: t('common.heritage') },
+          { path: '/news', label: t('common.news') },
+          ...(user ? [{ path: '/profile', label: t('common.profile') }] : []),
         ]" :key="item.path" :to="item.path" 
         class="block px-4 py-3 rounded-xl text-base font-medium text-apple-gray-600 hover:text-apple-gray-900 hover:bg-white/60 transition-all duration-300 ease-out-expo active:scale-98 hover:translate-x-2 group will-change-transform"
         @click="isOpen = false">
@@ -132,17 +199,41 @@ const isLoggedIn = ref(!!user.value)
         <router-link v-if="user && user.role === 'ADMIN'" to="/admin"
           class="block px-4 py-3 rounded-xl text-base font-medium text-apple-gray-600 hover:text-apple-gray-900 hover:bg-white/50 transition-all active:scale-98"
           @click="isOpen = false">
-          管理
+          {{ t('common.admin') }}
         </router-link>
+        
+        <!-- Language Switcher Mobile -->
+        <div class="px-4 py-3 flex items-center justify-center space-x-2 border-t border-gray-100 mt-2">
+          <button 
+            @click="switchLanguage('zh')" 
+            :class="[
+              'px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200',
+              currentLocale === 'zh' 
+                ? 'bg-apple-blue text-white shadow-md' 
+                : 'bg-gray-100 text-apple-gray-600 hover:bg-gray-200'
+            ]">
+            中文
+          </button>
+          <button 
+            @click="switchLanguage('bo')" 
+            :class="[
+              'px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200',
+              currentLocale === 'bo' 
+                ? 'bg-apple-blue text-white shadow-md' 
+                : 'bg-gray-100 text-apple-gray-600 hover:bg-gray-200'
+            ]">
+            བོད་ཡིག
+          </button>
+        </div>
         
         <div class="pt-4 border-t border-gray-100 mt-2">
           <div v-if="user" class="flex items-center justify-between px-4">
             <span class="font-medium text-apple-gray-700">{{ user.nickname || user.username }}</span>
-            <button @click="logout" class="text-red-500 text-sm font-medium">退出登录</button>
+            <button @click="logout" class="text-red-500 text-sm font-medium">{{ t('common.logout') }}</button>
           </div>
           <div v-else class="grid grid-cols-2 gap-4 px-4">
-            <router-link to="/login" class="text-center py-2 rounded-xl bg-gray-100 text-apple-gray-700 font-medium">登录</router-link>
-            <router-link to="/register" class="text-center py-2 rounded-xl bg-apple-blue text-white font-medium">注册</router-link>
+            <router-link to="/login" class="text-center py-2 rounded-xl bg-gray-100 text-apple-gray-700 font-medium">{{ t('common.login') }}</router-link>
+            <router-link to="/register" class="text-center py-2 rounded-xl bg-apple-blue text-white font-medium">{{ t('common.register') }}</router-link>
           </div>
         </div>
       </div>

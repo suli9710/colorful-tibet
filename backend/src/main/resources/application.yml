@@ -24,6 +24,11 @@ spring:
     console:
       enabled: true
 
+# JWT配置（必须与登录时使用的密钥一致）
+jwt:
+  secret: ${JWT_SECRET:tibetTourismSecretKey12345678901234567890}
+  expiration: 86400000  # 24小时
+
 doubao:
   api:
     url: https://ark.cn-beijing.volces.com/api/v3/chat/completions
@@ -40,3 +45,8 @@ price:
       cron: "0 0 3 ? * MON"  # 每周一凌晨3点强制更新
     hourly:
       cron: "0 0 * * * ?"  # 每小时执行一次（仅更新缺失价格的景点）
+
+# 密码加密配置（仅管理员可解密）
+app:
+  encryption:
+    key: ${ADMIN_ENCRYPTION_KEY:tibetTourismSecretKey12345678901234567890}  # 生产环境请使用环境变量设置

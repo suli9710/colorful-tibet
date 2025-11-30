@@ -35,6 +35,20 @@ public class FileStorageService {
         return "/uploads/comments/" + filename;
     }
 
+    public String storeAvatar(MultipartFile file) throws IOException {
+        validateImage(file);
+        String extension = getFileExtension(file.getOriginalFilename());
+        String filename = UUID.randomUUID() + extension;
+
+        Path avatarDir = uploadRoot.resolve("avatars");
+        Files.createDirectories(avatarDir);
+
+        Path targetLocation = avatarDir.resolve(filename);
+        Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);
+
+        return "/uploads/avatars/" + filename;
+    }
+
     private void validateImage(MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("文件不能为空");
@@ -61,6 +75,8 @@ public class FileStorageService {
         return originalFilename.substring(dotIndex).toLowerCase(Locale.ROOT);
     }
 }
+
+
 
 
 

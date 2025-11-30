@@ -179,13 +179,29 @@ public class ScenicSpotDTO {
     }
 
     public static ScenicSpotDTO fromEntity(ScenicSpot spot) {
+        return fromEntity(spot, "zh");
+    }
+
+    public static ScenicSpotDTO fromEntity(ScenicSpot spot, String locale) {
         if (spot == null) {
             throw new IllegalArgumentException("ScenicSpot entity cannot be null");
         }
         ScenicSpotDTO dto = new ScenicSpotDTO();
         dto.setId(spot.getId());
-        dto.setName(spot.getName());
-        dto.setDescription(spot.getDescription());
+        
+        // 根据语言选择名称和描述
+        if ("bo".equals(locale) && spot.getNameTibetan() != null && !spot.getNameTibetan().isEmpty()) {
+            dto.setName(spot.getNameTibetan());
+        } else {
+            dto.setName(spot.getName());
+        }
+        
+        if ("bo".equals(locale) && spot.getDescriptionTibetan() != null && !spot.getDescriptionTibetan().isEmpty()) {
+            dto.setDescription(spot.getDescriptionTibetan());
+        } else {
+            dto.setDescription(spot.getDescription());
+        }
+        
         dto.setImageUrl(spot.getImageUrl());
         dto.setAltitude(spot.getAltitude());
         dto.setLocation(spot.getLocation());

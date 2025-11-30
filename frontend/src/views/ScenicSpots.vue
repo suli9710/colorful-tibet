@@ -3,9 +3,9 @@
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <!-- Header -->
       <div class="text-center mb-16 animate-fade-in">
-        <h1 class="text-4xl font-bold text-apple-gray-900 mb-4">探索西藏</h1>
-        <p class="text-lg text-apple-gray-500 max-w-2xl mx-auto">
-          从巍峨的雪山到神圣的寺庙，发现西藏每一处令人屏息的美景。
+        <h1 class="text-4xl font-bold text-apple-gray-900 mb-4 tibetan-font">{{ t('spots.title') }}</h1>
+        <p class="text-lg text-apple-gray-500 max-w-2xl mx-auto tibetan-font">
+          {{ t('spots.subtitle') }}
         </p>
       </div>
 
@@ -17,7 +17,7 @@
             :key="cat.value"
             @click="selectedCategory = cat.value"
             :class="[
-              'px-6 py-2.5 rounded-full text-sm font-medium transition-all duration-300 ease-out-expo relative overflow-hidden will-change-transform',
+              'px-6 py-2.5 rounded-full text-sm font-medium transition-all duration-300 ease-out-expo relative overflow-hidden will-change-transform tibetan-font',
               selectedCategory === cat.value 
                 ? 'bg-apple-gray-900 text-white shadow-md transform scale-105' 
                 : 'text-apple-gray-600 hover:bg-apple-gray-100 hover:text-apple-gray-900 hover:scale-105'
@@ -52,18 +52,18 @@
           <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-yellow-500 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
           </svg>
-          <h3 class="text-xl font-bold text-gray-900 mb-2">没有找到景点数据</h3>
-          <p class="text-gray-600 mb-4">后端服务可能未启动或数据加载失败</p>
+          <h3 class="text-xl font-bold text-gray-900 mb-2 tibetan-font">{{ t('spots.noDataTitle') }}</h3>
+          <p class="text-gray-600 mb-4 tibetan-font">{{ t('spots.noDataMessage') }}</p>
           <div class="text-left bg-white p-4 rounded-lg text-sm">
-            <p class="font-semibold mb-2">请检查：</p>
+            <p class="font-semibold mb-2 tibetan-font">{{ t('spots.checkList') }}</p>
             <ul class="list-disc list-inside space-y-1 text-gray-700">
-              <li>后端服务是否正在运行？</li>
-              <li>数据库是否正常？</li>
-              <li>按F12打开浏览器控制台查看详细错误</li>
+              <li class="tibetan-font">{{ t('spots.checkItem1') }}</li>
+              <li class="tibetan-font">{{ t('spots.checkItem2') }}</li>
+              <li class="tibetan-font">{{ t('spots.checkItem3') }}</li>
             </ul>
           </div>
-          <button @click="fetchSpots()" class="mt-4 bg-blue-500 text-white px-6 py-2 rounded-full hover:bg-blue-600 transition-colors">
-            重新加载
+          <button @click="fetchSpots()" class="mt-4 bg-blue-500 text-white px-6 py-2 rounded-full hover:bg-blue-600 transition-colors tibetan-font">
+            {{ t('spots.reload') }}
           </button>
         </div>
       </div>
@@ -93,21 +93,21 @@
             <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 ease-out-expo"></div>
             
             <!-- Category Badge -->
-            <div class="absolute top-4 right-4 bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-bold text-apple-gray-900 shadow-xl transform group-hover:scale-110 transition-transform duration-300 ease-out-expo will-change-transform">
-              {{ spot.category === 'NATURAL' ? '自然风光' : '人文景观' }}
+            <div class="absolute top-4 right-4 bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-bold text-apple-gray-900 shadow-xl transform group-hover:scale-110 transition-transform duration-300 ease-out-expo will-change-transform tibetan-font">
+              {{ spot.category === 'NATURAL' ? t('spots.category.natural') : t('spots.category.cultural') }}
             </div>
           </div>
           
           <!-- Content -->
           <div class="p-8">
             <div class="flex justify-between items-start mb-4">
-              <h3 class="text-xl font-bold text-apple-gray-900 group-hover:text-apple-blue transition-colors duration-300 ease-out-expo flex-1">
+              <h3 class="text-xl font-bold text-apple-gray-900 group-hover:text-apple-blue transition-colors duration-300 ease-out-expo flex-1 tibetan-font">
                 {{ spot.name }}
               </h3>
               <span class="text-lg font-semibold text-apple-blue shrink-0 ml-3 transform group-hover:scale-110 transition-transform duration-300 ease-out-expo will-change-transform">¥{{ spot.ticketPrice }}</span>
             </div>
             
-            <p class="text-apple-gray-500 mb-6 line-clamp-3 leading-relaxed">
+            <p class="text-apple-gray-500 mb-6 line-clamp-3 leading-relaxed tibetan-font">
               {{ spot.description }}
             </p>
             
@@ -120,8 +120,8 @@
                 </span>
               </div>
               <button @click="router.push(`/spots/${spot.id}`)" 
-                      class="text-apple-blue font-medium hover:text-apple-blue-hover transition-all duration-300 ease-out-expo flex items-center shrink-0 ml-4 group/btn">
-                查看详情
+                      class="text-apple-blue font-medium hover:text-apple-blue-hover transition-all duration-300 ease-out-expo flex items-center shrink-0 ml-4 group/btn tibetan-font">
+                {{ t('spots.viewDetails') }}
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-1 transform group-hover/btn:translate-x-2 transition-transform duration-300 ease-out-expo will-change-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
                 </svg>
@@ -135,37 +135,57 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import api, { endpoints } from '../api'
 
 const router = useRouter()
+const { t, locale } = useI18n()
 const spots = ref<any[]>([])
 const loading = ref(true)
 const selectedCategory = ref<string>('ALL')
 
-const categories = [
-  { label: '全部景点', value: 'ALL' },
-  { label: '自然风光', value: 'NATURAL' },
-  { label: '人文景观', value: 'CULTURAL' }
-]
+const categories = computed(() => [
+  { label: t('spots.category.all'), value: 'ALL' },
+  { label: t('spots.category.natural'), value: 'NATURAL' },
+  { label: t('spots.category.cultural'), value: 'CULTURAL' }
+])
 
 const fetchSpots = async () => {
   try {
-    console.log('开始获取景点数据...')
-    console.log('请求URL:', endpoints.spots.list)
+    loading.value = true
     const response = await api.get(endpoints.spots.list)
-    console.log('收到响应:', response)
-    console.log('景点数据:', response.data)
-    console.log('景点数量:', response.data?.length)
     spots.value = response.data
     
     if (!response.data || response.data.length === 0) {
-      alert('警告：后端返回了空数据！请检查后端服务是否正常运行。')
+      console.warn('后端返回了空数据')
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('获取景点失败:', error)
-    alert('错误：无法连接到后端服务！请确保后端正在运行。\n错误详情：' + error)
+    const apiBaseURL = (api.defaults.baseURL || '/api')
+    
+    let errorMessage = `${t('spots.errorTitle')}\n\n`
+    errorMessage += `${t('common.error')}: ${apiBaseURL}\n\n`
+    
+    if (error.code === 'ECONNREFUSED' || error.message?.includes('Network Error')) {
+      if (apiBaseURL === '/api') {
+        errorMessage += `${t('spots.errorLocal')}\n\n`
+        errorMessage += `${t('spots.errorSolution')}\n`
+        errorMessage += `${t('spots.errorSolutionLocal')}`
+      } else {
+        errorMessage += `${t('spots.errorRemote')}: ${apiBaseURL}\n\n`
+        errorMessage += `${t('spots.errorSolution')}\n`
+        errorMessage += `${t('spots.errorSolutionRemote')}`
+      }
+    } else if (error.response) {
+      errorMessage += `${t('common.error')}: ${error.response.status}\n`
+      errorMessage += `${error.response.data?.message || error.response.statusText}`
+    } else {
+      errorMessage += `${error.message || error}`
+    }
+    
+    alert(errorMessage)
   } finally {
     loading.value = false
   }
@@ -203,6 +223,11 @@ const getGradientClass = (spot: any) => {
   const index = spot.id % gradients.length
   return gradients[index]
 }
+
+// 监听语言变化，重新获取数据
+watch(locale, () => {
+  fetchSpots()
+})
 
 onMounted(() => {
   fetchSpots()

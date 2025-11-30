@@ -23,8 +23,8 @@
         <div class="absolute bottom-0 left-0 w-full p-8 md:p-16 text-white animate-slide-up">
           <div class="max-w-7xl mx-auto">
             <div class="flex items-center space-x-4 mb-4">
-              <span class="px-4 py-1.5 bg-white/20 backdrop-blur-md rounded-full text-sm font-bold border border-white/30">
-                {{ spot.category === 'NATURAL' ? '自然风光' : '人文景观' }}
+              <span class="px-4 py-1.5 bg-white/20 backdrop-blur-md rounded-full text-sm font-bold border border-white/30 tibetan-font">
+                {{ spot.category === 'NATURAL' ? t('spotDetail.natural') : t('spotDetail.cultural') }}
               </span>
               <div class="flex space-x-2">
                 <span v-for="tag in spot.tags" :key="tag.id" class="px-3 py-1 bg-black/30 backdrop-blur-sm rounded-full text-xs font-medium border border-white/10">
@@ -32,14 +32,14 @@
                 </span>
               </div>
             </div>
-            <h1 class="text-5xl md:text-6xl font-bold mb-4 tracking-tight">{{ spot.name }}</h1>
+            <h1 class="text-5xl md:text-6xl font-bold mb-4 tracking-tight tibetan-font">{{ spot.name }}</h1>
             <div class="flex items-center text-white/80 space-x-6">
-              <span class="flex items-center">
+              <span class="flex items-center tibetan-font">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
-                西藏自治区
+                {{ t('spotDetail.tibetAutonomousRegion') }}
               </span>
               <span class="text-2xl font-bold text-apple-blue">¥{{ unitPrice }}</span>
             </div>
@@ -53,21 +53,21 @@
           <!-- Left Column: Description -->
           <div class="lg:col-span-2 space-y-8 animate-slide-up" style="animation-delay: 0.2s">
             <div class="bg-white rounded-3xl p-8 shadow-xl border border-gray-100">
-              <h2 class="text-2xl font-bold text-apple-gray-900 mb-6">景点介绍</h2>
-              <p class="text-apple-gray-600 leading-loose text-lg whitespace-pre-line">
+              <h2 class="text-2xl font-bold text-apple-gray-900 mb-6 tibetan-font">{{ t('spotDetail.introduction') }}</h2>
+              <p class="text-apple-gray-600 leading-loose text-lg whitespace-pre-line tibetan-font">
                 {{ spot.description }}
               </p>
             </div>
 
             <!-- Comments Section -->
             <div class="bg-white rounded-3xl p-8 shadow-xl border border-gray-100">
-              <h2 class="text-2xl font-bold text-apple-gray-900 mb-6">游客评论</h2>
+              <h2 class="text-2xl font-bold text-apple-gray-900 mb-6 tibetan-font">{{ t('spotDetail.comments') }}</h2>
               
               <!-- Comment Form -->
               <div v-if="user" class="mb-8 p-6 bg-gray-50 rounded-2xl">
-                <h3 class="text-lg font-bold text-gray-800 mb-4">发表评论</h3>
+                <h3 class="text-lg font-bold text-gray-800 mb-4 tibetan-font">{{ t('spotDetail.postComment') }}</h3>
                 <div class="flex items-center mb-4">
-                  <span class="mr-4 text-gray-600">评分:</span>
+                  <span class="mr-4 text-gray-600 tibetan-font">{{ t('spotDetail.rating') }}:</span>
                   <div class="flex space-x-1">
                     <button v-for="star in 5" :key="star" @click="commentForm.rating = star" 
                             class="text-2xl focus:outline-none transition-transform hover:scale-110"
@@ -77,25 +77,25 @@
                   </div>
                 </div>
                 <textarea v-model="commentForm.content" rows="3" 
-                          class="w-full p-4 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all duration-300 input-focus mb-3 resize-none"
-                          placeholder="分享您的游玩体验..."></textarea>
+                          class="w-full p-4 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all duration-300 input-focus mb-3 resize-none tibetan-font"
+                          :placeholder="t('spotDetail.shareExperience')"></textarea>
                 <div class="mb-4">
-                  <label class="block text-sm font-medium text-gray-600 mb-2">添加照片（可选）</label>
+                  <label class="block text-sm font-medium text-gray-600 mb-2 tibetan-font">{{ t('spotDetail.addPhoto') }}</label>
                   <div class="flex items-center space-x-4">
                     <label for="comment-image-input"
-                           class="inline-flex items-center px-4 py-2 rounded-full bg-white border border-gray-200 text-sm font-medium text-gray-600 cursor-pointer hover:bg-blue-50 hover:text-blue-600 transition-colors">
+                           class="inline-flex items-center px-4 py-2 rounded-full bg-white border border-gray-200 text-sm font-medium text-gray-600 cursor-pointer hover:bg-blue-50 hover:text-blue-600 transition-colors tibetan-font">
                       <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M3 15a4 4 0 004 4h10a4 4 0 004-4m-4-8h-4m0 0V3m0 4l3-3m-3 3L9 4" />
                       </svg>
-                      选择图片
+                      {{ t('spotDetail.selectImage') }}
                     </label>
                     <span class="text-sm text-gray-500 truncate max-w-[200px]" v-if="commentImageFileName">{{ commentImageFileName }}</span>
-                    <span class="text-sm text-gray-400" v-else>支持 JPG / PNG / HEIC</span>
+                    <span class="text-sm text-gray-400 tibetan-font" v-else>{{ t('spotDetail.imageFormats') }}</span>
                   </div>
                   <input id="comment-image-input" type="file" accept="image/*" class="hidden" @change="handleCommentImageChange">
-                  <p class="text-xs text-gray-400 mt-1">提示：图片大小不超过 5MB</p>
+                  <p class="text-xs text-gray-400 mt-1 tibetan-font">{{ t('spotDetail.imageSizeHint') }}</p>
                   <div v-if="commentImagePreview" class="mt-4 relative w-40 h-28">
-                    <img :src="commentImagePreview" alt="评论预览" class="w-full h-full object-cover rounded-2xl border border-gray-100 shadow-sm">
+                    <img :src="commentImagePreview" :alt="t('spotDetail.comments')" class="w-full h-full object-cover rounded-2xl border border-gray-100 shadow-sm">
                     <button type="button" @click="removeSelectedCommentImage"
                             class="absolute -top-2 -right-2 bg-white text-gray-500 hover:text-red-500 rounded-full p-1 shadow">
                       <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -106,15 +106,15 @@
                 </div>
                 <div class="mt-4 text-right">
                   <button @click="submitComment" :disabled="submittingComment"
-                          class="bg-apple-blue text-white px-6 py-3 rounded-full font-medium hover:bg-blue-600 transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-blue-500/30 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none relative overflow-hidden group">
-                    <span class="relative z-10">{{ submittingComment ? '提交中...' : '发布评论' }}</span>
+                          class="bg-apple-blue text-white px-6 py-3 rounded-full font-medium hover:bg-blue-600 transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-blue-500/30 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none relative overflow-hidden group tibetan-font">
+                    <span class="relative z-10">{{ submittingComment ? t('spotDetail.submitting') : t('spotDetail.publishComment') }}</span>
                     <span class="absolute inset-0 bg-gradient-to-r from-blue-400 to-purple-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
                   </button>
                 </div>
               </div>
               <div v-else class="mb-8 p-6 bg-gray-50 rounded-2xl text-center">
-                <p class="text-gray-500">登录后即可发表评论</p>
-                <router-link to="/login" class="inline-block mt-2 text-blue-600 hover:underline">去登录</router-link>
+                <p class="text-gray-500 tibetan-font">{{ t('spotDetail.loginToComment') }}</p>
+                <router-link to="/login" class="inline-block mt-2 text-blue-600 hover:underline tibetan-font">{{ t('spotDetail.goToLogin') }}</router-link>
               </div>
 
               <!-- Comment List -->
@@ -170,8 +170,8 @@
                     </span>
                   </div>
                 </div>
-                <div v-if="comments.length === 0" class="text-center text-gray-400 py-8">
-                  暂无评论，快来抢沙发吧！
+                <div v-if="comments.length === 0" class="text-center text-gray-400 py-8 tibetan-font">
+                  {{ t('spotDetail.noComments') }}
                 </div>
               </div>
             </div>
@@ -180,13 +180,13 @@
             <div class="bg-white rounded-3xl p-8 shadow-xl border border-gray-100 overflow-hidden">
               <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
                 <div>
-                  <h2 class="text-2xl font-bold text-apple-gray-900">地理位置</h2>
-                  <p class="text-sm text-apple-gray-500 mt-1">拖拽、缩放查看周边环境</p>
+                  <h2 class="text-2xl font-bold text-apple-gray-900 tibetan-font">{{ t('spotDetail.location') }}</h2>
+                  <p class="text-sm text-apple-gray-500 mt-1 tibetan-font">{{ t('spotDetail.mapHint') }}</p>
                 </div>
                 <button
                   @click="recenterMap"
                   :disabled="!mapReady || !hasValidLocation"
-                  class="inline-flex items-center justify-center px-4 py-2 rounded-2xl text-sm font-semibold transition-all"
+                  class="inline-flex items-center justify-center px-4 py-2 rounded-2xl text-sm font-semibold transition-all tibetan-font"
                   :class="!mapReady || !hasValidLocation
                     ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                     : 'bg-blue-600/10 text-blue-600 hover:bg-blue-600/20'">
@@ -196,40 +196,40 @@
                           d="M12 3v2m0 14v2m9-9h-2M5 12H3m15.364-6.364l-1.414 1.414M7.05 16.95l-1.414 1.414m0-11.314L7.05 7.05m10.607 10.607l1.414 1.414" />
                     <circle cx="12" cy="12" r="3" />
                   </svg>
-                  回到景点
+                  {{ t('spotDetail.backToSpot') }}
                 </button>
               </div>
               <div class="relative rounded-2xl overflow-hidden">
                 <div v-if="!hasValidLocation" class="bg-apple-gray-100 h-72 flex items-center justify-center text-apple-gray-400 text-center px-6">
-                  <div>
-                    <p>该景点暂无地理坐标信息</p>
-                    <p class="text-sm mt-2">请稍后再试</p>
+                  <div class="tibetan-font">
+                    <p>{{ t('spotDetail.noLocationInfo') }}</p>
+                    <p class="text-sm mt-2">{{ t('spotDetail.tryLater') }}</p>
                   </div>
                 </div>
                 <div v-else>
                   <div ref="mapContainer" class="h-72 w-full"></div>
                   <div
                     v-if="mapLoading"
-                    class="absolute inset-0 bg-white/70 backdrop-blur-sm flex flex-col items-center justify-center text-apple-gray-500 text-sm">
+                    class="absolute inset-0 bg-white/70 backdrop-blur-sm flex flex-col items-center justify-center text-apple-gray-500 text-sm tibetan-font">
                     <svg class="animate-spin h-6 w-6 text-blue-500 mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                       <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                       <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
                     </svg>
-                    地图加载中...
+                    {{ t('spotDetail.mapLoading') }}
                   </div>
                 </div>
               </div>
               <div class="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm text-apple-gray-600">
                 <div class="bg-apple-gray-50 rounded-2xl px-4 py-3">
-                  <p class="text-xs text-apple-gray-400">经度</p>
+                  <p class="text-xs text-apple-gray-400 tibetan-font">{{ t('spotDetail.longitude') }}</p>
                   <p class="font-semibold mt-1">{{ spot.longitude || '—' }}</p>
                 </div>
                 <div class="bg-apple-gray-50 rounded-2xl px-4 py-3">
-                  <p class="text-xs text-apple-gray-400">纬度</p>
+                  <p class="text-xs text-apple-gray-400 tibetan-font">{{ t('spotDetail.latitude') }}</p>
                   <p class="font-semibold mt-1">{{ spot.latitude || '—' }}</p>
                 </div>
                 <div class="bg-apple-gray-50 rounded-2xl px-4 py-3">
-                  <p class="text-xs text-apple-gray-400">海拔</p>
+                  <p class="text-xs text-apple-gray-400 tibetan-font">{{ t('spotDetail.altitude') }}</p>
                   <p class="font-semibold mt-1">{{ spot.altitude ? spot.altitude + ' m' : '—' }}</p>
                 </div>
               </div>
@@ -238,19 +238,19 @@
 
           <!-- Right Column: Booking Form -->
           <div class="lg:col-span-1 animate-slide-up" style="animation-delay: 0.4s">
-            <div class="sticky top-24">
+              <div class="sticky top-24">
               <div class="glass rounded-3xl p-8 shadow-2xl border border-white/50">
-                <h2 class="text-2xl font-bold text-apple-gray-900 mb-6">立即预订</h2>
+                <h2 class="text-2xl font-bold text-apple-gray-900 mb-6 tibetan-font">{{ t('spotDetail.bookNow') }}</h2>
                 
                 <form @submit.prevent="handleBooking" class="space-y-6">
                   <div>
-                    <label class="block text-sm font-medium text-apple-gray-700 mb-2">游玩日期</label>
+                    <label class="block text-sm font-medium text-apple-gray-700 mb-2 tibetan-font">{{ t('spotDetail.visitDate') }}</label>
                     <input type="date" v-model="bookingForm.visitDate" required
                            class="w-full px-4 py-3 rounded-xl bg-white/50 border border-gray-200 focus:border-apple-blue focus:ring-2 focus:ring-blue-100 outline-none transition-all">
                   </div>
 
                   <div>
-                    <label class="block text-sm font-medium text-apple-gray-700 mb-2">购票数量</label>
+                    <label class="block text-sm font-medium text-apple-gray-700 mb-2 tibetan-font">{{ t('spotDetail.ticketCount') }}</label>
                     <div class="flex items-center space-x-4">
                       <button type="button" @click="bookingForm.ticketCount > 1 && bookingForm.ticketCount--" 
                               class="w-10 h-10 rounded-full bg-apple-gray-100 hover:bg-apple-gray-200 flex items-center justify-center text-apple-gray-600 transition-all duration-300 transform hover:scale-110 active:scale-95">
@@ -266,13 +266,13 @@
 
                   <div class="pt-6 border-t border-gray-200">
                     <div class="flex justify-between items-center mb-6">
-                      <span class="text-apple-gray-600">总计金额</span>
+                      <span class="text-apple-gray-600 tibetan-font">{{ t('spotDetail.totalAmount') }}</span>
                       <span class="text-3xl font-bold text-apple-blue">¥{{ totalPrice }}</span>
                     </div>
                     
                     <button type="submit" :disabled="submitting"
-                            class="w-full bg-apple-blue hover:bg-apple-blue-hover text-white font-bold py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-[1.03] hover:-translate-y-1 active:scale-[0.98] shadow-lg hover:shadow-blue-500/50 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none relative overflow-hidden group">
-                      <span class="relative z-10">{{ submitting ? '处理中...' : '确认支付' }}</span>
+                            class="w-full bg-apple-blue hover:bg-apple-blue-hover text-white font-bold py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-[1.03] hover:-translate-y-1 active:scale-[0.98] shadow-lg hover:shadow-blue-500/50 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none relative overflow-hidden group tibetan-font">
+                      <span class="relative z-10">{{ submitting ? t('spotDetail.processing') : t('spotDetail.confirmPayment') }}</span>
                       <span class="absolute inset-0 bg-gradient-to-r from-blue-400 to-purple-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
                     </button>
                   </div>
@@ -289,9 +289,12 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import api, { endpoints } from '../api'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+
+const { t, locale } = useI18n()
 
 const route = useRoute()
 const router = useRouter()
@@ -437,7 +440,7 @@ const initOrUpdateMap = async () => {
     fillOpacity: 0.7
   }).addTo(map)
 
-  marker.bindPopup(`<strong>${spot.value.name || '目的地'}</strong><br/>经度 ${lng}, 纬度 ${lat}`)
+  marker.bindPopup(`<strong>${spot.value.name || t('spotDetail.location')}</strong><br/>${t('spotDetail.longitude')} ${lng}, ${t('spotDetail.latitude')} ${lat}`)
 }
 
 const recenterMap = () => {
@@ -472,11 +475,11 @@ const handleBooking = async () => {
       visitDate: bookingForm.value.visitDate,
       ticketCount: bookingForm.value.ticketCount
     })
-    alert('预订成功！')
+    alert(t('spotDetail.bookingSuccess'))
     router.push('/profile')
   } catch (error) {
     console.error('Booking failed:', error)
-    alert('预订失败，请重试')
+    alert(t('spotDetail.bookingFailed'))
   } finally {
     submitting.value = false
   }
@@ -541,13 +544,13 @@ function handleCommentImageChange(event: Event) {
   }
 
   if (!file.type.startsWith('image/')) {
-    alert('请选择图片文件')
+    alert(t('spotDetail.selectImageFile'))
     target.value = ''
     return
   }
 
   if (file.size > 5 * 1024 * 1024) {
-    alert('图片大小不能超过5MB')
+    alert(t('spotDetail.imageTooLarge'))
     target.value = ''
     return
   }
@@ -585,10 +588,10 @@ const submitComment = async () => {
     commentForm.value.rating = 5
     removeSelectedCommentImage()
     await fetchComments()
-    alert('评论发布成功！')
+    alert(t('spotDetail.commentSuccess'))
   } catch (error) {
     console.error('Failed to submit comment:', error)
-    alert('评论失败，请重试')
+    alert(t('spotDetail.commentFailed'))
   } finally {
     submittingComment.value = false
   }
@@ -609,7 +612,7 @@ const toggleLike = async (comment: any) => {
     comment.likeCount = response.data.likeCount
   } catch (error) {
     console.error('Failed to toggle like:', error)
-    alert('操作失败，请重试')
+    alert(t('spotDetail.operationFailed'))
   }
 }
 
@@ -619,7 +622,8 @@ const openImageModal = (imageUrl: string) => {
 
 const handleCommentImageError = (event: Event) => {
   const img = event.target as HTMLImageElement
-  img.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300"%3E%3Crect fill="%23e5e7eb" width="400" height="300"/%3E%3Ctext x="50%25" y="50%25" font-family="Arial" font-size="16" fill="%239ca3af" text-anchor="middle" dy=".3em"%3E图片加载失败%3C/text%3E%3C/svg%3E'
+  const errorText = encodeURIComponent(t('spotDetail.imageLoadFailed'))
+  img.src = `data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300"%3E%3Crect fill="%23e5e7eb" width="400" height="300"/%3E%3Ctext x="50%25" y="50%25" font-family="Arial" font-size="16" fill="%239ca3af" text-anchor="middle" dy=".3em"%3E${errorText}%3C/text%3E%3C/svg%3E`
 }
 
 const getGradientClass = (spot: any) => {
@@ -646,6 +650,11 @@ const formatDate = (dateStr: string) => {
   if (!dateStr) return ''
   return new Date(dateStr).toLocaleString('zh-CN')
 }
+
+// 监听语言变化，重新获取数据
+watch(locale, () => {
+  fetchSpotDetail()
+})
 
 onMounted(() => {
   fetchSpotDetail()

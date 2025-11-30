@@ -19,8 +19,14 @@ public class ScenicSpot {
     @Column(nullable = false)
     private String name;
 
+    @Column(name = "name_tibetan")
+    private String nameTibetan;
+
     @Column(columnDefinition = "TEXT")
     private String description;
+
+    @Column(name = "description_tibetan", columnDefinition = "TEXT")
+    private String descriptionTibetan;
 
     private String imageUrl;
     private String altitude;
@@ -84,6 +90,22 @@ public class ScenicSpot {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public String getNameTibetan() {
+        return nameTibetan;
+    }
+
+    public void setNameTibetan(String nameTibetan) {
+        this.nameTibetan = nameTibetan;
+    }
+
+    public String getDescriptionTibetan() {
+        return descriptionTibetan;
+    }
+
+    public void setDescriptionTibetan(String descriptionTibetan) {
+        this.descriptionTibetan = descriptionTibetan;
     }
 
     public String getImageUrl() {

@@ -1,5 +1,6 @@
 package com.tibet.tourism.service;
 
+import com.tibet.tourism.dto.RecommendationContext;
 import com.tibet.tourism.dto.RecommendationDebugResponse;
 import com.tibet.tourism.dto.RecommendationDebugResponse.CandidateScoreEntry;
 import com.tibet.tourism.dto.RecommendationDebugResponse.HistoryEntry;
@@ -10,6 +11,8 @@ import com.tibet.tourism.entity.UserVisitHistory;
 import com.tibet.tourism.repository.ScenicSpotRepository;
 import com.tibet.tourism.repository.SpotTagRepository;
 import com.tibet.tourism.repository.UserVisitHistoryRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -21,6 +24,8 @@ import java.util.stream.Collectors;
 
 @Service
 public class RecommendationService {
+    
+    private static final Logger logger = LoggerFactory.getLogger(RecommendationService.class);
 
     // 基础配置常量
     private static final int MAX_SIMILAR_USERS = 15; // 增加相似用户数量以提高召回率
@@ -41,6 +46,14 @@ public class RecommendationService {
     private static final double CLICK_WEIGHT = 0.1d; // 点击权重
     private static final double DWELL_WEIGHT = 0.05d; // 停留时间权重（秒）
     private static final double SEASONAL_BOOST = 1.2d; // 季节性增强
+    
+    // 上下文感知参数
+    private static final double CONTEXT_WEIGHT = 0.25d; // 上下文权重（在最终得分中的占比）
+    private static final double SEASONAL_MATCH_BOOST = 1.3d; // 季节性匹配增强
+    private static final double WEATHER_MATCH_BOOST = 1.2d; // 天气匹配增强
+    private static final double DISTANCE_BOOST_FACTOR = 0.5d; // 距离增强因子（距离越近，分数越高）
+    private static final double BUDGET_PENALTY = 0.8d; // 超出预算的惩罚系数
+    private static final double COMPANION_MATCH_BOOST = 1.15d; // 旅伴匹配增强
 
     @Autowired
     private UserVisitHistoryRepository historyRepository;
@@ -51,20 +64,67 @@ public class RecommendationService {
     @Autowired
     private SpotTagRepository spotTagRepository;
     
+    @Autowired
+    private CompanionInferenceService companionInferenceService;
+    
+    @Autowired
+    private ItemBasedRecommendationService itemBasedRecommendationService;
+    
+    @Autowired
+    private ColdStartOptimizationService coldStartOptimizationService;
+    
     // 缓存：用户相似度映射（可扩展为Redis缓存）
     private final Map<Long, Map<Long, Double>> similarityCache = new ConcurrentHashMap<>();
     private final Map<Long, Map<String, Double>> tagProfileCache = new ConcurrentHashMap<>();
     private static final int CACHE_SIZE_LIMIT = 1000; // 缓存大小限制
+    
+    // 混合推荐权重配置
+    private static final double USER_BASED_WEIGHT = 0.3d; // User-Based CF权重
+    private static final double ITEM_BASED_WEIGHT = 0.7d; // Item-Based CF权重
 
     public List<ScenicSpot> recommendSpotsForUser(Long userId) {
-        RecommendationComputationContext context = computeContext(userId);
+        return recommendSpotsForUser(userId, null);
+    }
+    
+    public List<ScenicSpot> recommendSpotsForUser(Long userId, RecommendationContext recommendationContext) {
+        logger.info("═══════════════════════════════════════════════════════════");
+        logger.info("🎯 开始为用户 {} 生成推荐", userId);
+        if (recommendationContext != null) {
+            logger.info("📌 上下文信息: 季节={}, 天气={}, 位置={}, 预算={}", 
+                    recommendationContext.getSeason(), 
+                    recommendationContext.getWeather(),
+                    recommendationContext.getCurrentLocation(),
+                    recommendationContext.getBudget());
+        }
+        logger.info("═══════════════════════════════════════════════════════════");
+        
+        RecommendationComputationContext context = computeContext(userId, recommendationContext);
+        
+        logger.info("✅ 推荐完成，共生成 {} 个推荐结果", context.getRecommendations().size());
+        logger.info("═══════════════════════════════════════════════════════════\n");
+        
         return context.getRecommendations();
     }
 
     public RecommendationDebugResponse recommendWithDebug(Long userId) {
+        return recommendWithDebug(userId, null);
+    }
+    
+    public RecommendationDebugResponse recommendWithDebug(Long userId, RecommendationContext recommendationContext) {
         long startTime = System.currentTimeMillis();
         
-        RecommendationComputationContext context = computeContext(userId);
+        logger.info("═══════════════════════════════════════════════════════════");
+        logger.info("🎯 [DEBUG模式] 开始为用户 {} 生成推荐", userId);
+        if (recommendationContext != null) {
+            logger.info("📌 上下文信息: 季节={}, 天气={}, 位置={}, 预算={}", 
+                    recommendationContext.getSeason(), 
+                    recommendationContext.getWeather(),
+                    recommendationContext.getCurrentLocation(),
+                    recommendationContext.getBudget());
+        }
+        logger.info("═══════════════════════════════════════════════════════════");
+        
+        RecommendationComputationContext context = computeContext(userId, recommendationContext);
         
         RecommendationDebugResponse response = new RecommendationDebugResponse();
         response.setUserId(userId);
@@ -94,6 +154,9 @@ public class RecommendationService {
         // 计算耗时
         long endTime = System.currentTimeMillis();
         response.setComputationTimeMs(endTime - startTime);
+        
+        logger.info("✅ [DEBUG模式] 推荐完成，耗时: {}ms", endTime - startTime);
+        logger.info("═══════════════════════════════════════════════════════════\n");
         
         return response;
     }
@@ -503,16 +566,69 @@ public class RecommendationService {
     }
 
     private RecommendationComputationContext computeContext(Long userId) {
+        return computeContext(userId, null);
+    }
+    
+    private RecommendationComputationContext computeContext(Long userId, RecommendationContext recommendationContext) {
         RecommendationComputationContext context = new RecommendationComputationContext();
+        
+        // 如果上下文未提供旅伴类型，尝试自动推断
+        if (recommendationContext == null || recommendationContext.getCompanion() == null) {
+            try {
+                String inferredCompanion = companionInferenceService.getCompanionType(userId);
+                if (recommendationContext == null) {
+                    recommendationContext = new RecommendationContext();
+                }
+                recommendationContext.setCompanion(inferredCompanion);
+                logger.info("🔍 自动推断旅伴类型: {}", inferredCompanion);
+            } catch (Exception e) {
+                logger.warn("⚠️  旅伴类型推断失败: {}", e.getMessage());
+            }
+        }
+        
+        context.setRecommendationContext(recommendationContext);
 
         List<UserVisitHistory> currentUserHistory = historyRepository.findByUserId(userId);
         context.setCurrentUserHistory(currentUserHistory);
         context.setHasHistory(!currentUserHistory.isEmpty());
 
+        logger.info("📊 用户历史记录: {} 条访问记录", currentUserHistory.size());
+
         if (currentUserHistory.isEmpty()) {
+            logger.warn("⚠️  用户无历史记录，使用冷启动优化策略");
             context.setFallbackUsed(true);
-            context.setRecommendations(fallbackPopularSpots());
+            
+            // 使用冷启动优化服务
+            List<ScenicSpot> coldStartRecommendations;
+            if (recommendationContext != null) {
+                // 如果有上下文信息（位置、偏好等），使用混合冷启动推荐
+                coldStartRecommendations = coldStartOptimizationService.hybridColdStartRecommendation(
+                        userId,
+                        recommendationContext.getCurrentLatitude() != null ? 
+                                recommendationContext.getCurrentLatitude().doubleValue() : null,
+                        recommendationContext.getCurrentLongitude() != null ? 
+                                recommendationContext.getCurrentLongitude().doubleValue() : null,
+                        recommendationContext.getPreferredActivities() != null ? 
+                                Arrays.asList(recommendationContext.getPreferredActivities().split(",")) : null,
+                        recommendationContext.getSeason(), // 可以作为类别参考
+                        recommendationContext.getCompanion()
+                );
+            } else {
+                // 否则使用基于用户属性的推荐
+                coldStartRecommendations = coldStartOptimizationService.recommendForNewUserByAttributes(userId);
+            }
+            
+            context.setRecommendations(coldStartRecommendations);
+            logger.info("📌 冷启动推荐返回 {} 个景点", context.getRecommendations().size());
             return context;
+        }
+        
+        // 检查是否为新用户（访问记录少于3条）
+        if (coldStartOptimizationService.isNewUser(userId)) {
+            logger.info("🆕 检测到新用户（访问记录<3），增强冷启动推荐");
+            
+            // 对于新用户，可以混合使用冷启动推荐和少量协同过滤
+            // 这里先使用冷启动推荐，后续可以优化为混合策略
         }
 
         Set<Long> visitedSpotIds = currentUserHistory.stream()
@@ -520,10 +636,13 @@ public class RecommendationService {
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
         if (visitedSpotIds.isEmpty()) {
+            logger.warn("⚠️  访问记录中无有效景点ID，使用热门景点兜底策略");
             context.setFallbackUsed(true);
             context.setRecommendations(fallbackPopularSpots());
             return context;
         }
+
+        logger.info("📍 已访问景点数: {}", visitedSpotIds.size());
 
         // 尝试从缓存获取标签画像
         Map<String, Double> tagPreferenceProfile = tagProfileCache.get(userId);
@@ -533,6 +652,9 @@ public class RecommendationService {
             if (tagProfileCache.size() < CACHE_SIZE_LIMIT) {
                 tagProfileCache.put(userId, tagPreferenceProfile);
             }
+            logger.info("🏷️  构建用户标签画像: {} 个标签", tagPreferenceProfile.size());
+        } else {
+            logger.info("🏷️  从缓存获取标签画像: {} 个标签", tagPreferenceProfile.size());
         }
         context.setTagProfile(tagPreferenceProfile);
 
@@ -572,6 +694,24 @@ public class RecommendationService {
         // 移除null值
         userSimilarityMap.entrySet().removeIf(entry -> entry.getValue() == null);
         
+        logger.info("👥 找到 {} 个相似用户（相似度 >= {}）", userSimilarityMap.size(), MIN_SIMILARITY);
+        if (!userSimilarityMap.isEmpty()) {
+            userSimilarityMap.entrySet().stream()
+                    .sorted(Map.Entry.<Long, Double>comparingByValue().reversed())
+                    .limit(5)
+                    .forEach(entry -> {
+                        SimilarityDetails details = similarityDetailsMap.get(entry.getKey());
+                        if (details != null) {
+                            logger.info("   - 用户 {}: 总相似度={:.4f} (余弦={:.4f}, Jaccard={:.4f}, 时间={:.4f}, 共同景点={})",
+                                    entry.getKey(), entry.getValue(), 
+                                    details.getAdjustedCosine(), details.getJaccard(), 
+                                    details.getTimeWeighted(), details.getCommonSpotsCount());
+                        } else {
+                            logger.info("   - 用户 {}: 相似度={:.4f}", entry.getKey(), entry.getValue());
+                        }
+                    });
+        }
+        
         // 更新缓存
         updateSimilarityCache(userId, userSimilarityMap);
         
@@ -588,11 +728,14 @@ public class RecommendationService {
                     .map(Map.Entry::getKey)
                     .collect(Collectors.toList());
 
+            logger.info("🔄 使用前 {} 个相似用户生成候选推荐", Math.min(similarUserIds.size(), MAX_SIMILAR_USERS));
+
             if (!similarUserIds.isEmpty()) {
                 Map<Long, List<UserVisitHistory>> similarUserHistories = historyRepository.findByUserIdIn(similarUserIds)
                         .stream()
                         .collect(Collectors.groupingBy(history -> history.getUser().getId()));
 
+                int candidateCount = 0;
                 for (Long similarUserId : similarUserIds) {
                     double similarity = userSimilarityMap.get(similarUserId);
                     List<UserVisitHistory> histories = similarUserHistories.getOrDefault(similarUserId, Collections.emptyList());
@@ -619,13 +762,52 @@ public class RecommendationService {
                         double score = similarity * (adjustedRating + recencyBoost + engagementWeight);
                         collaborativeScores.merge(spotId, score, this::accumulateScores);
                         candidateSpots.merge(spotId, score, this::accumulateScores);
+                        candidateCount++;
                     }
                 }
+                logger.info("📊 协同过滤生成 {} 个候选景点", candidateCount);
             }
+        } else {
+            logger.warn("⚠️  未找到相似用户，仅使用标签匹配");
         }
 
+        // Item-Based CF推荐得分
+        Map<Long, Double> itemBasedScores = new HashMap<>();
+        if (!visitedSpotIds.isEmpty()) {
+            try {
+                itemBasedScores = itemBasedRecommendationService.recommendByItemCF(userId, visitedSpotIds);
+                logger.info("🎯 Item-Based CF生成 {} 个候选景点", itemBasedScores.size());
+            } catch (Exception e) {
+                logger.warn("⚠️  Item-Based CF推荐失败: {}", e.getMessage());
+            }
+        }
+        
+        // 归一化User-Based CF得分
+        Map<Long, Double> normalizedCollaborativeScores = normalizeScores(collaborativeScores);
+        
+        // 归一化Item-Based CF得分
+        Map<Long, Double> normalizedItemBasedScores = normalizeScores(itemBasedScores);
+        
+        // 混合User-Based和Item-Based得分
+        Map<Long, Double> hybridCollaborativeScores = new HashMap<>();
+        
+        // 合并User-Based和Item-Based得分
+        normalizedCollaborativeScores.forEach((spotId, score) -> {
+            hybridCollaborativeScores.put(spotId, score * USER_BASED_WEIGHT);
+        });
+        
+        normalizedItemBasedScores.forEach((spotId, score) -> {
+            hybridCollaborativeScores.merge(spotId, score * ITEM_BASED_WEIGHT, Double::sum);
+        });
+        
+        // 将混合得分加入候选集合
+        hybridCollaborativeScores.forEach((spotId, score) -> {
+            candidateSpots.merge(spotId, score * COLLABORATIVE_WEIGHT, this::accumulateScores);
+        });
+        
         // 内容过滤得分（标签匹配）
         Map<Long, Double> tagBasedScores = scoreSpotsByTags(tagPreferenceProfile, visitedSpotIds);
+        logger.info("🏷️  标签匹配生成 {} 个候选景点", tagBasedScores.size());
         Map<Long, Double> weightedTagScores = new HashMap<>();
         tagBasedScores.forEach((spotId, score) -> {
             double weighted = score * TAG_SCORE_MULTIPLIER * CONTENT_WEIGHT;
@@ -633,26 +815,44 @@ public class RecommendationService {
             candidateSpots.merge(spotId, weighted, this::accumulateScores);
         });
 
-        // 归一化协同过滤得分
-        Map<Long, Double> normalizedCollaborativeScores = normalizeScores(collaborativeScores);
-        normalizedCollaborativeScores.forEach((spotId, score) -> {
-            candidateSpots.merge(spotId, score * COLLABORATIVE_WEIGHT, this::accumulateScores);
-        });
-
-        context.setCollaborativeScores(normalizedCollaborativeScores);
+        context.setCollaborativeScores(hybridCollaborativeScores);
         context.setTagScores(weightedTagScores);
         context.setCandidateScores(candidateSpots);
+        
+        // 保存详细得分用于调试
+        context.setUserBasedScores(normalizedCollaborativeScores);
+        context.setItemBasedScores(normalizedItemBasedScores);
 
-        // 应用多样性惩罚和探索机制
+        logger.info("📈 候选景点总数: {} (混合协同过滤: {}, User-Based: {}, Item-Based: {}, 标签匹配: {})", 
+                candidateSpots.size(), 
+                hybridCollaborativeScores.size(),
+                normalizedCollaborativeScores.size(),
+                normalizedItemBasedScores.size(),
+                weightedTagScores.size());
+
+        // 应用上下文感知过滤和加权
+        Map<Long, Double> finalCandidateSpots = candidateSpots;
+        if (recommendationContext != null) {
+            finalCandidateSpots = applyContextAwareFiltering(candidateSpots, recommendationContext);
+            logger.info("🌍 上下文过滤后候选景点数: {}", finalCandidateSpots.size());
+        }
+
+        // 应用多样性惩罚和探索机制（如果无上下文，传入null）
         List<ScenicSpot> recommendations = rerankWithDiversityAndExploration(
-                candidateSpots, visitedSpotIds, tagPreferenceProfile);
+                finalCandidateSpots, visitedSpotIds, tagPreferenceProfile, recommendationContext);
 
         context.setRecommendations(recommendations);
 
         if (recommendations.isEmpty()) {
+            logger.warn("⚠️  重排序后无推荐结果，使用热门景点兜底");
             context.setFallbackUsed(true);
             recommendations = fallbackPopularSpots();
         }
+
+        logger.info("✨ 最终推荐结果: {} 个景点", recommendations.size());
+        recommendations.stream()
+                .limit(5)
+                .forEach(spot -> logger.info("   - {}", spot.getName()));
 
         context.setRecommendations(recommendations);
         return context;
@@ -710,6 +910,8 @@ public class RecommendationService {
             return Collections.emptyList();
         }
         Map<Long, Double> collaborativeScores = context.getCollaborativeScores();
+        Map<Long, Double> userBasedScores = context.getUserBasedScores();
+        Map<Long, Double> itemBasedScores = context.getItemBasedScores();
         Map<Long, Double> tagScores = context.getTagScores();
 
         List<Long> candidateIds = new ArrayList<>(finalScores.keySet());
@@ -725,6 +927,8 @@ public class RecommendationService {
                     candidateEntry.setSpotName(spotNames.getOrDefault(spotId, "未知景点"));
                     candidateEntry.setFinalScore(entry.getValue());
                     candidateEntry.setCollaborativeScore(collaborativeScores.getOrDefault(spotId, 0.0));
+                    candidateEntry.setUserBasedScore(userBasedScores.getOrDefault(spotId, 0.0));
+                    candidateEntry.setItemBasedScore(itemBasedScores.getOrDefault(spotId, 0.0));
                     candidateEntry.setTagScore(tagScores.getOrDefault(spotId, 0.0));
                     return candidateEntry;
                 })
@@ -738,10 +942,13 @@ public class RecommendationService {
         private Map<Long, Double> userSimilarityMap = Collections.emptyMap();
         private Map<Long, SimilarityDetails> similarityDetails = Collections.emptyMap();
         private Map<String, Double> tagProfile = Collections.emptyMap();
-        private Map<Long, Double> collaborativeScores = Collections.emptyMap();
+        private Map<Long, Double> collaborativeScores = Collections.emptyMap(); // 混合协同过滤得分
+        private Map<Long, Double> userBasedScores = Collections.emptyMap(); // User-Based CF得分
+        private Map<Long, Double> itemBasedScores = Collections.emptyMap(); // Item-Based CF得分
         private Map<Long, Double> tagScores = Collections.emptyMap();
         private Map<Long, Double> candidateScores = Collections.emptyMap();
         private List<ScenicSpot> recommendations = Collections.emptyList();
+        private RecommendationContext recommendationContext;
 
         public boolean hasHistory() {
             return hasHistory;
@@ -822,6 +1029,30 @@ public class RecommendationService {
         public void setRecommendations(List<ScenicSpot> recommendations) {
             this.recommendations = recommendations;
         }
+
+        public RecommendationContext getRecommendationContext() {
+            return recommendationContext;
+        }
+
+        public void setRecommendationContext(RecommendationContext recommendationContext) {
+            this.recommendationContext = recommendationContext;
+        }
+
+        public Map<Long, Double> getUserBasedScores() {
+            return userBasedScores;
+        }
+
+        public void setUserBasedScores(Map<Long, Double> userBasedScores) {
+            this.userBasedScores = userBasedScores;
+        }
+
+        public Map<Long, Double> getItemBasedScores() {
+            return itemBasedScores;
+        }
+
+        public void setItemBasedScores(Map<Long, Double> itemBasedScores) {
+            this.itemBasedScores = itemBasedScores;
+        }
     }
 
     /**
@@ -849,12 +1080,297 @@ public class RecommendationService {
     }
     
     /**
+     * 应用上下文感知过滤和加权
+     */
+    private Map<Long, Double> applyContextAwareFiltering(
+            Map<Long, Double> candidateScores,
+            RecommendationContext context) {
+        
+        if (candidateScores.isEmpty()) {
+            return candidateScores;
+        }
+        
+        // 获取所有候选景点
+        List<Long> candidateIds = new ArrayList<>(candidateScores.keySet());
+        Map<Long, ScenicSpot> spotMap = spotRepository.findAllById(candidateIds).stream()
+                .collect(Collectors.toMap(ScenicSpot::getId, spot -> spot));
+        
+        Map<Long, Double> contextScores = new HashMap<>();
+        Map<Long, Double> filteredScores = new HashMap<>();
+        
+        for (Map.Entry<Long, Double> entry : candidateScores.entrySet()) {
+            Long spotId = entry.getKey();
+            ScenicSpot spot = spotMap.get(spotId);
+            if (spot == null) continue;
+            
+            // 计算上下文得分
+            double contextScore = calculateContextScore(spot, context);
+            
+            // 如果上下文得分太低，过滤掉
+            if (contextScore < 0.3) {
+                continue;
+            }
+            
+            // 应用上下文加权
+            double baseScore = entry.getValue();
+            double finalScore = baseScore * (1.0 - CONTEXT_WEIGHT) + contextScore * CONTEXT_WEIGHT;
+            
+            contextScores.put(spotId, contextScore);
+            filteredScores.put(spotId, finalScore);
+        }
+        
+        logger.info("🌍 上下文过滤: 原始{}个 -> 过滤后{}个", candidateScores.size(), filteredScores.size());
+        
+        return filteredScores;
+    }
+    
+    /**
+     * 计算景点的上下文得分
+     */
+    private double calculateContextScore(ScenicSpot spot, RecommendationContext context) {
+        double score = 1.0;
+        
+        // 1. 季节性匹配
+        if (context.getSeason() != null) {
+            if (isSeasonalMatch(spot, context.getSeason())) {
+                score *= SEASONAL_MATCH_BOOST;
+                logger.debug("  景点 {} 季节性匹配: {}", spot.getName(), context.getSeason());
+            }
+        }
+        
+        // 2. 天气匹配
+        if (context.getWeather() != null) {
+            if (isWeatherSuitable(spot, context.getWeather())) {
+                score *= WEATHER_MATCH_BOOST;
+                logger.debug("  景点 {} 天气匹配: {}", spot.getName(), context.getWeather());
+            }
+        }
+        
+        // 3. 距离匹配
+        if (context.getConsiderDistance() != null && context.getConsiderDistance() 
+            && context.getCurrentLatitude() != null && context.getCurrentLongitude() != null
+            && spot.getLatitude() != null && spot.getLongitude() != null) {
+            double distance = calculateDistance(
+                    context.getCurrentLatitude(), context.getCurrentLongitude(),
+                    spot.getLatitude().doubleValue(), spot.getLongitude().doubleValue()
+            );
+            // 距离越近，分数越高（使用反比例函数）
+            double distanceScore = 1.0 / (1.0 + distance / 100.0); // 100km为基准
+            score *= (1.0 + distanceScore * DISTANCE_BOOST_FACTOR);
+            logger.debug("  景点 {} 距离: {}km, 距离得分: {}", spot.getName(), distance, distanceScore);
+        }
+        
+        // 4. 预算匹配
+        if (context.getConsiderBudget() != null && context.getConsiderBudget() 
+            && context.getBudget() != null && spot.getTicketPrice() != null) {
+            double ticketPrice = spot.getTicketPrice().doubleValue();
+            if (ticketPrice <= context.getBudget()) {
+                score *= 1.1; // 在预算内，略微提升
+            } else {
+                score *= BUDGET_PENALTY; // 超出预算，降低分数
+                logger.debug("  景点 {} 超出预算: {} > {}", spot.getName(), ticketPrice, context.getBudget());
+            }
+        }
+        
+        // 5. 旅伴匹配（基于景点特征）
+        if (context.getCompanion() != null) {
+            if (isCompanionSuitable(spot, context.getCompanion())) {
+                score *= COMPANION_MATCH_BOOST;
+                logger.debug("  景点 {} 旅伴匹配: {}", spot.getName(), context.getCompanion());
+            }
+        }
+        
+        // 6. 活动偏好匹配
+        if (context.getPreferredActivities() != null && !context.getPreferredActivities().isEmpty()) {
+            double activityMatch = calculateActivityMatch(spot, context.getPreferredActivities());
+            score *= (1.0 + activityMatch * 0.2); // 活动匹配最多提升20%
+        }
+        
+        return Math.min(score, 2.0); // 限制最大得分为2.0
+    }
+    
+    /**
+     * 判断景点是否适合当前季节
+     */
+    private boolean isSeasonalMatch(ScenicSpot spot, String season) {
+        // 如果未指定季节，根据当前月份自动判断
+        if (season == null) {
+            int month = LocalDateTime.now().getMonthValue();
+            if (month >= 3 && month <= 5) season = "SPRING";
+            else if (month >= 6 && month <= 8) season = "SUMMER";
+            else if (month >= 9 && month <= 11) season = "AUTUMN";
+            else season = "WINTER";
+        }
+        
+        // 西藏旅游旺季是5-10月（春夏秋），淡季是11-4月（冬春）
+        // 这里简化处理：春夏秋适合大部分景点，冬季适合室内景点
+        switch (season.toUpperCase()) {
+            case "SPRING":
+            case "SUMMER":
+            case "AUTUMN":
+                // 春夏秋适合大部分景点
+                return true;
+            case "WINTER":
+                // 冬季更适合室内景点（如寺庙、博物馆）
+                return spot.getCategory() == ScenicSpot.Category.CULTURAL 
+                    || spot.getCategory() == ScenicSpot.Category.RELIGIOUS;
+            default:
+                return true;
+        }
+    }
+    
+    /**
+     * 判断景点是否适合当前天气
+     */
+    private boolean isWeatherSuitable(ScenicSpot spot, String weather) {
+        if (weather == null) return true;
+        
+        switch (weather.toUpperCase()) {
+            case "SUNNY":
+                // 晴天适合所有景点
+                return true;
+            case "CLOUDY":
+                // 多云适合所有景点
+                return true;
+            case "RAINY":
+                // 雨天更适合室内景点
+                return spot.getCategory() == ScenicSpot.Category.CULTURAL 
+                    || spot.getCategory() == ScenicSpot.Category.RELIGIOUS;
+            case "SNOWY":
+                // 雪天更适合室内景点，但高海拔景点可能因雪景而加分
+                return spot.getCategory() == ScenicSpot.Category.CULTURAL 
+                    || spot.getCategory() == ScenicSpot.Category.RELIGIOUS
+                    || (spot.getAltitude() != null && parseAltitude(spot.getAltitude()) > 4000);
+            default:
+                return true;
+        }
+    }
+    
+    /**
+     * 判断景点是否适合旅伴类型
+     */
+    private boolean isCompanionSuitable(ScenicSpot spot, String companion) {
+        if (companion == null) return true;
+        
+        switch (companion.toUpperCase()) {
+            case "ALONE":
+                // 独自旅行适合所有景点
+                return true;
+            case "COUPLE":
+                // 情侣适合浪漫、风景优美的景点
+                return spot.getCategory() == ScenicSpot.Category.NATURAL
+                    || spot.getCategory() == ScenicSpot.Category.CULTURAL;
+            case "FAMILY":
+                // 家庭适合安全、易到达的景点
+                return spot.getCategory() == ScenicSpot.Category.CULTURAL
+                    || spot.getCategory() == ScenicSpot.Category.RELIGIOUS;
+            case "FRIENDS":
+            case "GROUP":
+                // 朋友/团队适合所有景点
+                return true;
+            default:
+                return true;
+        }
+    }
+    
+    /**
+     * 计算活动偏好匹配度
+     */
+    private double calculateActivityMatch(ScenicSpot spot, String preferredActivities) {
+        if (preferredActivities == null || preferredActivities.isEmpty()) {
+            return 0.0;
+        }
+        
+        String[] activities = preferredActivities.split(",");
+        List<String> spotTags = extractTagValues(spot.getTags());
+        
+        int matchCount = 0;
+        for (String activity : activities) {
+            String trimmed = activity.trim().toUpperCase();
+            // 检查标签中是否包含相关关键词
+            for (String tag : spotTags) {
+                if (tag.toUpperCase().contains(trimmed) || matchesActivityTag(trimmed, tag)) {
+                    matchCount++;
+                    break;
+                }
+            }
+        }
+        
+        return activities.length > 0 ? (double) matchCount / activities.length : 0.0;
+    }
+    
+    /**
+     * 匹配活动标签
+     */
+    private boolean matchesActivityTag(String activity, String tag) {
+        // 简单的关键词匹配
+        Map<String, String[]> activityKeywords = new HashMap<>();
+        activityKeywords.put("PHOTOGRAPHY", new String[]{"摄影", "拍照", "风景", "美景"});
+        activityKeywords.put("HIKING", new String[]{"徒步", "登山", "户外"});
+        activityKeywords.put("CULTURE", new String[]{"文化", "历史", "人文"});
+        activityKeywords.put("RELIGION", new String[]{"宗教", "寺庙", "朝圣"});
+        activityKeywords.put("NATURE", new String[]{"自然", "风光", "山水"});
+        
+        String[] keywords = activityKeywords.get(activity);
+        if (keywords == null) return false;
+        
+        for (String keyword : keywords) {
+            if (tag.contains(keyword)) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    /**
+     * 计算两点之间的距离（公里）- 使用Haversine公式
+     */
+    private double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+        final int R = 6371; // 地球半径（公里）
+        
+        double latDistance = Math.toRadians(lat2 - lat1);
+        double lonDistance = Math.toRadians(lon2 - lon1);
+        
+        double a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2)
+                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
+        
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        
+        return R * c;
+    }
+    
+    /**
+     * 解析海拔字符串（如"5000m" -> 5000）
+     */
+    private double parseAltitude(String altitude) {
+        if (altitude == null || altitude.isEmpty()) {
+            return 0.0;
+        }
+        try {
+            // 移除单位，提取数字
+            String numeric = altitude.replaceAll("[^0-9.]", "");
+            return Double.parseDouble(numeric);
+        } catch (NumberFormatException e) {
+            return 0.0;
+        }
+    }
+    
+    /**
      * 重排序 - 应用多样性惩罚和探索机制
      */
     private List<ScenicSpot> rerankWithDiversityAndExploration(
             Map<Long, Double> candidateScores,
             Set<Long> visitedSpotIds,
             Map<String, Double> tagProfile) {
+        return rerankWithDiversityAndExploration(candidateScores, visitedSpotIds, tagProfile, null);
+    }
+    
+    private List<ScenicSpot> rerankWithDiversityAndExploration(
+            Map<Long, Double> candidateScores,
+            Set<Long> visitedSpotIds,
+            Map<String, Double> tagProfile,
+            RecommendationContext recommendationContext) {
         
         if (candidateScores.isEmpty()) {
             return Collections.emptyList();
@@ -985,3 +1501,4 @@ public class RecommendationService {
         return left + right;
     }
 }
+

@@ -10,19 +10,19 @@
 
       <!-- Hero Content -->
       <div class="relative z-10 text-center px-4 max-w-5xl mx-auto">
-        <h1 class="text-5xl md:text-7xl font-bold text-white mb-6 tracking-tight animate-slide-up will-change-transform" style="animation-delay: 0.1s">
-          探索<span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-300 via-purple-300 to-pink-300 animate-gradient-fast bg-[length:200%_auto]">七彩西藏</span>
+        <h1 class="text-5xl md:text-7xl font-bold text-white mb-6 tracking-tight animate-slide-up will-change-transform tibetan-font" style="animation-delay: 0.1s">
+          {{ t('home.title') }}
         </h1>
-        <p class="text-xl md:text-2xl text-white/90 mb-10 font-light max-w-2xl mx-auto animate-slide-up will-change-transform" style="animation-delay: 0.3s">
-          在世界屋脊，发现心灵的归属。体验独特的文化，领略壮丽的自然风光。
+        <p class="text-xl md:text-2xl text-white/90 mb-10 font-light max-w-2xl mx-auto animate-slide-up will-change-transform tibetan-font" style="animation-delay: 0.3s">
+          {{ t('home.subtitle') }}
         </p>
         <div class="flex flex-col sm:flex-row justify-center gap-4 animate-slide-up will-change-transform" style="animation-delay: 0.5s">
-          <router-link to="/spots" class="group px-8 py-4 bg-white text-apple-gray-900 rounded-full font-semibold text-lg hover:bg-gray-100 transition-all duration-300 ease-out-expo transform hover:scale-105 hover:shadow-2xl shadow-lg relative overflow-hidden will-change-transform">
-            <span class="relative z-10">开始探索</span>
+          <router-link to="/spots" class="group px-8 py-4 bg-white text-apple-gray-900 rounded-full font-semibold text-lg hover:bg-gray-100 transition-all duration-300 ease-out-expo transform hover:scale-105 hover:shadow-2xl shadow-lg relative overflow-hidden will-change-transform tibetan-font">
+            <span class="relative z-10">{{ t('home.startExploring') }}</span>
             <span class="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500 opacity-0 group-hover:opacity-10 transition-opacity duration-300 ease-out-expo"></span>
           </router-link>
-          <button @click="scrollToHeatmap" class="px-8 py-4 bg-white/20 backdrop-blur-md border border-white/30 text-white rounded-full font-semibold text-lg hover:bg-white/30 transition-all duration-300 ease-out-expo transform hover:scale-105 hover:shadow-xl hover:border-white/50 will-change-transform">
-            查看热力图
+          <button @click="scrollToHeatmap" class="px-8 py-4 bg-white/20 backdrop-blur-md border border-white/30 text-white rounded-full font-semibold text-lg hover:bg-white/30 transition-all duration-300 ease-out-expo transform hover:scale-105 hover:shadow-xl hover:border-white/50 will-change-transform tibetan-font">
+            {{ t('home.viewHeatmap') }}
           </button>
         </div>
       </div>
@@ -31,8 +31,8 @@
     <!-- Heatmap Section -->
     <div id="heatmap" class="py-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
       <div class="text-center mb-16 animate-on-scroll opacity-0 translate-y-8 transition-all duration-1000">
-        <h2 class="text-4xl font-bold text-apple-gray-900 mb-4">热门景点分布</h2>
-        <p class="text-lg text-apple-gray-500">实时掌握西藏最受欢迎的旅游目的地</p>
+        <h2 class="text-4xl font-bold text-apple-gray-900 mb-4 tibetan-font">{{ t('home.hotSpotsDistribution') }}</h2>
+        <p class="text-lg text-apple-gray-500 tibetan-font">{{ t('home.hotSpotsDescription') }}</p>
       </div>
       
       <div class="bg-white rounded-3xl p-6 shadow-2xl animate-on-scroll opacity-0 translate-y-8 transition-all duration-1000 delay-200">
@@ -45,11 +45,11 @@
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between items-end mb-12 animate-on-scroll opacity-0 translate-y-8 transition-all duration-1000">
           <div>
-            <h2 class="text-4xl font-bold text-apple-gray-900 mb-2">为您推荐</h2>
-            <p class="text-lg text-apple-gray-500">基于您的兴趣，精选最适合您的目的地</p>
+            <h2 class="text-4xl font-bold text-apple-gray-900 mb-2 tibetan-font">{{ t('home.recommendations') }}</h2>
+            <p class="text-lg text-apple-gray-500 tibetan-font">{{ t('home.recommendationsDescription') }}</p>
           </div>
-          <router-link to="/spots" class="hidden md:flex items-center text-apple-blue hover:text-apple-blue-hover font-medium transition-colors">
-            查看全部
+          <router-link to="/spots" class="hidden md:flex items-center text-apple-blue hover:text-apple-blue-hover font-medium transition-colors tibetan-font">
+            {{ t('common.viewAll') }}
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 ml-1" viewBox="0 0 20 20" fill="currentColor">
               <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
             </svg>
@@ -69,8 +69,8 @@
                    class="w-full h-full object-cover transition-transform duration-700 ease-out-expo group-hover:scale-110 img-fade-in will-change-transform"
                    loading="lazy">
               <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 ease-out-expo"></div>
-              <div class="absolute top-4 right-4 bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-bold text-apple-gray-900 shadow-xl transform group-hover:scale-110 transition-transform duration-300 ease-out-expo will-change-transform">
-                {{ spot.category === 'NATURAL' ? '自然风光' : '人文景观' }}
+              <div class="absolute top-4 right-4 bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-bold text-apple-gray-900 shadow-xl transform group-hover:scale-110 transition-transform duration-300 ease-out-expo will-change-transform tibetan-font">
+                {{ spot.category === 'NATURAL' ? t('home.natural') : t('home.cultural') }}
               </div>
             </div>
             
@@ -80,21 +80,21 @@
                 <span class="text-lg font-semibold text-apple-blue transform group-hover:scale-110 transition-transform duration-300 ease-out-expo will-change-transform">¥{{ spot.ticketPrice }}</span>
               </div>
               <!-- 推荐原因 -->
-              <p v-if="getRecommendationReason(spot.id)" class="text-xs text-apple-blue mb-3 font-medium">
+              <p v-if="getRecommendationReason(spot.id)" class="text-xs text-apple-blue mb-3 font-medium tibetan-font">
                 💡 {{ getRecommendationReason(spot.id) }}
               </p>
-              <p class="text-apple-gray-500 mb-6 line-clamp-2 leading-relaxed">{{ spot.description }}</p>
+              <p class="text-apple-gray-500 mb-6 line-clamp-2 leading-relaxed tibetan-font">{{ spot.description }}</p>
               
               <div class="flex items-center justify-between pt-6 border-t border-gray-100">
                 <div class="flex space-x-2">
                   <span v-for="tag in spot.tags?.slice(0, 2)" :key="tag.id" 
-                        class="px-3 py-1 bg-apple-gray-100 text-apple-gray-600 rounded-full text-xs font-medium transform group-hover:scale-105 transition-transform duration-300 ease-out-expo will-change-transform">
+                        class="px-3 py-1 bg-apple-gray-100 text-apple-gray-600 rounded-full text-xs font-medium transform group-hover:scale-105 transition-transform duration-300 ease-out-expo will-change-transform tibetan-font">
                     {{ tag.tag }}
                   </span>
                 </div>
                 <button @click="router.push(`/spots/${spot.id}`)" 
-                        class="text-apple-blue font-medium hover:text-apple-blue-hover transition-all duration-300 ease-out-expo flex items-center group/btn">
-                  预订
+                        class="text-apple-blue font-medium hover:text-apple-blue-hover transition-all duration-300 ease-out-expo flex items-center group/btn tibetan-font">
+                  {{ t('common.book') }}
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-1 transform group-hover/btn:translate-x-2 transition-transform duration-300 ease-out-expo will-change-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
                   </svg>
@@ -109,12 +109,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import HeatMap from '../components/HeatMap.vue'
 import api, { endpoints } from '../api'
 
 const router = useRouter()
+const { t, locale } = useI18n()
 const recommendedSpots = ref<any[]>([])
 const recommendationReasons = ref<Map<number, string>>(new Map())
 const loading = ref(true)
@@ -130,7 +132,7 @@ const getRecommendationReason = (spotId: number) => {
   const reason = recommendationReasons.value.get(spotId) || 
                  recommendationReasons.value.get(Number(spotId))
   // 如果还是没有，返回默认原因
-  return reason || '为您精心挑选'
+  return reason || t('home.recommendationReason')
 }
 
 const logRecommendationDebugInfo = (debugData: any) => {
@@ -328,6 +330,11 @@ const initIntersectionObserver = () => {
     observer.observe(el)
   })
 }
+
+// 监听语言变化，重新获取数据
+watch(locale, () => {
+  fetchRecommendations()
+})
 
 onMounted(async () => {
   await fetchRecommendations()
