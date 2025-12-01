@@ -8,8 +8,9 @@ RUN mvn clean package -DskipTests
 FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
 
-# 创建必要的目录
-RUN mkdir -p /app/data /app/logs
+# 创建必要的目录并安装运行期依赖
+RUN apk add --no-cache curl \
+    && mkdir -p /app/data /app/logs
 
 # 复制构建好的jar文件
 COPY --from=builder /app/target/tourism-0.0.1-SNAPSHOT.jar app.jar
