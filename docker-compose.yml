@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   backend:
     build:
@@ -23,7 +21,8 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost:8080/api/spots"]
       interval: 30s
       timeout: 10s
-      retries: 3
+      retries: 5
+      start_period: 120s  # 启动宽限期，允许后端在 120 秒内启动
 
   frontend:
     build:
