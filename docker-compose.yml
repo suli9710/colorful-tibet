@@ -22,7 +22,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 120s  # 启动宽限期，允许后端在 120 秒内启动
+      start_period: 600s  # 启动宽限期，允许后端在 699 秒内启动
 
   frontend:
     build:
