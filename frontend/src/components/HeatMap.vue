@@ -197,7 +197,7 @@ onMounted(async () => {
     
     // Load Tibet Map Data (西藏自治区地图)
     try {
-      const mapResponse = await fetch('https://geo.datav.aliyun.com/areas_v3/bound/540000_full.json')
+      const mapResponse = await fetch('/geo/540000_full.json')
       // 检查响应状态和内容类型
       if (mapResponse.ok) {
         const contentType = mapResponse.headers.get('content-type')

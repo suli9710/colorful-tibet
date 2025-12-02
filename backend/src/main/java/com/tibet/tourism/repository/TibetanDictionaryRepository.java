@@ -49,3 +49,4 @@ public interface TibetanDictionaryRepository extends JpaRepository<TibetanDictio
 
 
 
+
