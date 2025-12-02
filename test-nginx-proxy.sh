@@ -18,3 +18,4 @@ docker logs colorful-tibet-frontend 2>&1 | grep -i error | tail -10
 
 
 
+
