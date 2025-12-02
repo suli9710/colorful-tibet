@@ -16,3 +16,5 @@ echo ""
 echo "=== 4. 查看 Nginx 错误日志 ==="
 docker logs colorful-tibet-frontend 2>&1 | grep -i error | tail -10
 
+
+

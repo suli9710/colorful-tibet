@@ -29,3 +29,5 @@ echo "=== 步骤 6: 测试 Nginx 代理 ==="
 echo ""
 curl -v http://localhost/api/spots 2>&1 | head -20
 
+
+

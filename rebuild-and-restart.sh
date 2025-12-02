@@ -48,3 +48,5 @@ echo "如果服务正常，可以访问："
 echo "  前端: http://$(curl -s ifconfig.me || echo 'YOUR_SERVER_IP')"
 echo "  后端: http://$(curl -s ifconfig.me || echo 'YOUR_SERVER_IP'):8080/api/spots"
 
+
+

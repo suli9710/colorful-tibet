@@ -28,3 +28,5 @@ curl -s http://localhost/api/spots | head -10 || echo "测试失败"
 echo ""
 echo "=== 完成 ==="
 
+
+
