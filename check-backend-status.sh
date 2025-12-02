@@ -27,3 +27,5 @@ echo ""
 echo "=== 5. 检查端口监听 ==="
 docker exec colorful-tibet-backend netstat -tlnp 2>/dev/null | grep 8080 || echo "端口 8080 未监听"
 
+
+
