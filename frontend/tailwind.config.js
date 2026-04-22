@@ -49,6 +49,8 @@ export default {
         'slide-in-left': 'slideInLeft 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards',
         'zoom-in': 'zoomIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards',
         'rotate-in': 'rotateIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+        'draw-line': 'drawLine 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+        'count-up': 'countUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards',
       },
       keyframes: {
         fadeIn: {
@@ -121,6 +123,14 @@ export default {
         rotateIn: {
           '0%': { opacity: '0', transform: 'rotate(-5deg) scale(0.95)' },
           '100%': { opacity: '1', transform: 'rotate(0deg) scale(1)' },
+        },
+        drawLine: {
+          '0%': { strokeDashoffset: '1000' },
+          '100%': { strokeDashoffset: '0' },
+        },
+        countUp: {
+          '0%': { opacity: '0', transform: 'translateY(16px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
         },
       },
       transitionTimingFunction: {

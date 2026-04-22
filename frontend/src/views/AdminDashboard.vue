@@ -31,7 +31,7 @@
             <div class="flex items-center justify-between">
               <div>
                 <p class="text-sm text-stone-500 uppercase font-semibold">总订单数</p>
-                <p class="text-3xl font-bold text-stone-800">{{ stats.bookingCount }}</p>
+                <p class="text-3xl font-bold text-stone-800">{{ stats.orderCount }}</p>
               </div>
               <div class="bg-green-100 p-3 rounded-full">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -56,6 +56,92 @@
           </div>
         </div>
 
+        <!-- Hotel Orders Management -->
+        <div class="bg-white rounded-lg shadow overflow-hidden">
+          <div class="px-6 py-4 border-b border-stone-200 flex justify-between items-center cursor-pointer hover:bg-stone-50 transition-colors" @click="showAllHotelOrders = !showAllHotelOrders">
+            <h3 class="text-lg font-bold text-stone-800">酒店订单 <span class="text-sm font-normal text-stone-500">(共{{ hotelOrders.length }}条)</span></h3>
+            <div class="flex items-center space-x-3">
+              <button @click.stop="fetchHotelOrders" class="text-sm text-blue-600 hover:text-blue-800" :disabled="loadingHotelOrders">
+                {{ loadingHotelOrders ? '加载中...' : '刷新列表' }}
+              </button>
+              <button @click.stop="showAllHotelOrders = !showAllHotelOrders" class="text-sm text-stone-600 hover:text-stone-800 flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 transition-transform duration-200" :class="{ 'rotate-180': showAllHotelOrders }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                </svg>
+                <span class="ml-1">{{ showAllHotelOrders ? '收起' : '展开' }}</span>
+              </button>
+            </div>
+          </div>
+
+          <div v-if="loadingHotelOrders" class="p-8 text-center text-stone-500">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+            <p>正在加载酒店订单...</p>
+          </div>
+
+          <div v-else-if="showAllHotelOrders" class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-stone-200">
+              <thead class="bg-stone-50">
+                <tr>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">订单ID</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">用户</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">酒店 / 房型</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">入住 - 离店</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">预订人</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">金额</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">状态</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">下单时间</th>
+                  <th class="px-6 py-3 text-right text-xs font-medium text-stone-500 uppercase tracking-wider">操作</th>
+                </tr>
+              </thead>
+              <tbody class="bg-white divide-y divide-stone-200">
+                <tr v-for="order in hotelOrders" :key="order.id" class="hover:bg-stone-50">
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-500">{{ order.id }}</td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-stone-800">{{ order.user?.username || '-' }}</td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-600">
+                    <div>{{ order.hotel?.name || '未知酒店' }}</div>
+                    <div class="text-xs text-stone-400">{{ order.roomName }}</div>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-500">
+                    <div>{{ order.checkInDate }}</div>
+                    <div class="text-xs text-stone-400">至 {{ order.checkOutDate }}</div>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-600">
+                    <div>{{ order.guestName }}</div>
+                    <div class="text-xs text-stone-400">{{ order.phone }}</div>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-red-600">¥{{ order.totalPrice }}</td>
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <select
+                      :value="order.status"
+                      @change="updateHotelOrderStatus(order.id, ($event.target as HTMLSelectElement).value)"
+                      class="text-xs px-2 py-1 rounded-full font-semibold border-0 cursor-pointer"
+                      :class="{
+                        'bg-yellow-100 text-yellow-800': order.status === 'PENDING',
+                        'bg-green-100 text-green-800': order.status === 'CONFIRMED',
+                        'bg-red-100 text-red-800': order.status === 'CANCELLED'
+                      }"
+                    >
+                      <option value="PENDING">待确认</option>
+                      <option value="CONFIRMED">已确认</option>
+                      <option value="CANCELLED">已取消</option>
+                    </select>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-500">{{ formatDateTime(order.createdAt) }}</td>
+                  <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <button @click="deleteHotelOrder(order.id)" class="text-red-600 hover:text-red-900">删除</button>
+                  </td>
+                </tr>
+                <tr v-if="hotelOrders.length === 0">
+                  <td colspan="9" class="px-6 py-8 text-center text-stone-500">暂无酒店订单</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div v-else-if="!loadingHotelOrders && hotelOrders.length > 0" class="px-6 py-4 text-center text-stone-500 text-sm">
+            点击上方标题栏展开查看全部订单（共{{ hotelOrders.length }}条）
+          </div>
+        </div>
+
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <!-- Recent Bookings -->
           <div class="bg-white rounded-lg shadow overflow-hidden">
@@ -63,17 +149,23 @@
               <h3 class="text-lg font-bold text-stone-800">最新订单</h3>
             </div>
             <div class="divide-y divide-stone-200">
-              <div v-for="booking in stats.recentBookings" :key="booking.id" class="px-6 py-4 flex items-center justify-between">
-                <div>
-                  <p class="text-sm font-medium text-stone-800">{{ booking.spot?.name || '未知景点' }}</p>
-                  <p class="text-xs text-stone-500">{{ formatDate(booking.createdAt) }}</p>
+              <template v-if="recentOrders.length > 0">
+                <div v-for="order in recentOrders" :key="order.id" class="px-6 py-4 flex items-center justify-between">
+                  <div>
+                    <div class="flex items-center gap-2">
+                      <span v-if="order.hotel" class="text-xs px-2 py-0.5 rounded bg-blue-100 text-blue-700">酒店</span>
+                      <span v-else class="text-xs px-2 py-0.5 rounded bg-orange-100 text-orange-700">景点</span>
+                      <p class="text-sm font-medium text-stone-800">{{ order.hotel?.name || order.spot?.name || '未知' }}</p>
+                    </div>
+                    <p class="text-xs text-stone-500 mt-1">{{ formatDate(order.createdAt) }}</p>
+                  </div>
+                  <div class="text-right">
+                    <p class="text-sm font-bold text-stone-800">¥{{ order.totalPrice }}</p>
+                    <span :class="getStatusClass(order.status)" class="text-xs px-2 py-1 rounded-full">{{ order.status }}</span>
+                  </div>
                 </div>
-                <div class="text-right">
-                  <p class="text-sm font-bold text-stone-800">¥{{ booking.totalPrice }}</p>
-                  <span :class="getStatusClass(booking.status)" class="text-xs px-2 py-1 rounded-full">{{ booking.status }}</span>
-                </div>
-              </div>
-              <div v-if="!stats.recentBookings?.length" class="px-6 py-4 text-center text-stone-500">
+              </template>
+              <div v-else class="px-6 py-4 text-center text-stone-500">
                 暂无订单
               </div>
             </div>
@@ -209,36 +301,24 @@
                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-stone-900">{{ u.username }}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-500 font-mono">
                       <div class="flex items-center gap-2">
-                        <span v-if="decryptedPasswords[u.id]" class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded font-semibold">
-                          {{ decryptedPasswords[u.id] }}
-                        </span>
-                        <span v-else class="text-xs bg-gray-100 px-2 py-1 rounded" title="密码已加密存储">
-                          {{ u.password ? (u.password.substring(0, 20) + '...') : '-' }}
+                        <span class="text-xs bg-gray-100 px-2 py-1 rounded" title="密码已加密存储">
+                          已加密存储
                         </span>
                         <button 
-                          v-if="!decryptedPasswords[u.id] && isSuperAdmin" 
-                          @click="decryptPassword(u.id)"
-                          :disabled="decryptingPasswords[u.id]"
-                          class="text-xs text-blue-600 hover:text-blue-800 hover:underline disabled:text-gray-400 disabled:cursor-not-allowed"
+                          v-if="isSuperAdmin" 
+                          @click="openPasswordModal(u)"
+                          class="text-xs text-blue-600 hover:text-blue-800 hover:underline"
                           title="点击查看原始密码（仅超级管理员）"
                         >
-                          {{ decryptingPasswords[u.id] ? '解密中...' : '查看密码' }}
+                          查看密码
                         </button>
                         <span 
-                          v-else-if="!decryptedPasswords[u.id] && !isSuperAdmin"
+                          v-else
                           class="text-xs text-gray-400"
                           title="仅超级管理员可以查看密码"
                         >
                           无权限
                         </span>
-                        <button 
-                          v-else
-                          @click="hidePassword(u.id)"
-                          class="text-xs text-gray-500 hover:text-gray-700"
-                          title="隐藏密码"
-                        >
-                          隐藏
-                        </button>
                       </div>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-500">{{ u.nickname || '-' }}</td>
@@ -266,13 +346,53 @@
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <button v-if="u.role !== 'ADMIN'" @click="updateRole(u.id, 'ADMIN')" class="text-blue-600 hover:text-blue-900 mr-4">设为管理员</button>
-                      <button v-else-if="u.username !== 'lzh'" @click="updateRole(u.id, 'USER')" class="text-red-600 hover:text-red-900">取消管理员</button>
-                      <span v-else class="text-gray-400 cursor-not-allowed">不可操作</span>
+                      <button v-else-if="u.username !== 'lzh'" @click="updateRole(u.id, 'USER')" class="text-orange-600 hover:text-orange-900 mr-4">取消管理员</button>
+                      <button v-if="isSuperAdmin && u.username !== 'lzh'" @click="deleteUser(u)" class="text-red-600 hover:text-red-900">删除</button>
+                      <span v-if="u.username === 'lzh'" class="text-gray-400 cursor-not-allowed">不可操作</span>
                     </td>
                   </tr>
                 </tbody>
               </table>
             </div>
+          </div>
+        </div>
+
+        <!-- 审计日志（仅超级管理员） -->
+        <div v-if="isSuperAdmin" class="bg-white rounded-lg shadow overflow-hidden mt-8">
+          <div class="px-6 py-4 border-b border-stone-200 flex justify-between items-center">
+            <h3 class="text-lg font-bold text-stone-800">密码解密审计日志</h3>
+            <button @click="fetchAuditLogs" class="text-sm text-blue-600 hover:text-blue-800" :disabled="loadingAuditLogs">
+              {{ loadingAuditLogs ? '加载中...' : '刷新日志' }}
+            </button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-stone-200">
+              <thead class="bg-stone-50">
+                <tr>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">时间</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">操作人</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">目标用户</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">结果</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">原因</th>
+                </tr>
+              </thead>
+              <tbody class="bg-white divide-y divide-stone-200">
+                <tr v-for="log in auditLogs" :key="log.id" class="hover:bg-stone-50">
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-600">{{ formatDateTime(log.createdAt) }}</td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-stone-800">{{ log.operatorUsername }}</td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-600">{{ log.targetUsername }} (ID: {{ log.targetUserId }})</td>
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <span :class="getAuditActionClass(log.action)" class="px-2 py-1 rounded-full text-xs font-semibold">
+                      {{ getAuditActionLabel(log.action) }}
+                    </span>
+                  </td>
+                  <td class="px-6 py-4 text-sm text-stone-600">{{ log.detail || '-' }}</td>
+                </tr>
+                <tr v-if="!loadingAuditLogs && auditLogs.length === 0">
+                  <td colspan="5" class="px-6 py-6 text-center text-stone-500">暂无审计记录</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
 
@@ -344,6 +464,31 @@
           <div v-else-if="!loadingNews && newsList.length > 0" class="px-6 py-4 text-center text-stone-500 text-sm">
             点击上方标题栏展开查看全部资讯（共{{ newsList.length }}条）
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 查看密码弹窗 -->
+    <div
+      v-if="showPasswordModal"
+      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+      @click.self="closePasswordModal"
+    >
+      <div class="bg-white rounded-2xl max-w-md w-full p-6">
+        <h2 class="text-xl font-bold mb-4 text-stone-800">查看用户密码</h2>
+        <p class="text-sm text-stone-600 mb-3">用户：{{ selectedUserForPassword?.username }}</p>
+
+        <div v-if="passwordModalLoading" class="text-sm text-stone-500">正在解密，请稍候...</div>
+        <div v-else-if="passwordModalError" class="text-sm text-red-600 bg-red-50 p-3 rounded">{{ passwordModalError }}</div>
+        <div v-else class="bg-green-50 border border-green-200 rounded p-3">
+          <p class="text-xs text-green-700 mb-1">明文密码</p>
+          <p class="font-mono text-base text-green-900 break-all">{{ revealedPassword }}</p>
+        </div>
+
+        <div class="mt-5 flex justify-end">
+          <button @click="closePasswordModal" class="px-4 py-2 bg-stone-200 text-stone-700 rounded-lg hover:bg-stone-300">
+            关闭
+          </button>
         </div>
       </div>
     </div>
@@ -509,17 +654,19 @@ import api, { endpoints } from '../api'
 
 interface Stats {
   userCount: number
-  bookingCount: number
+  orderCount: number
   totalRevenue: number
   recentBookings: any[]
+  recentHotelBookings: any[]
   popularSpots: any[]
 }
 
 const stats = ref<Stats>({
   userCount: 0,
-  bookingCount: 0,
+  orderCount: 0,
   totalRevenue: 0,
   recentBookings: [],
+  recentHotelBookings: [],
   popularSpots: []
 })
 const loading = ref(true)
@@ -593,6 +740,15 @@ const getStatusClass = (status: string) => {
   }
 }
 
+// 合并景点门票订单和酒店预订，按时间倒序
+const recentOrders = computed(() => {
+  const scenic = (stats.value.recentBookings || []).map((b: any) => ({ ...b, _type: 'scenic' }))
+  const hotel = (stats.value.recentHotelBookings || []).map((h: any) => ({ ...h, _type: 'hotel' }))
+  return [...scenic, ...hotel]
+    .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, 10)
+})
+
 // 确保热门景点按点击量降序排序
 const sortedPopularSpots = computed(() => {
   if (!stats.value.popularSpots || stats.value.popularSpots.length === 0) {
@@ -617,9 +773,14 @@ const getClickCountPercentage = (spot: any) => {
 }
 
 const users = ref<any[]>([])
-const decryptedPasswords = ref<Record<number, string>>({}) // 存储解密后的密码
-const decryptingPasswords = ref<Record<number, boolean>>({}) // 跟踪解密状态
 const currentUser = ref<any>(null) // 当前登录用户信息
+const auditLogs = ref<any[]>([])
+const loadingAuditLogs = ref(false)
+const showPasswordModal = ref(false)
+const passwordModalLoading = ref(false)
+const passwordModalError = ref('')
+const selectedUserForPassword = ref<any>(null)
+const revealedPassword = ref('')
 const spots = ref<any[]>([])
 const loadingSpots = ref(false)
 const spotsError = ref('')
@@ -811,7 +972,7 @@ const updateSpotImage = async () => {
 
 const updateRole = async (userId: number, newRole: string) => {
   if (!confirm(`确定要将该用户设置为 ${newRole} 吗？`)) return
-  
+
   try {
     await api.post(endpoints.admin.updateRole(userId), { role: newRole })
     await fetchUsers() // Refresh list
@@ -822,73 +983,106 @@ const updateRole = async (userId: number, newRole: string) => {
   }
 }
 
-// 解密密码（仅超级管理员lzh可用）
-const decryptPassword = async (userId: number) => {
-  // 前端再次确认权限
+const deleteUser = async (user: any) => {
+  if (!confirm(`确定要删除用户 "${user.username}" 吗？此操作不可恢复。`)) return
+
+  try {
+    await api.delete(endpoints.admin.deleteUser(user.id))
+    alert(`用户 "${user.username}" 已删除`)
+    await fetchUsers()
+  } catch (error: any) {
+    console.error('Failed to delete user:', error)
+    alert(error.response?.data?.error || '删除失败')
+  }
+}
+
+const openPasswordModal = async (user: any) => {
   if (!isSuperAdmin.value) {
     alert('权限不足：仅超级管理员可以查看密码')
     return
   }
 
-  decryptingPasswords.value[userId] = true
+  selectedUserForPassword.value = user
+  revealedPassword.value = ''
+  passwordModalError.value = ''
+  showPasswordModal.value = true
+  passwordModalLoading.value = true
+
   try {
-    // 使用 POST 请求（后端接口是 POST）
-    const response = await api.post(endpoints.admin.decryptPassword(userId))
+    const response = await api.post(endpoints.admin.decryptPassword(user.id))
     if (response.data.password) {
-      decryptedPasswords.value[userId] = response.data.password
-    } else if (response.data.message) {
-      // 后端返回的消息
-      alert(response.data.message)
+      revealedPassword.value = response.data.password
     } else {
-      alert('该用户没有可解密的密码（可能是旧用户）')
+      passwordModalError.value = response.data.message || '该用户没有可解密密码'
     }
   } catch (error: any) {
     console.error('Failed to decrypt password:', error)
-    
-    // 处理不同的错误情况
-    if (error.response?.status === 401) {
-      // 401 可能是 token 过期，但不一定需要立即清除
-      // 先检查 token 是否真的无效
-      const userStr = localStorage.getItem('user')
-      if (userStr) {
-        try {
-          const user = JSON.parse(userStr)
-          if (user.token) {
-            // 有 token 但 401，可能是 token 过期，提示用户重新登录
-            const shouldRelogin = confirm('登录可能已过期，是否重新登录？')
-            if (shouldRelogin) {
-              localStorage.removeItem('user')
-              window.location.href = '/login'
-            }
-          } else {
-            alert('登录已过期，请重新登录')
-            localStorage.removeItem('user')
-            window.location.href = '/login'
-          }
-        } catch (e) {
-          alert('登录已过期，请重新登录')
-          localStorage.removeItem('user')
-          window.location.href = '/login'
-        }
-      } else {
-        alert('未登录，请先登录')
-        window.location.href = '/login'
-      }
-    } else if (error.response?.status === 403) {
-      alert('权限不足：仅超级管理员可以查看密码')
-      delete decryptedPasswords.value[userId]
-    } else {
-      const errorMsg = error.response?.data?.error || error.response?.data?.message || '解密失败，请重试'
-      alert(errorMsg)
-    }
+    passwordModalError.value = error.response?.data?.error || error.response?.data?.message || '解密失败，请重试'
   } finally {
-    decryptingPasswords.value[userId] = false
+    passwordModalLoading.value = false
+    await fetchAuditLogs()
   }
 }
 
-// 隐藏密码
-const hidePassword = (userId: number) => {
-  delete decryptedPasswords.value[userId]
+const closePasswordModal = () => {
+  showPasswordModal.value = false
+  selectedUserForPassword.value = null
+  revealedPassword.value = ''
+  passwordModalError.value = ''
+}
+
+const fetchAuditLogs = async () => {
+  if (!isSuperAdmin.value) return
+  loadingAuditLogs.value = true
+  try {
+    const response = await api.get(endpoints.admin.auditLogs)
+    auditLogs.value = Array.isArray(response.data) ? response.data : []
+  } catch (error: any) {
+    console.error('Failed to fetch audit logs:', error)
+    auditLogs.value = []
+  } finally {
+    loadingAuditLogs.value = false
+  }
+}
+
+// Hotel orders management
+const hotelOrders = ref<any[]>([])
+const loadingHotelOrders = ref(false)
+const showAllHotelOrders = ref(false)
+
+const fetchHotelOrders = async () => {
+  loadingHotelOrders.value = true
+  try {
+    const response = await api.get(endpoints.hotelBookings.all)
+    hotelOrders.value = Array.isArray(response.data) ? response.data : []
+  } catch (error: any) {
+    console.error('Failed to fetch hotel orders:', error)
+    hotelOrders.value = []
+  } finally {
+    loadingHotelOrders.value = false
+  }
+}
+
+const updateHotelOrderStatus = async (orderId: number, status: string) => {
+  try {
+    await api.put(endpoints.hotelBookings.updateStatus(orderId), { status })
+    await fetchHotelOrders()
+  } catch (error) {
+    console.error('Failed to update hotel order status:', error)
+    alert('更新状态失败')
+  }
+}
+
+const deleteHotelOrder = async (orderId: number) => {
+  if (!confirm('确定要删除此订单吗？')) return
+  try {
+    await api.delete(endpoints.hotelBookings.cancel(orderId))
+    await fetchHotelOrders()
+    alert('删除成功')
+  } catch (error) {
+    console.error('Failed to delete hotel order:', error)
+    alert('删除失败')
+  }
 }
 
 const fetchNews = async () => {
@@ -1083,6 +1277,29 @@ const getCategoryLabel = (category: string) => {
   return labels[category] || category
 }
 
+const getAuditActionLabel = (action: string) => {
+  switch (action) {
+    case 'DECRYPT_PASSWORD': return '查看密码成功'
+    case 'DECRYPT_PASSWORD_DENIED': return '查看密码拒绝'
+    case 'DELETE_USER': return '删除用户成功'
+    case 'DELETE_USER_DENIED': return '删除用户拒绝'
+    default: return action
+  }
+}
+
+const getAuditActionClass = (action: string) => {
+  switch (action) {
+    case 'DECRYPT_PASSWORD':
+    case 'DELETE_USER':
+      return 'bg-green-100 text-green-800'
+    case 'DECRYPT_PASSWORD_DENIED':
+    case 'DELETE_USER_DENIED':
+      return 'bg-red-100 text-red-800'
+    default:
+      return 'bg-gray-100 text-gray-800'
+  }
+}
+
 const getCategoryClass = (category: string) => {
   const classes: Record<string, string> = {
     POLICY: 'bg-blue-100 text-blue-800',
@@ -1111,11 +1328,13 @@ const loadCurrentUser = () => {
 }
 
 onMounted(() => {
-  loadCurrentUser() // 先加载当前用户信息
+  loadCurrentUser()
   fetchStats()
   fetchUsers()
   fetchSpots()
+  fetchHotelOrders()
   fetchNews()
+  fetchAuditLogs()
 })
 
 onUnmounted(() => {

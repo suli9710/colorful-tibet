@@ -4,7 +4,7 @@
     <div class="relative h-[calc(100vh-6rem)] md:h-[calc(100vh-7rem)] flex items-center justify-center overflow-hidden -mt-24 md:-mt-28">
       <!-- Background Video/Image -->
       <div class="absolute inset-0 z-0">
-        <img src="/heritage/布达拉宫3.jpg" alt="Potala Palace" class="w-full h-full object-cover scale-105 animate-float-slow will-change-transform">
+        <img src="/heritage/布达拉宫3.jpg" alt="Potala Palace" class="w-full h-full object-cover scale-105 animate-float-slow will-change-transform hero-parallax-bg" style="transform-origin: center center;">
         <div class="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-apple-gray-50"></div>
       </div>
 
@@ -30,12 +30,12 @@
 
     <!-- Heatmap Section -->
     <div id="heatmap" class="py-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-      <div class="text-center mb-16 animate-on-scroll opacity-0 translate-y-8 transition-all duration-1000">
+      <div class="text-center mb-16 animate-on-scroll">
         <h2 class="text-4xl font-bold text-apple-gray-900 mb-4 tibetan-font">{{ t('home.hotSpotsDistribution') }}</h2>
         <p class="text-lg text-apple-gray-500 tibetan-font">{{ t('home.hotSpotsDescription') }}</p>
       </div>
       
-      <div class="bg-white rounded-3xl p-6 shadow-2xl animate-on-scroll opacity-0 translate-y-8 transition-all duration-1000 delay-200">
+      <div class="bg-white rounded-3xl p-6 shadow-2xl animate-on-scroll">
         <HeatMap />
       </div>
     </div>
@@ -43,7 +43,7 @@
     <!-- Recommendations Section -->
     <div class="py-24 bg-white">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex justify-between items-end mb-12 animate-on-scroll opacity-0 translate-y-8 transition-all duration-1000">
+        <div class="flex justify-between items-end mb-12 animate-on-scroll">
           <div>
             <h2 class="text-4xl font-bold text-apple-gray-900 mb-2 tibetan-font">{{ t('home.recommendations') }}</h2>
             <p class="text-lg text-apple-gray-500 tibetan-font">{{ t('home.recommendationsDescription') }}</p>
@@ -62,8 +62,8 @@
 
         <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           <div v-for="(spot, index) in recommendedSpots" :key="spot.id" 
-               class="group bg-white rounded-3xl shadow-sm hover:shadow-2xl card-hover overflow-hidden border border-gray-100 animate-on-scroll opacity-0 translate-y-8 hover:border-apple-blue/20 gpu-accelerated"
-               :style="{ transitionDelay: `${index * 100}ms` }">
+               class="group bg-white rounded-3xl shadow-sm hover:shadow-2xl card-hover overflow-hidden border border-gray-100 animate-on-scroll hover:border-apple-blue/20 gpu-accelerated"
+               :style="{ animationDelay: `${index * 100}ms` }">
             <div class="relative h-72 overflow-hidden">
               <img :src="spot.imageUrl" :alt="spot.name" 
                    class="w-full h-full object-cover transition-transform duration-700 ease-out-expo group-hover:scale-110 img-fade-in will-change-transform"
@@ -109,7 +109,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import HeatMap from '../components/HeatMap.vue'
@@ -274,31 +274,22 @@ const fetchRecommendations = async () => {
     const userStr = localStorage.getItem('user')
     if (userStr) {
       const user = JSON.parse(userStr)
-      const [recommendationRes, debugRes] = await Promise.all([
-        api.get(`${endpoints.spots.recommendations}?userId=${user.id}`),
-        api.get(`${endpoints.spots.recommendationsDebug}?userId=${user.id}`)
-      ])
+      // 只调用一次推荐接口，推荐原因从推荐结果中推断，不再额外调用 debug 接口
+      const recommendationRes = await api.get(`${endpoints.spots.recommendations}?userId=${user.id}`)
       recommendedSpots.value = recommendationRes.data
       
-      // 提取推荐原因
-      if (debugRes.data?.recommendationReasons) {
-        const reasonsMap = new Map<number, string>()
-        Object.entries(debugRes.data.recommendationReasons).forEach(([spotId, reason]) => {
-          reasonsMap.set(Number(spotId), reason as string)
-        })
-        recommendationReasons.value = reasonsMap
-        console.log('推荐原因已加载:', reasonsMap, '推荐景点:', recommendedSpots.value.map(s => s.id))
-      } else {
-        console.log('未找到推荐原因数据，使用默认原因')
-        // 为每个推荐景点设置默认原因
-        const defaultReasons = new Map<number, string>()
-        recommendedSpots.value.forEach((spot: any) => {
-          defaultReasons.set(spot.id, '热门景点')
-        })
-        recommendationReasons.value = defaultReasons
-      }
-      
-      logRecommendationDebugInfo(debugRes.data)
+      // 为推荐景点生成推荐原因（从景点属性推断，无需额外请求）
+      const reasonsMap = new Map<number, string>()
+      recommendedSpots.value.forEach((spot: any) => {
+        if (spot.rating && spot.rating >= 4.0) {
+          reasonsMap.set(spot.id, '高评分景点')
+        } else if (spot.visitCount && spot.visitCount > 15000) {
+          reasonsMap.set(spot.id, '热门景点')
+        } else {
+          reasonsMap.set(spot.id, '为您精选')
+        }
+      })
+      recommendationReasons.value = reasonsMap
     } else {
       const response = await api.get(endpoints.spots.list)
       recommendedSpots.value = response.data.slice(0, 3)
@@ -316,29 +307,54 @@ const fetchRecommendations = async () => {
   }
 }
 
-const initIntersectionObserver = () => {
+const initScrollAnimations = () => {
   const observer = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
       if (entry.isIntersecting) {
-        entry.target.classList.remove('opacity-0', 'translate-y-8')
+        entry.target.classList.add('revealed')
         observer.unobserve(entry.target)
       }
     })
-  }, { threshold: 0.1 })
+  }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' })
 
-  document.querySelectorAll('.animate-on-scroll').forEach(el => {
+  document.querySelectorAll('.animate-on-scroll:not(.revealed)').forEach(el => {
     observer.observe(el)
   })
+}
+
+// 视差滚动效果（Hero 背景随页面滚动轻微移动）
+const initParallax = () => {
+  const heroBg = document.querySelector('.hero-parallax-bg') as HTMLElement | null
+  if (!heroBg) return
+
+  let ticking = false
+  const onScroll = () => {
+    if (!ticking) {
+      requestAnimationFrame(() => {
+        const scrollY = window.scrollY
+        heroBg.style.transform = `translateY(${scrollY * 0.3}px)`
+        ticking = false
+      })
+      ticking = true
+    }
+  }
+
+  window.addEventListener('scroll', onScroll, { passive: true })
+  return () => window.removeEventListener('scroll', onScroll)
 }
 
 // 监听语言变化，重新获取数据
 watch(locale, () => {
   fetchRecommendations()
+  setTimeout(initScrollAnimations, 300)
 })
 
 onMounted(async () => {
   await fetchRecommendations()
-  // Wait for DOM update
-  setTimeout(initIntersectionObserver, 100)
+  setTimeout(initScrollAnimations, 100)
+  const cleanupParallax = initParallax()
+  if (cleanupParallax) {
+    onUnmounted(cleanupParallax)
+  }
 })
 </script>

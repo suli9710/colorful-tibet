@@ -1,7 +1,6 @@
 <template>
   <div class="min-h-screen bg-apple-gray-50 py-24">
     <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-      <!-- Header -->
       <div class="text-center mb-12 animate-fade-in">
         <h1 class="text-4xl font-bold text-apple-gray-900 mb-4">{{ t('createRoute.title') }}</h1>
         <p class="text-lg text-apple-gray-500">
@@ -9,10 +8,8 @@
         </p>
       </div>
 
-      <!-- Form Section -->
       <div class="glass rounded-3xl p-8 md:p-12 mb-12 animate-slide-up shadow-xl border border-white/50">
         <form @submit.prevent="submitRoute" class="space-y-8">
-          <!-- Title -->
           <div>
             <label class="block text-sm font-medium text-apple-gray-700 mb-2">
               {{ t('createRoute.routeTitle') }} <span class="text-red-500">*</span>
@@ -28,9 +25,7 @@
             <p class="mt-1 text-xs text-gray-500">{{ form.title.length }}/200</p>
           </div>
 
-          <!-- Days, Budget, Preference -->
           <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <!-- Days -->
             <div>
               <label class="block text-sm font-medium text-apple-gray-700 mb-2">
                 {{ t('createRoute.plannedDays') }} <span class="text-red-500">*</span>
@@ -54,7 +49,6 @@
               </div>
             </div>
 
-            <!-- Budget -->
             <div>
               <label class="block text-sm font-medium text-apple-gray-700 mb-2">
                 {{ t('createRoute.budgetRange') }} <span class="text-red-500">*</span>
@@ -65,13 +59,10 @@
                 required
               >
                 <option value="">{{ t('createRoute.selectBudget') }}</option>
-                <option value="经济型">{{ t('routePlanner.budget.economy') }}</option>
-                <option value="舒适型">{{ t('routePlanner.budget.comfort') }}</option>
-                <option value="豪华型">{{ t('routePlanner.budget.luxury') }}</option>
+                <option v-for="opt in budgetOptions" :key="opt.key" :value="opt.key">{{ opt.label }}</option>
               </select>
             </div>
 
-            <!-- Preference -->
             <div>
               <label class="block text-sm font-medium text-apple-gray-700 mb-2">
                 {{ t('createRoute.preference') }} <span class="text-red-500">*</span>
@@ -82,15 +73,11 @@
                 required
               >
                 <option value="">{{ t('createRoute.selectPreference') }}</option>
-                <option value="自然风光">{{ t('routePlanner.preferenceOptions.natural') }}</option>
-                <option value="人文历史">{{ t('routePlanner.preferenceOptions.cultural') }}</option>
-                <option value="深度摄影">{{ t('routePlanner.preferenceOptions.photography') }}</option>
-                <option value="休闲度假">{{ t('routePlanner.preferenceOptions.relaxation') }}</option>
+                <option v-for="opt in preferenceOptions" :key="opt.key" :value="opt.key">{{ opt.label }}</option>
               </select>
             </div>
           </div>
 
-          <!-- Content -->
           <div>
             <label class="block text-sm font-medium text-apple-gray-700 mb-2">
               {{ t('createRoute.routeContent') }} <span class="text-red-500">*</span>
@@ -107,7 +94,6 @@
             </p>
           </div>
 
-          <!-- Buttons -->
           <div class="flex justify-end gap-4 pt-4 border-t border-gray-200">
             <button 
               type="button"
@@ -138,7 +124,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import api from '../api'
@@ -157,8 +143,20 @@ const form = ref({
 
 const submitting = ref(false)
 
+const budgetOptions = computed(() => [
+  { key: '经济型', label: t('routePlanner.budget.economy') },
+  { key: '舒适型', label: t('routePlanner.budget.comfort') },
+  { key: '豪华型', label: t('routePlanner.budget.luxury') }
+])
+
+const preferenceOptions = computed(() => [
+  { key: '自然风光', label: t('routePlanner.preferenceOptions.natural') },
+  { key: '人文历史', label: t('routePlanner.preferenceOptions.cultural') },
+  { key: '深度摄影', label: t('routePlanner.preferenceOptions.photography') },
+  { key: '休闲度假', label: t('routePlanner.preferenceOptions.relaxation') }
+])
+
 const submitRoute = async () => {
-  // 检查是否登录
   const userStr = localStorage.getItem('user')
   if (!userStr) {
     if (confirm(t('createRoute.loginRequired'))) {
@@ -194,7 +192,6 @@ const submitRoute = async () => {
 }
 
 onMounted(() => {
-  // 检查登录状态
   const userStr = localStorage.getItem('user')
   if (!userStr) {
     if (confirm(t('createRoute.loginRequired'))) {
@@ -203,7 +200,3 @@ onMounted(() => {
   }
 })
 </script>
-
-
-
-

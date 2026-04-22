@@ -266,21 +266,30 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public ResponseEntity<?> registerUser(@RequestBody User signUpRequest) {
-        if (userRepository.existsByUsername(signUpRequest.getUsername())) {
+    public ResponseEntity<?> registerUser(@RequestBody Map<String, String> signUpRequest) {
+        String username = signUpRequest.get("username") == null ? null : signUpRequest.get("username").trim();
+        String nickname = signUpRequest.get("nickname") == null ? null : signUpRequest.get("nickname").trim();
+        String plainPassword = signUpRequest.get("password");
+
+        System.out.println("=== [AuthController] register payload username=" + username + ", nickname=" + nickname + ", passwordEmpty=" + !StringUtils.hasText(plainPassword));
+
+        if (!StringUtils.hasText(username) || !StringUtils.hasText(plainPassword)) {
+            return ResponseEntity.badRequest().body(Map.of("message", "用户名和密码不能为空"));
+        }
+
+        if (userRepository.existsByUsernameIgnoreCase(username)) {
             return ResponseEntity
                     .badRequest()
-                    .body(Map.of("message", "Error: Username is already taken!"));
+                    .body(Map.of("message", "用户名已存在，请换一个用户名"));
         }
 
         // Create new user's account
-        String plainPassword = signUpRequest.getPassword();
         User user = new User();
-        user.setUsername(signUpRequest.getUsername());
+        user.setUsername(username);
         // 双重存储：BCrypt用于验证，AES用于管理员查看
         user.setPassword(passwordEncoder.encode(plainPassword)); // BCrypt哈希
         user.setEncryptedPassword(passwordEncryptionService.encrypt(plainPassword)); // AES加密
-        user.setNickname(signUpRequest.getNickname());
+        user.setNickname(StringUtils.hasText(nickname) ? nickname : username);
         user.setRole(User.Role.USER);
 
         userRepository.save(user);

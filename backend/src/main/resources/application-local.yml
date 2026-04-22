@@ -1,5 +1,8 @@
-# 本地部署配置（使用H2文件数据库，无需安装MySQL）
-# 使用方式：java -jar app.jar --spring.profiles.active=local
+# 本地部署配置（默认连接 MySQL）
+# 使用方式：
+# 1. 先启动 MySQL，并创建数据库：colorful_tibet
+# 2. 配置环境变量或直接修改下面的连接信息
+# 3. 启动时使用：java -jar app.jar --spring.profiles.active=local
 
 server:
   port: 8080
@@ -12,24 +15,20 @@ spring:
     async:
       request-timeout: 120000
   datasource:
-    # 使用H2文件数据库，数据保存在 ./data/tibet_tourism.mv.db
-    # AUTO_SERVER=TRUE 允许多个连接同时访问
-    url: jdbc:h2:file:./data/tibet_tourism;AUTO_SERVER=TRUE;DB_CLOSE_DELAY=-1
-    username: sa
-    password: 
-    driver-class-name: org.h2.Driver
+    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:colorful_tibet}?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: ${MYSQL_USERNAME:root}
+    password: ${MYSQL_PASSWORD:password}
+    driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
-    database-platform: org.hibernate.dialect.H2Dialect
+    database-platform: org.hibernate.dialect.MySQL8Dialect
     hibernate:
-      ddl-auto: update  # 自动更新表结构，保留数据
+      ddl-auto: update
     show-sql: false
     properties:
       hibernate:
         format_sql: false
-  h2:
-    console:
-      enabled: true
-      path: /h2-console  # H2数据库控制台访问路径
+
+# 可选：如果你仍想临时使用 H2，可把上面的 datasource 改回 H2 配置
 
 doubao:
   api:
@@ -53,10 +52,17 @@ jwt:
   secret: ${JWT_SECRET:tibetTourismSecretKey12345678901234567890}
   expiration: 86400000  # 24小时
 
-# 密码加密配置
+# 密码加密配置 + H2 -> MySQL 一次性迁移开关
 app:
   encryption:
     key: ${ADMIN_ENCRYPTION_KEY:tibetTourismSecretKey12345678901234567890}
+  migration:
+    h2-to-mysql:
+      enabled: ${H2_TO_MYSQL_MIGRATION_ENABLED:false}
+      h2-url: ${H2_MIGRATION_URL:jdbc:h2:file:./data/h2/tibet_tourism;AUTO_SERVER=TRUE;DB_CLOSE_DELAY=-1}
+      h2-username: ${H2_MIGRATION_USERNAME:sa}
+      h2-password: ${H2_MIGRATION_PASSWORD:}
+      skip-non-empty-table: ${H2_TO_MYSQL_SKIP_NON_EMPTY_TABLE:true}
 
 # 日志配置
 logging:
@@ -68,9 +74,3 @@ logging:
   pattern:
     file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
-
-
-
-
-
-

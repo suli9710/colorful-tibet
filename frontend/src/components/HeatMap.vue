@@ -4,11 +4,20 @@ import { useI18n } from 'vue-i18n'
 import * as echarts from 'echarts'
 import api from '@/api'
 
-const { locale } = useI18n()
+const { locale, t } = useI18n()
 const chartRef = ref<HTMLElement | null>(null)
 let chart: echarts.ECharts | null = null
-const zoomLevel = ref(1.0) // 缩放倍率，范围 0.5 - 5.0
-let mapLoaded = false // 地图是否加载成功（在onMounted中设置）
+const zoomLevel = ref(1.0)
+let mapLoaded = false
+
+const getHeatLevel = (heat: number): string => {
+  if (heat >= 2000) return t('heatmap.heatLevel.superHot')
+  if (heat >= 1500) return t('heatmap.heatLevel.veryHot')
+  if (heat >= 1000) return t('heatmap.heatLevel.hot')
+  if (heat >= 500) return t('heatmap.heatLevel.fairlyHot')
+  if (heat >= 100) return t('heatmap.heatLevel.normal')
+  return t('heatmap.heatLevel.spot')
+}
 
 const loadChartData = async () => {
   if (!chartRef.value || !chart) return
@@ -17,18 +26,16 @@ const loadChartData = async () => {
     const response = await api.get('/spots')
     const spots = Array.isArray(response.data) ? response.data : (response.data.content || [])
     
-    // 过滤掉没有经纬度的景点，保留所有有坐标的景点（包括visitCount为0的）
     const data = spots
       .filter((spot: any) => spot.longitude != null && spot.latitude != null)
       .map((spot: any) => ({
         name: spot.name,
-        value: [spot.longitude, spot.latitude, spot.visitCount || 1] // 最小值为1，确保所有景点都能显示
+        value: [spot.longitude, spot.latitude, spot.visitCount || 1]
       }))
 
-    // 根据地图是否加载成功，使用不同的配置
     const option: any = {
       title: {
-        text: '西藏热门景点热力分布',
+        text: t('heatmap.title'),
         left: 'center',
         top: 20,
         textStyle: {
@@ -41,15 +48,8 @@ const loadChartData = async () => {
         trigger: 'item',
         formatter: function (params: any) {
           const heat = params.value[2]
-          let level = '一般'
-          if (heat >= 2000) level = '🔥🔥🔥 超级热门'
-          else if (heat >= 1500) level = '🔥🔥 非常热门'
-          else if (heat >= 1000) level = '🔥 热门'
-          else if (heat >= 500) level = '⭐ 较热门'
-          else if (heat >= 100) level = '⭐ 一般热门'
-          else if (heat > 0) level = '📍 景点'
-          else level = '📍 景点'
-          return `<strong style="font-size: 14px">${params.name}</strong><br/>访问热度: ${heat}<br/>热度等级: ${level}`
+          const level = getHeatLevel(heat)
+          return `<strong style="font-size: 14px">${params.name}</strong><br/>${t('heatmap.accessHeat')}: ${heat}<br/>${t('heatmap.heatLevelLabel')}: ${level}`
         },
         backgroundColor: 'rgba(0, 0, 0, 0.85)',
         borderColor: '#fbbf24',
@@ -67,8 +67,6 @@ const loadChartData = async () => {
           coordinateSystem: mapLoaded ? 'geo' : undefined,
           data: data,
           symbolSize: function (val: any) {
-            // 根据热度动态调整大小：1-2500 -> 6-25px
-            // 确保即使热度很低的景点也能看到（最小6px）
             const size = val[2] > 0 ? Math.max(Math.min(val[2] / 100, 25), 6) : 6;
             return size;
           },
@@ -98,13 +96,11 @@ const loadChartData = async () => {
           name: '热门景点',
           type: 'effectScatter',
           coordinateSystem: mapLoaded ? 'geo' : undefined,
-          // 显示热度前10的景点，或者热度大于等于100的景点
           data: data
-            .filter((item: any) => item.value[2] >= 100) // 只显示热度>=100的景点
+            .filter((item: any) => item.value[2] >= 100)
             .sort((a: any, b: any) => b.value[2] - a.value[2])
-            .slice(0, 10), // 最多显示10个热门景点
+            .slice(0, 10),
           symbolSize: function (val: any) {
-            // 热门景点更大：100-2500 -> 18-30px
             return Math.max(Math.min(val[2] / 80, 30), 18);
           },
           showEffectOn: 'render',
@@ -134,16 +130,15 @@ const loadChartData = async () => {
       ]
     }
 
-    // 如果地图加载成功，添加geo配置
     if (mapLoaded) {
       option.geo = {
         map: 'tibet',
-        roam: 'move', // 只允许拖拽，缩放由滑块控制
-        center: [90.0, 30.5], // 西藏中心位置
-        zoom: zoomLevel.value, // 使用响应式的缩放级别
+        roam: 'move',
+        center: [90.0, 30.5],
+        zoom: zoomLevel.value,
         scaleLimit: {
-          min: 0.5, // 最小缩放级别（可以缩小到50%）
-          max: 5 // 最大缩放级别（可以放大到500%）
+          min: 0.5,
+          max: 5
         },
         label: {
           show: true,
@@ -165,7 +160,6 @@ const loadChartData = async () => {
         }
       }
     } else {
-      // 如果地图加载失败，使用地理坐标系（基于经纬度的散点图）
       option.geo = {
         roam: 'move',
         center: [90.0, 30.5],
@@ -174,13 +168,12 @@ const loadChartData = async () => {
           min: 0.5,
           max: 5
         },
-        map: undefined, // 不使用地图
+        map: undefined,
         itemStyle: {
           areaColor: 'transparent',
           borderColor: 'transparent'
         }
       }
-      // 为散点图添加地理坐标配置
       option.series[0].coordinateSystem = 'geo'
       option.series[1].coordinateSystem = 'geo'
     }
@@ -195,15 +188,12 @@ onMounted(async () => {
   if (chartRef.value) {
     chart = echarts.init(chartRef.value)
     
-    // Load Tibet Map Data (西藏自治区地图)
     try {
-      const mapResponse = await fetch('/geo/540000_full.json')
-      // 检查响应状态和内容类型
+      const mapResponse = await fetch('https://geo.datav.aliyun.com/areas_v3/bound/540000_full.json')
       if (mapResponse.ok) {
         const contentType = mapResponse.headers.get('content-type')
         if (contentType && contentType.includes('application/json')) {
           const mapJson = await mapResponse.json()
-          // 验证返回的是有效的JSON对象
           if (mapJson && typeof mapJson === 'object') {
             echarts.registerMap('tibet', mapJson)
             mapLoaded = true
@@ -220,7 +210,6 @@ onMounted(async () => {
   window.addEventListener('resize', handleResize)
 })
 
-// 监听缩放级别变化，更新地图
 watch(zoomLevel, (newZoom) => {
   if (chart) {
     chart.setOption({
@@ -231,7 +220,6 @@ watch(zoomLevel, (newZoom) => {
   }
 }, { immediate: false })
 
-// 监听语言变化，重新加载数据
 watch(locale, () => {
   loadChartData()
 })
@@ -254,10 +242,9 @@ onUnmounted(() => {
 <template>
   <div class="relative w-full h-[600px] bg-white rounded-2xl shadow-lg border border-gray-200">
     <div ref="chartRef" class="w-full h-full"></div>
-    <!-- 左下角缩放控制器 -->
     <div class="absolute left-4 bottom-4 bg-white/90 backdrop-blur-sm rounded-lg shadow-lg border border-gray-200 p-4 min-w-[200px]">
       <div class="flex items-center justify-between mb-2">
-        <span class="text-sm font-medium text-gray-700">缩放倍率</span>
+        <span class="text-sm font-medium text-gray-700">{{ t('heatmap.zoomLevel') }}</span>
         <span class="text-sm font-bold text-blue-600">{{ zoomLevel.toFixed(1) }}x</span>
       </div>
       <input
@@ -278,7 +265,13 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-/* 自定义滑块样式 */
+/* 缩放滑块样式 */
+.slider {
+  outline: none;
+}
+.slider:focus::-webkit-slider-thumb {
+  box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.25), 0 2px 8px rgba(14, 165, 233, 0.4);
+}
 .slider::-webkit-slider-thumb {
   appearance: none;
   width: 18px;
@@ -293,6 +286,7 @@ onUnmounted(() => {
 .slider::-webkit-slider-thumb:hover {
   background: #0284c7;
   transform: scale(1.1);
+  box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.2), 0 2px 8px rgba(14, 165, 233, 0.4);
 }
 
 .slider::-moz-range-thumb {

@@ -1,7 +1,6 @@
 <template>
   <div class="min-h-screen bg-apple-gray-50 py-24">
     <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-      <!-- Header -->
       <div class="text-center mb-12 animate-fade-in">
         <h1 class="text-4xl font-bold text-apple-gray-900 mb-4">{{ t('routePlanner.title') }}</h1>
         <p class="text-lg text-apple-gray-500">
@@ -9,11 +8,9 @@
         </p>
       </div>
 
-      <!-- Form Section -->
       <div class="glass rounded-3xl p-8 mb-12 animate-slide-up" style="animation-delay: 0.1s">
         <form @submit.prevent="generateRoute" class="space-y-8">
           <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <!-- Days -->
             <div>
               <label class="block text-sm font-medium text-apple-gray-700 mb-2">{{ t('routePlanner.plannedDays') }}</label>
               <div class="flex items-center space-x-4">
@@ -29,24 +26,22 @@
               </div>
             </div>
 
-            <!-- Budget -->
             <div>
               <label class="block text-sm font-medium text-apple-gray-700 mb-2">{{ t('routePlanner.budgetRange') }}</label>
               <select v-model="form.budget" class="w-full px-4 py-2.5 rounded-xl bg-white/50 border border-gray-200 focus:border-apple-blue focus:ring-2 focus:ring-blue-100 outline-none transition-all appearance-none">
-                <option value="经济型">{{ t('routePlanner.budget.economy') }}</option>
-                <option value="舒适型">{{ t('routePlanner.budget.comfort') }}</option>
-                <option value="豪华型">{{ t('routePlanner.budget.luxury') }}</option>
+                <option value="economy">{{ t('routePlanner.budget.economy') }}</option>
+                <option value="comfort">{{ t('routePlanner.budget.comfort') }}</option>
+                <option value="luxury">{{ t('routePlanner.budget.luxury') }}</option>
               </select>
             </div>
 
-            <!-- Preference -->
             <div>
               <label class="block text-sm font-medium text-apple-gray-700 mb-2">{{ t('routePlanner.preference') }}</label>
               <select v-model="form.preference" class="w-full px-4 py-2.5 rounded-xl bg-white/50 border border-gray-200 focus:border-apple-blue focus:ring-2 focus:ring-blue-100 outline-none transition-all appearance-none">
-                <option value="自然风光">{{ t('routePlanner.preferenceOptions.natural') }}</option>
-                <option value="人文历史">{{ t('routePlanner.preferenceOptions.cultural') }}</option>
-                <option value="深度摄影">{{ t('routePlanner.preferenceOptions.photography') }}</option>
-                <option value="休闲度假">{{ t('routePlanner.preferenceOptions.relaxation') }}</option>
+                <option value="natural">{{ t('routePlanner.preferenceOptions.natural') }}</option>
+                <option value="cultural">{{ t('routePlanner.preferenceOptions.cultural') }}</option>
+                <option value="photography">{{ t('routePlanner.preferenceOptions.photography') }}</option>
+                <option value="relaxation">{{ t('routePlanner.preferenceOptions.relaxation') }}</option>
               </select>
             </div>
           </div>
@@ -68,8 +63,7 @@
         </form>
       </div>
 
-      <!-- Result Section -->
-      <div v-if="result" class="glass rounded-3xl p-8 md:p-12 animate-slide-up shadow-xl border border-white/50">
+      <div v-if="result" class="glass rounded-3xl p-8 md:p-12 animate-on-scroll shadow-xl border border-white/50">
         <div class="prose prose-lg max-w-none prose-headings:text-apple-gray-900 prose-p:text-apple-gray-600 prose-strong:text-apple-blue">
           <div v-html="renderedResult"></div>
         </div>
@@ -94,20 +88,38 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { marked } from 'marked'
 import api from '../api'
 
 const { t } = useI18n()
+const { init: initScrollAnimations } = (() => {
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('revealed')
+        observer.unobserve(entry.target)
+      }
+    })
+  }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' })
+
+  return {
+    init: () => {
+      document.querySelectorAll('.animate-on-scroll:not(.revealed)').forEach(el => {
+        observer.observe(el)
+      })
+    }
+  }
+})()
 
 const router = useRouter()
 
 const form = ref({
   days: 7,
-  budget: '舒适型',
-  preference: '自然风光'
+  budget: 'comfort',
+  preference: 'natural'
 })
 
 const loading = ref(false)
@@ -126,6 +138,7 @@ const generateRoute = async () => {
   try {
     const response = await api.post('/routes/generate', form.value)
     result.value = response.data
+    setTimeout(initScrollAnimations, 50)
   } catch (error: any) {
     console.error('Failed to generate route:', error)
     
@@ -163,10 +176,13 @@ const saveRoute = () => {
   document.body.removeChild(link)
 }
 
+const getPreferenceText = (key: string) => {
+  return t(`routePlanner.preferenceOptions.${key}`)
+}
+
 const shareRoute = async () => {
     if (!result.value) return
     
-    // 检查是否登录
     const userStr = localStorage.getItem('user')
     if (!userStr) {
         if (confirm(t('routePlanner.loginRequired'))) {
@@ -178,7 +194,7 @@ const shareRoute = async () => {
     sharing.value = true
     try {
         await api.post('/routes/share', {
-            title: t('routePlanner.routeTitle', { days: form.value.days, preference: form.value.preference }),
+            title: t('routePlanner.routeTitle', { days: form.value.days, preference: getPreferenceText(form.value.preference) }),
             content: result.value,
             days: form.value.days,
             budget: form.value.budget,

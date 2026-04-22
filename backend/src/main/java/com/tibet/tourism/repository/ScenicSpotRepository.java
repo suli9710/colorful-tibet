@@ -4,8 +4,8 @@ import com.tibet.tourism.entity.ScenicSpot;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 public interface ScenicSpotRepository extends JpaRepository<ScenicSpot, Long> {
@@ -14,7 +14,6 @@ public interface ScenicSpotRepository extends JpaRepository<ScenicSpot, Long> {
     @Query("SELECT DISTINCT s FROM ScenicSpot s LEFT JOIN FETCH s.tags")
     List<ScenicSpot> findAll();
     
-    // 不加载 tags 的查询方法，用于 admin 接口，避免懒加载问题
     @Query("SELECT s FROM ScenicSpot s")
     List<ScenicSpot> findAllWithoutTags();
     

@@ -562,7 +562,12 @@ function handleCommentImageChange(event: Event) {
 
 const submitComment = async () => {
   if (!commentForm.value.content.trim()) return
-  
+
+  if (!user.value) {
+    router.push('/login')
+    return
+  }
+
   submittingComment.value = true
   try {
     let uploadedImageUrl: string | null = null
@@ -656,8 +661,29 @@ watch(locale, () => {
   fetchSpotDetail()
 })
 
+const updateUser = () => {
+  user.value = JSON.parse(localStorage.getItem('user') || 'null')
+}
+
+const handleStorageChange = (e: StorageEvent) => {
+  if (e.key === 'user') {
+    updateUser()
+  }
+}
+
+const handleUserUpdate = () => {
+  updateUser()
+}
+
 onMounted(() => {
   fetchSpotDetail()
   fetchComments()
+  window.addEventListener('storage', handleStorageChange)
+  window.addEventListener('user-updated', handleUserUpdate)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('storage', handleStorageChange)
+  window.removeEventListener('user-updated', handleUserUpdate)
 })
 </script>

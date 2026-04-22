@@ -136,3 +136,15 @@ public class TibetanDictionary {
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+

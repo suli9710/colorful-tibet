@@ -8,21 +8,33 @@ spring:
     async:
       request-timeout: 120000  # 120秒异步请求超时，适应AI生成时间
   datasource:
-    url: jdbc:h2:mem:tibet_tourism;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    # 默认使用固定路径的 H2 文件数据库，避免重启后数据丢失
+    url: jdbc:h2:file:./data/h2/tibet_tourism;AUTO_SERVER=TRUE;DB_CLOSE_DELAY=-1
     username: sa
-    password: 
+    password:
     driver-class-name: org.h2.Driver
+    # HikariCP 连接池配置（适配 H2 数据库）
+    hikari:
+      maximum-pool-size: 15
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      pool-name: TibetH2Pool
   jpa:
     database-platform: org.hibernate.dialect.H2Dialect
     hibernate:
-      ddl-auto: create-drop
-    show-sql: true
+      ddl-auto: update
+    show-sql: false
     properties:
       hibernate:
         format_sql: true
-  h2:
-    console:
-      enabled: true
+        # JPA 批量处理优化
+        jdbc:
+          batch_size: 25
+        order_inserts: true
+        order_updates: true
+        default_batch_fetch_size: 25
 
 # JWT配置（必须与登录时使用的密钥一致）
 jwt:
@@ -48,5 +60,6 @@ price:
 
 # 密码加密配置（仅管理员可解密）
 app:
+  super-admin-username: ${SUPER_ADMIN_USERNAME:lzh}
   encryption:
     key: ${ADMIN_ENCRYPTION_KEY:tibetTourismSecretKey12345678901234567890}  # 生产环境请使用环境变量设置

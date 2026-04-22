@@ -1,9 +1,13 @@
 {
   "common": {
+    "brandName": "七彩西藏",
+    "chinese": "中文",
+    "tibetan": "藏文",
     "home": "首页",
     "spots": "景点导览",
     "routePlanner": "AI行程",
     "community": "社区",
+    "hotels": "酒店预订",
     "heritage": "非遗文化",
     "news": "资讯",
     "profile": "我的",
@@ -184,7 +188,16 @@
     "imageTooLarge": "图片大小不能超过5MB",
     "avatarUploadSuccess": "头像上传成功",
     "avatarUploadFailed": "头像上传失败，请重试",
-    "avatar": "头像"
+    "avatar": "头像",
+    "myHotelBookingsTab": "我的酒店",
+    "noHotelBookings": "暂无酒店预订记录",
+    "browseHotelsLink": "去浏览酒店 →",
+    "room": "房间",
+    "nights": "晚",
+    "checkIn": "入住",
+    "checkOut": "退房",
+    "confirmCancelHotelBooking": "确定要取消这个酒店预订吗？",
+    "cancelHotelBookingFailed": "取消酒店预订失败"
   },
   "routePlanner": {
     "title": "AI 智能行程规划",
@@ -280,6 +293,57 @@
     "operationFailed": "操作失败，请重试",
     "imageLoadFailed": "图片加载失败"
   },
+  "hotel": {
+    "badge": "甄选住宿",
+    "listTitle": "探索西藏精选酒店",
+    "listSubtitle": "覆盖拉萨、林芝、日喀则等热门目的地，按预算和偏好快速找到理想住宿。",
+    "detailBadge": "酒店详情",
+    "detailTitle": "酒店详情页骨架",
+    "detailSubtitle": "后续可在这里接入酒店图片、房型、设施、评价与地图信息。",
+    "bookNow": "立即预订",
+    "bookingTitle": "酒店预订",
+    "bookingSubtitle": "这里将承载入住日期、离店日期、房型和联系人信息。",
+    "ordersTitle": "我的酒店订单",
+    "ordersSubtitle": "这里将展示待确认、已确认和已取消的酒店订单列表。",
+    "searchPlaceholder": "搜索酒店名称或城市...",
+    "allCities": "全部城市",
+    "allStars": "全部星级",
+    "starUnit": "星",
+    "regionalHotels": "{region}酒店",
+    "hotelsCount": "共 {count} 家酒店",
+    "minHotelsHint": "每个地区至少 4 家酒店",
+    "perNight": "起 / 晚",
+    "reviewCountUnit": "条点评",
+    "available": "可预订",
+    "full": "已满房",
+    "viewDetails": "查看详情",
+    "noResults": "没有找到符合条件的酒店，请调整筛选条件。",
+    "city": {
+      "lhasa": "拉萨",
+      "nyingchi": "林芝",
+      "shigatse": "日喀则",
+      "ngari": "阿里"
+    },
+    "introduction": "酒店介绍",
+    "roomSelection": "房型选择",
+    "startingPrice": "起价",
+    "perNightCompact": "起/晚",
+    "bookThisRoom": "预订此房型",
+    "reviewCount": "{count}条评论",
+    "ordersLoading": "加载订单中...",
+    "noOrders": "暂无订单",
+    "loadingOrders": "加载中...",
+    "checkIn": "入住",
+    "checkOut": "离店",
+    "dateConnector": "至",
+    "guests": "人",
+    "booker": "预订人",
+    "status": {
+      "pending": "待确认",
+      "confirmed": "已确认",
+      "cancelled": "已取消"
+    }
+  },
   "login": {
     "welcomeBack": "欢迎回来",
     "subtitle": "登录您的七彩西藏账号",
@@ -304,11 +368,29 @@
     "registerSuccess": "注册成功，请登录",
     "registerFailed": "注册失败，用户名可能已存在"
   },
+  "footer": {
+    "brandName": "七彩西藏",
+    "description": "探索西藏的神秘与美丽，体验高原上的独特文化。我们致力于为您提供最优质的西藏旅游服务，让每一次旅行都成为难忘的回忆。",
+    "shareToWechat": "分享到微信",
+    "shareToQQ": "分享到QQ",
+    "shareToWeibo": "分享到微博",
+    "quickLinks": "快速导航",
+    "contactUs": "联系我们",
+    "details": "详情",
+    "workHours": "周一至周五 10:00 - 18:00",
+    "emailResponseTime": "通常在 24 小时内回复",
+    "addressLine1": "湖南省长沙市长沙县",
+    "addressLine2": "湖南信息学院",
+    "copyright": "七彩西藏旅游网",
+    "privacyPolicy": "隐私政策",
+    "terms": "服务条款",
+    "aboutUs": "关于我们"
+  },
   "contact": {
     "title": "联系我们",
     "subtitle": "有任何问题或建议？我们随时倾听您的声音。",
     "phone": "电话咨询",
-    "phoneHours": "周一至周日 9:00 - 18:00",
+    "phoneHours": "周一至周五 9:00 - 18:00",
     "email": "电子邮件",
     "emailResponse": "通常在 24 小时内回复",
     "address": "公司地址",
@@ -320,7 +402,37 @@
     "message": "留言内容",
     "messagePlaceholder": "请详细描述您的需求...",
     "sendMessage": "发送消息",
-    "messageSent": "消息已发送！我们会尽快与您联系。"
+    "messageSent": "消息已发送！我们会尽快与您联系。",
+    "phoneConsult": "电话咨询",
+    "emailContact": "邮箱联系",
+    "companyAddress": "公司地址",
+    "closingMessage": "期待为您服务 ❤️",
+    "copiedToClipboard": "已复制到剪贴板"
+  },
+  "heatmap": {
+    "title": "西藏热门景点热力分布",
+    "zoomLevel": "缩放倍率",
+    "heatLevel": {
+      "superHot": "🔥🔥🔥 超级热门",
+      "veryHot": "🔥🔥 非常热门",
+      "hot": "🔥 热门",
+      "fairlyHot": "⭐ 较热门",
+      "normal": "⭐ 一般热门",
+      "spot": "📍 景点"
+    },
+    "accessHeat": "访问热度",
+    "heatLevelLabel": "热度等级",
+    "wechatShare": "请点击右上角菜单，选择「分享到朋友圈」或「发送给朋友」",
+    "pcShare": "请使用微信扫描二维码分享，或复制链接发送给微信好友"
+  },
+  "terms": {
+    "title": "服务条款",
+    "lastUpdated": "最后更新日期：2025年11月",
+    "backToHome": "返回首页"
+  },
+  "share": {
+    "shareTitle": "七彩西藏旅游 - 探索西藏的神秘与美丽",
+    "shareDesc": "探索西藏的神秘与美丽，体验高原上的独特文化。我们致力于为您提供最优质的西藏旅游服务。"
   },
   "routeDetail": {
     "backToList": "返回列表",

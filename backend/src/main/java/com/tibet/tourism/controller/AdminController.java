@@ -1,17 +1,31 @@
 package com.tibet.tourism.controller;
 
+import com.tibet.tourism.entity.AuditLog;
+import com.tibet.tourism.entity.Booking;
+import com.tibet.tourism.entity.HotelBooking;
 import com.tibet.tourism.entity.News;
 import com.tibet.tourism.entity.ScenicSpot;
 import com.tibet.tourism.entity.User;
+import com.tibet.tourism.repository.AuditLogRepository;
+import com.tibet.tourism.repository.BookingRepository;
+import com.tibet.tourism.repository.CommentLikeRepository;
+import com.tibet.tourism.repository.CommentRepository;
+import com.tibet.tourism.repository.HotelBookingRepository;
 import com.tibet.tourism.repository.NewsRepository;
+import com.tibet.tourism.repository.RouteCommentRepository;
+import com.tibet.tourism.repository.RouteLikeRepository;
+import com.tibet.tourism.repository.SharedRouteRepository;
+import com.tibet.tourism.repository.UserVisitHistoryRepository;
+import org.springframework.data.domain.Sort;
 import com.tibet.tourism.repository.ScenicSpotRepository;
 import com.tibet.tourism.repository.UserRepository;
 import com.tibet.tourism.service.PasswordEncryptionService;
 import com.tibet.tourism.service.TibetanTranslationService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -39,7 +53,31 @@ public class AdminController {
     private UserRepository userRepository;
 
     @Autowired
-    private PasswordEncoder passwordEncoder;
+    private AuditLogRepository auditLogRepository;
+
+    @Autowired
+    private BookingRepository bookingRepository;
+
+    @Autowired
+    private HotelBookingRepository hotelBookingRepository;
+
+    @Autowired
+    private CommentRepository commentRepository;
+
+    @Autowired
+    private RouteCommentRepository routeCommentRepository;
+
+    @Autowired
+    private CommentLikeRepository commentLikeRepository;
+
+    @Autowired
+    private RouteLikeRepository routeLikeRepository;
+
+    @Autowired
+    private SharedRouteRepository sharedRouteRepository;
+
+    @Autowired
+    private UserVisitHistoryRepository userVisitHistoryRepository;
 
     @Autowired
     private TibetanTranslationService translationService;
@@ -47,19 +85,44 @@ public class AdminController {
     @Autowired
     private PasswordEncryptionService passwordEncryptionService;
 
+    @Value("${app.super-admin-username:lzh}")
+    private String superAdminUsername;
+
     /**
-     * 获取统计信息
+     * 获取统计信息（景点门票订单 + 酒店预订 合并统计）
      */
     @GetMapping("/stats")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Map<String, Object>> getStats() {
         long userCount = userRepository.count();
         long spotCount = scenicSpotRepository.count();
-        
+
+        // 景点门票订单统计（仅已确认的）
+        long scenicBookingCount = bookingRepository.countConfirmed();
+        BigDecimal scenicRevenue = bookingRepository.sumConfirmedRevenue();
+        if (scenicRevenue == null) scenicRevenue = BigDecimal.ZERO;
+
+        // 酒店预订统计（仅已确认的）
+        long hotelBookingCount = hotelBookingRepository.countAll(); // 已有 countAll()
+        BigDecimal hotelRevenue = hotelBookingRepository.sumTotalRevenue();
+        if (hotelRevenue == null) hotelRevenue = BigDecimal.ZERO;
+
+        // 合并统计
+        long totalOrderCount = scenicBookingCount + hotelBookingCount;
+        BigDecimal totalRevenue = scenicRevenue.add(hotelRevenue);
+
+        // 最新混合订单（景点 + 酒店，各取最新的5条）
+        List<Booking> recentScenicBookings = bookingRepository.findTop5ByStatusOrderByCreatedAtDesc(Booking.Status.CONFIRMED);
+        List<HotelBooking> recentHotelBookings = hotelBookingRepository.findTop5ByStatusOrderByCreatedAtDesc(HotelBooking.Status.CONFIRMED);
+
         Map<String, Object> stats = new HashMap<>();
         stats.put("userCount", userCount);
         stats.put("spotCount", spotCount);
-        
+        stats.put("orderCount", totalOrderCount);
+        stats.put("totalRevenue", totalRevenue);
+        stats.put("recentBookings", recentScenicBookings);
+        stats.put("recentHotelBookings", recentHotelBookings);
+
         return ResponseEntity.ok(stats);
     }
 
@@ -70,6 +133,12 @@ public class AdminController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<User>> getAllUsers() {
         return ResponseEntity.ok(userRepository.findAll());
+    }
+
+    @GetMapping("/audit-logs/list")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<AuditLog>> getAuditLogs() {
+        return ResponseEntity.ok(auditLogRepository.findAll(Sort.by(Sort.Direction.DESC, "createdAt")));
     }
 
     /**
@@ -98,53 +167,119 @@ public class AdminController {
     }
 
     /**
-     * 解密用户密码（仅管理员可用）
+     * 删除用户账户（仅超级管理员可用）
      */
-    @PostMapping("/users/{id}/decrypt-password")
+    @DeleteMapping("/users/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> decryptPassword(@PathVariable Long id) {
-        // 检查服务是否注入成功
-        if (passwordEncryptionService == null) {
-            System.err.println("=== [AdminController] PasswordEncryptionService 未注入！");
-            return ResponseEntity.status(500).body(Map.of(
-                    "error", "密码解密服务未初始化，请检查后端配置"
-            ));
-        }
-        
+    public ResponseEntity<?> deleteUser(@PathVariable Long id, Authentication authentication) {
         Optional<User> userOpt = userRepository.findById(id);
         if (userOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
-        
+
+        User targetUser = userOpt.get();
+        String operatorUsername = authentication == null ? "anonymous" : authentication.getName();
+
+        if (authentication == null || !superAdminUsername.equals(operatorUsername)) {
+            recordAudit(AuditLog.Action.DELETE_USER_DENIED, operatorUsername, targetUser, "非超级管理员尝试删除用户");
+            return ResponseEntity.status(403).body(Map.of(
+                    "error", "只有超级管理员可以删除用户账户"
+            ));
+        }
+
+        if (superAdminUsername.equals(targetUser.getUsername())) {
+            recordAudit(AuditLog.Action.DELETE_USER_DENIED, operatorUsername, targetUser, "不允许删除超级管理员自身");
+            return ResponseEntity.badRequest().body(Map.of("error", "不能删除超级管理员账户"));
+        }
+
+        Long userId = targetUser.getId();
+
+        commentLikeRepository.deleteByUserId(userId);
+
+        routeLikeRepository.deleteByUser(targetUser);
+
+        routeCommentRepository.deleteByUser(targetUser);
+
+        commentRepository.deleteByUser(targetUser);
+
+        sharedRouteRepository.deleteByAuthor(targetUser);
+
+        bookingRepository.deleteByUserId(userId);
+
+        hotelBookingRepository.deleteByUserId(userId);
+
+        userVisitHistoryRepository.deleteByUserId(userId);
+
+        recordAudit(AuditLog.Action.DELETE_USER, operatorUsername, targetUser, "成功删除用户: " + targetUser.getUsername());
+        userRepository.delete(targetUser);
+        return ResponseEntity.ok(Map.of("message", "用户删除成功"));
+    }
+
+    /**
+     * 解密用户密码（仅超级管理员可用）
+     */
+    @PostMapping("/users/{id}/decrypt-password")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> decryptPassword(@PathVariable Long id, Authentication authentication) {
+        Optional<User> userOpt = userRepository.findById(id);
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
         User user = userOpt.get();
-        
-        // 检查是否有加密密码
+        String operatorUsername = authentication == null ? "anonymous" : authentication.getName();
+
+        if (authentication == null || !superAdminUsername.equals(operatorUsername)) {
+            recordAudit(AuditLog.Action.DECRYPT_PASSWORD_DENIED, operatorUsername, user, "仅超级管理员可查看用户密码");
+            return ResponseEntity.status(403).body(Map.of(
+                    "error", "只有超级管理员可以查看用户密码"
+            ));
+        }
+
         if (user.getEncryptedPassword() == null || user.getEncryptedPassword().isEmpty()) {
+            recordAudit(AuditLog.Action.DECRYPT_PASSWORD_DENIED, operatorUsername, user, "目标用户没有可解密的密码");
             return ResponseEntity.ok(Map.of(
                     "message", "该用户没有可解密的密码（可能是旧用户）",
                     "hasEncryptedPassword", false
             ));
         }
-        
+
         try {
-            System.out.println("=== [AdminController] 开始解密用户 " + id + " 的密码");
-            System.out.println("=== [AdminController] 加密密码长度: " + user.getEncryptedPassword().length());
-            
-            // 使用 PasswordEncryptionService 解密密码
             String decryptedPassword = passwordEncryptionService.decrypt(user.getEncryptedPassword());
-            
-            System.out.println("=== [AdminController] 密码解密成功");
-            
+            recordAudit(AuditLog.Action.DECRYPT_PASSWORD, operatorUsername, user, "成功解密用户密码");
             return ResponseEntity.ok(Map.of(
                     "password", decryptedPassword,
                     "hasEncryptedPassword", true
             ));
         } catch (Exception e) {
-            System.err.println("=== [AdminController] 密码解密失败: " + e.getMessage());
-            e.printStackTrace();
+            recordAudit(AuditLog.Action.DECRYPT_PASSWORD_DENIED, operatorUsername, user, "密码解密失败: " + e.getMessage());
             return ResponseEntity.status(500).body(Map.of(
                     "error", "密码解密失败: " + e.getMessage()
             ));
+        }
+    }
+
+    @GetMapping("/audit-logs")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> getAuditLogs(Authentication authentication) {
+        String operatorUsername = authentication == null ? "anonymous" : authentication.getName();
+        if (authentication == null || !superAdminUsername.equals(operatorUsername)) {
+            return ResponseEntity.status(403).body(Map.of("error", "只有超级管理员可以查看审计日志"));
+        }
+        return ResponseEntity.ok(auditLogRepository.findTop200ByOrderByCreatedAtDesc());
+    }
+
+    private void recordAudit(AuditLog.Action action, String operatorUsername, User targetUser, String detail) {
+        try {
+            AuditLog log = new AuditLog();
+            log.setAction(action);
+            log.setOperatorUsername(operatorUsername);
+            log.setTargetUserId(targetUser.getId());
+            log.setTargetUsername(targetUser.getUsername());
+            log.setDetail(detail);
+            auditLogRepository.save(log);
+        } catch (Exception e) {
+            System.err.println("审计日志写入失败: " + e.getMessage());
         }
     }
 
@@ -172,18 +307,11 @@ public class AdminController {
         ScenicSpot spot = spotOpt.get();
         boolean autoTranslate = request.getOrDefault("autoTranslate", true).equals(true);
 
-        // 更新基本信息
         if (request.containsKey("name")) {
             String name = (String) request.get("name");
             spot.setName(name);
-            
-            // 如果启用了自动翻译且没有提供藏语名称，尝试自动生成
             if (autoTranslate && (spot.getNameTibetan() == null || spot.getNameTibetan().isEmpty())) {
-                String tibetanName = translationService.translateOrCreate(
-                        name, 
-                        null, 
-                        com.tibet.tourism.entity.TibetanDictionary.Type.WORD
-                );
+                String tibetanName = translationService.translateOrCreate(name, null, com.tibet.tourism.entity.TibetanDictionary.Type.WORD);
                 if (tibetanName != null) {
                     spot.setNameTibetan(tibetanName);
                 }
@@ -193,8 +321,6 @@ public class AdminController {
         if (request.containsKey("description")) {
             String description = (String) request.get("description");
             spot.setDescription(description);
-            
-            // 如果启用了自动翻译且没有提供藏语描述，尝试自动生成
             if (autoTranslate && (spot.getDescriptionTibetan() == null || spot.getDescriptionTibetan().isEmpty())) {
                 String tibetanDesc = translationService.translateDescription(description);
                 if (tibetanDesc != null) {
@@ -203,18 +329,15 @@ public class AdminController {
             }
         }
 
-        // 如果明确提供了藏语翻译，使用提供的翻译
         if (request.containsKey("nameTibetan")) {
             spot.setNameTibetan((String) request.get("nameTibetan"));
         }
         if (request.containsKey("descriptionTibetan")) {
             spot.setDescriptionTibetan((String) request.get("descriptionTibetan"));
         }
-
         if (request.containsKey("imageUrl")) {
             spot.setImageUrl((String) request.get("imageUrl"));
         }
-
         if (request.containsKey("ticketPrice")) {
             Object priceObj = request.get("ticketPrice");
             if (priceObj instanceof Number) {
@@ -227,15 +350,12 @@ public class AdminController {
                 }
             }
         }
-
         if (request.containsKey("altitude")) {
             spot.setAltitude((String) request.get("altitude"));
         }
-
         if (request.containsKey("location")) {
             spot.setLocation((String) request.get("location"));
         }
-
         if (request.containsKey("category")) {
             try {
                 spot.setCategory(ScenicSpot.Category.valueOf(((String) request.get("category")).toUpperCase()));
@@ -263,13 +383,8 @@ public class AdminController {
         }
         spot.setName(name);
 
-        // 自动生成藏语名称
         if (autoTranslate) {
-            String tibetanName = translationService.translateOrCreate(
-                    name, 
-                    null, 
-                    com.tibet.tourism.entity.TibetanDictionary.Type.WORD
-            );
+            String tibetanName = translationService.translateOrCreate(name, null, com.tibet.tourism.entity.TibetanDictionary.Type.WORD);
             if (tibetanName != null) {
                 spot.setNameTibetan(tibetanName);
             }
@@ -280,7 +395,6 @@ public class AdminController {
         if (request.containsKey("description")) {
             String description = (String) request.get("description");
             spot.setDescription(description);
-            
             if (autoTranslate) {
                 String tibetanDesc = translationService.translateDescription(description);
                 if (tibetanDesc != null) {
@@ -290,18 +404,15 @@ public class AdminController {
                 spot.setDescriptionTibetan((String) request.get("descriptionTibetan"));
             }
         }
-
         if (request.containsKey("imageUrl")) {
             spot.setImageUrl((String) request.get("imageUrl"));
         }
-
         if (request.containsKey("ticketPrice")) {
             Object priceObj = request.get("ticketPrice");
             if (priceObj instanceof Number) {
                 spot.setTicketPrice(BigDecimal.valueOf(((Number) priceObj).doubleValue()));
             }
         }
-
         if (request.containsKey("category")) {
             try {
                 spot.setCategory(ScenicSpot.Category.valueOf(((String) request.get("category")).toUpperCase()));
@@ -338,7 +449,6 @@ public class AdminController {
 
     /**
      * 创建新资讯
-     * 支持自动生成藏语翻译
      */
     @PostMapping("/news")
     @PreAuthorize("hasRole('ADMIN')")
@@ -352,13 +462,8 @@ public class AdminController {
         }
         news.setTitle(title);
 
-        // 自动生成藏语标题
         if (autoTranslate) {
-            String tibetanTitle = translationService.translateOrCreate(
-                    title, 
-                    null, 
-                    com.tibet.tourism.entity.TibetanDictionary.Type.SENTENCE
-            );
+            String tibetanTitle = translationService.translateOrCreate(title, null, com.tibet.tourism.entity.TibetanDictionary.Type.SENTENCE);
             if (tibetanTitle != null) {
                 news.setTitleTibetan(tibetanTitle);
             }
@@ -372,7 +477,6 @@ public class AdminController {
         }
         news.setContent(content);
 
-        // 自动生成藏语内容
         if (autoTranslate) {
             String tibetanContent = translationService.translateDescription(content);
             if (tibetanContent != null) {
@@ -389,11 +493,9 @@ public class AdminController {
                 return ResponseEntity.badRequest().body(Map.of("error", "无效的类别"));
             }
         }
-
         if (request.containsKey("imageUrl")) {
             news.setImageUrl((String) request.get("imageUrl"));
         }
-
         if (request.containsKey("viewCount")) {
             Object viewCountObj = request.get("viewCount");
             if (viewCountObj instanceof Number) {
@@ -407,7 +509,6 @@ public class AdminController {
 
     /**
      * 更新资讯
-     * 支持自动生成藏语翻译
      */
     @PutMapping("/news/{id}")
     @PreAuthorize("hasRole('ADMIN')")
@@ -420,30 +521,20 @@ public class AdminController {
         News news = newsOpt.get();
         boolean autoTranslate = request.getOrDefault("autoTranslate", true).equals(true);
 
-        // 更新标题
         if (request.containsKey("title")) {
             String title = (String) request.get("title");
             news.setTitle(title);
-            
-            // 如果启用了自动翻译且没有提供藏语标题，尝试自动生成
             if (autoTranslate && (news.getTitleTibetan() == null || news.getTitleTibetan().isEmpty())) {
-                String tibetanTitle = translationService.translateOrCreate(
-                        title, 
-                        null, 
-                        com.tibet.tourism.entity.TibetanDictionary.Type.SENTENCE
-                );
+                String tibetanTitle = translationService.translateOrCreate(title, null, com.tibet.tourism.entity.TibetanDictionary.Type.SENTENCE);
                 if (tibetanTitle != null) {
                     news.setTitleTibetan(tibetanTitle);
                 }
             }
         }
 
-        // 更新内容
         if (request.containsKey("content")) {
             String content = (String) request.get("content");
             news.setContent(content);
-            
-            // 如果启用了自动翻译且没有提供藏语内容，尝试自动生成
             if (autoTranslate && (news.getContentTibetan() == null || news.getContentTibetan().isEmpty())) {
                 String tibetanContent = translationService.translateDescription(content);
                 if (tibetanContent != null) {
@@ -452,14 +543,12 @@ public class AdminController {
             }
         }
 
-        // 如果明确提供了藏语翻译，使用提供的翻译
         if (request.containsKey("titleTibetan")) {
             news.setTitleTibetan((String) request.get("titleTibetan"));
         }
         if (request.containsKey("contentTibetan")) {
             news.setContentTibetan((String) request.get("contentTibetan"));
         }
-
         if (request.containsKey("category")) {
             try {
                 news.setCategory(News.Category.valueOf(((String) request.get("category")).toUpperCase()));
@@ -467,11 +556,9 @@ public class AdminController {
                 return ResponseEntity.badRequest().body(Map.of("error", "无效的类别"));
             }
         }
-
         if (request.containsKey("imageUrl")) {
             news.setImageUrl((String) request.get("imageUrl"));
         }
-
         if (request.containsKey("viewCount")) {
             Object viewCountObj = request.get("viewCount");
             if (viewCountObj instanceof Number) {

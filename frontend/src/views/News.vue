@@ -1,12 +1,12 @@
 <template>
   <div class="min-h-screen bg-stone-50 py-12">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="text-center mb-12">
+      <div class="text-center mb-12 animate-on-scroll">
         <h1 class="text-4xl font-bold text-stone-800 mb-4">{{ t('news.title') }}</h1>
         <p class="text-lg text-stone-600">{{ t('news.description') }}</p>
       </div>
 
-      <div class="flex justify-center mb-8 space-x-4">
+      <div class="flex justify-center mb-8 space-x-4 animate-on-scroll">
         <button 
           v-for="cat in categories" 
           :key="cat.value"
@@ -27,7 +27,8 @@
       </div>
 
       <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div v-for="item in filteredNews" :key="item.id" class="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300 flex flex-col h-full">
+        <div v-for="(item, index) in filteredNews" :key="item.id" class="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300 flex flex-col h-full animate-on-scroll"
+             :style="{ animationDelay: `${index * 80}ms` }">
           <div class="w-full h-48 relative flex-shrink-0">
             <img :src="item.imageUrl || '/images/news/default-news.jpg'" :alt="item.title" class="w-full h-full object-cover" onerror="this.src='/images/spots/布达拉宫.jpg'">
             <div class="absolute top-0 left-0 bg-red-600 text-white px-3 py-1 m-4 rounded-full text-xs font-medium">
@@ -51,28 +52,32 @@
       </div>
 
       <!-- Modal for details -->
-      <div v-if="selectedItem" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" @click="closeDetail">
-        <div class="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto" @click.stop>
-          <div class="relative h-64 md:h-96">
-            <img :src="selectedItem.imageUrl || '/images/news/default-news.jpg'" :alt="selectedItem.title" class="w-full h-full object-cover" onerror="this.src='/images/spots/布达拉宫.jpg'">
-            <button @click="closeDetail" class="absolute top-4 right-4 bg-black bg-opacity-50 text-white p-2 rounded-full hover:bg-opacity-70">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-          <div class="p-8">
-            <div class="flex items-center justify-between mb-4">
-              <span class="bg-red-100 text-red-800 px-3 py-1 rounded-full text-sm font-medium">{{ getCategoryLabel(selectedItem.category) }}</span>
-              <span class="text-stone-500 text-sm">{{ formatDate(selectedItem.createdAt) }}</span>
+      <transition name="modal">
+        <div v-if="selectedItem" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50" @click="closeDetail">
+          <transition name="modal-content" appear>
+            <div v-if="selectedItem" class="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto" @click.stop>
+              <div class="relative h-64 md:h-96">
+                <img :src="selectedItem.imageUrl || '/images/news/default-news.jpg'" :alt="selectedItem.title" class="w-full h-full object-cover" onerror="this.src='/images/spots/布达拉宫.jpg'">
+                <button @click="closeDetail" class="absolute top-4 right-4 bg-black/50 text-white p-2 rounded-full hover:bg-black/70 transition-colors">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <div class="p-8">
+                <div class="flex items-center justify-between mb-4">
+                  <span class="bg-red-100 text-red-800 px-3 py-1 rounded-full text-sm font-medium">{{ getCategoryLabel(selectedItem.category) }}</span>
+                  <span class="text-stone-500 text-sm">{{ formatDate(selectedItem.createdAt) }}</span>
+                </div>
+                <h2 class="text-3xl font-bold text-stone-800 mb-6">{{ selectedItem.title }}</h2>
+                <div class="prose max-w-none text-stone-600 whitespace-pre-line">
+                  {{ selectedItem.content }}
+                </div>
+              </div>
             </div>
-            <h2 class="text-3xl font-bold text-stone-800 mb-6">{{ selectedItem.title }}</h2>
-            <div class="prose max-w-none text-stone-600 whitespace-pre-line">
-              {{ selectedItem.content }}
-            </div>
-          </div>
+          </transition>
         </div>
-      </div>
+      </transition>
     </div>
   </div>
 </template>
@@ -159,5 +164,21 @@ watch(locale, () => {
 
 onMounted(() => {
   fetchNews()
+  setTimeout(initScrollAnimations, 100)
 })
+
+const initScrollAnimations = () => {
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('revealed')
+        observer.unobserve(entry.target)
+      }
+    })
+  }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' })
+
+  document.querySelectorAll('.animate-on-scroll:not(.revealed)').forEach(el => {
+    observer.observe(el)
+  })
+}
 </script>

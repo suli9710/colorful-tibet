@@ -18,8 +18,8 @@ public class AiRouteController {
     @PostMapping("/generate")
     public Mono<String> generateRoute(@RequestBody Map<String, Object> params) {
         int days = (int) params.getOrDefault("days", 5);
-        String budget = (String) params.getOrDefault("budget", "中等");
-        String preference = (String) params.getOrDefault("preference", "自然风光");
+        String budget = (String) params.getOrDefault("budget", "comfort");
+        String preference = (String) params.getOrDefault("preference", "natural");
         
         return aiRouteService.generateRoute(days, budget, preference);
     }

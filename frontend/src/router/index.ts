@@ -73,25 +73,46 @@ const router = createRouter({
             path: '/terms',
             name: 'terms',
             component: () => import('../views/TermsOfService.vue')
+        },
+        {
+            path: '/hotels',
+            name: 'hotels',
+            component: () => import('../views/HotelList.vue')
+        },
+        {
+            path: '/hotels/:id',
+            name: 'hotel-detail',
+            component: () => import('../views/HotelDetail.vue')
+        },
+        {
+            path: '/hotel-booking/:id',
+            name: 'hotel-booking',
+            component: () => import('../views/HotelBooking.vue'),
+            meta: { requiresAuth: true }
+        },
+        {
+            path: '/hotel-orders',
+            name: 'hotel-orders',
+            component: () => import('../views/HotelOrders.vue'),
+            meta: { requiresAuth: true }
         }
     ]
 })
 
-router.beforeEach((to, from, next) => {
+router.beforeEach((to) => {
     const userStr = localStorage.getItem('user')
     const user = userStr ? JSON.parse(userStr) : null
     const isAuthenticated = !!user
 
     if (to.path.startsWith('/admin') && (!user || user.role !== 'ADMIN')) {
-        next('/')
-        return
+        return '/'
     }
 
     if (to.meta.requiresAuth && !isAuthenticated) {
-        next('/login')
-    } else {
-        next()
+        return '/login'
     }
+
+    return true
 })
 
 export default router

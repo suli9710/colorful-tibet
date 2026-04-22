@@ -4,9 +4,9 @@
       <!-- 页面标题 -->
       <div class="text-center mb-12">
         <h1 class="text-4xl md:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 mb-4">
-          服务条款
+          {{ t('terms.title') }}
         </h1>
-        <p class="text-gray-500 text-sm">最后更新日期：2025年11月</p>
+        <p class="text-gray-500 text-sm">{{ t('terms.lastUpdated') }}</p>
       </div>
 
       <!-- 内容区域 -->
@@ -221,7 +221,7 @@
           <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
           </svg>
-          返回首页
+          {{ t('terms.backToHome') }}
         </router-link>
       </div>
     </div>
@@ -229,6 +229,7 @@
 </template>
 
 <script setup lang="ts">
-// 页面逻辑（如果需要）
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 </script>
 

@@ -1,25 +1,18 @@
 <template>
-  <!-- Modal Backdrop with blur -->
   <Transition name="modal-fade">
     <div v-if="modelValue" 
          @click="close"
          class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-md">
       
-      <!-- Modal Card with Apple Glass Effect -->
       <Transition name="modal-scale">
         <div v-if="modelValue"
              @click.stop
              class="relative w-full max-w-lg overflow-hidden rounded-3xl shadow-2xl animate-float">
           
-          <!-- Glassmorphism Background -->
           <div class="absolute inset-0 bg-gradient-to-br from-white/90 via-white/80 to-white/70 backdrop-blur-2xl"></div>
-          
-          <!-- Animated gradient overlay -->
           <div class="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-purple-500/10 to-pink-500/10 animate-gradient"></div>
           
-          <!-- Content -->
           <div class="relative z-10 p-8">
-            <!-- Close Button -->
             <button @click="close" 
                     class="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-gray-200/50 hover:bg-gray-300/70 backdrop-blur-sm transition-all duration-200 active:scale-90 group">
               <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-600 group-hover:text-gray-800 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -27,7 +20,6 @@
               </svg>
             </button>
 
-            <!-- Header -->
             <div class="text-center mb-8">
               <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 mb-4 shadow-lg animate-pulse-slow">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -35,14 +27,12 @@
                 </svg>
               </div>
               <h2 class="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 mb-2">
-                联系我们
+                {{ t('contact.title') }}
               </h2>
-              <p class="text-sm text-gray-600">我们随时为您服务</p>
+              <p class="text-sm text-gray-600">{{ t('contact.subtitle') }}</p>
             </div>
 
-            <!-- Contact Cards -->
             <div class="space-y-4">
-              <!-- Phone -->
               <div class="group relative overflow-hidden rounded-2xl bg-white/40 backdrop-blur-sm border border-white/50 p-5 shadow-sm hover:shadow-lg hover:scale-[1.02] transition-all duration-300">
                 <div class="absolute inset-0 bg-gradient-to-r from-blue-500/0 via-blue-500/5 to-blue-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                 <div class="relative flex items-start space-x-4">
@@ -54,9 +44,9 @@
                     </div>
                   </div>
                   <div class="flex-1 min-w-0">
-                    <h3 class="text-sm font-medium text-gray-500 mb-1">电话咨询</h3>
+                    <h3 class="text-sm font-medium text-gray-500 mb-1">{{ t('contact.phoneConsult') }}</h3>
                     <p class="text-lg font-semibold text-gray-900 mb-1">19532458802</p>
-                    <p class="text-xs text-gray-500">周一至周五 9:00 - 18:00</p>
+                    <p class="text-xs text-gray-500">{{ t('contact.phoneHours') }}</p>
                   </div>
                   <button @click="copyToClipboard('19532458802')" 
                           class="flex-shrink-0 w-8 h-8 rounded-lg bg-gray-100/50 hover:bg-gray-200/70 flex items-center justify-center transition-all duration-200 active:scale-90">
@@ -67,7 +57,6 @@
                 </div>
               </div>
 
-              <!-- Email -->
               <div class="group relative overflow-hidden rounded-2xl bg-white/40 backdrop-blur-sm border border-white/50 p-5 shadow-sm hover:shadow-lg hover:scale-[1.02] transition-all duration-300">
                 <div class="absolute inset-0 bg-gradient-to-r from-purple-500/0 via-purple-500/5 to-purple-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                 <div class="relative flex items-start space-x-4">
@@ -79,9 +68,9 @@
                     </div>
                   </div>
                   <div class="flex-1 min-w-0">
-                    <h3 class="text-sm font-medium text-gray-500 mb-1">邮箱联系</h3>
+                    <h3 class="text-sm font-medium text-gray-500 mb-1">{{ t('contact.emailContact') }}</h3>
                     <p class="text-lg font-semibold text-gray-900 mb-1 break-all">lengzhehao@gmail.com</p>
-                    <p class="text-xs text-gray-500">通常在 24 小时内回复</p>
+                    <p class="text-xs text-gray-500">{{ t('contact.emailResponse') }}</p>
                   </div>
                   <button @click="copyToClipboard('lengzhehao@gmail.com')" 
                           class="flex-shrink-0 w-8 h-8 rounded-lg bg-gray-100/50 hover:bg-gray-200/70 flex items-center justify-center transition-all duration-200 active:scale-90">
@@ -92,7 +81,6 @@
                 </div>
               </div>
 
-              <!-- Address -->
               <div class="group relative overflow-hidden rounded-2xl bg-white/40 backdrop-blur-sm border border-white/50 p-5 shadow-sm hover:shadow-lg hover:scale-[1.02] transition-all duration-300">
                 <div class="absolute inset-0 bg-gradient-to-r from-green-500/0 via-green-500/5 to-green-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                 <div class="relative flex items-start space-x-4">
@@ -105,21 +93,19 @@
                     </div>
                   </div>
                   <div class="flex-1 min-w-0">
-                    <h3 class="text-sm font-medium text-gray-500 mb-1">公司地址</h3>
-                    <p class="text-lg font-semibold text-gray-900 mb-1">湖南省长沙市长沙县</p>
-                    <p class="text-xs text-gray-500">湖南信息学院</p>
+                    <h3 class="text-sm font-medium text-gray-500 mb-1">{{ t('contact.companyAddress') }}</h3>
+                    <p class="text-lg font-semibold text-gray-900 mb-1">{{ t('footer.addressLine1') }}</p>
+                    <p class="text-xs text-gray-500">{{ t('footer.addressLine2') }}</p>
                   </div>
                 </div>
               </div>
             </div>
 
-            <!-- Footer -->
             <div class="mt-6 pt-6 border-t border-gray-200/50 text-center">
-              <p class="text-xs text-gray-500">期待为您服务 ❤️</p>
+              <p class="text-xs text-gray-500">{{ t('contact.closingMessage') }}</p>
             </div>
           </div>
 
-          <!-- Decorative Elements -->
           <div class="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-blue-400/20 to-transparent rounded-full blur-3xl"></div>
           <div class="absolute bottom-0 left-0 w-40 h-40 bg-gradient-to-tr from-purple-400/20 to-transparent rounded-full blur-3xl"></div>
         </div>
@@ -127,20 +113,20 @@
     </div>
   </Transition>
 
-  <!-- Toast Notification -->
   <Transition name="toast">
     <div v-if="showToast" 
          class="fixed bottom-8 right-8 z-[60] bg-gray-900/90 backdrop-blur-xl text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center space-x-3">
       <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
       </svg>
-      <span class="text-sm font-medium">已复制到剪贴板</span>
+      <span class="text-sm font-medium">{{ t('contact.copiedToClipboard') }}</span>
     </div>
   </Transition>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 interface Props {
   modelValue: boolean
@@ -151,6 +137,7 @@ const emit = defineEmits<{
   (e: 'update:modelValue', value: boolean): void
 }>()
 
+const { t } = useI18n()
 const showToast = ref(false)
 
 const close = () => {
@@ -171,7 +158,6 @@ const copyToClipboard = async (text: string) => {
 </script>
 
 <style scoped>
-/* Modal Transitions */
 .modal-fade-enter-active,
 .modal-fade-leave-active {
   transition: opacity 0.3s ease;
@@ -193,7 +179,6 @@ const copyToClipboard = async (text: string) => {
   transform: scale(0.9) translateY(20px);
 }
 
-/* Toast Transition */
 .toast-enter-active,
 .toast-leave-active {
   transition: all 0.3s ease;
@@ -205,7 +190,6 @@ const copyToClipboard = async (text: string) => {
   transform: translateY(20px);
 }
 
-/* Animations */
 @keyframes float {
   0%, 100% {
     transform: translateY(0px);
@@ -248,6 +232,3 @@ const copyToClipboard = async (text: string) => {
   animation: pulse-slow 2s ease-in-out infinite;
 }
 </style>
-
-
-
