@@ -1,5 +1,6 @@
 package com.tibet.tourism.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
@@ -13,11 +14,13 @@ public class User {
     @Column(unique = true, nullable = false)
     private String username;
 
+    @JsonIgnore
     @Column(nullable = false)
     private String password; // BCrypt哈希，用于登录验证
 
+    @JsonIgnore
     @Column(name = "encrypted_password")
-    private String encryptedPassword; // AES加密的原始密码，仅管理员可解密
+    private String encryptedPassword; // AES加密的原始密码，仅超级管理员可解密
 
     private String nickname;
     private String avatar;

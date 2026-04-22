@@ -32,3 +32,15 @@ curl -v http://localhost/api/spots 2>&1 | head -20
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+

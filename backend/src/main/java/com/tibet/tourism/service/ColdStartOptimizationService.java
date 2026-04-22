@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
@@ -26,6 +27,11 @@ public class ColdStartOptimizationService {
     // 冷启动阈值
     private static final int NEW_USER_THRESHOLD = 3; // 访问记录少于3条视为新用户
     private static final int NEW_ITEM_THRESHOLD = 5; // 访问记录少于5条视为新物品
+    
+    // 热点景点缓存（避免每次请求都调用 findAll）
+    private final Map<String, List<ScenicSpot>> popularSpotsCache = new ConcurrentHashMap<>();
+    private volatile long popularSpotsCacheTime = 0;
+    private static final long CACHE_TTL_MS = 5 * 60 * 1000; // 5分钟缓存
     
     @Autowired
     private ScenicSpotRepository spotRepository;
@@ -55,7 +61,7 @@ public class ColdStartOptimizationService {
             List<UserVisitHistory> history = historyRepository.findBySpotId(spotId);
             return history == null || history.size() < NEW_ITEM_THRESHOLD;
         } catch (Exception e) {
-            logger.warn("⚠️  检查新物品状态失败: spotId={}, error={}", spotId, e.getMessage());
+            logger.warn("检查新物品状态失败: spotId={}, error={}", spotId, e.getMessage());
             return false;
         }
     }
@@ -65,7 +71,7 @@ public class ColdStartOptimizationService {
      * 策略1：基于用户属性的推荐（城市、IP地址等）
      */
     public List<ScenicSpot> recommendForNewUserByAttributes(Long userId) {
-        logger.info("🆕 新用户冷启动推荐（基于用户属性）: userId={}", userId);
+        logger.info("新用户冷启动推荐（基于用户属性）: userId={}", userId);
         
         Optional<User> userOpt = userRepository.findById(userId);
         if (!userOpt.isPresent()) {
@@ -75,23 +81,24 @@ public class ColdStartOptimizationService {
         User user = userOpt.get();
         List<ScenicSpot> recommendations = new ArrayList<>();
         
-        // 策略1：基于用户所在城市推荐
+        // 策略1：基于用户所在城市推荐（在Java层过滤，因为城市是字符串匹配）
         if (user.getCity() != null && !user.getCity().isEmpty()) {
-            List<ScenicSpot> citySpots = spotRepository.findAll().stream()
+            List<ScenicSpot> allSpots = getCachedSpotList();
+            List<ScenicSpot> citySpots = allSpots.stream()
                     .filter(spot -> spot.getLocation() != null && 
                             spot.getLocation().contains(user.getCity()))
                     .sorted(Comparator.comparing(ScenicSpot::getVisitCount).reversed())
                     .limit(5)
                     .collect(Collectors.toList());
             recommendations.addAll(citySpots);
-            logger.info("📍 基于城市 {} 推荐 {} 个景点", user.getCity(), citySpots.size());
+            logger.info("基于城市 {} 推荐 {} 个景点", user.getCity(), citySpots.size());
         }
         
         // 策略2：基于热门景点（如果城市推荐不足）
         if (recommendations.size() < 5) {
-            List<ScenicSpot> popularSpots = getPopularSpots(10 - recommendations.size());
+            List<ScenicSpot> popularSpots = getCachedPopularSpots(10 - recommendations.size());
             recommendations.addAll(popularSpots);
-            logger.info("🔥 补充热门景点 {} 个", popularSpots.size());
+            logger.info("补充热门景点 {} 个", popularSpots.size());
         }
         
         // 去重
@@ -111,12 +118,12 @@ public class ColdStartOptimizationService {
             String preferredCategory,
             String companionType) {
         
-        logger.info("🆕 新用户冷启动推荐（基于偏好问卷）: userId={}, tags={}, category={}, companion={}", 
+        logger.info("新用户冷启动推荐（基于偏好问卷）: userId={}, tags={}, category={}, companion={}", 
                 userId, preferredTags, preferredCategory, companionType);
         
         List<ScenicSpot> candidates = new ArrayList<>();
         
-        // 基于标签匹配
+        // 基于标签匹配（使用缓存的景点列表）
         if (preferredTags != null && !preferredTags.isEmpty()) {
             candidates.addAll(findSpotsByTags(preferredTags, 10));
         }
@@ -128,7 +135,7 @@ public class ColdStartOptimizationService {
                 List<ScenicSpot> categorySpots = spotRepository.findByCategory(category);
                 candidates.addAll(categorySpots);
             } catch (IllegalArgumentException e) {
-                logger.warn("⚠️  无效的类别: {}", preferredCategory);
+                logger.warn("无效的类别: {}", preferredCategory);
             }
         }
         
@@ -139,7 +146,7 @@ public class ColdStartOptimizationService {
         
         // 如果候选不足，补充热门景点
         if (candidates.size() < 10) {
-            List<ScenicSpot> popularSpots = getPopularSpots(10 - candidates.size());
+            List<ScenicSpot> popularSpots = getCachedPopularSpots(10 - candidates.size());
             candidates.addAll(popularSpots);
         }
         
@@ -160,16 +167,16 @@ public class ColdStartOptimizationService {
             Double longitude, 
             Double maxDistanceKm) {
         
-        logger.info("🆕 新用户冷启动推荐（基于位置）: lat={}, lng={}, maxDistance={}km", 
+        logger.info("新用户冷启动推荐（基于位置）: lat={}, lng={}, maxDistance={}km", 
                 latitude, longitude, maxDistanceKm);
         
         if (latitude == null || longitude == null) {
             return Collections.emptyList();
         }
         
-        double maxDistance = maxDistanceKm != null ? maxDistanceKm : 50.0; // 默认50km
+        double maxDistance = maxDistanceKm != null ? maxDistanceKm : 50.0;
         
-        List<ScenicSpot> allSpots = spotRepository.findAll();
+        List<ScenicSpot> allSpots = getCachedSpotList();
         
         return allSpots.stream()
                 .filter(spot -> spot.getLatitude() != null && spot.getLongitude() != null)
@@ -192,10 +199,10 @@ public class ColdStartOptimizationService {
      * 基于内容相似度推荐新景点
      */
     public List<ScenicSpot> recommendNewItems(Long userId) {
-        logger.info("🆕 新物品冷启动推荐: userId={}", userId);
+        logger.info("新物品冷启动推荐: userId={}", userId);
         
-        // 找到所有新物品（访问记录少的景点）
-        List<ScenicSpot> allSpots = spotRepository.findAll();
+        // 使用缓存的景点列表，只调用一次
+        List<ScenicSpot> allSpots = getCachedSpotList();
         List<ScenicSpot> newItems = allSpots.stream()
                 .filter(spot -> isNewItem(spot.getId()))
                 .collect(Collectors.toList());
@@ -205,7 +212,6 @@ public class ColdStartOptimizationService {
         }
         
         // 基于内容相似度排序
-        // 1. 如果用户有少量历史，基于历史偏好推荐相似的新物品
         List<UserVisitHistory> userHistory = historyRepository.findByUserId(userId);
         if (!userHistory.isEmpty()) {
             // 获取用户偏好的标签
@@ -219,7 +225,6 @@ public class ColdStartOptimizationService {
                     })
                     .collect(Collectors.toSet());
             
-            // 基于标签匹配排序
             return newItems.stream()
                     .map(spot -> {
                         double score = calculateContentSimilarity(spot, userTags);
@@ -231,7 +236,6 @@ public class ColdStartOptimizationService {
                     .collect(Collectors.toList());
         }
         
-        // 2. 如果用户没有历史，基于景点质量推荐（评分、访问量等）
         return newItems.stream()
                 .sorted(Comparator
                         .<ScenicSpot>comparingDouble(s -> s.getRating() != null ? s.getRating().doubleValue() : 0.0)
@@ -253,7 +257,7 @@ public class ColdStartOptimizationService {
             String preferredCategory,
             String companionType) {
         
-        logger.info("🔄 混合冷启动推荐: userId={}", userId);
+        logger.info("混合冷启动推荐: userId={}", userId);
         
         Map<Long, Double> candidateScores = new HashMap<>();
         
@@ -282,7 +286,7 @@ public class ColdStartOptimizationService {
         
         // 如果候选不足，补充热门景点
         if (candidateScores.size() < 10) {
-            List<ScenicSpot> popularSpots = getPopularSpots(10);
+            List<ScenicSpot> popularSpots = getCachedPopularSpots(10);
             popularSpots.forEach(spot -> {
                 candidateScores.putIfAbsent(spot.getId(), 0.1);
             });
@@ -300,8 +304,31 @@ public class ColdStartOptimizationService {
     
     // ========== 辅助方法 ==========
     
-    private List<ScenicSpot> getPopularSpots(int limit) {
-        return spotRepository.findAll().stream()
+    /**
+     * 获取带缓存的景点列表（5分钟TTL）
+     * 避免每次请求都调用 findAll()
+     */
+    private List<ScenicSpot> getCachedSpotList() {
+        String cacheKey = "all";
+        long now = System.currentTimeMillis();
+        
+        if (popularSpotsCache.containsKey(cacheKey) 
+                && (now - popularSpotsCacheTime) < CACHE_TTL_MS) {
+            return popularSpotsCache.get(cacheKey);
+        }
+        
+        List<ScenicSpot> spots = spotRepository.findAll();
+        popularSpotsCache.put(cacheKey, spots);
+        popularSpotsCacheTime = now;
+        return spots;
+    }
+    
+    /**
+     * 获取热门景点（从缓存列表中取前N个）
+     */
+    private List<ScenicSpot> getCachedPopularSpots(int limit) {
+        List<ScenicSpot> allSpots = getCachedSpotList();
+        return allSpots.stream()
                 .sorted(Comparator
                         .<ScenicSpot>comparingInt(s -> s.getVisitCount() != null ? s.getVisitCount() : 0)
                         .reversed()
@@ -312,13 +339,15 @@ public class ColdStartOptimizationService {
     }
     
     private List<ScenicSpot> findSpotsByTags(List<String> tags, int limit) {
-        return spotRepository.findAll().stream()
+        List<ScenicSpot> allSpots = getCachedSpotList();
+        Set<String> tagSet = new HashSet<>(tags);
+        return allSpots.stream()
                 .filter(spot -> {
                     if (spot.getTags() == null) return false;
                     Set<String> spotTags = spot.getTags().stream()
                             .map(t -> t.getTag())
                             .collect(Collectors.toSet());
-                    return tags.stream().anyMatch(spotTags::contains);
+                    return tagSet.stream().anyMatch(spotTags::contains);
                 })
                 .sorted(Comparator.comparing(ScenicSpot::getVisitCount).reversed())
                 .limit(limit)
@@ -326,15 +355,8 @@ public class ColdStartOptimizationService {
     }
     
     private List<ScenicSpot> filterByCompanionType(List<ScenicSpot> spots, String companionType) {
-        // 根据旅伴类型过滤（可以基于景点标签或属性）
-        // 例如：家庭 -> 安全、易到达的景点
-        // 情侣 -> 浪漫、风景优美的景点
         return spots.stream()
-                .filter(spot -> {
-                    // 这里可以根据实际业务逻辑实现
-                    // 暂时返回所有景点
-                    return true;
-                })
+                .filter(spot -> true) // 占位：可基于景点标签或属性扩展
                 .collect(Collectors.toList());
     }
     
@@ -347,7 +369,6 @@ public class ColdStartOptimizationService {
                 .map(t -> t.getTag())
                 .collect(Collectors.toSet());
         
-        // Jaccard相似度
         Set<String> intersection = new HashSet<>(userTags);
         intersection.retainAll(spotTags);
         
@@ -358,7 +379,7 @@ public class ColdStartOptimizationService {
     }
     
     private double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
-        final int R = 6371; // 地球半径（公里）
+        final int R = 6371;
         double latDistance = Math.toRadians(lat2 - lat1);
         double lonDistance = Math.toRadians(lon2 - lon1);
         double a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2)
@@ -368,7 +389,6 @@ public class ColdStartOptimizationService {
         return R * c;
     }
     
-    // 内部类：景点与距离
     private static class SpotWithDistance {
         ScenicSpot spot;
         double distance;
@@ -379,7 +399,6 @@ public class ColdStartOptimizationService {
         }
     }
     
-    // 内部类：景点与得分
     private static class SpotWithScore {
         ScenicSpot spot;
         double score;
@@ -390,4 +409,3 @@ public class ColdStartOptimizationService {
         }
     }
 }
-

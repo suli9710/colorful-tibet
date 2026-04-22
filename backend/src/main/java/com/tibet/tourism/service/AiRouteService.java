@@ -22,6 +22,19 @@ public class AiRouteService {
     @Value("${doubao.api.model}")
     private String model;
 
+    private static final Map<String, String> BUDGET_MAP = Map.of(
+            "economy", "经济型",
+            "comfort", "舒适型",
+            "luxury", "豪华型"
+    );
+
+    private static final Map<String, String> PREFERENCE_MAP = Map.of(
+            "natural", "自然风光",
+            "cultural", "人文历史",
+            "photography", "深度摄影",
+            "relaxation", "休闲度假"
+    );
+
     private static final List<String> DEFAULT_STOPS = List.of(
             "拉萨市区适应",
             "布达拉宫与大昭寺",
@@ -56,7 +69,10 @@ public class AiRouteService {
         this.webClient = webClientBuilder.build();
     }
 
-    public Mono<String> generateRoute(int days, String budget, String preference) {
+    public Mono<String> generateRoute(int days, String budgetKey, String preferenceKey) {
+        String budget = BUDGET_MAP.getOrDefault(budgetKey, "舒适型");
+        String preference = PREFERENCE_MAP.getOrDefault(preferenceKey, "自然风光");
+
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("model", model);
         
@@ -68,14 +84,14 @@ public class AiRouteService {
             "- 核心偏好：%s\n\n" +
             "【设计要求】\n" +
             "1. **深度结合偏好**：\n" +
-            "   - 若偏好“自然风光”，请重点安排纳木错、羊卓雍措、珠峰、南迦巴瓦等，减少寺庙行程。\n" +
-            "   - 若偏好“人文历史”，请重点安排布达拉宫、大昭寺、扎什伦布寺、古格王朝，并讲解文化背景。\n" +
-            "   - 若偏好“深度摄影”，请标注最佳拍摄点和日出日落时间（如：拍南迦巴瓦日照金山）。\n" +
-            "   - 若偏好“休闲度假”，请安排林芝鲁朗、巴松措等低海拔氧吧，行程要松弛。\n" +
+            "   - 若偏好\"自然风光\"，请重点安排纳木错、羊卓雍措、珠峰、南迦巴瓦等，减少寺庙行程。\n" +
+            "   - 若偏好\"人文历史\"，请重点安排布达拉宫、大昭寺、扎什伦布寺、古格王朝，并讲解文化背景。\n" +
+            "   - 若偏好\"深度摄影\"，请标注最佳拍摄点和日出日落时间（如：拍南迦巴瓦日照金山）。\n" +
+            "   - 若偏好\"休闲度假\"，请安排林芝鲁朗、巴松措等低海拔氧吧，行程要松弛。\n" +
             "2. **预算匹配**：\n" +
-            "   - “经济型”：推荐青旅、拼车、高性价比藏餐。\n" +
-            "   - “舒适型”：推荐精品民宿/四星酒店、包车、特色体验。\n" +
-            "   - “豪华型”：推荐五星/景观酒店（如松赞）、直升机/越野车、高端定制餐饮。\n" +
+            "   - \"经济型\"：推荐青旅、拼车、高性价比藏餐。\n" +
+            "   - \"舒适型\"：推荐精品民宿/四星酒店、包车、特色体验。\n" +
+            "   - \"豪华型\"：推荐五星/景观酒店（如松赞）、直升机/越野车、高端定制餐饮。\n" +
             "3. **行程合理性**：必须考虑海拔适应，第一天务必安排低强度适应，避免剧烈运动。\n\n" +
             "【输出格式】（请严格遵守Markdown格式）\n" +
             "## 🏔️ 定制路线：[极具吸引力的路线名称]\n\n" +
@@ -91,7 +107,7 @@ public class AiRouteService {
             "- **晚上**：[推荐体验或美食]\n" +
             "- **🏨 住宿推荐**：[根据预算推荐具体酒店或区域]\n" +
             "- **💡 贴心提示**：[针对当天的海拔或路况建议]\n\n" +
-            "（...依次列出每一天...）\n\n" +
+            "(...依次列出每一天...)\n\n" +
             "### 💰 预算预估 (%s)\n" +
             "- 交通：[预估]\n" +
             "- 住宿：[预估]\n" +
@@ -106,7 +122,7 @@ public class AiRouteService {
         );
 
         requestBody.put("messages", List.of(
-            Map.of("role", "system", "content", "你是一位热情、专业、细致的西藏金牌导游，你的回答应该充满藏地风情，同时逻辑严密，实用性强。"),
+            Map.of("role", "system", "content", "你是一位热情，专业、细致的西藏金牌导游，你的回答应该充满藏地风情，同时逻辑严密，实用性强。"),
             Map.of("role", "user", "content", prompt)
         ));
 
@@ -152,7 +168,7 @@ public class AiRouteService {
 
         builder.append("## 🏔️ 定制路线：").append(routeName).append("\n\n");
         builder.append("### ✨ 为什么这条路线适合你？\n");
-        builder.append(String.format("围绕“%s”偏好打造的行程，搭配“%s”预算标准，首日留在拉萨循序渐进适应海拔，随后逐步提升海拔与景观强度，兼顾体验与安全。\n\n", preference, budget));
+        builder.append(String.format("围绕\"%s\"偏好打造的行程，搭配\"%s\"预算标准，首日留在拉萨循序渐进适应海拔，随后逐步提升海拔与景观强度，兼顾体验与安全。\n\n", preference, budget));
 
         builder.append("### 🌟 行程亮点\n");
         builder.append("- Day 1 轻量化适应，提供氧气补给与慢行路线\n");

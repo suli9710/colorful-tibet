@@ -94,9 +94,10 @@ const handleRegister = async () => {
     await api.post('/auth/register', form.value)
     alert(t('register.registerSuccess'))
     router.push('/login')
-  } catch (error) {
+  } catch (error: any) {
     console.error('Register failed:', error)
-    alert(t('register.registerFailed'))
+    const serverMessage = error?.response?.data?.message || error?.response?.data?.error
+    alert(serverMessage || t('register.registerFailed'))
   } finally {
     loading.value = false
   }

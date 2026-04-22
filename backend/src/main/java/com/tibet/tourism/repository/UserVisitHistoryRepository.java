@@ -9,4 +9,7 @@ public interface UserVisitHistoryRepository extends JpaRepository<UserVisitHisto
     List<UserVisitHistory> findBySpotId(Long spotId);
     List<UserVisitHistory> findBySpotIdIn(List<Long> spotIds);
     List<UserVisitHistory> findByUserIdIn(List<Long> userIds);
+
+    // 根据用户ID删除访问历史
+    void deleteByUserId(Long userId);
 }

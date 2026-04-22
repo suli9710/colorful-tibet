@@ -13,10 +13,11 @@ const userInfo = ref<any>(null)
 const stats = ref<any>(null)
 const myRoutes = ref<any[]>([])
 const bookings = ref<any[]>([])
+const hotelBookings = ref<any[]>([])
 const spotComments = ref<any[]>([])
 const routeComments = ref<any[]>([])
 const loading = ref(true)
-const activeTab = ref<'routes' | 'bookings' | 'comments'>('routes')
+const activeTab = ref<'routes' | 'bookings' | 'hotel-bookings' | 'comments'>('routes')
 const showPasswordModal = ref(false)
 const passwordForm = ref({
   oldPassword: '',
@@ -50,6 +51,7 @@ onMounted(async () => {
       fetchStats(),
       fetchMyRoutes(),
       fetchBookings(),
+      fetchHotelBookings(),
       fetchMyComments()
     ])
   } catch (e: any) {
@@ -111,6 +113,28 @@ const fetchBookings = async () => {
   } catch (e) {
     console.error('Failed to fetch bookings:', e)
     bookings.value = []
+  }
+}
+
+const fetchHotelBookings = async () => {
+  try {
+    const response = await api.get(endpoints.hotelBookings.my)
+    hotelBookings.value = response.data || []
+  } catch (e) {
+    console.error('Failed to fetch hotel bookings:', e)
+    hotelBookings.value = []
+  }
+}
+
+const cancelHotelBooking = async (id: number) => {
+  if (!confirm(t('profile.confirmCancelHotelBooking'))) return
+
+  try {
+    await api.delete(endpoints.hotelBookings.cancel(id))
+    fetchHotelBookings()
+  } catch (e) {
+    console.error(e)
+    alert(t('profile.cancelHotelBookingFailed'))
   }
 }
 
@@ -502,6 +526,17 @@ const getAvatarUrl = () => {
             {{ t('profile.myBookingsTab') }} ({{ bookings.length }})
           </button>
           <button 
+            @click="activeTab = 'hotel-bookings'"
+            :class="[
+              'px-6 py-3 font-medium transition-all duration-300 border-b-2 whitespace-nowrap',
+              activeTab === 'hotel-bookings' 
+                ? 'text-apple-blue border-apple-blue' 
+                : 'text-apple-gray-500 border-transparent hover:text-apple-gray-700'
+            ]"
+          >
+            {{ t('profile.myHotelBookingsTab') }} ({{ hotelBookings.length }})
+          </button>
+          <button 
             @click="activeTab = 'comments'"
             :class="[
               'px-6 py-3 font-medium transition-all duration-300 border-b-2 whitespace-nowrap',
@@ -629,6 +664,67 @@ const getAvatarUrl = () => {
                 <button 
                   v-if="booking.status === 'CONFIRMED' || booking.status === 'PENDING'"
                   @click="cancelBooking(booking.id)"
+                  class="px-4 py-2 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition-colors"
+                >
+                  {{ t('profile.cancelBooking') }}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- My Hotel Bookings -->
+        <div v-else-if="activeTab === 'hotel-bookings'">
+          <div v-if="hotelBookings.length === 0" class="text-center py-12">
+            <p class="text-gray-500 mb-4">{{ t('profile.noHotelBookings') }}</p>
+            <router-link to="/hotels" class="text-apple-blue hover:text-apple-blue-hover font-medium">
+              {{ t('profile.browseHotelsLink') }}
+            </router-link>
+          </div>
+
+          <div v-else class="space-y-4">
+            <div 
+              v-for="booking in hotelBookings" 
+              :key="booking.id" 
+              class="glass rounded-2xl p-6 flex flex-col md:flex-row justify-between items-center transition-all hover:shadow-lg border border-white/20"
+            >
+              <div class="flex items-center space-x-4 mb-4 md:mb-0 w-full md:w-auto">
+                <div class="h-16 w-16 rounded-xl bg-gray-100 overflow-hidden flex-shrink-0">
+                  <img v-if="booking.hotel?.coverImage" :src="booking.hotel.coverImage" class="w-full h-full object-cover" alt="">
+                  <div v-else class="w-full h-full flex items-center justify-center text-gray-400">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                    </svg>
+                  </div>
+                </div>
+                <div>
+                  <h3 class="text-lg font-bold text-gray-900 mb-1">{{ booking.hotel?.name || '-' }}</h3>
+                  <div class="flex items-center text-gray-500 text-sm space-x-4">
+                    <span>{{ t('profile.room') }} {{ booking.roomName }}</span>
+                    <span>{{ t('profile.nights') }} {{ booking.nights }}</span>
+                  </div>
+                  <div class="flex items-center text-gray-500 text-sm space-x-4 mt-1">
+                    <span>{{ t('profile.checkIn') }} {{ booking.checkInDate }}</span>
+                    <span>{{ t('profile.checkOut') }} {{ booking.checkOutDate }}</span>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="flex items-center space-x-6 w-full md:w-auto justify-between md:justify-end">
+                <div class="text-right">
+                  <div class="text-xl font-bold text-apple-blue mb-1">¥{{ booking.totalPrice }}</div>
+                  <span :class="{
+                    'bg-green-100 text-green-800': booking.status === 'CONFIRMED',
+                    'bg-yellow-100 text-yellow-800': booking.status === 'PENDING',
+                    'bg-red-100 text-red-800': booking.status === 'CANCELLED'
+                  }" class="px-2.5 py-0.5 rounded-full text-xs font-medium">
+                    {{ booking.status === 'CONFIRMED' ? t('profile.bookingSuccess') : (booking.status === 'PENDING' ? t('profile.pending') : t('profile.cancelled')) }}
+                  </span>
+                </div>
+                
+                <button 
+                  v-if="booking.status === 'CONFIRMED' || booking.status === 'PENDING'"
+                  @click="cancelHotelBooking(booking.id)"
                   class="px-4 py-2 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition-colors"
                 >
                   {{ t('profile.cancelBooking') }}

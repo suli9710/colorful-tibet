@@ -543,7 +543,11 @@ public class RecommendationService {
     private List<ScenicSpot> fallbackPopularSpots() {
         List<UserVisitHistory> histories = historyRepository.findAll();
         if (histories.isEmpty()) {
-            return spotRepository.findAll().stream()
+            List<ScenicSpot> allSpots = spotRepository.findAll();
+            return allSpots.stream()
+                    .sorted(Comparator
+                            .<ScenicSpot>comparingInt(s -> s.getVisitCount() != null ? s.getVisitCount() : 0)
+                            .reversed())
                     .limit(MAX_RESULTS)
                     .collect(Collectors.toList());
         }
@@ -554,13 +558,14 @@ public class RecommendationService {
                         Collectors.summingDouble(history -> normalizeRating(history.getRating()) + calculateRecencyBoost(history.getVisitDate()))
                 ));
 
+        List<ScenicSpot> allSpots = spotRepository.findAll();
+        Map<Long, ScenicSpot> spotMap = allSpots.stream()
+                .collect(Collectors.toMap(ScenicSpot::getId, s -> s));
+
         return spotScores.entrySet().stream()
                 .sorted(Map.Entry.<Long, Double>comparingByValue().reversed())
                 .limit(MAX_RESULTS)
-                .map(entry -> {
-                    Long spotId = Objects.requireNonNull(entry.getKey());
-                    return spotRepository.findById(spotId).orElse(null);
-                })
+                .map(entry -> spotMap.get(entry.getKey()))
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
     }
@@ -832,14 +837,18 @@ public class RecommendationService {
 
         // 应用上下文感知过滤和加权
         Map<Long, Double> finalCandidateSpots = candidateSpots;
+        Map<Long, ScenicSpot> contextSpotMap = null;
         if (recommendationContext != null) {
-            finalCandidateSpots = applyContextAwareFiltering(candidateSpots, recommendationContext);
-            logger.info("🌍 上下文过滤后候选景点数: {}", finalCandidateSpots.size());
+            List<Long> contextCandidateIds = new ArrayList<>(candidateSpots.keySet());
+            contextSpotMap = spotRepository.findAllById(contextCandidateIds).stream()
+                    .collect(Collectors.toMap(ScenicSpot::getId, s -> s));
+            finalCandidateSpots = applyContextAwareFilteringWithSpotMap(candidateSpots, recommendationContext, contextSpotMap);
+            logger.info("上下文过滤后候选景点数: {}", finalCandidateSpots.size());
         }
 
         // 应用多样性惩罚和探索机制（如果无上下文，传入null）
         List<ScenicSpot> recommendations = rerankWithDiversityAndExploration(
-                finalCandidateSpots, visitedSpotIds, tagPreferenceProfile, recommendationContext);
+                finalCandidateSpots, visitedSpotIds, tagPreferenceProfile, recommendationContext, contextSpotMap);
 
         context.setRecommendations(recommendations);
 
@@ -1085,42 +1094,53 @@ public class RecommendationService {
     private Map<Long, Double> applyContextAwareFiltering(
             Map<Long, Double> candidateScores,
             RecommendationContext context) {
-        
+
         if (candidateScores.isEmpty()) {
             return candidateScores;
         }
-        
-        // 获取所有候选景点
+
         List<Long> candidateIds = new ArrayList<>(candidateScores.keySet());
         Map<Long, ScenicSpot> spotMap = spotRepository.findAllById(candidateIds).stream()
                 .collect(Collectors.toMap(ScenicSpot::getId, spot -> spot));
-        
+
+        return applyContextAwareFilteringWithSpotMap(candidateScores, context, spotMap);
+    }
+
+    /**
+     * 应用上下文感知过滤和加权（复用已查询的 spotMap，避免重复查询）
+     */
+    private Map<Long, Double> applyContextAwareFilteringWithSpotMap(
+            Map<Long, Double> candidateScores,
+            RecommendationContext context,
+            Map<Long, ScenicSpot> spotMap) {
+
+        if (candidateScores.isEmpty()) {
+            return candidateScores;
+        }
+
         Map<Long, Double> contextScores = new HashMap<>();
         Map<Long, Double> filteredScores = new HashMap<>();
-        
+
         for (Map.Entry<Long, Double> entry : candidateScores.entrySet()) {
             Long spotId = entry.getKey();
             ScenicSpot spot = spotMap.get(spotId);
             if (spot == null) continue;
-            
-            // 计算上下文得分
+
             double contextScore = calculateContextScore(spot, context);
-            
-            // 如果上下文得分太低，过滤掉
+
             if (contextScore < 0.3) {
                 continue;
             }
-            
-            // 应用上下文加权
+
             double baseScore = entry.getValue();
             double finalScore = baseScore * (1.0 - CONTEXT_WEIGHT) + contextScore * CONTEXT_WEIGHT;
-            
+
             contextScores.put(spotId, contextScore);
             filteredScores.put(spotId, finalScore);
         }
-        
-        logger.info("🌍 上下文过滤: 原始{}个 -> 过滤后{}个", candidateScores.size(), filteredScores.size());
-        
+
+        logger.info("上下文过滤: 原始{}个 -> 过滤后{}个", candidateScores.size(), filteredScores.size());
+
         return filteredScores;
     }
     
@@ -1363,64 +1383,69 @@ public class RecommendationService {
             Map<Long, Double> candidateScores,
             Set<Long> visitedSpotIds,
             Map<String, Double> tagProfile) {
-        return rerankWithDiversityAndExploration(candidateScores, visitedSpotIds, tagProfile, null);
+        return rerankWithDiversityAndExploration(candidateScores, visitedSpotIds, tagProfile, null, null);
     }
-    
+
+    /**
+     * 重排序 - 应用多样性惩罚和探索机制（复用已查询的 spotMap，避免重复查询）
+     */
     private List<ScenicSpot> rerankWithDiversityAndExploration(
             Map<Long, Double> candidateScores,
             Set<Long> visitedSpotIds,
             Map<String, Double> tagProfile,
-            RecommendationContext recommendationContext) {
-        
+            RecommendationContext recommendationContext,
+            Map<Long, ScenicSpot> preloadedSpotMap) {
+
         if (candidateScores.isEmpty()) {
             return Collections.emptyList();
         }
-        
-        // 获取所有候选景点
-        List<Long> candidateIds = new ArrayList<>(candidateScores.keySet());
-        Map<Long, ScenicSpot> spotMap = spotRepository.findAllById(candidateIds).stream()
-                .collect(Collectors.toMap(ScenicSpot::getId, spot -> spot));
-        
+
+        // 如果没有预加载的 spotMap，则查询
+        Map<Long, ScenicSpot> spotMap = preloadedSpotMap;
+        List<Long> remainingCandidateIds = new ArrayList<>(candidateScores.keySet());
+        if (spotMap == null) {
+            spotMap = spotRepository.findAllById(remainingCandidateIds).stream()
+                    .collect(Collectors.toMap(ScenicSpot::getId, spot -> spot));
+        }
+
         // 计算多样性惩罚后的得分
         List<Long> selectedSpots = new ArrayList<>();
-        
+
         Random random = new Random();
         int explorationCount = (int) (MAX_RESULTS * EXPLORATION_RATE);
-        
-        for (int i = 0; i < MAX_RESULTS && !candidateIds.isEmpty(); i++) {
+
+        for (int i = 0; i < MAX_RESULTS && !remainingCandidateIds.isEmpty(); i++) {
             // ε-greedy: 探索机制
             if (i < explorationCount && random.nextDouble() < EXPLORATION_RATE) {
-                // 随机选择一个低曝光景点
-                Long randomSpotId = candidateIds.get(random.nextInt(candidateIds.size()));
+                Long randomSpotId = remainingCandidateIds.get(random.nextInt(remainingCandidateIds.size()));
                 ScenicSpot spot = spotMap.get(randomSpotId);
                 if (spot != null) {
                     selectedSpots.add(randomSpotId);
-                    candidateIds.remove(randomSpotId);
+                    remainingCandidateIds.remove(randomSpotId);
                     continue;
                 }
             }
-            
+
             // 计算每个候选的多样性调整得分
             Map<Long, Double> adjustedScores = new HashMap<>();
-            for (Long spotId : candidateIds) {
+            for (Long spotId : remainingCandidateIds) {
                 double baseScore = candidateScores.getOrDefault(spotId, 0.0);
                 double diversityPenalty = calculateDiversityPenalty(spotId, selectedSpots, spotMap);
                 adjustedScores.put(spotId, baseScore * (1.0 - diversityPenalty));
             }
-            
+
             // 选择得分最高的
             Long bestSpotId = adjustedScores.entrySet().stream()
                     .max(Map.Entry.comparingByValue())
                     .map(Map.Entry::getKey)
                     .orElse(null);
-            
+
             if (bestSpotId != null) {
                 selectedSpots.add(bestSpotId);
-                candidateIds.remove(bestSpotId);
+                remainingCandidateIds.remove(bestSpotId);
             }
         }
-        
-        // 转换为景点列表
+
         return selectedSpots.stream()
                 .map(spotMap::get)
                 .filter(Objects::nonNull)

@@ -71,8 +71,8 @@
       <!-- Spots Grid -->
       <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
         <div v-for="(spot, index) in filteredSpots" :key="spot.id" 
-             class="group bg-white rounded-3xl shadow-sm hover:shadow-2xl card-hover overflow-hidden border border-gray-100 animate-slide-up hover:border-apple-blue/20 gpu-accelerated"
-             :style="{ animationDelay: `${0.2 + index * 0.08}s` }">
+             class="group bg-white rounded-3xl shadow-sm hover:shadow-2xl card-hover overflow-hidden border border-gray-100 animate-on-scroll hover:border-apple-blue/20 gpu-accelerated"
+             :style="{ animationDelay: `${index * 80}ms` }">
           
           <!-- Image Container -->
           <div class="relative h-72 overflow-hidden cursor-pointer bg-gray-200" @click="router.push(`/spots/${spot.id}`)">
@@ -224,12 +224,29 @@ const getGradientClass = (spot: any) => {
   return gradients[index]
 }
 
-// 监听语言变化，重新获取数据
+// 监听语言变化，重新获取数据并重新初始化滚动动画
 watch(locale, () => {
   fetchSpots()
+  setTimeout(initScrollAnimations, 300)
 })
 
 onMounted(() => {
   fetchSpots()
+  setTimeout(initScrollAnimations, 100)
 })
+
+const initScrollAnimations = () => {
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('revealed')
+        observer.unobserve(entry.target)
+      }
+    })
+  }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' })
+
+  document.querySelectorAll('.animate-on-scroll').forEach(el => {
+    observer.observe(el)
+  })
+}
 </script>

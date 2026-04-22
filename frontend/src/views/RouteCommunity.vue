@@ -1,7 +1,6 @@
 <template>
   <div class="min-h-screen bg-apple-gray-50 py-24">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <!-- Header -->
       <div class="text-center mb-12 animate-fade-in">
         <h1 class="text-4xl font-bold text-apple-gray-900 mb-4">{{ t('community.title') }}</h1>
         <p class="text-lg text-apple-gray-500">
@@ -9,7 +8,6 @@
         </p>
       </div>
 
-      <!-- Filters -->
       <div class="glass rounded-2xl p-6 mb-8 flex flex-wrap gap-4 items-center justify-between animate-slide-up">
         <div class="flex flex-wrap gap-4">
           <select v-model="filters.days" @change="loadRoutes" class="px-4 py-2 rounded-xl bg-white/50 border border-gray-200 focus:border-apple-blue outline-none">
@@ -21,16 +19,11 @@
           </select>
           <select v-model="filters.budget" @change="loadRoutes" class="px-4 py-2 rounded-xl bg-white/50 border border-gray-200 focus:border-apple-blue outline-none">
             <option value="">{{ t('community.allBudget') }}</option>
-            <option value="经济型">{{ t('routePlanner.budget.economy').split(' (')[0] }}</option>
-            <option value="舒适型">{{ t('routePlanner.budget.comfort').split(' (')[0] }}</option>
-            <option value="豪华型">{{ t('routePlanner.budget.luxury').split(' (')[0] }}</option>
+            <option v-for="opt in budgetOptions" :key="opt.key" :value="opt.key">{{ opt.label }}</option>
           </select>
           <select v-model="filters.preference" @change="loadRoutes" class="px-4 py-2 rounded-xl bg-white/50 border border-gray-200 focus:border-apple-blue outline-none">
             <option value="">{{ t('community.allPreference') }}</option>
-            <option value="自然风光">{{ t('routePlanner.preferenceOptions.natural').split(' (')[0] }}</option>
-            <option value="人文历史">{{ t('routePlanner.preferenceOptions.cultural').split(' (')[0] }}</option>
-            <option value="深度摄影">{{ t('routePlanner.preferenceOptions.photography').split(' (')[0] }}</option>
-            <option value="休闲度假">{{ t('routePlanner.preferenceOptions.relaxation').split(' (')[0] }}</option>
+            <option v-for="opt in preferenceOptions" :key="opt.key" :value="opt.key">{{ opt.label }}</option>
           </select>
         </div>
         
@@ -41,7 +34,6 @@
         </div>
       </div>
 
-      <!-- Route List -->
       <div v-if="loading" class="text-center py-12">
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-apple-blue mx-auto"></div>
       </div>
@@ -51,9 +43,9 @@
       </div>
 
       <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div v-for="(route, index) in routes" :key="route.id" 
-             class="glass rounded-2xl p-6 hover:shadow-2xl transition-all duration-500 ease-out cursor-pointer group transform hover:-translate-y-2 hover:border-apple-blue/30 border border-white/20 animate-slide-up"
-             :style="{ animationDelay: `${index * 0.1}s` }"
+        <div v-for="(route, index) in routes" :key="route.id"
+             class="glass rounded-2xl p-6 hover:shadow-2xl transition-all duration-500 ease-out cursor-pointer group transform hover:-translate-y-2 hover:border-apple-blue/30 border border-white/20 animate-on-scroll"
+             :style="{ animationDelay: `${index * 80}ms` }"
              @click="viewRoute(route.id)">
           <div class="flex justify-between items-start mb-4">
             <h3 class="text-xl font-bold text-gray-900 group-hover:text-apple-blue transition-colors duration-300 line-clamp-2 flex-1">
@@ -65,8 +57,8 @@
           </div>
           
           <div class="flex gap-2 mb-4 text-sm text-gray-600">
-            <span class="px-3 py-1.5 bg-gray-100 rounded-lg transform group-hover:scale-105 transition-transform duration-300">{{ route.budget }}</span>
-            <span class="px-3 py-1.5 bg-gray-100 rounded-lg transform group-hover:scale-105 transition-transform duration-300">{{ route.preference }}</span>
+            <span class="px-3 py-1.5 bg-gray-100 rounded-lg transform group-hover:scale-105 transition-transform duration-300">{{ getBudgetLabel(route.budget) }}</span>
+            <span class="px-3 py-1.5 bg-gray-100 rounded-lg transform group-hover:scale-105 transition-transform duration-300">{{ getPreferenceLabel(route.preference) }}</span>
           </div>
           
           <div class="flex justify-between items-center text-sm text-gray-500 pt-4 border-t border-gray-100">
@@ -96,7 +88,6 @@
         </div>
       </div>
       
-      <!-- Pagination -->
       <div v-if="totalPages > 1" class="flex justify-center mt-8 gap-2">
         <button 
           @click="changePage(currentPage - 1)" 
@@ -121,7 +112,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, reactive, onActivated } from 'vue'
+import { ref, onMounted, reactive, onActivated, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import api from '../api'
@@ -134,6 +125,42 @@ const loading = ref(true)
 const routes = ref<any[]>([])
 const currentPage = ref(0)
 const totalPages = ref(0)
+
+const BUDGET_KEY_TO_LABEL = {
+  '经济型': 'routePlanner.budget.economy',
+  '舒适型': 'routePlanner.budget.comfort',
+  '豪华型': 'routePlanner.budget.luxury'
+}
+
+const PREFERENCE_KEY_TO_LABEL = {
+  '自然风光': 'routePlanner.preferenceOptions.natural',
+  '人文历史': 'routePlanner.preferenceOptions.cultural',
+  '深度摄影': 'routePlanner.preferenceOptions.photography',
+  '休闲度假': 'routePlanner.preferenceOptions.relaxation'
+}
+
+const getBudgetLabel = (key: string) => {
+  const labelKey = BUDGET_KEY_TO_LABEL[key]
+  return labelKey ? t(labelKey) : key
+}
+
+const getPreferenceLabel = (key: string) => {
+  const labelKey = PREFERENCE_KEY_TO_LABEL[key]
+  return labelKey ? t(labelKey) : key
+}
+
+const budgetOptions = computed(() => [
+  { key: '经济型', label: t('routePlanner.budget.economy') },
+  { key: '舒适型', label: t('routePlanner.budget.comfort') },
+  { key: '豪华型', label: t('routePlanner.budget.luxury') }
+])
+
+const preferenceOptions = computed(() => [
+  { key: '自然风光', label: t('routePlanner.preferenceOptions.natural') },
+  { key: '人文历史', label: t('routePlanner.preferenceOptions.cultural') },
+  { key: '深度摄影', label: t('routePlanner.preferenceOptions.photography') },
+  { key: '休闲度假', label: t('routePlanner.preferenceOptions.relaxation') }
+])
 
 const filters = reactive({
   days: '',
@@ -151,7 +178,6 @@ const loadRoutes = async () => {
     }
     
     if (filters.days) {
-      // 将字符串转换为整数
       const daysNum = parseInt(filters.days)
       if (!isNaN(daysNum)) {
         params.days = daysNum
@@ -169,6 +195,7 @@ const loadRoutes = async () => {
     totalPages.value = 0
   } finally {
     loading.value = false
+    setTimeout(initScrollAnimations, 100)
   }
 }
 
@@ -189,9 +216,24 @@ const formatDate = (dateStr: string) => {
 
 onMounted(() => {
   loadRoutes()
+  setTimeout(initScrollAnimations, 100)
 })
 
-// 当页面被激活时（从其他页面返回时）重新加载数据
+const initScrollAnimations = () => {
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('revealed')
+        observer.unobserve(entry.target)
+      }
+    })
+  }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' })
+
+  document.querySelectorAll('.animate-on-scroll:not(.revealed)').forEach(el => {
+    observer.observe(el)
+  })
+}
+
 onActivated(() => {
   loadRoutes()
 })

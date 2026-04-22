@@ -7,6 +7,8 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.Query;
 import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.List;
@@ -27,6 +29,10 @@ public class DataSeeder implements CommandLineRunner {
     private NewsRepository newsRepository;
     @Autowired
     private HeritageItemRepository heritageRepository;
+    @Autowired
+    private BookingRepository bookingRepository;
+    @Autowired
+    private HotelBookingRepository hotelBookingRepository;
     
     @Autowired
     private PasswordEncoder passwordEncoder;
@@ -45,24 +51,16 @@ public class DataSeeder implements CommandLineRunner {
         
         seedUsers();
         
-        // 清空现有景点数据并重新加载
-        long spotCount = spotRepository.count();
-        if (spotCount > 0) {
-            System.out.println("清空现有景点数据...");
-            // 先删除关联数据，避免外键约束错误
-            historyRepository.deleteAll();
-            tagRepository.deleteAll();
-            spotRepository.deleteAll();
-        }
-        
-        System.out.println("加载新景点数据...");
-        seedSpots();
-        
-        if (newsRepository.count() == 0) {
-            seedNews();
-        }
-        if (heritageRepository.count() == 0) {
-            seedHeritage();
+        // 只在数据库为空时才播种景点和资讯数据，避免破坏已有数据
+        if (spotRepository.count() == 0) {
+            System.out.println("数据库为空，开始播种景点数据...");
+            seedSpots();
+            if (newsRepository.count() == 0) {
+                seedNews();
+            }
+            if (heritageRepository.count() == 0) {
+                seedHeritage();
+            }
         }
         if (historyRepository.count() == 0) {
             seedHistory();
@@ -74,7 +72,7 @@ public class DataSeeder implements CommandLineRunner {
         userRepository.findByUsername("admin").ifPresentOrElse(
             existing -> {
                 // 如果密码未加密（长度小于20，BCrypt hash通常更长），则更新
-                if (existing.getPassword().length() < 20) {
+                if (existing.getPassword().length() < 20 || !passwordEncoder.matches("admin123", existing.getPassword())) {
                     String plainPassword = "admin123";
                     existing.setPassword(passwordEncoder.encode(plainPassword)); // BCrypt
                     existing.setEncryptedPassword(passwordEncryptionService.encrypt(plainPassword)); // AES
@@ -103,7 +101,8 @@ public class DataSeeder implements CommandLineRunner {
         // 创建或更新 lzh 超级管理员
         userRepository.findByUsername("lzh").ifPresentOrElse(
             existing -> {
-                if (existing.getPassword().length() < 20) {
+                // 强制验证：密码长度<20 或 BCrypt验证不通过，都强制重设
+                if (existing.getPassword().length() < 20 || !passwordEncoder.matches("031224", existing.getPassword())) {
                     String plainPassword = "031224";
                     existing.setPassword(passwordEncoder.encode(plainPassword)); // BCrypt
                     existing.setEncryptedPassword(passwordEncryptionService.encrypt(plainPassword)); // AES
@@ -131,7 +130,7 @@ public class DataSeeder implements CommandLineRunner {
         // 创建或更新 user1
         userRepository.findByUsername("user1").ifPresentOrElse(
             existing -> {
-                if (existing.getPassword().length() < 20) {
+                if (existing.getPassword().length() < 20 || !passwordEncoder.matches("123456", existing.getPassword())) {
                     String plainPassword = "123456";
                     existing.setPassword(passwordEncoder.encode(plainPassword)); // BCrypt
                     existing.setEncryptedPassword(passwordEncryptionService.encrypt(plainPassword)); // AES
@@ -158,7 +157,7 @@ public class DataSeeder implements CommandLineRunner {
         // 创建或更新 user2
         userRepository.findByUsername("user2").ifPresentOrElse(
             existing -> {
-                if (existing.getPassword().length() < 20) {
+                if (existing.getPassword().length() < 20 || !passwordEncoder.matches("123456", existing.getPassword())) {
                     String plainPassword = "123456";
                     existing.setPassword(passwordEncoder.encode(plainPassword)); // BCrypt
                     existing.setEncryptedPassword(passwordEncryptionService.encrypt(plainPassword)); // AES
