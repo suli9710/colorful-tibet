@@ -41,11 +41,11 @@ jwt:
   secret: ${JWT_SECRET:tibetTourismSecretKey12345678901234567890}
   expiration: 86400000  # 24小时
 
-doubao:
+ark:
   api:
-    url: https://ark.cn-beijing.volces.com/api/v3/chat/completions
-    key: e23d1e75-53b0-473d-92dc-8d70395b077b
-    model: ep-20251124231555-hdr7j
+    url: ${ARK_API_URL:https://ark.cn-beijing.volces.com/api/v3/responses}
+    key: ${ARK_API_KEY:}
+    model: ${AI_MODEL:doubao-seed-2-0-pro-260215}
 
 # 价格定时更新配置
 price:

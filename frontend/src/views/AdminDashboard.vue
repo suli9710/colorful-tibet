@@ -11,6 +11,8 @@
       </div>
 
       <div v-else class="space-y-8">
+        <AdminAnalyticsPanel :loading="loading" :chart-data="analyticsData" :error="analyticsError" />
+
         <!-- Stats Cards -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div class="bg-white rounded-lg shadow p-6 border-l-4 border-blue-500">
@@ -62,7 +64,7 @@
             <h3 class="text-lg font-bold text-stone-800">酒店订单 <span class="text-sm font-normal text-stone-500">(共{{ hotelOrders.length }}条)</span></h3>
             <div class="flex items-center space-x-3">
               <button @click.stop="fetchHotelOrders" class="text-sm text-blue-600 hover:text-blue-800" :disabled="loadingHotelOrders">
-                {{ loadingHotelOrders ? '加载中...' : '刷新列表' }}
+                {{ loadingHotelOrders ? '加载中……' : '刷新列表' }}
               </button>
               <button @click.stop="showAllHotelOrders = !showAllHotelOrders" class="text-sm text-stone-600 hover:text-stone-800 flex items-center">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 transition-transform duration-200" :class="{ 'rotate-180': showAllHotelOrders }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -224,7 +226,7 @@
             </div>
           </div>
           
-          <!-- Loading State -->
+          <!-- 加载状态 -->
           <div v-if="loadingSpots" class="p-8 text-center text-stone-500">
             <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
             <p>正在加载景点数据...</p>
@@ -650,6 +652,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import AdminAnalyticsPanel from '../components/AdminAnalyticsPanel.vue'
 import api, { endpoints } from '../api'
 
 interface Stats {
@@ -659,6 +662,13 @@ interface Stats {
   recentBookings: any[]
   recentHotelBookings: any[]
   popularSpots: any[]
+  spotCount?: number
+  newsCount?: number
+  monthlyBookingTrend?: Array<{ month: string; orderCount: number; revenue: number }>
+  userGrowthTrend?: Array<{ month: string; count: number }>
+  newsPublishTrend?: Array<{ month: string; count: number }>
+  spotCategories?: Array<{ name: string; value: number }>
+  updatedAt?: string
 }
 
 const stats = ref<Stats>({
@@ -670,6 +680,8 @@ const stats = ref<Stats>({
   popularSpots: []
 })
 const loading = ref(true)
+const analyticsError = ref('')
+const analyticsData = ref<Stats | null>(null)
 
 const fetchStats = async () => {
   try {
@@ -695,12 +707,15 @@ const fetchStats = async () => {
       return
     }
     
-    console.log('📊 [AdminDashboard] 开始获取统计数据，用户:', user.username, '角色:', user.role)
+    console.log('开始获取统计数据，用户：', user.username, '角色：', user.role)
+    analyticsError.value = ''
     const response = await api.get(endpoints.admin.stats)
     stats.value = response.data
-    console.log('✅ [AdminDashboard] 统计数据获取成功')
+    analyticsData.value = response.data
+    console.log('统计数据获取成功')
   } catch (error: any) {
-    console.error('❌ [AdminDashboard] 获取统计数据失败:', error)
+    console.error('获取统计数据失败：', error)
+    analyticsError.value = error.response?.data?.error || '统计面板加载失败，请稍后重试'
     if (error.response?.status === 401) {
       alert('未授权：请先登录管理员账户')
       localStorage.removeItem('user')
@@ -975,7 +990,7 @@ const updateRole = async (userId: number, newRole: string) => {
 
   try {
     await api.post(endpoints.admin.updateRole(userId), { role: newRole })
-    await fetchUsers() // Refresh list
+    await fetchUsers() // 刷新列表
     alert('操作成功')
   } catch (error) {
     console.error('Failed to update role:', error)

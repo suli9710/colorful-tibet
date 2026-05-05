@@ -53,6 +53,7 @@ deploy_backend() {
     
     # 编译
     log_info "编译后端项目..."
+    export AI_MODEL="doubao-seed-2-0-pro-260215"
     mvn clean package -DskipTests
     
     if [ ! -f "target/tourism-0.0.1-SNAPSHOT.jar" ]; then

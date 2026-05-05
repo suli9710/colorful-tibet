@@ -21,21 +21,20 @@ public class JwtUtils {
         UserDetails userPrincipal = (UserDetails) authentication.getPrincipal();
 
         return Jwts.builder()
-                .setSubject((userPrincipal.getUsername()))
+                .setSubject(userPrincipal.getUsername())
                 .setIssuedAt(new Date())
-                .setExpiration(new Date((new Date()).getTime() + jwtExpirationMs))
+                .setExpiration(new Date(System.currentTimeMillis() + jwtExpirationMs))
                 .signWith(SignatureAlgorithm.HS512, jwtSecret)
                 .compact();
     }
 
     public String getUserNameFromJwtToken(String token) {
-        return Jwts.parser().setSigningKey(jwtSecret).parseClaimsJws(token).getBody().getSubject();
+        return parseClaims(token).getBody().getSubject();
     }
 
     public boolean validateJwtToken(String authToken) {
         try {
-            Jwts.parser().setSigningKey(jwtSecret).parseClaimsJws(authToken);
-            System.out.println("=== [JwtUtils] Token验证成功");
+            parseClaims(authToken);
             return true;
         } catch (SignatureException e) {
             System.err.println("=== [JwtUtils] Invalid JWT signature: " + e.getMessage());
@@ -50,8 +49,11 @@ public class JwtUtils {
             System.err.println("=== [JwtUtils] JWT claims string is empty: " + e.getMessage());
         } catch (Exception e) {
             System.err.println("=== [JwtUtils] JWT验证异常: " + e.getClass().getName() + " - " + e.getMessage());
-            e.printStackTrace();
         }
         return false;
+    }
+
+    private Jws<Claims> parseClaims(String token) {
+        return Jwts.parser().setSigningKey(jwtSecret).parseClaimsJws(token);
     }
 }

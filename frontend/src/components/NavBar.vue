@@ -32,7 +32,7 @@ watch(() => route.path, () => {
 })
 
 const handleStorageChange = (e: StorageEvent) => {
-  if (e.key === 'user') {
+  if (e.key === 'user' || e.key === 'token') {
     updateUser()
   }
 }
@@ -55,7 +55,9 @@ onUnmounted(() => {
 
 const logout = () => {
   localStorage.removeItem('user')
+  localStorage.removeItem('token')
   user.value = null
+  window.dispatchEvent(new CustomEvent('user-updated'))
   router.push('/login')
 }
 </script>

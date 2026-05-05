@@ -90,7 +90,7 @@
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { getHotelById, getRoomById } from '../api'
+import { getHotelById, getRoomById } from '../data/hotels'
 import api, { endpoints } from '../api'
 
 const { t } = useI18n()

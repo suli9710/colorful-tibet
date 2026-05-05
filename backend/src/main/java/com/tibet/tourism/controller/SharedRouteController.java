@@ -34,7 +34,7 @@ public class SharedRouteController {
     private JwtUtils jwtUtils;
 
     // 辅助方法：从请求中获取当前用户ID
-    private Long getCurrentUserId(HttpServletRequest request) {
+    private long getCurrentUserId(HttpServletRequest request) {
         String jwt = parseJwt(request);
         if (jwt != null && jwtUtils.validateJwtToken(jwt)) {
             String username = jwtUtils.getUserNameFromJwtToken(jwt);
@@ -57,15 +57,14 @@ public class SharedRouteController {
     @PostMapping("/share")
     public ResponseEntity<?> shareRoute(@RequestBody Map<String, Object> payload, HttpServletRequest request) {
         try {
-            Long userId = getCurrentUserId(request);
-            String title = (String) payload.get("title");
-            String content = (String) payload.get("content");
-            Integer days = (Integer) payload.get("days");
-            String budget = (String) payload.get("budget");
-            String preference = (String) payload.get("preference");
-
-            SharedRoute route = routeService.shareRoute(userId, title, content, days, budget, preference);
-            return ResponseEntity.ok(route);
+            return ResponseEntity.ok(routeService.shareRoute(
+                    getCurrentUserId(request),
+                    (String) payload.get("title"),
+                    (String) payload.get("content"),
+                    (Integer) payload.get("days"),
+                    (String) payload.get("budget"),
+                    (String) payload.get("preference")
+            ));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
@@ -131,7 +130,7 @@ public class SharedRouteController {
             Long userId = getCurrentUserId(request);
             boolean success = routeService.unlikeRoute(id, userId);
             SharedRoute route = routeService.getRoute(id);
-            return ResponseEntity.ok(Map.of("liked", !success, "likeCount", route.getLikeCount()));
+            return ResponseEntity.ok(Map.of("liked", !success, "likeCount", route.getLikeCount() == null ? 0L : route.getLikeCount()));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
@@ -177,8 +176,7 @@ public class SharedRouteController {
     @GetMapping("/my-routes")
     public ResponseEntity<?> getMyRoutes(HttpServletRequest request) {
         try {
-            Long userId = getCurrentUserId(request);
-            User user = userRepository.findById(userId)
+            User user = userRepository.findById(getCurrentUserId(request))
                     .orElseThrow(() -> new RuntimeException("User not found"));
             List<SharedRoute> routes = routeService.getRoutesByAuthor(user);
             return ResponseEntity.ok(routes);

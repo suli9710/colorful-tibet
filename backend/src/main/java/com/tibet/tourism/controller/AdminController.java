@@ -96,6 +96,7 @@ public class AdminController {
     public ResponseEntity<Map<String, Object>> getStats() {
         long userCount = userRepository.count();
         long spotCount = scenicSpotRepository.count();
+        long newsCount = newsRepository.count();
 
         // 景点门票订单统计（仅已确认的）
         long scenicBookingCount = bookingRepository.countConfirmed();
@@ -118,10 +119,17 @@ public class AdminController {
         Map<String, Object> stats = new HashMap<>();
         stats.put("userCount", userCount);
         stats.put("spotCount", spotCount);
+        stats.put("newsCount", newsCount);
         stats.put("orderCount", totalOrderCount);
         stats.put("totalRevenue", totalRevenue);
         stats.put("recentBookings", recentScenicBookings);
         stats.put("recentHotelBookings", recentHotelBookings);
+        stats.put("popularSpots", scenicSpotRepository.findAll());
+        stats.put("spotCategories", buildSpotCategories());
+        stats.put("monthlyBookingTrend", buildMonthlyBookingTrend(recentScenicBookings, recentHotelBookings));
+        stats.put("userGrowthTrend", buildUserGrowthTrend());
+        stats.put("newsPublishTrend", buildNewsPublishTrend());
+        stats.put("updatedAt", java.time.LocalDateTime.now());
 
         return ResponseEntity.ok(stats);
     }
@@ -267,6 +275,71 @@ public class AdminController {
             return ResponseEntity.status(403).body(Map.of("error", "只有超级管理员可以查看审计日志"));
         }
         return ResponseEntity.ok(auditLogRepository.findTop200ByOrderByCreatedAtDesc());
+    }
+
+    private List<Map<String, Object>> buildSpotCategories() {
+        Map<String, Long> counts = new HashMap<>();
+        scenicSpotRepository.findAll().forEach(spot -> {
+            String key = spot.getCategory() == null ? "未分类" : spot.getCategory().name();
+            counts.put(key, counts.getOrDefault(key, 0L) + 1);
+        });
+        return counts.entrySet().stream()
+                .map(entry -> Map.<String, Object>of("name", entry.getKey(), "value", entry.getValue()))
+                .toList();
+    }
+
+    private List<Map<String, Object>> buildMonthlyBookingTrend(List<Booking> scenicBookings, List<HotelBooking> hotelBookings) {
+        Map<String, long[]> buckets = new HashMap<>();
+        java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM");
+
+        scenicBookings.forEach(item -> {
+            if (item.getCreatedAt() != null) {
+                String month = item.getCreatedAt().format(formatter);
+                long[] values = buckets.computeIfAbsent(month, k -> new long[2]);
+                values[0] += 1;
+                values[1] += item.getTotalPrice() == null ? 0 : item.getTotalPrice().longValue();
+            }
+        });
+        hotelBookings.forEach(item -> {
+            if (item.getCreatedAt() != null) {
+                String month = item.getCreatedAt().format(formatter);
+                long[] values = buckets.computeIfAbsent(month, k -> new long[2]);
+                values[0] += 1;
+                values[1] += item.getTotalPrice() == null ? 0 : item.getTotalPrice().longValue();
+            }
+        });
+
+        return buckets.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(entry -> Map.<String, Object>of(
+                        "month", entry.getKey(),
+                        "orderCount", entry.getValue()[0],
+                        "revenue", entry.getValue()[1]))
+                .toList();
+    }
+
+    private List<Map<String, Object>> buildUserGrowthTrend() {
+        return userRepository.findAll(Sort.by(Sort.Direction.ASC, "createdAt")).stream()
+                .filter(user -> user.getCreatedAt() != null)
+                .collect(java.util.stream.Collectors.groupingBy(
+                        user -> user.getCreatedAt().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM")),
+                        java.util.TreeMap::new,
+                        java.util.stream.Collectors.counting()))
+                .entrySet().stream()
+                .map(entry -> Map.<String, Object>of("month", entry.getKey(), "count", entry.getValue()))
+                .toList();
+    }
+
+    private List<Map<String, Object>> buildNewsPublishTrend() {
+        return newsRepository.findAll(Sort.by(Sort.Direction.ASC, "createdAt")).stream()
+                .filter(news -> news.getCreatedAt() != null)
+                .collect(java.util.stream.Collectors.groupingBy(
+                        news -> news.getCreatedAt().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM")),
+                        java.util.TreeMap::new,
+                        java.util.stream.Collectors.counting()))
+                .entrySet().stream()
+                .map(entry -> Map.<String, Object>of("month", entry.getKey(), "count", entry.getValue()))
+                .toList();
     }
 
     private void recordAudit(AuditLog.Action action, String operatorUsername, User targetUser, String detail) {
