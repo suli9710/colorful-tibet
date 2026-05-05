@@ -1,62 +1,71 @@
 @echo off
+setlocal EnableExtensions
+
 chcp 65001 >nul
+
 echo ========================================
-echo   彩色西藏旅游网站 - 一键启动脚本
+echo   Colorful Tibet - Startup Script
 echo ========================================
 echo.
 
-:: 检查 Java 是否安装
 where java >nul 2>&1
-if %errorlevel% neq 0 (
-    echo [错误] 未检测到 Java，请先安装 Java 17 或更高版本
+if errorlevel 1 (
+    echo [ERROR] Java was not found. Please install Java 17 or later.
     pause
     exit /b 1
 )
 
-:: 检查 Maven 是否安装
 where mvn >nul 2>&1
-if %errorlevel% neq 0 (
-    echo [错误] 未检测到 Maven，请先安装 Maven
+if errorlevel 1 (
+    echo [ERROR] Maven was not found. Please install Maven.
     pause
     exit /b 1
 )
 
-:: 检查 Node.js 是否安装
 where node >nul 2>&1
-if %errorlevel% neq 0 (
-    echo [错误] 未检测到 Node.js，请先安装 Node.js
+if errorlevel 1 (
+    echo [ERROR] Node.js was not found. Please install Node.js.
     pause
     exit /b 1
 )
 
-echo [信息] 正在启动后端服务...
-cd backend
-start "后端服务 - Spring Boot" cmd /k "mvn spring-boot:run"
-cd ..
+echo [INFO] Starting backend service...
+pushd "%~dp0backend"
+set "AI_MODEL=doubao-seed-2-0-pro-260215"
+if not defined ARK_API_KEY (
+    echo [WARN] ARK_API_KEY is not set. AI route generation will not work.
+    echo [WARN] Please set ARK_API_KEY environment variable before starting.
+)
+start "" cmd /k "set AI_MODEL=%AI_MODEL%&& set ARK_API_KEY=%ARK_API_KEY%&& mvn spring-boot:run"
+popd
 
-echo [信息] 等待后端服务启动...
+echo [INFO] Waiting for backend to start...
 timeout /t 5 /nobreak >nul
 
-echo [信息] 正在启动前端服务...
-cd frontend
+echo [INFO] Starting frontend service...
+pushd "%~dp0frontend"
 
-:: 检查 node_modules 是否存在
 if not exist "node_modules" (
-    echo [信息] 检测到 node_modules 不存在，正在安装依赖...
+    echo [INFO] node_modules not found, installing dependencies...
     call npm install
+    if errorlevel 1 (
+        echo [ERROR] Frontend dependency installation failed.
+        popd
+        pause
+        exit /b 1
+    )
 )
 
-start "前端服务 - Vite" cmd /k "npm run dev"
-cd ..
+start "" cmd /k "npm run dev"
+popd
 
 echo.
 echo ========================================
-echo   启动完成！
+echo   Startup complete!
 echo ========================================
-echo 后端服务: http://localhost:8080
-echo 前端服务: 请查看前端服务窗口中的地址
+echo Backend: http://localhost:8080
+echo Frontend: check the frontend terminal window for its URL
 echo.
-echo 提示: 关闭服务窗口即可停止对应的服务
+echo Tip: close the service windows to stop them
 echo ========================================
 pause
-

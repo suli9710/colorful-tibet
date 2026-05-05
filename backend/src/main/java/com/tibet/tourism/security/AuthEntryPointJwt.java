@@ -19,7 +19,14 @@ public class AuthEntryPointJwt implements AuthenticationEntryPoint {
         response.setContentType("application/json;charset=UTF-8");
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         PrintWriter writer = response.getWriter();
-        writer.write("{\"error\":\"Unauthorized\",\"message\":\"Authentication required\"}");
+        String message = authException != null && authException.getMessage() != null
+                ? authException.getMessage()
+                : "Authentication required";
+        writer.write("{\"error\":\"Unauthorized\",\"message\":\"" + escapeJson(message) + "\"}");
         writer.flush();
+    }
+
+    private String escapeJson(String value) {
+        return value.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 }

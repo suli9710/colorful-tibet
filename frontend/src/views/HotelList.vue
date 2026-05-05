@@ -66,7 +66,7 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { hotelsByRegion, hotelRegions, type HotelItem } from '../api'
+import { hotelsByRegion, hotelRegions, type HotelItem } from '../data/hotels'
 
 const { t } = useI18n()
 const keyword = ref('')

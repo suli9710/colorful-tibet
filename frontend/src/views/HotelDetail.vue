@@ -55,7 +55,7 @@
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { getHotelById, hotels } from '../api'
+import { getHotelById, hotels } from '../data/hotels'
 
 const { t } = useI18n()
 const route = useRoute()

@@ -72,38 +72,21 @@ const form = ref({
 const handleLogin = async () => {
   loading.value = true
   try {
-    const response = await api.post('/auth/login', form.value)
-    const user = response.data
-    
-    // 确保token存在
+    const { data: user } = await api.post('/auth/login', form.value)
+
     if (!user.token) {
-      console.error('登录响应中缺少token:', response.data)
       alert(t('login.loginFailed') + ' (缺少token)')
       return
     }
-    
-    // 保存用户信息到localStorage
+
     localStorage.setItem('user', JSON.stringify(user))
-    console.log('✅ 登录成功，用户信息已保存:', {
-      username: user.username,
-      role: user.role,
-      hasToken: !!user.token,
-      tokenLength: user.token?.length
-    })
-    
-    // 触发自定义事件，通知NavBar更新用户状态
+    localStorage.setItem('token', user.token)
     window.dispatchEvent(new CustomEvent('user-updated'))
-    
-    // 如果是管理员，跳转到管理页面；否则跳转到首页
-    if (user.role === 'ADMIN') {
-      router.push('/admin')
-    } else {
-      router.push('/')
-    }
+    window.dispatchEvent(new CustomEvent('auth-restored'))
+
+    router.push(user.role === 'ADMIN' ? '/admin' : '/')
   } catch (error: any) {
-    console.error('Login failed:', error)
-    const errorMsg = error.response?.data?.message || error.response?.data?.error || t('login.loginFailed')
-    alert(errorMsg)
+    alert(error.response?.data?.message || error.response?.data?.error || t('login.loginFailed'))
   } finally {
     loading.value = false
   }

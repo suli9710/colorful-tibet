@@ -17,10 +17,17 @@ spring:
   datasource:
     url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:colorful_tibet}?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
     username: ${MYSQL_USERNAME:root}
-    password: ${MYSQL_PASSWORD:password}
+    password: ${MYSQL_PASSWORD:}
     driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 15
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      pool-name: TibetMySQLPool
   jpa:
-    database-platform: org.hibernate.dialect.MySQL8Dialect
+    database-platform: org.hibernate.dialect.MySQLDialect
     hibernate:
       ddl-auto: update
     show-sql: false
@@ -30,11 +37,11 @@ spring:
 
 # 可选：如果你仍想临时使用 H2，可把上面的 datasource 改回 H2 配置
 
-doubao:
+ark:
   api:
-    url: ${DOUBAO_API_URL:https://ark.cn-beijing.volces.com/api/v3/chat/completions}
-    key: ${DOUBAO_API_KEY:your-doubao-api-key}
-    model: ${DOUBAO_MODEL:your-model-name}
+    url: ${ARK_API_URL:https://ark.cn-beijing.volces.com/api/v3/responses}
+    key: ${ARK_API_KEY:}
+    model: ${AI_MODEL:doubao-seed-2-0-pro-260215}
 
 # 价格定时更新配置
 price:
@@ -54,6 +61,7 @@ jwt:
 
 # 密码加密配置 + H2 -> MySQL 一次性迁移开关
 app:
+  super-admin-username: ${SUPER_ADMIN_USERNAME:lzh}
   encryption:
     key: ${ADMIN_ENCRYPTION_KEY:tibetTourismSecretKey12345678901234567890}
   migration:

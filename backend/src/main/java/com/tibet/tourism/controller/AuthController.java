@@ -2,6 +2,7 @@ package com.tibet.tourism.controller;
 
 import com.tibet.tourism.entity.User;
 import com.tibet.tourism.repository.*;
+import com.tibet.tourism.security.JwtAuthSupport;
 import com.tibet.tourism.security.JwtUtils;
 import com.tibet.tourism.service.FileStorageService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -35,6 +36,9 @@ public class AuthController {
     JwtUtils jwtUtils;
 
     @Autowired
+    JwtAuthSupport jwtAuthSupport;
+
+    @Autowired
     PasswordEncoder passwordEncoder;
 
     @Autowired
@@ -61,31 +65,19 @@ public class AuthController {
     @Autowired
     com.tibet.tourism.service.PasswordEncryptionService passwordEncryptionService;
 
-    private String parseJwt(HttpServletRequest request) {
-        String headerAuth = request.getHeader("Authorization");
-        if (StringUtils.hasText(headerAuth) && headerAuth.startsWith("Bearer ")) {
-            return headerAuth.substring(7);
-        }
-        return null;
+    private Long getCurrentUserId(HttpServletRequest request) {
+        return jwtAuthSupport.resolveCurrentUserId(request);
     }
 
-    private Long getCurrentUserId(HttpServletRequest request) {
-        String jwt = parseJwt(request);
-        if (jwt != null && jwtUtils.validateJwtToken(jwt)) {
-            String username = jwtUtils.getUserNameFromJwtToken(jwt);
-            User user = userRepository.findByUsername(username)
-                    .orElseThrow(() -> new RuntimeException("User not found"));
-            return user.getId();
-        }
-        throw new RuntimeException("User not authenticated");
+    private ResponseEntity<?> errorResponse(Exception e) {
+        return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
     }
 
     // 获取当前用户信息
     @GetMapping("/me")
     public ResponseEntity<?> getCurrentUser(HttpServletRequest request) {
         try {
-            Long userId = getCurrentUserId(request);
-            User user = userRepository.findById(userId)
+            User user = userRepository.findById(getCurrentUserId(request))
                     .orElseThrow(() -> new RuntimeException("User not found"));
 
             Map<String, Object> response = new HashMap<>();
@@ -99,7 +91,7 @@ public class AuthController {
 
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return errorResponse(e);
         }
     }
 

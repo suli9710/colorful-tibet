@@ -248,6 +248,10 @@ public class ColdStartOptimizationService {
     
     /**
      * 混合冷启动推荐（综合多种策略）
+     *
+     * 文字说明：该方法用于解决“新用户没有行为数据、单一推荐结果不稳定”的问题。
+     * 它将用户属性、地理位置和问卷偏好三类信号进行加权融合，
+     * 再用热门景点补齐候选，保证推荐结果既有个性化，也有可用性。
      */
     public List<ScenicSpot> hybridColdStartRecommendation(
             Long userId,

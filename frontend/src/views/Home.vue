@@ -4,17 +4,21 @@
     <div class="relative h-[calc(100vh-6rem)] md:h-[calc(100vh-7rem)] flex items-center justify-center overflow-hidden -mt-24 md:-mt-28">
       <!-- Background Video/Image -->
       <div class="absolute inset-0 z-0">
-        <img src="/heritage/布达拉宫3.jpg" alt="Potala Palace" class="w-full h-full object-cover scale-105 animate-float-slow will-change-transform hero-parallax-bg" style="transform-origin: center center;">
+        <img :src="heroSlides[currentSlide].image" :alt="heroSlides[currentSlide].title" class="w-full h-full object-cover scale-105 animate-float-slow will-change-transform hero-parallax-bg" style="transform-origin: center center;">
         <div class="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-apple-gray-50"></div>
       </div>
 
       <!-- Hero Content -->
       <div class="relative z-10 text-center px-4 max-w-5xl mx-auto">
+        <div class="mb-6 inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm text-white/90 backdrop-blur-md border border-white/20">
+          <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
+          {{ heroSlides[currentSlide].tag }}
+        </div>
         <h1 class="text-5xl md:text-7xl font-bold text-white mb-6 tracking-tight animate-slide-up will-change-transform tibetan-font" style="animation-delay: 0.1s">
-          {{ t('home.title') }}
+          {{ heroSlides[currentSlide].title }}
         </h1>
         <p class="text-xl md:text-2xl text-white/90 mb-10 font-light max-w-2xl mx-auto animate-slide-up will-change-transform tibetan-font" style="animation-delay: 0.3s">
-          {{ t('home.subtitle') }}
+          {{ heroSlides[currentSlide].subtitle }}
         </p>
         <div class="flex flex-col sm:flex-row justify-center gap-4 animate-slide-up will-change-transform" style="animation-delay: 0.5s">
           <router-link to="/spots" class="group px-8 py-4 bg-white text-apple-gray-900 rounded-full font-semibold text-lg hover:bg-gray-100 transition-all duration-300 ease-out-expo transform hover:scale-105 hover:shadow-2xl shadow-lg relative overflow-hidden will-change-transform tibetan-font">
@@ -24,6 +28,13 @@
           <button @click="scrollToHeatmap" class="px-8 py-4 bg-white/20 backdrop-blur-md border border-white/30 text-white rounded-full font-semibold text-lg hover:bg-white/30 transition-all duration-300 ease-out-expo transform hover:scale-105 hover:shadow-xl hover:border-white/50 will-change-transform tibetan-font">
             {{ t('home.viewHeatmap') }}
           </button>
+        </div>
+
+        <div class="mt-10 flex items-center justify-center gap-3">
+          <button v-for="(slide, index) in heroSlides" :key="slide.title" @click="goToSlide(index)"
+                  class="h-2.5 rounded-full transition-all duration-300"
+                  :class="currentSlide === index ? 'w-10 bg-white' : 'w-2.5 bg-white/50 hover:bg-white/80'"
+                  :aria-label="`切换到第 ${index + 1} 张轮播图`"></button>
         </div>
       </div>
     </div>
@@ -120,9 +131,34 @@ const { t, locale } = useI18n()
 const recommendedSpots = ref<any[]>([])
 const recommendationReasons = ref<Map<number, string>>(new Map())
 const loading = ref(true)
+const currentSlide = ref(0)
+const heroSlides = [
+  { image: '/heritage/布达拉宫3.jpg', title: '走进西藏', subtitle: '从布达拉宫到雪山湖泊，开启你的高原之旅。', tag: '经典首图' },
+  { image: '/heritage/纳木错.jpg', title: '看见高原湖泊', subtitle: '湖光、天空与远山，适合最简单的首页轮播。', tag: '自然风景' },
+  { image: '/heritage/藏戏.jpg', title: '感受人文底色', subtitle: '从非遗文化中挑一张更有烟火气的图片，补全人文轮播。', tag: '人文旅行' }
+]
+let slideTimer: number | null = null
 
 const scrollToHeatmap = () => {
   document.getElementById('heatmap')?.scrollIntoView({ behavior: 'smooth' })
+}
+
+const goToSlide = (index: number) => {
+  currentSlide.value = index
+}
+
+const startCarousel = () => {
+  stopCarousel()
+  slideTimer = window.setInterval(() => {
+    currentSlide.value = (currentSlide.value + 1) % heroSlides.length
+  }, 4000)
+}
+
+const stopCarousel = () => {
+  if (slideTimer !== null) {
+    window.clearInterval(slideTimer)
+    slideTimer = null
+  }
 }
 
 // 获取推荐原因（处理类型转换）
@@ -133,140 +169,6 @@ const getRecommendationReason = (spotId: number) => {
                  recommendationReasons.value.get(Number(spotId))
   // 如果还是没有，返回默认原因
   return reason || t('home.recommendationReason')
-}
-
-const logRecommendationDebugInfo = (debugData: any) => {
-  if (!debugData) return
-  
-  // 主标题
-  console.group('%c🎯 协同过滤算法训练详情', 'color:#2563eb;font-weight:bold;font-size:16px;padding:8px;background:#e3f2fd;border-radius:4px;')
-  
-  // 基础信息
-  console.group('%c📊 基础信息', 'color:#1976d2;font-weight:bold;')
-  console.log('%c用户ID:', 'color:#666;font-weight:bold', debugData.userId)
-  console.log('%c使用历史记录:', 'color:#666;font-weight:bold', debugData.hasHistory ? '✅ 是' : '❌ 否')
-  console.log('%c是否回退热门:', 'color:#666;font-weight:bold', debugData.fallbackUsed ? '✅ 是' : '❌ 否')
-  if (debugData.computationTimeMs) {
-    console.log('%c计算耗时:', 'color:#666;font-weight:bold', `${debugData.computationTimeMs}ms`)
-  }
-  console.groupEnd()
-  
-  // 算法配置
-  if (debugData.algorithmConfig) {
-    console.group('%c⚙️ 算法配置', 'color:#1976d2;font-weight:bold;')
-    const config = debugData.algorithmConfig
-    console.table({
-      '最大相似用户数': config.maxSimilarUsers,
-      '推荐结果数量': config.maxResults,
-      '最小相似度阈值': config.minSimilarity,
-      '协同过滤权重': `${(config.collaborativeWeight * 100).toFixed(0)}%`,
-      '内容过滤权重': `${(config.contentWeight * 100).toFixed(0)}%`,
-      '多样性惩罚系数': config.diversityPenalty,
-      '探索率': `${(config.explorationRate * 100).toFixed(0)}%`
-    })
-    console.groupEnd()
-  }
-  
-  // 用户访问记录
-  if (debugData.history?.length) {
-    console.group('%c📝 用户访问记录', 'color:#1976d2;font-weight:bold;')
-    console.table(debugData.history.map((item: any) => ({
-      景点: item.spotName,
-      评分: item.rating ? '⭐'.repeat(item.rating) + ` (${item.rating})` : '未评分',
-      访问时间: item.visitDate ? new Date(item.visitDate).toLocaleString('zh-CN') : '未知'
-    })))
-    console.groupEnd()
-  }
-  
-  // 标签画像
-  if (debugData.tagProfile && Object.keys(debugData.tagProfile).length > 0) {
-    console.group('%c🏷️ 用户标签画像', 'color:#1976d2;font-weight:bold;')
-    const tagEntries = Object.entries(debugData.tagProfile)
-      .sort((a: any, b: any) => b[1] - a[1])
-      .map(([tag, weight]: [string, any]) => ({
-        标签: tag,
-        权重: weight.toFixed(3),
-        权重条: '█'.repeat(Math.min(20, Math.floor(weight * 2)))
-      }))
-    console.table(tagEntries)
-    console.groupEnd()
-  }
-  
-  // 相似用户详情
-  if (debugData.similarUsers?.length) {
-    console.group('%c👥 相似用户分析', 'color:#1976d2;font-weight:bold;')
-    console.log(`找到 ${debugData.similarUsers.length} 个相似用户`)
-    
-    debugData.similarUsers.forEach((user: any, index: number) => {
-      console.group(`%c相似用户 #${index + 1} (ID: ${user.userId})`, 'color:#4caf50;font-weight:bold;')
-      console.log('%c综合相似度:', 'color:#666;font-weight:bold', `${(user.similarity * 100).toFixed(2)}%`)
-      
-      if (user.adjustedCosine !== undefined) {
-        console.log('%c  ├─ 调整余弦相似度:', 'color:#666', `${(user.adjustedCosine * 100).toFixed(2)}%`)
-      }
-      if (user.jaccard !== undefined) {
-        console.log('%c  ├─ Jaccard相似度:', 'color:#666', `${(user.jaccard * 100).toFixed(2)}%`)
-      }
-      if (user.timeWeighted !== undefined) {
-        console.log('%c  ├─ 时间加权相似度:', 'color:#666', `${(user.timeWeighted * 100).toFixed(2)}%`)
-      }
-      if (user.commonSpotsCount !== undefined) {
-        console.log('%c  └─ 共同访问景点数:', 'color:#666', user.commonSpotsCount)
-      }
-      
-      // 可视化相似度
-      const similarityBar = '█'.repeat(Math.min(50, Math.floor(user.similarity * 50)))
-      console.log(`%c相似度可视化: ${similarityBar}`, `color:${user.similarity > 0.5 ? '#4caf50' : user.similarity > 0.3 ? '#ff9800' : '#f44336'}`)
-      console.groupEnd()
-    })
-    console.groupEnd()
-  }
-  
-  // 候选景点得分详情
-  if (debugData.candidateScores?.length) {
-    console.group('%c🏔️ 候选景点得分分析', 'color:#1976d2;font-weight:bold;')
-    console.log(`共 ${debugData.candidateScores.length} 个候选景点`)
-    
-    const topCandidates = debugData.candidateScores.slice(0, 10)
-    console.table(topCandidates.map((candidate: any) => ({
-      排名: debugData.candidateScores.indexOf(candidate) + 1,
-      景点: candidate.spotName,
-      最终得分: candidate.finalScore?.toFixed(4),
-      协同得分: candidate.collaborativeScore?.toFixed(4) || '0.0000',
-      标签得分: candidate.tagScore?.toFixed(4) || '0.0000',
-      得分占比: {
-        协同: candidate.finalScore ? `${((candidate.collaborativeScore || 0) / candidate.finalScore * 100).toFixed(1)}%` : '0%',
-        标签: candidate.finalScore ? `${((candidate.tagScore || 0) / candidate.finalScore * 100).toFixed(1)}%` : '0%'
-      }
-    })))
-    
-    // 得分分布可视化
-    console.group('%c📈 得分分布', 'color:#1976d2;font-weight:bold;')
-    topCandidates.forEach((candidate: any, index: number) => {
-      const maxScore = topCandidates[0]?.finalScore || 1
-      const barLength = Math.floor((candidate.finalScore / maxScore) * 30)
-      const bar = '█'.repeat(barLength) + '░'.repeat(30 - barLength)
-      const color = index < 3 ? '#4caf50' : index < 6 ? '#ff9800' : '#9e9e9e'
-      console.log(`%c${(index + 1).toString().padStart(2, ' ')}. ${candidate.spotName.padEnd(20, ' ')} ${bar} ${candidate.finalScore?.toFixed(4)}`, `color:${color}`)
-    })
-    console.groupEnd()
-    
-    console.groupEnd()
-  }
-  
-  // 最终推荐结果
-  if (debugData.recommendations?.length) {
-    console.group('%c✨ 最终推荐结果', 'color:#4caf50;font-weight:bold;')
-    debugData.recommendations.forEach((spot: any, index: number) => {
-      console.log(`%c${index + 1}. ${spot.name}`, 'color:#4caf50;font-weight:bold;font-size:14px;')
-    })
-    console.groupEnd()
-  }
-  
-  console.groupEnd()
-  
-  // 训练完成提示
-  console.log('%c✅ 协同过滤算法训练完成！', 'color:#4caf50;font-weight:bold;font-size:14px;padding:4px;background:#e8f5e9;border-radius:4px;')
 }
 
 const fetchRecommendations = async () => {
@@ -353,8 +255,13 @@ onMounted(async () => {
   await fetchRecommendations()
   setTimeout(initScrollAnimations, 100)
   const cleanupParallax = initParallax()
+  startCarousel()
   if (cleanupParallax) {
     onUnmounted(cleanupParallax)
   }
+})
+
+onUnmounted(() => {
+  stopCarousel()
 })
 </script>
