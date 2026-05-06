@@ -304,4 +304,151 @@
       scroll-behavior: auto !important;
     }
   }
+
+  /* ===== 藏式装饰纹样 ===== */
+
+  /* 经幡色彩渐变 */
+  .tibet-prayer-flag {
+    background: linear-gradient(90deg, #2D5F8A 0%, #2D5F8A 20%, #F7F3EE 20%, #F7F3EE 40%, #8B2E3A 40%, #8B2E3A 60%, #3BA99C 60%, #3BA99C 80%, #F2C94C 80%, #F2C94C 100%);
+  }
+
+  .tibet-prayer-flag-vertical {
+    background: linear-gradient(180deg, #2D5F8A 0%, #2D5F8A 20%, #F7F3EE 20%, #F7F3EE 40%, #8B2E3A 40%, #8B2E3A 60%, #3BA99C 60%, #3BA99C 80%, #F2C94C 80%, #F2C94C 100%);
+  }
+
+  /* 藏式祥云纹 — 重复背景图案 */
+  .tibet-cloud-pattern {
+    background-color: #F7F3EE;
+    background-image: url("data:image/svg+xml,%3Csvg width='60' height='30' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M15 15c0-5 5-10 10-8s10 8 15 5 5-8 10-5' fill='none' stroke='%238B2E3A' stroke-width='1.5' stroke-opacity='0.15'/%3E%3Ccircle cx='15' cy='12' r='4' fill='%238B2E3A' fill-opacity='0.08'/%3E%3Ccircle cx='40' cy='8' r='3' fill='%238B2E3A' fill-opacity='0.06'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+  }
+
+  /* 藏式几何边框 — 用于卡片/容器 */
+  .tibet-border {
+    border: 2px solid #8B2E3A;
+    border-image: repeating-linear-gradient(45deg, #C5964B, #C5964B 4px, #8B2E3A 4px, #8B2E3A 8px) 2;
+  }
+
+  /* 藏式顶部装饰条 */
+  .tibet-top-ornament {
+    position: relative;
+  }
+  .tibet-top-ornament::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60px;
+    height: 4px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, #C5964B, #8B2E3A, #C5964B);
+  }
+
+  /* 藏式对角线装饰 — 背景角花 */
+  .tibet-corner-ornament {
+    position: relative;
+  }
+  .tibet-corner-ornament::after {
+    content: '❖';
+    position: absolute;
+    top: 12px;
+    right: 16px;
+    font-size: 18px;
+    color: #C5964B;
+    opacity: 0.4;
+  }
+
+  /* 金刚结装饰 — 分割线 */
+  .tibet-divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .tibet-divider::before,
+  .tibet-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, #C5964B, transparent);
+  }
+
+  /* 藏式金边卡片 */
+  .tibet-card {
+    background: #fff;
+    border: 1px solid rgba(197, 150, 75, 0.3);
+    box-shadow: 0 4px 24px rgba(139, 46, 58, 0.06);
+    position: relative;
+  }
+  .tibet-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 20px;
+    right: 20px;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #C5964B, transparent);
+    opacity: 0.6;
+  }
+
+  /* 经幡飘扬动画 */
+  .tibet-flag-wave {
+    animation: flagWave 3s ease-in-out infinite;
+  }
+  @keyframes flagWave {
+    0%, 100% { transform: rotate(0deg) translateY(0); }
+    25% { transform: rotate(1deg) translateY(-2px); }
+    75% { transform: rotate(-1deg) translateY(2px); }
+  }
+
+  /* 藏式按钮 */
+  .tibet-btn {
+    background: linear-gradient(135deg, #8B2E3A, #6B1D2A);
+    color: #F2C94C;
+    font-weight: 600;
+    border-radius: 9999px;
+    padding: 0.625rem 1.5rem;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(139, 46, 58, 0.3);
+  }
+  .tibet-btn:hover {
+    background: linear-gradient(135deg, #6B1D2A, #4A1218);
+    box-shadow: 0 4px 16px rgba(139, 46, 58, 0.4);
+    transform: translateY(-1px);
+  }
+  .tibet-btn-outline {
+    background: transparent;
+    border: 1.5px solid #C5964B;
+    color: #8B2E3A;
+    font-weight: 600;
+    border-radius: 9999px;
+    padding: 0.625rem 1.5rem;
+    transition: all 0.3s ease;
+  }
+  .tibet-btn-outline:hover {
+    background: #8B2E3A;
+    border-color: #8B2E3A;
+    color: #F2C94C;
+  }
+
+  /* 藏式标题装饰 */
+  .tibet-heading {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .tibet-heading::before {
+    content: '';
+    width: 8px;
+    height: 28px;
+    border-radius: 4px;
+    background: linear-gradient(180deg, #C5964B, #8B2E3A);
+  }
+
+  /* 藏式暗纹背景 */
+  .tibet-bg-subtle {
+    background-color: #F7F3EE;
+    background-image: radial-gradient(circle at 50% 50%, rgba(139, 46, 58, 0.04) 1px, transparent 1px);
+    background-size: 20px 20px;
+  }
 }

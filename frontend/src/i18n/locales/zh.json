@@ -74,7 +74,10 @@
     "errorRemote": "无法连接到远程后端",
     "errorSolution": "解决方案：",
     "errorSolutionLocal": "- 运行 start.bat 启动本地后端\n- 或使用 frontend/start-remote.bat 连接远程后端",
-    "errorSolutionRemote": "- 检查 FRP 客户端是否运行\n- 或切换到本地模式（使用 start.bat）"
+    "errorSolutionRemote": "- 检查 FRP 客户端是否运行\n- 或切换到本地模式（使用 start.bat）",
+    "noCategoryTitle": "该分类暂无景点",
+    "noCategoryMessage": "当前分类下没有找到景点数据，请查看其他分类",
+    "showAll": "查看全部景点"
   },
   "heritage": {
     "title": "西藏非物质文化遗产",
@@ -311,12 +314,12 @@
     "starUnit": "星",
     "regionalHotels": "{region}酒店",
     "hotelsCount": "共 {count} 家酒店",
-    "minHotelsHint": "每个地区至少 4 家酒店",
     "perNight": "起 / 晚",
     "reviewCountUnit": "条点评",
     "available": "可预订",
     "full": "已满房",
     "viewDetails": "查看详情",
+    "navigate": "导航",
     "noResults": "没有找到符合条件的酒店，请调整筛选条件。",
     "city": {
       "lhasa": "拉萨",
@@ -325,6 +328,8 @@
       "ngari": "阿里"
     },
     "introduction": "酒店介绍",
+    "amenities": "设施服务",
+    "hotelLevel": "酒店",
     "roomSelection": "房型选择",
     "startingPrice": "起价",
     "perNightCompact": "起/晚",

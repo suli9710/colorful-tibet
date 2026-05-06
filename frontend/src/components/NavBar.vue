@@ -74,7 +74,7 @@ const logout = () => {
         <div class="flex-shrink-0 flex items-center">
           <router-link to="/" class="flex items-center space-x-2 group">
             <span :class="[
-              'text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600 transition-opacity',
+              'text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-tibet-yellow via-tibet-gold to-tibet-red transition-opacity tibetan-font',
               isScrolled ? 'opacity-100' : 'group-hover:opacity-80'
             ]">
               {{ t('common.brandName') }}
@@ -109,7 +109,7 @@ const logout = () => {
             :class="[
               'px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200',
               currentLocale === 'zh'
-                ? 'bg-apple-blue text-white shadow-md'
+                ? 'bg-tibet-red text-tibet-yellow shadow-md'
                 : 'bg-white/50 text-apple-gray-600 hover:bg-white/70'
             ]">
             {{ t('common.chinese') }}
@@ -119,7 +119,7 @@ const logout = () => {
             :class="[
               'px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200',
               currentLocale === 'bo'
-                ? 'bg-apple-blue text-white shadow-md'
+                ? 'bg-tibet-red text-tibet-yellow shadow-md'
                 : 'bg-white/50 text-apple-gray-600 hover:bg-white/70'
             ]">
             {{ t('common.tibetan') }}
@@ -137,9 +137,8 @@ const logout = () => {
             <router-link to="/login" class="text-sm font-medium text-apple-gray-600 hover:text-apple-gray-900 transition-colors">
               {{ t('common.login') }}
             </router-link>
-            <router-link to="/register" class="bg-apple-blue hover:bg-apple-blue-hover text-white text-sm font-medium px-4 py-2 rounded-full transition-all duration-300 ease-out-expo shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 hover:-translate-y-1 hover:scale-105 active:scale-95 relative overflow-hidden group will-change-transform">
+            <router-link to="/register" class="bg-tibet-red hover:bg-tibet-red/90 text-tibet-yellow text-sm font-medium px-4 py-2 rounded-full transition-all duration-300 ease-out-expo shadow-lg shadow-tibet-red/30 hover:shadow-tibet-red/50 hover:-translate-y-1 hover:scale-105 active:scale-95 relative overflow-hidden group will-change-transform">
               <span class="relative z-10">{{ t('common.register') }}</span>
-              <span class="absolute inset-0 bg-gradient-to-r from-blue-400 to-purple-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300 ease-out-expo"></span>
             </router-link>
           </div>
         </div>
@@ -194,7 +193,7 @@ const logout = () => {
             :class="[
               'px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200',
               currentLocale === 'zh'
-                ? 'bg-apple-blue text-white shadow-md'
+                ? 'bg-tibet-red text-tibet-yellow shadow-md'
                 : 'bg-gray-100 text-apple-gray-600 hover:bg-gray-200'
             ]">
             {{ t('common.chinese') }}
@@ -204,7 +203,7 @@ const logout = () => {
             :class="[
               'px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200',
               currentLocale === 'bo'
-                ? 'bg-apple-blue text-white shadow-md'
+                ? 'bg-tibet-red text-tibet-yellow shadow-md'
                 : 'bg-gray-100 text-apple-gray-600 hover:bg-gray-200'
             ]">
             {{ t('common.tibetan') }}
@@ -218,7 +217,7 @@ const logout = () => {
           </div>
           <div v-else class="grid grid-cols-2 gap-4 px-4">
             <router-link to="/login" class="text-center py-2 rounded-xl bg-gray-100 text-apple-gray-700 font-medium">{{ t('common.login') }}</router-link>
-            <router-link to="/register" class="text-center py-2 rounded-xl bg-apple-blue text-white font-medium">{{ t('common.register') }}</router-link>
+            <router-link to="/register" class="text-center py-2 rounded-xl bg-tibet-red text-tibet-yellow font-medium">{{ t('common.register') }}</router-link>
           </div>
         </div>
       </div>

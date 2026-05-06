@@ -160,21 +160,17 @@
                   <p class="mt-1 text-sm leading-6" :class="errorMessage ? 'text-rose-600' : 'text-apple-gray-600'">
                     {{ errorMessage || statusMessage || '生成结果会直接显示在这里。' }}
                   </p>
-                  <div v-if="loading" class="mt-4 space-y-3 animate-breath">
+                  <div v-if="loading" class="mt-4 space-y-3">
                     <div class="flex items-center justify-between text-xs text-sky-700">
-                      <span class="transition-all duration-300">{{ typingProgressMessage }}</span>
-                      <span>{{ Math.round(progress) }}%</span>
+                      <span class="flex items-center gap-2">
+                        <span v-if="streaming" class="inline-block w-2 h-2 rounded-full bg-sky-500 animate-pulse"></span>
+                        {{ streaming ? 'AI 逐字生成中...' : '准备中...' }}
+                      </span>
+                      <span v-if="charCount > 0">{{ charCount }} 字</span>
                     </div>
-                    <div class="h-3 overflow-hidden rounded-full bg-sky-100 ring-1 ring-sky-200/70">
-                      <div class="h-full rounded-full bg-gradient-to-r from-sky-500 via-indigo-500 to-purple-500 transition-all duration-700 ease-out" :style="{ width: `${progress}%` }"></div>
-                    </div>
-                    <div class="flex items-center justify-between text-[11px] text-sky-700/75">
-                      <div class="flex flex-wrap gap-2">
-                        <span class="rounded-full bg-white/70 px-3 py-1" :class="progress < 28 ? 'bg-sky-100 text-sky-800' : ''">解析需求</span>
-                        <span class="rounded-full bg-white/70 px-3 py-1" :class="progress >= 28 && progress < 62 ? 'bg-sky-100 text-sky-800' : ''">规划景点</span>
-                        <span class="rounded-full bg-white/70 px-3 py-1" :class="progress >= 62 ? 'bg-sky-100 text-sky-800' : ''">整理 Markdown</span>
-                      </div>
-                      <span class="whitespace-nowrap rounded-full bg-white/70 px-3 py-1">预计剩余 {{ estimatedRemainingTime }}</span>
+                    <div class="h-2 overflow-hidden rounded-full bg-sky-100 ring-1 ring-sky-200/70">
+                      <div v-if="streaming" class="h-full rounded-full bg-gradient-to-r from-sky-500 via-indigo-500 to-purple-500 animate-pulse"></div>
+                      <div v-else class="h-full rounded-full bg-emerald-500 transition-all duration-500" style="width:100%"></div>
                     </div>
                   </div>
                   <div v-if="result" class="mt-3 rounded-xl bg-white/70 p-3 text-sm text-apple-gray-700 border border-white/80">
@@ -258,10 +254,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick, onBeforeUnmount } from 'vue'
+import { ref, computed, shallowRef, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { marked } from 'marked'
+import { generateRouteStream } from '../api/stream'
 import api from '../api'
 
 const { t } = useI18n()
@@ -288,86 +285,14 @@ const loading = ref(false)
 const saving = ref(false)
 const sharing = ref(false)
 const copying = ref(false)
-const progress = ref(0)
-const progressTimer = ref<number | null>(null)
-const typingTimer = ref<number | null>(null)
-const typingProgressMessage = ref('正在生成路线')
-const estimatedRemainingTime = computed(() => {
-  if (!loading.value) return '0 秒'
-  if (progress.value < 20) return '18 秒左右'
-  if (progress.value < 40) return '14 秒左右'
-  if (progress.value < 60) return '10 秒左右'
-  if (progress.value < 80) return '6 秒左右'
-  return '3 秒左右'
-})
-const result = ref('')
+const streaming = ref(false)
+const charCount = ref(0)
+const streamAbortController = ref<AbortController | null>(null)
+const result = shallowRef('')
 const statusMessage = ref('')
 const errorMessage = ref('')
 
 const renderedResult = computed(() => marked.parse(result.value || ''))
-
-const clearProgressTimer = () => {
-  if (progressTimer.value !== null) {
-    window.clearInterval(progressTimer.value)
-    progressTimer.value = null
-  }
-}
-
-const startTypingProgress = () => {
-  if (typingTimer.value !== null) {
-    window.clearInterval(typingTimer.value)
-  }
-  const messages = [
-    '正在解析预算和偏好',
-    '正在规划景点和路线',
-    '正在整理 Markdown 结果',
-    '即将完成生成'
-  ]
-  let index = 0
-  typingProgressMessage.value = messages[index]
-  typingTimer.value = window.setInterval(() => {
-    if (!loading.value) {
-      if (typingTimer.value !== null) {
-        window.clearInterval(typingTimer.value)
-        typingTimer.value = null
-      }
-      return
-    }
-    index = (index + 1) % messages.length
-    typingProgressMessage.value = messages[index]
-  }, 1800)
-}
-
-const startProgress = () => {
-  clearProgressTimer()
-  typingProgressMessage.value = '正在解析预算和偏好'
-  startTypingProgress()
-  progress.value = 6
-  progressTimer.value = window.setInterval(() => {
-    if (!loading.value) {
-      clearProgressTimer()
-      return
-    }
-    const increment = progress.value < 30 ? 2 : progress.value < 65 ? 1.5 : 0.8
-    progress.value = Math.min(94, Number((progress.value + increment).toFixed(1)))
-  }, 700)
-}
-
-const finishProgress = () => {
-  clearProgressTimer()
-  if (typingTimer.value !== null) {
-    window.clearInterval(typingTimer.value)
-    typingTimer.value = null
-  }
-  progress.value = 100
-  typingProgressMessage.value = '已完成生成'
-  window.setTimeout(() => {
-    if (!loading.value) {
-      progress.value = 0
-      typingProgressMessage.value = '正在生成路线'
-    }
-  }, 600)
-}
 
 const adjustDays = (delta: number) => {
   form.value.days = Math.min(30, Math.max(1, form.value.days + delta))
@@ -384,48 +309,62 @@ const applyPreset = (preset: { label: string; days: number; budget: string; pref
 
 const generateRoute = async () => {
   loading.value = true
+  streaming.value = true
   result.value = ''
+  charCount.value = 0
   copying.value = false
   errorMessage.value = ''
-  statusMessage.value = '正在生成路线，请稍候…'
-  startProgress()
+  statusMessage.value = 'AI 正在编写路线...'
+
+  const controller = new AbortController()
+  streamAbortController.value = controller
 
   try {
-    const response = await api.post('/routes/generate', form.value)
-    const content = response.data?.content ?? response.data
-    result.value = typeof content === 'string' ? content : JSON.stringify(content, null, 2)
-    statusMessage.value = '路线生成成功，可以继续保存或分享。'
+    await generateRouteStream(
+      form.value,
+      {
+        onMeta: (meta) => {
+          statusMessage.value = `AI 正在生成 ${meta.days} 天 ${meta.preference} 路线...`
+        },
+        onDelta: (text: string) => {
+          result.value += text
+          charCount.value = result.value.length
+        },
+        onDone: (fullText) => {
+          result.value = fullText
+          charCount.value = fullText.length
+          streaming.value = false
+          loading.value = false
+          if (fullText && fullText.trim().length > 0) {
+            statusMessage.value = `路线生成完成，共 ${fullText.trim().length} 字。`
+          } else {
+            errorMessage.value = 'AI 生成失败，返回内容为空，请稍后重试。'
+            statusMessage.value = '路线生成失败，请检查后重试。'
+          }
+        },
+        onError: (message) => {
+          errorMessage.value = message
+          statusMessage.value = '路线生成失败，请检查后重试。'
+          streaming.value = false
+          loading.value = false
+        },
+      },
+      controller.signal
+    )
   } catch (error: any) {
     console.error('Failed to generate route:', error)
-
     let message = t('routePlanner.generateFailed')
-
-    if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+    if (error.name === 'AbortError') {
+      message = '生成已取消'
+    } else if (error.message?.includes('timeout')) {
       message = t('routePlanner.timeoutError')
-    } else if (error.response) {
-      const status = error.response.status
-      const backendError = error.response.data?.detail || error.response.data?.error || error.response.data?.message || ''
-      if (status === 500) {
-        message = backendError || t('routePlanner.serviceUnavailable')
-      } else if (status === 401) {
-        const serverMessage = String(backendError).toLowerCase()
-        if (serverMessage.includes('expired') || serverMessage.includes('invalid') || serverMessage.includes('authentication')) {
-          message = t('routePlanner.authFailed')
-        } else {
-          message = backendError || t('routePlanner.authFailed')
-        }
-      } else {
-        message = backendError || t('routePlanner.serverError', { status })
-      }
-    } else if (error.request) {
-      message = t('routePlanner.connectionError')
     }
-
     errorMessage.value = message
     statusMessage.value = '路线生成失败，请检查后重试。'
   } finally {
     loading.value = false
-    finishProgress()
+    streaming.value = false
+    streamAbortController.value = null
   }
 }
 
@@ -506,7 +445,9 @@ const shareRoute = async () => {
 }
 
 onBeforeUnmount(() => {
-  clearProgressTimer()
+  if (streamAbortController.value) {
+    streamAbortController.value.abort()
+  }
 })
 </script>
 

@@ -83,7 +83,7 @@ public class AuthTokenFilter extends OncePerRequestFilter {
                servletPath.startsWith("/api/spots/") ||
                servletPath.startsWith("/api/news/") ||
                servletPath.startsWith("/api/heritage/") ||
-               servletPath.equals("/api/routes/generate") || // 只跳过AI生成接口
+               servletPath.startsWith("/api/routes/generate") || // 跳过AI生成及流式端点
                servletPath.startsWith("/api/routes/shared") || // 分享列表保持匿名访问
                servletPath.startsWith("/api/test/") ||
                servletPath.startsWith("/h2-console/");

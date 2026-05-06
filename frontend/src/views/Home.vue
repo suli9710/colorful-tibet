@@ -10,8 +10,8 @@
 
       <!-- Hero Content -->
       <div class="relative z-10 text-center px-4 max-w-5xl mx-auto">
-        <div class="mb-6 inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm text-white/90 backdrop-blur-md border border-white/20">
-          <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
+        <div class="mb-6 inline-flex items-center gap-2 rounded-full bg-tibet-red/30 px-4 py-2 text-sm text-tibet-yellow backdrop-blur-md border border-tibet-gold/30">
+          <span class="h-2 w-2 rounded-full bg-tibet-yellow"></span>
           {{ heroSlides[currentSlide].tag }}
         </div>
         <h1 class="text-5xl md:text-7xl font-bold text-white mb-6 tracking-tight animate-slide-up will-change-transform tibetan-font" style="animation-delay: 0.1s">
@@ -21,9 +21,8 @@
           {{ heroSlides[currentSlide].subtitle }}
         </p>
         <div class="flex flex-col sm:flex-row justify-center gap-4 animate-slide-up will-change-transform" style="animation-delay: 0.5s">
-          <router-link to="/spots" class="group px-8 py-4 bg-white text-apple-gray-900 rounded-full font-semibold text-lg hover:bg-gray-100 transition-all duration-300 ease-out-expo transform hover:scale-105 hover:shadow-2xl shadow-lg relative overflow-hidden will-change-transform tibetan-font">
-            <span class="relative z-10">{{ t('home.startExploring') }}</span>
-            <span class="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500 opacity-0 group-hover:opacity-10 transition-opacity duration-300 ease-out-expo"></span>
+          <router-link to="/spots" class="tibet-btn text-lg px-8 py-4 shadow-xl hover:shadow-2xl transform hover:scale-105 will-change-transform">
+            {{ t('home.startExploring') }}
           </router-link>
           <button @click="scrollToHeatmap" class="px-8 py-4 bg-white/20 backdrop-blur-md border border-white/30 text-white rounded-full font-semibold text-lg hover:bg-white/30 transition-all duration-300 ease-out-expo transform hover:scale-105 hover:shadow-xl hover:border-white/50 will-change-transform tibetan-font">
             {{ t('home.viewHeatmap') }}
@@ -42,7 +41,7 @@
     <!-- Heatmap Section -->
     <div id="heatmap" class="py-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
       <div class="text-center mb-16 animate-on-scroll">
-        <h2 class="text-4xl font-bold text-apple-gray-900 mb-4 tibetan-font">{{ t('home.hotSpotsDistribution') }}</h2>
+        <h2 class="tibet-heading text-4xl font-bold text-tibet-dark mb-4 tibetan-font">{{ t('home.hotSpotsDistribution') }}</h2>
         <p class="text-lg text-apple-gray-500 tibetan-font">{{ t('home.hotSpotsDescription') }}</p>
       </div>
       
@@ -56,10 +55,10 @@
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between items-end mb-12 animate-on-scroll">
           <div>
-            <h2 class="text-4xl font-bold text-apple-gray-900 mb-2 tibetan-font">{{ t('home.recommendations') }}</h2>
+            <h2 class="tibet-heading text-4xl font-bold text-tibet-dark mb-2 tibetan-font">{{ t('home.recommendations') }}</h2>
             <p class="text-lg text-apple-gray-500 tibetan-font">{{ t('home.recommendationsDescription') }}</p>
           </div>
-          <router-link to="/spots" class="hidden md:flex items-center text-apple-blue hover:text-apple-blue-hover font-medium transition-colors tibetan-font">
+          <router-link to="/spots" class="hidden md:flex items-center text-tibet-red hover:text-tibet-red/80 font-medium transition-colors tibetan-font">
             {{ t('common.viewAll') }}
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 ml-1" viewBox="0 0 20 20" fill="currentColor">
               <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
@@ -80,15 +79,15 @@
                    class="w-full h-full object-cover transition-transform duration-700 ease-out-expo group-hover:scale-110 img-fade-in will-change-transform"
                    loading="lazy">
               <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 ease-out-expo"></div>
-              <div class="absolute top-4 right-4 bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-bold text-apple-gray-900 shadow-xl transform group-hover:scale-110 transition-transform duration-300 ease-out-expo will-change-transform tibetan-font">
+              <div class="absolute top-4 right-4 bg-tibet-white/95 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-bold text-tibet-red shadow-xl transform group-hover:scale-110 transition-transform duration-300 ease-out-expo will-change-transform">
                 {{ spot.category === 'NATURAL' ? t('home.natural') : t('home.cultural') }}
               </div>
             </div>
             
               <div class="p-8">
               <div class="flex justify-between items-start mb-4">
-                <h3 class="text-2xl font-bold text-apple-gray-900 group-hover:text-apple-blue transition-colors duration-300 ease-out-expo">{{ spot.name }}</h3>
-                <span class="text-lg font-semibold text-apple-blue transform group-hover:scale-110 transition-transform duration-300 ease-out-expo will-change-transform">¥{{ spot.ticketPrice }}</span>
+                <h3 class="text-2xl font-bold text-tibet-dark group-hover:text-tibet-red transition-colors duration-300 ease-out-expo">{{ spot.name }}</h3>
+                <span class="text-lg font-semibold text-tibet-red transform group-hover:scale-110 transition-transform duration-300 ease-out-expo will-change-transform">¥{{ spot.ticketPrice }}</span>
               </div>
               <!-- 推荐原因 -->
               <p v-if="getRecommendationReason(spot.id)" class="text-xs text-apple-blue mb-3 font-medium tibetan-font">
@@ -103,8 +102,8 @@
                     {{ tag.tag }}
                   </span>
                 </div>
-                <button @click="router.push(`/spots/${spot.id}`)" 
-                        class="text-apple-blue font-medium hover:text-apple-blue-hover transition-all duration-300 ease-out-expo flex items-center group/btn tibetan-font">
+                <button @click="router.push(`/spots/${spot.id}`)"
+                        class="text-tibet-red font-medium hover:text-tibet-red/80 transition-all duration-300 ease-out-expo flex items-center group/btn tibetan-font">
                   {{ t('common.book') }}
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-1 transform group-hover/btn:translate-x-2 transition-transform duration-300 ease-out-expo will-change-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
@@ -171,31 +170,145 @@ const getRecommendationReason = (spotId: number) => {
   return reason || t('home.recommendationReason')
 }
 
+const logDebugToConsole = (debug: any) => {
+  console.group('%c🔬 协同过滤推荐算法 - 中间过程', 'font-size:16px;font-weight:bold;color:#e74c3c')
+
+  // 1. 基本信息
+  console.group('%c📋 基本信息', 'font-weight:bold;color:#3498db')
+  console.log('用户ID:', debug.userId)
+  console.log('是否有历史记录:', debug.hasHistory)
+  console.log('是否使用兜底策略(冷启动):', debug.fallbackUsed)
+  console.log('计算耗时:', debug.computationTimeMs + 'ms')
+  console.groupEnd()
+
+  // 2. 算法配置
+  if (debug.algorithmConfig) {
+    console.group('%c⚙️ 算法配置', 'font-weight:bold;color:#9b59b6')
+    console.table(debug.algorithmConfig)
+    console.groupEnd()
+  }
+
+  // 3. 用户历史记录
+  if (debug.history && debug.history.length > 0) {
+    console.group('%c📜 用户访问历史 (' + debug.history.length + '条)', 'font-weight:bold;color:#e67e22')
+    console.table(debug.history.map((h: any) => ({
+      '景点ID': h.spotId,
+      '景点名称': h.spotName,
+      '评分': h.rating,
+      '访问时间': h.visitDate
+    })))
+    console.groupEnd()
+  } else {
+    console.log('%c📜 用户访问历史: 无 (冷启动用户)', 'color:#e67e22')
+  }
+
+  // 4. 用户标签画像
+  if (debug.tagProfile && Object.keys(debug.tagProfile).length > 0) {
+    console.group('%c🏷️ 用户标签画像', 'font-weight:bold;color:#2ecc71')
+    const tagEntries = Object.entries(debug.tagProfile) as [string, number][]
+    tagEntries.sort((a, b) => b[1] - a[1])
+    console.table(tagEntries.map(([tag, weight]) => ({
+      '标签': tag,
+      '权重': Number(weight).toFixed(4)
+    })))
+    console.groupEnd()
+  }
+
+  // 5. 相似用户 (User-Based CF 核心)
+  if (debug.similarUsers && debug.similarUsers.length > 0) {
+    console.group('%c👥 相似用户 (User-Based CF)', 'font-weight:bold;color:#e91e63')
+    console.log('找到 ' + debug.similarUsers.length + ' 个相似用户')
+    console.table(debug.similarUsers.map((u: any, i: number) => ({
+      '排名': i + 1,
+      '用户ID': u.userId,
+      '综合相似度': Number(u.similarity).toFixed(4),
+      '余弦相似度(Adjusted)': u.adjustedCosine != null ? Number(u.adjustedCosine).toFixed(4) : '-',
+      'Jaccard相似度': u.jaccard != null ? Number(u.jaccard).toFixed(4) : '-',
+      '时间加权相似度': u.timeWeighted != null ? Number(u.timeWeighted).toFixed(4) : '-',
+      '共同访问景点数': u.commonSpotsCount ?? '-'
+    })))
+    console.groupEnd()
+  } else if (!debug.fallbackUsed) {
+    console.log('%c👥 相似用户: 未找到相似度达标的用户', 'color:#e91e63')
+  }
+
+  // 6. 候选景点得分 (最终排序依据)
+  if (debug.candidateScores && debug.candidateScores.length > 0) {
+    console.group('%c🎯 候选景点得分 (混合协同过滤 + 标签匹配)', 'font-weight:bold;color:#f39c12')
+    console.log('候选景点总数: ' + debug.candidateScores.length)
+    console.table(debug.candidateScores.map((c: any, i: number) => ({
+      '排名': i + 1,
+      '景点ID': c.spotId,
+      '景点名称': c.spotName,
+      '最终得分': Number(c.finalScore).toFixed(4),
+      '混合协同(UB+IB)': Number(c.collaborativeScore || 0).toFixed(4),
+      'User-Based CF': Number(c.userBasedScore || 0).toFixed(4),
+      'Item-Based CF': Number(c.itemBasedScore || 0).toFixed(4),
+      '标签匹配得分': Number(c.tagScore || 0).toFixed(4)
+    })))
+    console.groupEnd()
+  }
+
+  // 7. 最终推荐结果
+  if (debug.recommendations && debug.recommendations.length > 0) {
+    console.group('%c✨ 最终推荐结果 (' + debug.recommendations.length + '个)', 'font-weight:bold;color:#27ae60')
+    console.table(debug.recommendations.map((spot: any, i: number) => ({
+      '排名': i + 1,
+      'ID': spot.id,
+      '名称': spot.name,
+      '类别': spot.category,
+      '评分': spot.rating,
+      '访问量': spot.visitCount,
+      '推荐原因': (debug.recommendationReasons && debug.recommendationReasons[spot.id]) || '-'
+    })))
+    console.groupEnd()
+  }
+
+  console.groupEnd()
+}
+
 const fetchRecommendations = async () => {
   try {
     const userStr = localStorage.getItem('user')
     if (userStr) {
       const user = JSON.parse(userStr)
-      // 只调用一次推荐接口，推荐原因从推荐结果中推断，不再额外调用 debug 接口
-      const recommendationRes = await api.get(`${endpoints.spots.recommendations}?userId=${user.id}`)
+
+      // 并行请求：常规推荐 + debug 详情
+      const [recommendationRes, debugRes] = await Promise.all([
+        api.get(`${endpoints.spots.recommendations}?userId=${user.id}`),
+        api.get(`${endpoints.spots.recommendationsDebug}?userId=${user.id}`).catch(() => null)
+      ])
+
       recommendedSpots.value = recommendationRes.data
-      
-      // 为推荐景点生成推荐原因（从景点属性推断，无需额外请求）
-      const reasonsMap = new Map<number, string>()
-      recommendedSpots.value.forEach((spot: any) => {
-        if (spot.rating && spot.rating >= 4.0) {
-          reasonsMap.set(spot.id, '高评分景点')
-        } else if (spot.visitCount && spot.visitCount > 15000) {
-          reasonsMap.set(spot.id, '热门景点')
-        } else {
-          reasonsMap.set(spot.id, '为您精选')
-        }
-      })
-      recommendationReasons.value = reasonsMap
+
+      // 将协同过滤中间过程输出到浏览器控制台
+      if (debugRes && debugRes.data) {
+        logDebugToConsole(debugRes.data)
+      }
+
+      // 使用后端返回的推荐原因
+      if (debugRes && debugRes.data && debugRes.data.recommendationReasons) {
+        const reasonsMap = new Map<number, string>()
+        Object.entries(debugRes.data.recommendationReasons).forEach(([spotId, reason]) => {
+          reasonsMap.set(Number(spotId), reason as string)
+        })
+        recommendationReasons.value = reasonsMap
+      } else {
+        const reasonsMap = new Map<number, string>()
+        recommendedSpots.value.forEach((spot: any) => {
+          if (spot.rating && spot.rating >= 4.0) {
+            reasonsMap.set(spot.id, '高评分景点')
+          } else if (spot.visitCount && spot.visitCount > 15000) {
+            reasonsMap.set(spot.id, '热门景点')
+          } else {
+            reasonsMap.set(spot.id, '为您精选')
+          }
+        })
+        recommendationReasons.value = reasonsMap
+      }
     } else {
       const response = await api.get(endpoints.spots.list)
       recommendedSpots.value = response.data.slice(0, 3)
-      // 未登录用户使用默认原因
       const defaultReasons = new Map<number, string>()
       recommendedSpots.value.forEach((spot: any) => {
         defaultReasons.set(spot.id, '热门景点')

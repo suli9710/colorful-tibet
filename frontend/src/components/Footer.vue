@@ -1,20 +1,22 @@
 <template>
-  <footer class="relative bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-950 text-white mt-20 overflow-hidden">
+  <footer class="relative bg-gradient-to-br from-tibet-dark via-tibet-brown to-tibet-dark text-white mt-20 overflow-hidden">
+    <!-- 顶部经幡色带 -->
+    <div class="h-1 tibet-prayer-flag opacity-80"></div>
     <div class="absolute inset-0 opacity-10">
-      <div class="absolute top-0 left-0 w-96 h-96 bg-purple-500 rounded-full blur-3xl"></div>
-      <div class="absolute bottom-0 right-0 w-96 h-96 bg-blue-500 rounded-full blur-3xl"></div>
+      <div class="absolute top-0 left-0 w-96 h-96 bg-tibet-red rounded-full blur-3xl"></div>
+      <div class="absolute bottom-0 right-0 w-96 h-96 bg-tibet-gold rounded-full blur-3xl"></div>
     </div>
-    
-    <div class="relative h-px bg-gradient-to-r from-transparent via-purple-500/50 to-transparent"></div>
-    
+
+    <div class="relative h-px bg-gradient-to-r from-transparent via-tibet-gold/40 to-transparent"></div>
+
     <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-12">
         <div class="lg:col-span-2">
           <div class="mb-6">
-            <h3 class="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 mb-4">
+            <h3 class="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-tibet-yellow via-tibet-gold to-tibet-red mb-4 tibetan-font">
               {{ t('footer.brandName') }}
             </h3>
-            <div class="w-20 h-1 bg-gradient-to-r from-blue-400 to-purple-400 rounded-full mb-6"></div>
+            <div class="w-20 h-1 bg-gradient-to-r from-tibet-gold to-tibet-red rounded-full mb-6"></div>
             <p class="text-gray-300 text-base leading-relaxed max-w-md">
               {{ t('footer.description') }}
             </p>

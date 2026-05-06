@@ -42,6 +42,11 @@ ark:
     url: ${ARK_API_URL:https://ark.cn-beijing.volces.com/api/v3/responses}
     key: ${ARK_API_KEY:}
     model: ${AI_MODEL:doubao-seed-2-0-pro-260215}
+    stream-url: ${ARK_STREAM_API_URL:}  # 流式端点，为空时从url自动推导
+
+ai:
+  route:
+    stream-timeout-seconds: ${AI_STREAM_TIMEOUT:180}
 
 # 价格定时更新配置
 price:

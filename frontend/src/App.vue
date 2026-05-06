@@ -15,12 +15,15 @@ if (typeof window !== 'undefined') {
 
 <template>
   <div class="flex flex-col min-h-screen">
+    <!-- 经幡色彩顶条 -->
+    <div class="fixed top-0 left-0 right-0 h-1 z-[101] tibet-prayer-flag"></div>
+
     <!-- Navigation loading bar -->
     <div
       v-if="isNavigating"
-      class="fixed top-0 left-0 right-0 h-0.5 z-[100] overflow-hidden"
+      class="fixed top-1 left-0 right-0 h-0.5 z-[100] overflow-hidden"
     >
-      <div class="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 shimmer-gradient"></div>
+      <div class="h-full bg-gradient-to-r from-tibet-yellow via-tibet-gold to-tibet-red shimmer-gradient"></div>
     </div>
 
     <NavBar />
