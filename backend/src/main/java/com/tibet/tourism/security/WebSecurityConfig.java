@@ -65,7 +65,7 @@ public class WebSecurityConfig {
                     .requestMatchers("/api/heritage/**").permitAll()
                     .requestMatchers("/images/**").permitAll()
                     .requestMatchers("/uploads/**").permitAll()
-                    .requestMatchers("/api/routes/generate").permitAll() // AI生成公开
+                    .requestMatchers("/api/routes/generate/**").permitAll() // AI生成及流式端点公开
                     // 分享路线相关的GET请求允许匿名访问（必须在 /api/routes/** 之前）
                     .requestMatchers(HttpMethod.GET, "/api/routes/shared").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/routes/shared/**").permitAll()

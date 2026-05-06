@@ -54,6 +54,11 @@ doubao:
     url: ${DOUBAO_API_URL:https://ark.cn-beijing.volces.com/api/v3/chat/completions}
     key: ${DOUBAO_API_KEY:your-doubao-api-key}
     model: ${AI_MODEL:doubao-seed-2-0-pro}
+    stream-url: ${DOUBAO_STREAM_API_URL:}  # 流式端点，为空时使用url本身
+
+ai:
+  route:
+    stream-timeout-seconds: ${AI_STREAM_TIMEOUT:180}
 
 # 价格定时更新配置
 price:

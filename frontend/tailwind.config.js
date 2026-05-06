@@ -10,6 +10,16 @@ export default {
         sans: ['Inter', 'Noto Sans SC', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
       },
       colors: {
+        'tibet': {
+          'red': '#8B2E3A',       // 藏红 — 喇嘛僧袍
+          'gold': '#C5964B',      // 藏金 — 寺庙金顶
+          'yellow': '#F2C94C',    // 明黄 — 经幡
+          'blue': '#2D5F8A',      // 藏蓝 — 天空/药师佛
+          'turquoise': '#3BA99C', // 松石绿 — 藏饰绿松石
+          'white': '#F7F3EE',     // 奶白 — 哈达/雪山
+          'brown': '#5C3D2E',     // 赭石 — 寺庙墙壁
+          'dark': '#1A1520',      // 深色 — 藏文经版
+        },
         'apple-gray': {
           50: '#fbfbfd',
           100: '#f5f5f7',

@@ -46,7 +46,7 @@
         </div>
       </div>
 
-      <!-- Debug Info -->
+      <!-- All spots empty (API returned no data) -->
       <div v-else-if="spots.length === 0" class="text-center py-20">
         <div class="bg-yellow-50 border-2 border-yellow-400 rounded-2xl p-8 max-w-2xl mx-auto">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-yellow-500 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -64,6 +64,20 @@
           </div>
           <button @click="fetchSpots()" class="mt-4 bg-blue-500 text-white px-6 py-2 rounded-full hover:bg-blue-600 transition-colors tibetan-font">
             {{ t('spots.reload') }}
+          </button>
+        </div>
+      </div>
+
+      <!-- No spots match the current category filter -->
+      <div v-else-if="filteredSpots.length === 0" class="text-center py-20">
+        <div class="bg-gray-50 border-2 border-gray-200 rounded-2xl p-8 max-w-md mx-auto">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-gray-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <h3 class="text-lg font-bold text-gray-700 mb-2 tibetan-font">{{ t('spots.noCategoryTitle') }}</h3>
+          <p class="text-gray-500 mb-4 tibetan-font">{{ t('spots.noCategoryMessage') }}</p>
+          <button @click="selectedCategory = 'ALL'" class="bg-apple-gray-900 text-white px-6 py-2 rounded-full hover:bg-black transition-colors tibetan-font">
+            {{ t('spots.showAll') }}
           </button>
         </div>
       </div>
@@ -135,7 +149,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import api, { endpoints } from '../api'
@@ -227,26 +241,39 @@ const getGradientClass = (spot: any) => {
 // 监听语言变化，重新获取数据并重新初始化滚动动画
 watch(locale, () => {
   fetchSpots()
-  setTimeout(initScrollAnimations, 300)
+  nextTick(() => initScrollAnimations())
+})
+
+// 监听分类切换，重新初始化滚动动画（因为切换分类时 v-if/v-else 会重建 DOM）
+watch(filteredSpots, () => {
+  nextTick(() => initScrollAnimations())
 })
 
 onMounted(() => {
   fetchSpots()
-  setTimeout(initScrollAnimations, 100)
+  nextTick(() => initScrollAnimations())
 })
 
+onUnmounted(() => {
+  if (scrollObserver) scrollObserver.disconnect()
+})
+
+let scrollObserver: IntersectionObserver | null = null
+
 const initScrollAnimations = () => {
-  const observer = new IntersectionObserver((entries) => {
+  if (scrollObserver) scrollObserver.disconnect()
+
+  scrollObserver = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
       if (entry.isIntersecting) {
         entry.target.classList.add('revealed')
-        observer.unobserve(entry.target)
+        scrollObserver!.unobserve(entry.target)
       }
     })
   }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' })
 
-  document.querySelectorAll('.animate-on-scroll').forEach(el => {
-    observer.observe(el)
+  document.querySelectorAll('.animate-on-scroll:not(.revealed)').forEach(el => {
+    scrollObserver!.observe(el)
   })
 }
 </script>

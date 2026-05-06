@@ -74,7 +74,10 @@
     "errorRemote": "རྒྱུན་མཐུད་རྒྱབ་སྐྱོར་ལ་འབྲེལ་མ་ཐུབ་པ་",
     "errorSolution": "ཐབས་ལམ་",
     "errorSolutionLocal": "- start.bat ནང་དུ་ས་ཆའི་རྒྱབ་སྐྱོར་འགོ་འཛུགས་པ་\n- ཡང་ན་frontend/start-remote.bat ནང་དུ་རྒྱུན་མཐུད་རྒྱབ་སྐྱོར་ལ་འབྲེལ་པ་",
-    "errorSolutionRemote": "- FRP ཁ་པར་འགོ་འཛུགས་པ་ཡིན་ནམ་ཞིབ་བཤེར་བྱེད་པ་\n- ཡང་ན་ས་ཆའི་རྣམ་པར་སྒྱུར་པ་（start.bat སྤྱོད་པ་）"
+    "errorSolutionRemote": "- FRP ཁ་པར་འགོ་འཛུགས་པ་ཡིན་ནམ་ཞིབ་བཤེར་བྱེད་པ་\n- ཡང་ན་ས་ཆའི་རྣམ་པར་སྒྱུར་པ་（start.bat སྤྱོད་པ་）",
+    "noCategoryTitle": "རིགས་འདིར་གནས་དམངས་མེད་པ་",
+    "noCategoryMessage": "རིགས་འདིར་གནས་དམངས་གནས་ཚུལ་མ་རྙེད་པ། རིགས་གཞན་ལ་ལྟ་རོགས་",
+    "showAll": "གནས་དམངས་ཡོངས་ལ་ལྟ་བ་"
   },
   "heritage": {
     "title": "བོད་ཀྱི་རིག་གནས་དང་རིག་གནས་",
@@ -311,12 +314,12 @@
     "starUnit": "སྤྱི་",
     "regionalHotels": "{region}མགྲོན་ཁང",
     "hotelsCount": "སྤྱིར་ {count} ཁང་པ",
-    "minHotelsHint": "ས་གནས་རེ་རེར་ཆེས་ཉུང་བ་ 4 ཁང་པ",
     "perNight": "འགོ་ / མཚན",
     "reviewCountUnit": "དཔྱད་གཞི",
     "available": "མངགས་ཉོ་ཆོག",
     "full": "ཁང་པ་མི་འདོད",
     "viewDetails": "གནས་ཚུལ་ལ་ལྟ་བ་",
+    "navigate": "ས་ཁྲ་སྟོན་པ",
     "noResults": "ཆ་རྐྱེན་དང་མ་མཐུད་པའི་མགྲོན་ཁང་མ་རྙེད་པ། ཆ་རྐྱེན་བཟོ་བཅོས་བྱེད་པ་",
     "city": {
       "lhasa": "ལྷ་ས",
@@ -325,6 +328,8 @@
       "ngari": "མངའ་རིས"
     },
     "introduction": "མགྲོན་ཁང་ངོ་སྤྲོད",
+    "amenities": "སྒྲིག་ཆས་ཞབས་ཞུ",
+    "hotelLevel": "མགྲོན་ཁང",
     "roomSelection": "ཁང་པ་གདམ་ག",
     "startingPrice": "འགོ་གི་རིན་ཐང",
     "perNightCompact": "འགོ/མཚན",

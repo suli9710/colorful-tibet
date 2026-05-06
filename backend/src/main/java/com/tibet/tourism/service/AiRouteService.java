@@ -3,14 +3,19 @@ package com.tibet.tourism.service;
 import com.tibet.tourism.dto.AiRouteGenerateResponse;
 import com.tibet.tourism.entity.User;
 import jakarta.annotation.PostConstruct;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.io.IOException;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
@@ -38,17 +43,25 @@ public class AiRouteService {
     private final String apiKey;
     private final String model;
     private final Duration timeout;
+    private final String streamApiUrl;
+    private final Duration streamTimeout;
+    private final ObjectMapper objectMapper;
 
     public AiRouteService(WebClient.Builder webClientBuilder,
                           @Value("${ark.api.url:${doubao.api.url:}}") String apiUrl,
                           @Value("${ark.api.key:${doubao.api.key:}}") String apiKey,
                           @Value("${ark.api.model:${doubao.api.model:}}") String model,
-                          @Value("${ai.route.timeout-seconds:180}") long timeoutSeconds) {
+                          @Value("${ai.route.timeout-seconds:180}") long timeoutSeconds,
+                          @Value("${ark.api.stream-url:${doubao.api.stream-url:}}") String streamApiUrl,
+                          @Value("${ai.route.stream-timeout-seconds:180}") long streamTimeoutSeconds) {
         this.webClient = webClientBuilder.build();
         this.apiUrl = apiUrl;
         this.apiKey = apiKey;
         this.model = model;
         this.timeout = Duration.ofSeconds(Math.max(30, timeoutSeconds));
+        this.streamApiUrl = resolveStreamApiUrl(apiUrl, streamApiUrl);
+        this.streamTimeout = Duration.ofSeconds(Math.max(30, streamTimeoutSeconds));
+        this.objectMapper = new ObjectMapper();
     }
 
     @PostConstruct
@@ -58,6 +71,246 @@ public class AiRouteService {
                 apiKey != null && !apiKey.isBlank(),
                 blankToPlaceholder(model),
                 timeout.getSeconds());
+        log.info("AI stream config loaded: streamApiUrl={}, streamTimeoutSeconds={}",
+                blankToPlaceholder(streamApiUrl),
+                streamTimeout.getSeconds());
+    }
+
+    private String resolveStreamApiUrl(String mainApiUrl, String explicitStreamUrl) {
+        if (explicitStreamUrl != null && !explicitStreamUrl.isBlank()) {
+            return explicitStreamUrl;
+        }
+        return mainApiUrl.replace("/v3/responses", "/v3/chat/completions");
+    }
+
+    private Map<String, Object> buildStreamRequestBody(String prompt) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("model", model);
+        body.put("input", List.of(
+                Map.of("role", "user",
+                        "content", List.of(Map.of("type", "input_text", "text", prompt)))
+        ));
+        body.put("thinking", Map.of("type", "disabled"));
+        body.put("temperature", 0.6);
+        body.put("top_p", 0.9);
+        body.put("max_output_tokens", 6000);
+        body.put("stream", true);
+        return body;
+    }
+
+    public void streamRoute(int days, String budgetKey, String preferenceKey,
+                            User currentUser, SseEmitter emitter) {
+        try {
+            validateConfig();
+        } catch (IllegalStateException e) {
+            sendEmitterEvent(emitter, "error", Map.of("message", e.getMessage()));
+            emitter.complete();
+            return;
+        }
+
+        int safeDays = Math.max(1, days);
+        String budgetLabel = BUDGET_LABELS.getOrDefault(normalizeKey(budgetKey), BUDGET_LABELS.get("comfort"));
+        String preferenceLabel = PREFERENCE_LABELS.getOrDefault(normalizeKey(preferenceKey), PREFERENCE_LABELS.get("natural"));
+        String prompt = buildPrompt(safeDays, budgetLabel, preferenceLabel, currentUser);
+        Map<String, Object> streamBody = buildStreamRequestBody(prompt);
+
+        log.info("AI stream request: model={}, url={}, promptLength={}",
+                blankToPlaceholder(model), apiUrl, prompt.length());
+
+        // Send metadata event
+        sendEmitterEvent(emitter, "meta", Map.of(
+                "model", model,
+                "days", String.valueOf(safeDays),
+                "budget", budgetLabel,
+                "preference", preferenceLabel
+        ));
+
+        Flux<String> streamFlux = webClient.post()
+                .uri(apiUrl)
+                .contentType(MediaType.APPLICATION_JSON)
+                .accept(MediaType.TEXT_EVENT_STREAM)
+                .header("Authorization", "Bearer " + apiKey)
+                .bodyValue(streamBody)
+                .retrieve()
+                .onStatus(status -> status.isError(), clientResponse ->
+                        clientResponse.bodyToMono(String.class)
+                                .defaultIfEmpty("AI stream request failed")
+                                .flatMap(errorBody -> {
+                                    log.warn("AI stream upstream error: HTTP {}, body={}",
+                                            clientResponse.statusCode().value(), previewText(errorBody, 600));
+                                    return Mono.error(new IllegalStateException(
+                                            "HTTP " + clientResponse.statusCode().value() + ": " + errorBody));
+                                }))
+                .bodyToFlux(String.class)
+                .timeout(streamTimeout);
+
+        streamLineCount = 0;
+        streamDeltaCount = 0;
+        StringBuilder jsonBuffer = new StringBuilder();
+
+        streamFlux.subscribe(
+                chunk -> {
+                    jsonBuffer.append(chunk);
+                    String buffer = jsonBuffer.toString();
+                    int pos = 0;
+                    int depth = 0;
+                    int start = -1;
+                    boolean inString = false;
+                    boolean escaped = false;
+
+                    for (int i = 0; i < buffer.length(); i++) {
+                        char c = buffer.charAt(i);
+
+                        if (inString) {
+                            if (escaped) {
+                                escaped = false;
+                            } else if (c == '\\') {
+                                escaped = true;
+                            } else if (c == '"') {
+                                inString = false;
+                            }
+                            continue;
+                        }
+
+                        if (c == '"') {
+                            inString = true;
+                            continue;
+                        }
+
+                        if (c == '{') {
+                            if (depth == 0) start = i;
+                            depth++;
+                        } else if (c == '}') {
+                            depth--;
+                            if (depth == 0 && start >= 0) {
+                                String jsonStr = buffer.substring(start, i + 1);
+                                try {
+                                    processStreamEvent(jsonStr, emitter);
+                                } catch (IOException e) {
+                                    log.warn("Failed to send SSE event from json chunk: {}", previewText(jsonStr, 200), e);
+                                }
+                                pos = i + 1;
+                                start = -1;
+                            } else if (depth < 0) {
+                                depth = 0; // malformed, recover
+                            }
+                        }
+                    }
+
+                    jsonBuffer.setLength(0);
+                    jsonBuffer.append(buffer.substring(pos));
+                },
+                error -> {
+                    if (jsonBuffer.length() > 0) {
+                        try {
+                            processStreamEvent(jsonBuffer.toString(), emitter);
+                        } catch (IOException e) {
+                            log.warn("Failed to send SSE event from remaining buffer: {}", previewText(jsonBuffer.toString(), 200), e);
+                        }
+                    }
+                    log.error("AI stream error", error);
+                    sendEmitterEvent(emitter, "error",
+                            Map.of("message", "AI streaming failed: " + extractErrorMessage((Exception) error)));
+                    emitter.complete();
+                },
+                () -> {
+                    if (jsonBuffer.length() > 0) {
+                        try {
+                            processStreamEvent(jsonBuffer.toString(), emitter);
+                        } catch (IOException e) {
+                            log.warn("Failed to send SSE event from final buffer: {}", previewText(jsonBuffer.toString(), 200), e);
+                        }
+                    }
+                    sendEmitterEvent(emitter, "done", Map.of());
+                    emitter.complete();
+                }
+        );
+
+        emitter.onTimeout(() -> log.warn("SSE emitter timed out after {}s", streamTimeout.getSeconds()));
+        emitter.onError(throwable -> log.warn("SSE emitter error (client may have disconnected): {}",
+                throwable.getMessage() != null ? throwable.getMessage() : throwable.getClass().getSimpleName()));
+    }
+
+    private int streamLineCount = 0;
+    private int streamDeltaCount = 0;
+
+    private void processStreamEvent(String jsonStr, SseEmitter emitter) throws IOException {
+        if (jsonStr == null || jsonStr.isBlank()) {
+            return;
+        }
+        streamLineCount++;
+
+        // Log first few raw events for debugging
+        if (streamLineCount <= 3) {
+            log.info("AI stream event #{}: {}", streamLineCount, previewText(jsonStr, 600));
+        }
+
+        Map<String, Object> event;
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> parsed = objectMapper.readValue(jsonStr, Map.class);
+            event = parsed;
+        } catch (JsonProcessingException e) {
+            if (streamLineCount <= 5) {
+                log.warn("AI stream JSON parse failed for event #{}: {}", streamLineCount, previewText(jsonStr, 400));
+            }
+            return;
+        }
+
+        // ARK Responses API format: {"type":"response.output_text.delta","delta":"text"}
+        Object deltaField = event.get("delta");
+        if (deltaField instanceof String deltaText && !deltaText.isEmpty()) {
+            streamDeltaCount++;
+            if (streamDeltaCount <= 3) {
+                log.info("AI stream delta #{}: {}", streamDeltaCount, previewText(deltaText, 200));
+            }
+            sendEmitterEvent(emitter, "delta", Map.of("text", deltaText));
+            return;
+        }
+
+        // OpenAI Chat Completions format: {"choices":[{"delta":{"content":"text"}}]}
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> choices = (List<Map<String, Object>>) event.get("choices");
+        if (choices != null && !choices.isEmpty()) {
+            Map<String, Object> delta = (Map<String, Object>) choices.get(0).get("delta");
+            if (delta != null) {
+                Object content = delta.get("content");
+                if (content instanceof String text && !text.isEmpty()) {
+                    streamDeltaCount++;
+                    if (streamDeltaCount <= 3) {
+                        log.info("AI stream delta #{}: {}", streamDeltaCount, previewText(text, 200));
+                    }
+                    sendEmitterEvent(emitter, "delta", Map.of("text", text));
+                    return;
+                }
+            }
+        }
+
+        // Also check for top-level "text" field (some APIs use this)
+        Object textField = event.get("text");
+        if (textField instanceof String text && !text.isEmpty()) {
+            streamDeltaCount++;
+            if (streamDeltaCount <= 3) {
+                log.info("AI stream delta #{} (text field): {}", streamDeltaCount, previewText(text, 200));
+            }
+            sendEmitterEvent(emitter, "delta", Map.of("text", text));
+            return;
+        }
+
+        // Log first non-delta events for debugging
+        if (streamLineCount <= 5) {
+            log.info("AI stream non-delta event keys: {}", event.keySet());
+        }
+    }
+
+    private void sendEmitterEvent(SseEmitter emitter, String type, Map<String, Object> payload) {
+        try {
+            Map<String, Object> event = new HashMap<>(payload);
+            event.put("type", type);
+            emitter.send(SseEmitter.event().data(objectMapper.writeValueAsString(event)));
+        } catch (IOException e) {
+            log.warn("Failed to send SSE event type={}: {}", type, e.getMessage());
+        }
     }
 
     public AiRouteGenerateResponse generateRoute(int days, String budgetKey, String preferenceKey, User currentUser) {
