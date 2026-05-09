@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;700&family=Noto+Sans+Tibetan:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700;900&family=Noto+Sans+SC:wght@300;400;500;700&family=Noto+Sans+Tibetan:wght@400;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,10 +6,22 @@
 
 @layer base {
   body {
-    @apply bg-white text-gray-900 font-sans antialiased;
-    font-family: 'Inter', 'Noto Sans SC', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    @apply text-tibet-dark font-sans antialiased;
+    font-family: 'Noto Sans SC', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background-color: #F7F3EE;
+    background-image:
+      radial-gradient(circle at 15% 20%, rgba(197, 150, 75, 0.04) 0%, transparent 50%),
+      radial-gradient(circle at 85% 80%, rgba(139, 46, 58, 0.03) 0%, transparent 50%),
+      radial-gradient(circle at 50% 50%, rgba(139, 46, 58, 0.02) 1px, transparent 1px);
+    background-size: 100% 100%, 100% 100%, 20px 20px;
+    background-attachment: fixed;
   }
-  
+
+  h1, h2, h3, h4, .font-display {
+    font-family: 'Noto Serif SC', 'Noto Sans SC', serif;
+    letter-spacing: -0.01em;
+  }
+
   html {
     @apply scroll-smooth;
   }
@@ -28,7 +40,10 @@
 
   /* 当语言为藏语时，默认使用藏语字体 */
   html[lang="bo"] body {
-    font-family: 'Noto Sans Tibetan', 'Microsoft Himalaya', 'Kailash', 'Tibetan Machine Uni', 'Inter', sans-serif;
+    font-family: 'Noto Sans Tibetan', 'Microsoft Himalaya', 'Kailash', 'Tibetan Machine Uni', 'Noto Sans SC', sans-serif;
+  }
+  html[lang="bo"] h1, html[lang="bo"] h2, html[lang="bo"] h3, html[lang="bo"] h4 {
+    font-family: 'Noto Serif SC', 'Noto Sans Tibetan', serif;
   }
 }
 
@@ -40,6 +55,15 @@
     -webkit-backdrop-filter: blur(20px) saturate(180%);
     border: 1px solid rgba(255, 255, 255, 0.2);
     box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+  }
+
+  /* 用于卡片/组件背景 — 更不透明，保证可读性 */
+  .glass-card {
+    background: rgba(255, 255, 255, 0.75);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    box-shadow: 0 4px 24px rgba(139, 46, 58, 0.06);
   }
 
   .glass-dark {
@@ -55,9 +79,9 @@
   }
 
   .input-focus:focus {
-    @apply ring-2 ring-apple-blue ring-offset-2 ring-offset-transparent;
+    @apply ring-2 ring-tibet-gold/60 ring-offset-2 ring-offset-transparent;
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0, 113, 227, 0.15);
+    box-shadow: 0 4px 16px rgba(197, 150, 75, 0.15);
   }
 
   /* 图片淡入效果 */
@@ -408,13 +432,32 @@
     font-weight: 600;
     border-radius: 9999px;
     padding: 0.625rem 1.5rem;
-    transition: all 0.3s ease;
-    box-shadow: 0 2px 8px rgba(139, 46, 58, 0.3);
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 2px 8px rgba(139, 46, 58, 0.3),
+                inset 0 1px 0 rgba(242, 201, 76, 0.15);
+    position: relative;
+    overflow: hidden;
   }
   .tibet-btn:hover {
     background: linear-gradient(135deg, #6B1D2A, #4A1218);
-    box-shadow: 0 4px 16px rgba(139, 46, 58, 0.4);
+    box-shadow: 0 4px 20px rgba(139, 46, 58, 0.4),
+                inset 0 1px 0 rgba(242, 201, 76, 0.2);
     transform: translateY(-1px);
+  }
+  .tibet-btn:active {
+    transform: translateY(0) scale(0.98);
+  }
+  .tibet-btn:active::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border: 1px solid rgba(197, 150, 75, 0.3);
+    border-radius: inherit;
+    animation: sacredRipple 0.6s ease-out forwards;
+  }
+  @keyframes sacredRipple {
+    0% { inset: -4px; opacity: 1; }
+    100% { inset: -16px; opacity: 0; }
   }
   .tibet-btn-outline {
     background: transparent;
@@ -423,12 +466,26 @@
     font-weight: 600;
     border-radius: 9999px;
     padding: 0.625rem 1.5rem;
-    transition: all 0.3s ease;
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   }
   .tibet-btn-outline:hover {
     background: #8B2E3A;
     border-color: #8B2E3A;
     color: #F2C94C;
+  }
+  .tibet-btn-ghost {
+    background: transparent;
+    border: 1px solid rgba(197, 150, 75, 0.25);
+    color: #8B2E3A;
+    font-weight: 500;
+    border-radius: 9999px;
+    padding: 0.5rem 1.25rem;
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .tibet-btn-ghost:hover {
+    background: rgba(197, 150, 75, 0.08);
+    border-color: rgba(197, 150, 75, 0.5);
+    color: #6B1D2A;
   }
 
   /* 藏式标题装饰 */
@@ -450,5 +507,378 @@
     background-color: #F7F3EE;
     background-image: radial-gradient(circle at 50% 50%, rgba(139, 46, 58, 0.04) 1px, transparent 1px);
     background-size: 20px 20px;
+  }
+
+  /* ===== 新版卡片系统（替代 card-hover）===== */
+  .tibet-card-elevated {
+    background: #fff;
+    border-radius: 1.5rem;
+    border: 1px solid rgba(197, 150, 75, 0.15);
+    box-shadow: 0 1px 2px rgba(26, 21, 32, 0.04),
+                0 4px 16px rgba(139, 46, 58, 0.04),
+                0 8px 32px rgba(139, 46, 58, 0.02);
+    position: relative;
+    transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .tibet-card-elevated::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 16px;
+    right: 16px;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(197, 150, 75, 0.5), transparent);
+    border-radius: 1px;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+  }
+  .tibet-card-elevated:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 4px 12px rgba(139, 46, 58, 0.06),
+                0 12px 40px rgba(139, 46, 58, 0.08);
+    border-color: rgba(197, 150, 75, 0.35);
+  }
+  .tibet-card-elevated:hover::before {
+    opacity: 1;
+  }
+
+  /* ===== 藏式标签药丸 ===== */
+  .tibet-tag {
+    @apply px-3 py-1 rounded-full text-xs font-medium;
+    background: rgba(197, 150, 75, 0.1);
+    color: #8B2E3A;
+    border: 1px solid rgba(197, 150, 75, 0.2);
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .tibet-tag:hover {
+    background: rgba(197, 150, 75, 0.18);
+    border-color: rgba(197, 150, 75, 0.35);
+  }
+
+  /* ===== 藏式链接（底线动画展开）===== */
+  .tibet-link {
+    position: relative;
+    color: #8B2E3A;
+    font-weight: 500;
+    transition: color 0.3s ease;
+  }
+  .tibet-link::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    width: 0;
+    height: 1.5px;
+    background: linear-gradient(90deg, #C5964B, #8B2E3A);
+    transition: width 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .tibet-link:hover {
+    color: #6B1D2A;
+  }
+  .tibet-link:hover::after {
+    width: 100%;
+  }
+
+  /* ===== 图片悬浮效果 ===== */
+  .tibet-image-hover {
+    transition: transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .group:hover .tibet-image-hover {
+    transform: scale(1.05);
+  }
+
+  /* ===== 骨架屏（暖色金闪）===== */
+  .tibet-skeleton {
+    background: linear-gradient(
+      90deg,
+      rgba(247, 243, 238, 0.6) 0%,
+      rgba(197, 150, 75, 0.12) 50%,
+      rgba(247, 243, 238, 0.6) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.8s ease-in-out infinite;
+  }
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+
+  /* ===== 无尽结 Loading Spinner ===== */
+  .tibet-spinner {
+    width: 48px;
+    height: 48px;
+    position: relative;
+    animation: knotSpin 3s linear infinite;
+  }
+  .tibet-spinner::before,
+  .tibet-spinner::after {
+    content: '';
+    position: absolute;
+    border-radius: 50%;
+    border: 2px solid transparent;
+  }
+  .tibet-spinner::before {
+    inset: 4px;
+    border-top-color: #C5964B;
+    border-right-color: #8B2E3A;
+    animation: knotPulse 1.5s ease-in-out infinite;
+  }
+  .tibet-spinner::after {
+    inset: 12px;
+    border-bottom-color: #C5964B;
+    border-left-color: #F2C94C;
+    animation: knotPulse 1.5s ease-in-out 0.75s infinite;
+  }
+  @keyframes knotSpin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+  @keyframes knotPulse {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 1; }
+  }
+
+  /* ===== 山峦分割线 ===== */
+  .tibet-mountain-divider {
+    position: relative;
+    height: 80px;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .tibet-mountain-divider::before {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 80px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 80' preserveAspectRatio='none'%3E%3Cpath d='M0,80 L0,15 Q120,0 240,12 Q360,24 480,8 Q600,-8 720,14 Q840,28 960,10 Q1080,-4 1200,12 Q1320,20 1440,8 L1440,80 Z' fill='%238B2E3A' fill-opacity='0.04'/%3E%3Cpath d='M0,80 L0,28 Q180,16 360,24 Q540,36 720,18 Q900,6 1080,22 Q1260,32 1440,16 L1440,80 Z' fill='%238B2E3A' fill-opacity='0.06'/%3E%3C/svg%3E");
+    background-size: cover;
+    background-position: bottom;
+  }
+
+  /* ===== 四角纹饰 ===== */
+  .tibet-four-corners {
+    position: relative;
+  }
+  .tibet-four-corners::before,
+  .tibet-four-corners::after {
+    content: '❖';
+    position: absolute;
+    font-size: 16px;
+    color: #C5964B;
+    opacity: 0.35;
+  }
+  .tibet-four-corners::before {
+    top: 12px;
+    left: 16px;
+  }
+  .tibet-four-corners::after {
+    bottom: 12px;
+    right: 16px;
+  }
+
+  /* ===== 认证页「天花」粒子 ===== */
+  .auth-particles {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .auth-particle {
+    position: absolute;
+    width: 4px;
+    height: 4px;
+    background: rgba(242, 201, 76, 0.5);
+    border-radius: 50%;
+    animation: particleFall linear infinite;
+  }
+  .auth-particle:nth-child(1) { left: 10%; animation-duration: 8s; animation-delay: 0s; }
+  .auth-particle:nth-child(2) { left: 25%; animation-duration: 11s; animation-delay: 2s; }
+  .auth-particle:nth-child(3) { left: 40%; animation-duration: 9s; animation-delay: 4s; }
+  .auth-particle:nth-child(4) { left: 55%; animation-duration: 12s; animation-delay: 1s; }
+  .auth-particle:nth-child(5) { left: 70%; animation-duration: 7s; animation-delay: 3s; }
+  .auth-particle:nth-child(6) { left: 85%; animation-duration: 10s; animation-delay: 5s; }
+  .auth-particle:nth-child(7) { left: 15%; animation-duration: 13s; animation-delay: 6s; }
+  .auth-particle:nth-child(8) { left: 50%; animation-duration: 8s; animation-delay: 2.5s; }
+  @keyframes particleFall {
+    0% { transform: translateY(-10vh) rotate(0deg); opacity: 0; }
+    10% { opacity: 1; }
+    90% { opacity: 1; }
+    100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+  }
+
+  /* ===== 圣门拱形装饰（登录/注册卡片顶部）===== */
+  .auth-arch {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 120px;
+    height: 40px;
+    overflow: hidden;
+  }
+  .auth-arch::before {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100px;
+    height: 60px;
+    border: 2px solid rgba(197, 150, 75, 0.3);
+    border-radius: 50% 50% 0 0;
+    border-bottom: none;
+  }
+
+  /* ===== Hero 山峦层 ===== */
+  .hero-mountains-far,
+  .hero-mountains-mid,
+  .hero-foreground {
+    position: absolute;
+    left: 0;
+    right: 0;
+    pointer-events: none;
+  }
+  .hero-mountains-far {
+    bottom: 20%;
+    height: 40%;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 400' preserveAspectRatio='none'%3E%3Cpath d='M0,400 L0,120 Q100,80 200,110 Q300,140 400,90 Q500,50 600,100 Q700,150 800,80 Q900,30 1000,100 Q1100,160 1200,95 Q1300,60 1440,110 L1440,400 Z' fill='%232D5F8A' fill-opacity='0.25'/%3E%3C/svg%3E") no-repeat bottom/cover;
+  }
+  .hero-mountains-mid {
+    bottom: 10%;
+    height: 50%;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 500' preserveAspectRatio='none'%3E%3Cpath d='M0,500 L0,180 Q80,140 160,175 Q240,210 340,150 Q440,90 540,160 Q640,230 740,155 Q840,80 940,170 Q1040,240 1140,160 Q1240,100 1340,145 Q1400,170 1440,150 L1440,500 Z' fill='%231A1520' fill-opacity='0.3'/%3E%3Cpath d='M0,500 L0,240 Q120,200 240,230 Q360,260 480,210 Q600,160 720,225 Q840,280 960,215 Q1080,160 1200,220 Q1320,260 1440,195 L1440,500 Z' fill='%23FFFFFF' fill-opacity='0.08'/%3E%3C/svg%3E") no-repeat bottom/cover;
+  }
+  .hero-foreground {
+    bottom: 0;
+    height: 30%;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 300' preserveAspectRatio='none'%3E%3Cpath d='M0,300 L0,80 Q60,60 120,70 Q200,90 300,50 Q400,20 500,65 Q600,100 700,55 Q800,20 900,60 Q1000,100 1100,45 Q1200,15 1300,55 Q1380,70 1440,50 L1440,300 Z' fill='%231A1520' fill-opacity='0.5'/%3E%3C/svg%3E") no-repeat bottom/cover;
+  }
+
+  /* ===== Hero 薄雾层 ===== */
+  .hero-mist {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+  .hero-mist::before,
+  .hero-mist::after {
+    content: '';
+    position: absolute;
+    left: -10%;
+    width: 120%;
+    height: 30%;
+    background: linear-gradient(180deg, rgba(255,255,255,0.15) 0%, transparent 100%);
+    animation: mistDrift 8s ease-in-out infinite;
+  }
+  .hero-mist::before {
+    bottom: 40%;
+    animation-delay: 0s;
+  }
+  .hero-mist::after {
+    bottom: 25%;
+    animation-delay: 4s;
+    opacity: 0.6;
+  }
+  @keyframes mistDrift {
+    0%, 100% { transform: translateX(-2%) translateY(0); opacity: 0.5; }
+    50% { transform: translateX(2%) translateY(-1%); opacity: 0.8; }
+  }
+
+  /* ===== Hero 经幡串 ===== */
+  .hero-prayer-flags {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+  .hero-prayer-flags::before {
+    content: '';
+    position: absolute;
+    top: 8%;
+    left: -5%;
+    width: 110%;
+    height: 3px;
+    background: linear-gradient(90deg,
+      transparent 0%,
+      #2D5F8A 5%, #2D5F8A 8%,
+      #F7F3EE 8%, #F7F3EE 11%,
+      #8B2E3A 11%, #8B2E3A 14%,
+      #3BA99C 14%, #3BA99C 17%,
+      #F2C94C 17%, #F2C94C 20%,
+      #2D5F8A 20%, #2D5F8A 23%,
+      #F7F3EE 23%, #F7F3EE 26%,
+      #8B2E3A 26%, #8B2E3A 29%,
+      #3BA99C 29%, #3BA99C 32%,
+      #F2C94C 32%, #F2C94C 35%,
+      #2D5F8A 35%, #2D5F8A 38%,
+      transparent 40%
+    );
+    transform: rotate(-2deg);
+    transform-origin: left center;
+    animation: flagSway 5s ease-in-out infinite;
+    box-shadow: 0 -2px 4px rgba(0,0,0,0.05);
+  }
+  .hero-prayer-flags::after {
+    content: '';
+    position: absolute;
+    top: 14%;
+    left: -5%;
+    width: 110%;
+    height: 2px;
+    background: linear-gradient(90deg,
+      transparent 5%,
+      #F2C94C 8%, #F2C94C 11%,
+      #3BA99C 11%, #3BA99C 14%,
+      #8B2E3A 14%, #8B2E3A 17%,
+      #F7F3EE 17%, #F7F3EE 20%,
+      #2D5F8A 20%, #2D5F8A 23%,
+      #F2C94C 23%, #F2C94C 26%,
+      #3BA99C 26%, #3BA99C 29%,
+      #8B2E3A 29%, #8B2E3A 32%,
+      #F7F3EE 32%, #F7F3EE 35%,
+      #2D5F8A 35%, #2D5F8A 38%,
+      transparent 42%
+    );
+    transform: rotate(1.5deg);
+    transform-origin: right center;
+    animation: flagSway 4.5s ease-in-out 1s infinite;
+  }
+  @keyframes flagSway {
+    0%, 100% { transform: rotate(-2deg); }
+    50% { transform: rotate(-0.5deg); }
+  }
+
+  /* ===== Hero 金光 ===== */
+  .hero-golden-light {
+    position: absolute;
+    top: -20%;
+    right: -10%;
+    width: 60%;
+    height: 80%;
+    background: radial-gradient(ellipse at 70% 30%, rgba(242, 201, 76, 0.12) 0%, transparent 70%);
+    pointer-events: none;
+    animation: goldenShift 10s ease-in-out infinite;
+  }
+  @keyframes goldenShift {
+    0%, 100% { opacity: 0.6; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.05); }
+  }
+
+  /* ===== 念珠风格轮播点 ===== */
+  .tibet-carousel-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    border: 1px solid rgba(197, 150, 75, 0.5);
+    background: rgba(197, 150, 75, 0.2);
+    transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .tibet-carousel-dot.active {
+    width: 28px;
+    border-radius: 4px;
+    background: #C5964B;
+    border-color: #C5964B;
+    box-shadow: 0 0 10px rgba(197, 150, 75, 0.5);
   }
 }

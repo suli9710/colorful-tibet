@@ -9,7 +9,11 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Entity
-@Table(name = "scenic_spots")
+@Table(name = "scenic_spots", indexes = {
+    @Index(name = "idx_scenic_spots_category", columnList = "category"),
+    @Index(name = "idx_scenic_spots_visit_count", columnList = "visit_count"),
+    @Index(name = "idx_scenic_spots_rating", columnList = "rating")
+})
 @JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "tags"})
 public class ScenicSpot {
     @Id
@@ -54,6 +58,10 @@ public class ScenicSpot {
     private BigDecimal longitude;
 
     private Integer visitCount = 0;
+
+    private Integer num; // 每日库存/接待量上限
+    private String openInfo; // 开放说明，如"全年开放"
+    private String entryTime; // 入园时间，如"09:00 - 16:00"
 
     @OneToMany(mappedBy = "spot", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @JsonIgnore  // 防止序列化时的懒加载问题
@@ -227,6 +235,15 @@ public class ScenicSpot {
     public void setVisitCount(Integer visitCount) {
         this.visitCount = visitCount;
     }
+
+    public Integer getNum() { return num; }
+    public void setNum(Integer num) { this.num = num; }
+
+    public String getOpenInfo() { return openInfo; }
+    public void setOpenInfo(String openInfo) { this.openInfo = openInfo; }
+
+    public String getEntryTime() { return entryTime; }
+    public void setEntryTime(String entryTime) { this.entryTime = entryTime; }
 
     public List<SpotTag> getTags() {
         return tags;

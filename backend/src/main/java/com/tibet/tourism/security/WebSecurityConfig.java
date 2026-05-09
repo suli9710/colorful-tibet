@@ -23,11 +23,14 @@ public class WebSecurityConfig {
     UserDetailsServiceImpl userDetailsService;
 
     @Autowired
+    private JwtUtils jwtUtils;
+
+    @Autowired
     private AuthEntryPointJwt unauthorizedHandler;
 
     @Bean
     public AuthTokenFilter authenticationJwtTokenFilter() {
-        return new AuthTokenFilter();
+        return new AuthTokenFilter(jwtUtils, userDetailsService);
     }
 
     @Bean
@@ -78,8 +81,15 @@ public class WebSecurityConfig {
                     .requestMatchers(HttpMethod.DELETE, "/api/routes/shared/*").authenticated()
                     // 其他路线操作需要认证
                     .requestMatchers("/api/routes/**").authenticated()
+                    .requestMatchers(HttpMethod.GET, "/api/carousels").permitAll()
+                    .requestMatchers("/api/hotel-bookings/hotels/**").permitAll()
+                    .requestMatchers("/api/hotel-bookings/room-types/**").permitAll()
                     .requestMatchers("/api/comments/**").permitAll()
                     .requestMatchers("/api/test/**").permitAll()
+                    // 社区问答 — GET 请求公开，写操作需认证
+                    .requestMatchers(HttpMethod.GET, "/api/community/questions").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/community/questions/**").permitAll()
+                    .requestMatchers("/api/community/questions/**").authenticated()
                     .requestMatchers("/h2-console/**").permitAll()
                     .requestMatchers("/api/admin/**").authenticated()
                     .anyRequest().authenticated()

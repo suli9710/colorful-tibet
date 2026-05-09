@@ -1,48 +1,73 @@
 <template>
-  <div class="min-h-screen bg-apple-gray-50">
-    <!-- Hero Section -->
-    <div class="relative h-[calc(100vh-6rem)] md:h-[calc(100vh-7rem)] flex items-center justify-center overflow-hidden -mt-24 md:-mt-28">
-      <!-- Background Video/Image -->
-      <div class="absolute inset-0 z-0">
-        <img :src="heroSlides[currentSlide].image" :alt="heroSlides[currentSlide].title" class="w-full h-full object-cover scale-105 animate-float-slow will-change-transform hero-parallax-bg" style="transform-origin: center center;">
-        <div class="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-apple-gray-50"></div>
-      </div>
+  <div class="min-h-screen bg-tibet-white">
+    <!-- Hero Section: Multi-layer Parallax -->
+    <div class="relative h-[calc(100vh-5rem)] md:h-[calc(100vh-6rem)] flex items-center justify-center overflow-hidden -mt-20 md:-mt-24">
+      <!-- Layer 0: Sky gradient base -->
+      <div class="absolute inset-0 z-0 bg-gradient-to-b from-tibet-dark via-tibet-brown/60 to-tibet-dark/40"></div>
 
-      <!-- Hero Content -->
+      <!-- Layer 1: Background image -->
+      <img :src="heroSlides[currentSlide].image" :alt="heroSlides[currentSlide].title"
+           class="absolute inset-0 w-full h-full object-cover z-1 opacity-60 hero-parallax-bg will-change-transform"
+           style="transform-origin: center center;">
+
+      <!-- Layer 2: Distant mountains (slowest parallax) -->
+      <div class="hero-mountains-far z-2 parallax-layer" data-speed="0.1" style="bottom: 20%; height: 40%;"></div>
+
+      <!-- Layer 3: Mid-ground mountains with snow -->
+      <div class="hero-mountains-mid z-3 parallax-layer" data-speed="0.25" style="bottom: 10%; height: 50%;"></div>
+
+      <!-- Layer 4: Foreground terrain -->
+      <div class="hero-foreground z-4 parallax-layer" data-speed="0.45" style="bottom: 0; height: 30%;"></div>
+
+      <!-- Layer 5: Golden light -->
+      <div class="hero-golden-light z-5"></div>
+
+      <!-- Layer 6: Floating mist -->
+      <div class="hero-mist z-6"></div>
+
+      <!-- Layer 7: Prayer flags -->
+      <div class="hero-prayer-flags z-7"></div>
+
+      <!-- Layer 8: Content overlay -->
       <div class="relative z-10 text-center px-4 max-w-5xl mx-auto">
-        <div class="mb-6 inline-flex items-center gap-2 rounded-full bg-tibet-red/30 px-4 py-2 text-sm text-tibet-yellow backdrop-blur-md border border-tibet-gold/30">
-          <span class="h-2 w-2 rounded-full bg-tibet-yellow"></span>
+        <div class="mb-6 inline-flex items-center gap-2 rounded-full bg-tibet-red/25 px-4 py-2 text-sm text-tibet-yellow backdrop-blur-md border border-tibet-gold/30 animate-slide-up will-change-transform" style="animation-delay: 0.1s">
+          <span class="h-2 w-2 rounded-full bg-tibet-yellow animate-pulse-slow"></span>
           {{ heroSlides[currentSlide].tag }}
         </div>
-        <h1 class="text-5xl md:text-7xl font-bold text-white mb-6 tracking-tight animate-slide-up will-change-transform tibetan-font" style="animation-delay: 0.1s">
+        <h1 class="text-5xl md:text-7xl font-bold text-white mb-6 tracking-tight animate-slide-up will-change-transform font-display" style="animation-delay: 0.2s; text-shadow: 0 2px 24px rgba(0,0,0,0.3);">
           {{ heroSlides[currentSlide].title }}
         </h1>
-        <p class="text-xl md:text-2xl text-white/90 mb-10 font-light max-w-2xl mx-auto animate-slide-up will-change-transform tibetan-font" style="animation-delay: 0.3s">
+        <p class="text-xl md:text-2xl text-white/85 mb-10 font-light max-w-2xl mx-auto animate-slide-up will-change-transform" style="animation-delay: 0.4s; text-shadow: 0 1px 12px rgba(0,0,0,0.2);">
           {{ heroSlides[currentSlide].subtitle }}
         </p>
-        <div class="flex flex-col sm:flex-row justify-center gap-4 animate-slide-up will-change-transform" style="animation-delay: 0.5s">
-          <router-link to="/spots" class="tibet-btn text-lg px-8 py-4 shadow-xl hover:shadow-2xl transform hover:scale-105 will-change-transform">
+        <div class="flex flex-col sm:flex-row justify-center gap-4 animate-slide-up will-change-transform" style="animation-delay: 0.6s">
+          <router-link to="/spots" class="tibet-btn text-lg px-8 py-4 shadow-xl will-change-transform">
             {{ t('home.startExploring') }}
           </router-link>
-          <button @click="scrollToHeatmap" class="px-8 py-4 bg-white/20 backdrop-blur-md border border-white/30 text-white rounded-full font-semibold text-lg hover:bg-white/30 transition-all duration-300 ease-out-expo transform hover:scale-105 hover:shadow-xl hover:border-white/50 will-change-transform tibetan-font">
+          <button @click="scrollToHeatmap"
+                  class="tibet-btn-ghost text-white border-white/30 hover:bg-white/10 hover:border-white/50 hover:text-white text-lg px-8 py-4 will-change-transform">
             {{ t('home.viewHeatmap') }}
           </button>
         </div>
 
-        <div class="mt-10 flex items-center justify-center gap-3">
+        <!-- Bead-style carousel dots -->
+        <div class="mt-10 flex items-center justify-center gap-2.5">
           <button v-for="(slide, index) in heroSlides" :key="slide.title" @click="goToSlide(index)"
-                  class="h-2.5 rounded-full transition-all duration-300"
-                  :class="currentSlide === index ? 'w-10 bg-white' : 'w-2.5 bg-white/50 hover:bg-white/80'"
+                  class="tibet-carousel-dot"
+                  :class="{ active: currentSlide === index }"
                   :aria-label="`切换到第 ${index + 1} 张轮播图`"></button>
         </div>
       </div>
     </div>
 
+    <!-- Mountain divider -->
+    <div class="tibet-mountain-divider -mt-8 relative z-10"></div>
+
     <!-- Heatmap Section -->
     <div id="heatmap" class="py-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
       <div class="text-center mb-16 animate-on-scroll">
         <h2 class="tibet-heading text-4xl font-bold text-tibet-dark mb-4 tibetan-font">{{ t('home.hotSpotsDistribution') }}</h2>
-        <p class="text-lg text-apple-gray-500 tibetan-font">{{ t('home.hotSpotsDescription') }}</p>
+        <p class="text-lg text-tibet-brown/70 tibetan-font">{{ t('home.hotSpotsDescription') }}</p>
       </div>
       
       <div class="bg-white rounded-3xl p-6 shadow-2xl animate-on-scroll">
@@ -56,7 +81,7 @@
         <div class="flex justify-between items-end mb-12 animate-on-scroll">
           <div>
             <h2 class="tibet-heading text-4xl font-bold text-tibet-dark mb-2 tibetan-font">{{ t('home.recommendations') }}</h2>
-            <p class="text-lg text-apple-gray-500 tibetan-font">{{ t('home.recommendationsDescription') }}</p>
+            <p class="text-lg text-tibet-brown/70 tibetan-font">{{ t('home.recommendationsDescription') }}</p>
           </div>
           <router-link to="/spots" class="hidden md:flex items-center text-tibet-red hover:text-tibet-red/80 font-medium transition-colors tibetan-font">
             {{ t('common.viewAll') }}
@@ -67,43 +92,42 @@
         </div>
 
         <div v-if="loading" class="flex justify-center py-20">
-          <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-apple-blue"></div>
+          <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-tibet-gold"></div>
         </div>
 
         <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          <div v-for="(spot, index) in recommendedSpots" :key="spot.id" 
-               class="group bg-white rounded-3xl shadow-sm hover:shadow-2xl card-hover overflow-hidden border border-gray-100 animate-on-scroll hover:border-apple-blue/20 gpu-accelerated"
+          <div v-for="(spot, index) in recommendedSpots" :key="spot.id"
+               class="group tibet-card-elevated overflow-hidden animate-on-scroll gpu-accelerated"
                :style="{ animationDelay: `${index * 100}ms` }">
             <div class="relative h-72 overflow-hidden">
-              <img :src="spot.imageUrl" :alt="spot.name" 
-                   class="w-full h-full object-cover transition-transform duration-700 ease-out-expo group-hover:scale-110 img-fade-in will-change-transform"
+              <img :src="spot.imageUrl" :alt="spot.name"
+                   class="w-full h-full object-cover tibet-image-hover img-fade-in will-change-transform"
                    loading="lazy">
-              <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 ease-out-expo"></div>
-              <div class="absolute top-4 right-4 bg-tibet-white/95 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-bold text-tibet-red shadow-xl transform group-hover:scale-110 transition-transform duration-300 ease-out-expo will-change-transform">
+              <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/15 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 ease-out-expo"></div>
+              <div class="absolute top-4 right-4 bg-tibet-white/95 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-bold text-tibet-red shadow-lg transform group-hover:scale-105 transition-transform duration-300 ease-out-expo will-change-transform">
                 {{ spot.category === 'NATURAL' ? t('home.natural') : t('home.cultural') }}
               </div>
             </div>
-            
+
               <div class="p-8">
               <div class="flex justify-between items-start mb-4">
-                <h3 class="text-2xl font-bold text-tibet-dark group-hover:text-tibet-red transition-colors duration-300 ease-out-expo">{{ spot.name }}</h3>
-                <span class="text-lg font-semibold text-tibet-red transform group-hover:scale-110 transition-transform duration-300 ease-out-expo will-change-transform">¥{{ spot.ticketPrice }}</span>
+                <h3 class="text-2xl font-bold text-tibet-dark group-hover:text-tibet-red transition-colors duration-300 ease-out-expo font-display">{{ spot.name }}</h3>
+                <span class="text-lg font-semibold text-tibet-red transform group-hover:scale-105 transition-transform duration-300 ease-out-expo will-change-transform">¥{{ spot.ticketPrice }}</span>
               </div>
-              <!-- 推荐原因 -->
-              <p v-if="getRecommendationReason(spot.id)" class="text-xs text-apple-blue mb-3 font-medium tibetan-font">
+              <p v-if="getRecommendationReason(spot.id)" class="text-xs text-tibet-gold mb-3 font-medium tibetan-font">
                 💡 {{ getRecommendationReason(spot.id) }}
               </p>
-              <p class="text-apple-gray-500 mb-6 line-clamp-2 leading-relaxed tibetan-font">{{ spot.description }}</p>
-              
-              <div class="flex items-center justify-between pt-6 border-t border-gray-100">
+              <p class="text-tibet-brown/70 mb-6 line-clamp-2 leading-relaxed tibetan-font">{{ spot.description }}</p>
+
+              <div class="flex items-center justify-between pt-6 border-t border-tibet-gold/20">
                 <div class="flex space-x-2">
-                  <span v-for="tag in spot.tags?.slice(0, 2)" :key="tag.id" 
-                        class="px-3 py-1 bg-apple-gray-100 text-apple-gray-600 rounded-full text-xs font-medium transform group-hover:scale-105 transition-transform duration-300 ease-out-expo will-change-transform tibetan-font">
+                  <span v-for="tag in spot.tags?.slice(0, 2)" :key="tag.id"
+                        class="tibet-tag tibetan-font">
                     {{ tag.tag }}
                   </span>
                 </div>
                 <button @click="router.push(`/spots/${spot.id}`)"
-                        class="text-tibet-red font-medium hover:text-tibet-red/80 transition-all duration-300 ease-out-expo flex items-center group/btn tibetan-font">
+                        class="tibet-link text-sm flex items-center group/btn tibetan-font">
                   {{ t('common.book') }}
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-1 transform group-hover/btn:translate-x-2 transition-transform duration-300 ease-out-expo will-change-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
@@ -119,7 +143,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import HeatMap from '../components/HeatMap.vue'
@@ -131,12 +155,27 @@ const recommendedSpots = ref<any[]>([])
 const recommendationReasons = ref<Map<number, string>>(new Map())
 const loading = ref(true)
 const currentSlide = ref(0)
-const heroSlides = [
-  { image: '/heritage/布达拉宫3.jpg', title: '走进西藏', subtitle: '从布达拉宫到雪山湖泊，开启你的高原之旅。', tag: '经典首图' },
-  { image: '/heritage/纳木错.jpg', title: '看见高原湖泊', subtitle: '湖光、天空与远山，适合最简单的首页轮播。', tag: '自然风景' },
-  { image: '/heritage/藏戏.jpg', title: '感受人文底色', subtitle: '从非遗文化中挑一张更有烟火气的图片，补全人文轮播。', tag: '人文旅行' }
-]
+const heroSlides = ref<Array<{ image: string; title: string; subtitle: string; tag: string; linkUrl?: string }>>([
+  { image: '/heritage/布达拉宫3.jpg', title: '', subtitle: '', tag: '' }
+])
 let slideTimer: number | null = null
+
+const fetchCarousels = async () => {
+  try {
+    const response = await api.get(endpoints.carousels.list)
+    if (response.data && response.data.length > 0) {
+      heroSlides.value = response.data.map((c: any) => ({
+        image: c.imageUrl,
+        title: c.title,
+        subtitle: c.subtitle || '',
+        tag: c.tag || '',
+        linkUrl: c.linkUrl || ''
+      }))
+    }
+  } catch (e) {
+    // Fall back to defaults
+  }
+}
 
 const scrollToHeatmap = () => {
   document.getElementById('heatmap')?.scrollIntoView({ behavior: 'smooth' })
@@ -149,7 +188,7 @@ const goToSlide = (index: number) => {
 const startCarousel = () => {
   stopCarousel()
   slideTimer = window.setInterval(() => {
-    currentSlide.value = (currentSlide.value + 1) % heroSlides.length
+    currentSlide.value = (currentSlide.value + 1) % heroSlides.value.length
   }, 4000)
 }
 
@@ -308,7 +347,8 @@ const fetchRecommendations = async () => {
       }
     } else {
       const response = await api.get(endpoints.spots.list)
-      recommendedSpots.value = response.data.slice(0, 3)
+      const spots = response.data?.content || response.data || []
+      recommendedSpots.value = spots.slice(0, 3)
       const defaultReasons = new Map<number, string>()
       recommendedSpots.value.forEach((spot: any) => {
         defaultReasons.set(spot.id, '热门景点')
@@ -337,17 +377,25 @@ const initScrollAnimations = () => {
   })
 }
 
-// 视差滚动效果（Hero 背景随页面滚动轻微移动）
+// 多层视差滚动效果
 const initParallax = () => {
-  const heroBg = document.querySelector('.hero-parallax-bg') as HTMLElement | null
-  if (!heroBg) return
+  const layers = document.querySelectorAll('.parallax-layer') as NodeListOf<HTMLElement>
+  if (!layers.length) return
 
   let ticking = false
   const onScroll = () => {
     if (!ticking) {
       requestAnimationFrame(() => {
         const scrollY = window.scrollY
-        heroBg.style.transform = `translateY(${scrollY * 0.3}px)`
+        layers.forEach(layer => {
+          const speed = parseFloat(layer.dataset.speed || '0.3')
+          layer.style.transform = `translateY(${scrollY * speed}px)`
+        })
+        // Also move the background image for depth
+        const heroBg = document.querySelector('.hero-parallax-bg') as HTMLElement | null
+        if (heroBg) {
+          heroBg.style.transform = `translateY(${scrollY * 0.15}px) scale(1.05)`
+        }
         ticking = false
       })
       ticking = true
@@ -365,6 +413,7 @@ watch(locale, () => {
 })
 
 onMounted(async () => {
+  await fetchCarousels()
   await fetchRecommendations()
   setTimeout(initScrollAnimations, 100)
   const cleanupParallax = initParallax()

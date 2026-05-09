@@ -2,19 +2,27 @@ package com.tibet.tourism.controller;
 
 import com.tibet.tourism.entity.AuditLog;
 import com.tibet.tourism.entity.Booking;
+import com.tibet.tourism.entity.Carousel;
+import com.tibet.tourism.entity.Hotel;
 import com.tibet.tourism.entity.HotelBooking;
 import com.tibet.tourism.entity.News;
+import com.tibet.tourism.entity.RoomType;
 import com.tibet.tourism.entity.ScenicSpot;
+import com.tibet.tourism.entity.TravelRoute;
 import com.tibet.tourism.entity.User;
 import com.tibet.tourism.repository.AuditLogRepository;
 import com.tibet.tourism.repository.BookingRepository;
+import com.tibet.tourism.repository.CarouselRepository;
 import com.tibet.tourism.repository.CommentLikeRepository;
 import com.tibet.tourism.repository.CommentRepository;
 import com.tibet.tourism.repository.HotelBookingRepository;
+import com.tibet.tourism.repository.HotelRepository;
 import com.tibet.tourism.repository.NewsRepository;
+import com.tibet.tourism.repository.RoomTypeRepository;
 import com.tibet.tourism.repository.RouteCommentRepository;
 import com.tibet.tourism.repository.RouteLikeRepository;
 import com.tibet.tourism.repository.SharedRouteRepository;
+import com.tibet.tourism.repository.TravelRouteRepository;
 import com.tibet.tourism.repository.UserVisitHistoryRepository;
 import org.springframework.data.domain.Sort;
 import com.tibet.tourism.repository.ScenicSpotRepository;
@@ -40,7 +48,6 @@ import java.util.Optional;
  */
 @RestController
 @RequestMapping("/api/admin")
-@CrossOrigin(origins = "*")
 public class AdminController {
 
     @Autowired
@@ -78,6 +85,18 @@ public class AdminController {
 
     @Autowired
     private UserVisitHistoryRepository userVisitHistoryRepository;
+
+    @Autowired
+    private CarouselRepository carouselRepository;
+
+    @Autowired
+    private TravelRouteRepository travelRouteRepository;
+
+    @Autowired
+    private HotelRepository hotelRepository;
+
+    @Autowired
+    private RoomTypeRepository roomTypeRepository;
 
     @Autowired
     private TibetanTranslationService translationService;
@@ -436,6 +455,13 @@ public class AdminController {
                 return ResponseEntity.badRequest().body(Map.of("error", "无效的类别"));
             }
         }
+        if (request.containsKey("num")) spot.setNum(((Number) request.get("num")).intValue());
+        if (request.containsKey("openInfo")) spot.setOpenInfo((String) request.get("openInfo"));
+        if (request.containsKey("entryTime")) spot.setEntryTime((String) request.get("entryTime"));
+        if (request.containsKey("latitude")) spot.setLatitude(new BigDecimal(request.get("latitude").toString()));
+        if (request.containsKey("longitude")) spot.setLongitude(new BigDecimal(request.get("longitude").toString()));
+        if (request.containsKey("altitude")) spot.setAltitude((String) request.get("altitude"));
+        if (request.containsKey("location")) spot.setLocation((String) request.get("location"));
 
         scenicSpotRepository.save(spot);
         return ResponseEntity.ok(spot);
@@ -493,6 +519,13 @@ public class AdminController {
                 return ResponseEntity.badRequest().body(Map.of("error", "无效的类别"));
             }
         }
+        if (request.containsKey("num")) spot.setNum(((Number) request.get("num")).intValue());
+        if (request.containsKey("openInfo")) spot.setOpenInfo((String) request.get("openInfo"));
+        if (request.containsKey("entryTime")) spot.setEntryTime((String) request.get("entryTime"));
+        if (request.containsKey("latitude")) spot.setLatitude(new BigDecimal(request.get("latitude").toString()));
+        if (request.containsKey("longitude")) spot.setLongitude(new BigDecimal(request.get("longitude").toString()));
+        if (request.containsKey("altitude")) spot.setAltitude((String) request.get("altitude"));
+        if (request.containsKey("location")) spot.setLocation((String) request.get("location"));
 
         scenicSpotRepository.save(spot);
         return ResponseEntity.ok(spot);
@@ -654,5 +687,222 @@ public class AdminController {
         }
         newsRepository.deleteById(id);
         return ResponseEntity.ok(Map.of("message", "删除成功"));
+    }
+
+    // ========== 轮播图管理 ==========
+
+    @GetMapping("/carousels")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<Carousel>> getAllCarousels() {
+        return ResponseEntity.ok(carouselRepository.findAll(Sort.by(Sort.Direction.ASC, "sortOrder")));
+    }
+
+    @PostMapping("/carousels")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> createCarousel(@RequestBody Carousel carousel) {
+        if (carousel.getTitle() == null || carousel.getTitle().trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "标题不能为空"));
+        }
+        return ResponseEntity.ok(carouselRepository.save(carousel));
+    }
+
+    @PutMapping("/carousels/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> updateCarousel(@PathVariable Long id, @RequestBody Carousel carousel) {
+        Carousel existing = carouselRepository.findById(id).orElse(null);
+        if (existing == null) {
+            return ResponseEntity.notFound().build();
+        }
+        existing.setTitle(carousel.getTitle());
+        existing.setSubtitle(carousel.getSubtitle());
+        existing.setTag(carousel.getTag());
+        existing.setImageUrl(carousel.getImageUrl());
+        existing.setLinkUrl(carousel.getLinkUrl());
+        existing.setSortOrder(carousel.getSortOrder());
+        existing.setActive(carousel.getActive());
+        return ResponseEntity.ok(carouselRepository.save(existing));
+    }
+
+    @DeleteMapping("/carousels/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> deleteCarousel(@PathVariable Long id) {
+        if (!carouselRepository.existsById(id)) {
+            return ResponseEntity.notFound().build();
+        }
+        carouselRepository.deleteById(id);
+        return ResponseEntity.ok(Map.of("message", "删除成功"));
+    }
+
+    // ========== 酒店管理 ==========
+
+    @GetMapping("/hotels")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<Hotel>> getAllHotels() {
+        return ResponseEntity.ok(hotelRepository.findAll());
+    }
+
+    @PostMapping("/hotels")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> createHotel(@RequestBody Map<String, Object> request) {
+        Hotel hotel = new Hotel();
+        String name = (String) request.get("name");
+        if (name == null || name.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "酒店名称不能为空"));
+        }
+        hotel.setName(name);
+        if (request.containsKey("location")) hotel.setLocation((String) request.get("location"));
+        if (request.containsKey("phone")) hotel.setPhone((String) request.get("phone"));
+        if (request.containsKey("priceRange")) hotel.setPriceRange((String) request.get("priceRange"));
+        if (request.containsKey("imageUrl")) hotel.setImageUrl((String) request.get("imageUrl"));
+        if (request.containsKey("facilities")) hotel.setFacilities((String) request.get("facilities"));
+        if (request.containsKey("rating")) {
+            hotel.setRating(new java.math.BigDecimal(request.get("rating").toString()));
+        }
+        hotelRepository.save(hotel);
+        return ResponseEntity.ok(hotel);
+    }
+
+    @PutMapping("/hotels/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> updateHotel(@PathVariable Long id, @RequestBody Map<String, Object> request) {
+        Hotel hotel = hotelRepository.findById(id).orElse(null);
+        if (hotel == null) {
+            return ResponseEntity.notFound().build();
+        }
+        if (request.containsKey("name")) hotel.setName((String) request.get("name"));
+        if (request.containsKey("location")) hotel.setLocation((String) request.get("location"));
+        if (request.containsKey("phone")) hotel.setPhone((String) request.get("phone"));
+        if (request.containsKey("priceRange")) hotel.setPriceRange((String) request.get("priceRange"));
+        if (request.containsKey("imageUrl")) hotel.setImageUrl((String) request.get("imageUrl"));
+        if (request.containsKey("facilities")) hotel.setFacilities((String) request.get("facilities"));
+        if (request.containsKey("rating")) {
+            hotel.setRating(new java.math.BigDecimal(request.get("rating").toString()));
+        }
+        hotelRepository.save(hotel);
+        return ResponseEntity.ok(hotel);
+    }
+
+    @DeleteMapping("/hotels/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> deleteHotel(@PathVariable Long id) {
+        if (!hotelRepository.existsById(id)) {
+            return ResponseEntity.notFound().build();
+        }
+        hotelRepository.deleteById(id);
+        return ResponseEntity.ok(Map.of("message", "删除成功"));
+    }
+
+    // ========== 线路管理 ==========
+
+    @GetMapping("/routes")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<TravelRoute>> getAllRoutes() {
+        return ResponseEntity.ok(travelRouteRepository.findAll());
+    }
+
+    @PostMapping("/routes")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> createRoute(@RequestBody Map<String, Object> request) {
+        TravelRoute route = new TravelRoute();
+        String name = (String) request.get("name");
+        if (name == null || name.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "线路名称不能为空"));
+        }
+        route.setName(name);
+        if (request.containsKey("nameTibetan")) route.setNameTibetan((String) request.get("nameTibetan"));
+        if (request.containsKey("description")) route.setDescription((String) request.get("description"));
+        if (request.containsKey("descriptionTibetan")) route.setDescriptionTibetan((String) request.get("descriptionTibetan"));
+        if (request.containsKey("days")) route.setDays(((Number) request.get("days")).intValue());
+        if (request.containsKey("price")) {
+            route.setPrice(new java.math.BigDecimal(request.get("price").toString()));
+        }
+        if (request.containsKey("difficulty")) {
+            route.setDifficulty(TravelRoute.Difficulty.valueOf(((String) request.get("difficulty")).toUpperCase()));
+        }
+        if (request.containsKey("spotsJson")) route.setSpotsJson((String) request.get("spotsJson"));
+        if (request.containsKey("temperature")) route.setTemperature((String) request.get("temperature"));
+        if (request.containsKey("geography")) route.setGeography((String) request.get("geography"));
+        travelRouteRepository.save(route);
+        return ResponseEntity.ok(route);
+    }
+
+    @PutMapping("/routes/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> updateRoute(@PathVariable Long id, @RequestBody Map<String, Object> request) {
+        TravelRoute route = travelRouteRepository.findById(id).orElse(null);
+        if (route == null) {
+            return ResponseEntity.notFound().build();
+        }
+        if (request.containsKey("name")) route.setName((String) request.get("name"));
+        if (request.containsKey("nameTibetan")) route.setNameTibetan((String) request.get("nameTibetan"));
+        if (request.containsKey("description")) route.setDescription((String) request.get("description"));
+        if (request.containsKey("descriptionTibetan")) route.setDescriptionTibetan((String) request.get("descriptionTibetan"));
+        if (request.containsKey("days")) route.setDays(((Number) request.get("days")).intValue());
+        if (request.containsKey("price")) {
+            route.setPrice(new java.math.BigDecimal(request.get("price").toString()));
+        }
+        if (request.containsKey("difficulty")) {
+            route.setDifficulty(TravelRoute.Difficulty.valueOf(((String) request.get("difficulty")).toUpperCase()));
+        }
+        if (request.containsKey("spotsJson")) route.setSpotsJson((String) request.get("spotsJson"));
+        if (request.containsKey("temperature")) route.setTemperature((String) request.get("temperature"));
+        if (request.containsKey("geography")) route.setGeography((String) request.get("geography"));
+        travelRouteRepository.save(route);
+        return ResponseEntity.ok(route);
+    }
+
+    @DeleteMapping("/routes/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> deleteRoute(@PathVariable Long id) {
+        if (!travelRouteRepository.existsById(id)) {
+            return ResponseEntity.notFound().build();
+        }
+        travelRouteRepository.deleteById(id);
+        return ResponseEntity.ok(Map.of("message", "删除成功"));
+    }
+
+    // ========== 房型管理 ==========
+
+    @GetMapping("/hotels/{hotelId}/room-types")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> getRoomTypes(@PathVariable Long hotelId) {
+        return ResponseEntity.ok(roomTypeRepository.findByHotelIdOrderBySortOrderAsc(hotelId));
+    }
+
+    @PostMapping("/hotels/{hotelId}/room-types")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> createRoomType(@PathVariable Long hotelId, @RequestBody RoomType roomType) {
+        hotelRepository.findById(hotelId).ifPresent(roomType::setHotel);
+        return ResponseEntity.ok(roomTypeRepository.save(roomType));
+    }
+
+    @PutMapping("/room-types/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> updateRoomType(@PathVariable Long id, @RequestBody RoomType roomType) {
+        RoomType existing = roomTypeRepository.findById(id).orElse(null);
+        if (existing == null) return ResponseEntity.notFound().build();
+        existing.setName(roomType.getName());
+        existing.setPrice(roomType.getPrice());
+        existing.setCapacity(roomType.getCapacity());
+        existing.setImageUrl(roomType.getImageUrl());
+        existing.setAmenities(roomType.getAmenities());
+        existing.setSortOrder(roomType.getSortOrder());
+        return ResponseEntity.ok(roomTypeRepository.save(existing));
+    }
+
+    @DeleteMapping("/room-types/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> deleteRoomType(@PathVariable Long id) {
+        if (!roomTypeRepository.existsById(id)) return ResponseEntity.notFound().build();
+        roomTypeRepository.deleteById(id);
+        return ResponseEntity.ok(Map.of("message", "删除成功"));
+    }
+
+    // ========== 公开房型接口 ==========
+
+    @GetMapping("/public/room-types/{hotelId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> getPublicRoomTypes(@PathVariable Long hotelId) {
+        return ResponseEntity.ok(roomTypeRepository.findByHotelIdOrderBySortOrderAsc(hotelId));
     }
 }

@@ -31,6 +31,9 @@ public class TravelRoute {
     @Column(columnDefinition = "TEXT")
     private String spotsJson; // Storing IDs as JSON string for simplicity
 
+    private String temperature; // 温度描述，如"15°C - 25°C"
+    private String geography; // 地理特征，如"高原山地、河谷地带"
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
@@ -111,6 +114,12 @@ public class TravelRoute {
     public void setSpotsJson(String spotsJson) {
         this.spotsJson = spotsJson;
     }
+
+    public String getTemperature() { return temperature; }
+    public void setTemperature(String temperature) { this.temperature = temperature; }
+
+    public String getGeography() { return geography; }
+    public void setGeography(String geography) { this.geography = geography; }
 
     public LocalDateTime getCreatedAt() {
         return createdAt;

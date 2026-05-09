@@ -9,21 +9,53 @@ const chartRef = ref<HTMLElement | null>(null)
 let chart: echarts.ECharts | null = null
 const zoomLevel = ref(1.0)
 let mapLoaded = false
+let spotsData: any[] = []
+let fluctuationTimer: ReturnType<typeof setInterval> | null = null
 
 const getHeatLevel = (heat: number): string => {
-  if (heat >= 2000) return t('heatmap.heatLevel.superHot')
-  if (heat >= 1500) return t('heatmap.heatLevel.veryHot')
-  if (heat >= 1000) return t('heatmap.heatLevel.hot')
-  if (heat >= 500) return t('heatmap.heatLevel.fairlyHot')
-  if (heat >= 100) return t('heatmap.heatLevel.normal')
+  if (heat >= 19000) return t('heatmap.heatLevel.superHot')
+  if (heat >= 18000) return t('heatmap.heatLevel.veryHot')
+  if (heat >= 17000) return t('heatmap.heatLevel.hot')
+  if (heat >= 16000) return t('heatmap.heatLevel.fairlyHot')
+  if (heat >= 15500) return t('heatmap.heatLevel.normal')
   return t('heatmap.heatLevel.spot')
+}
+
+const applyFluctuation = (spots: any[]): any[] => {
+  const t0 = Date.now() / 4000
+  return spots.map((spot, i) => {
+    const factor = 1 + Math.sin(t0 + i * 0.7) * 0.06
+    return {
+      ...spot,
+      value: [spot.value[0], spot.value[1], Math.round(spot.value[2] * factor)]
+    }
+  })
+}
+
+const updateChartData = () => {
+  if (!chart || !spotsData.length) return
+
+  const fluctuated = applyFluctuation(spotsData)
+
+  const scatterData = fluctuated
+  const effectData = fluctuated
+    .filter((item: any) => item.value[2] >= 100)
+    .sort((a: any, b: any) => b.value[2] - a.value[2])
+    .slice(0, 10)
+
+  chart.setOption({
+    series: [
+      { data: scatterData },
+      { data: effectData }
+    ]
+  })
 }
 
 const loadChartData = async () => {
   if (!chartRef.value || !chart) return
   
   try {
-    const response = await api.get('/spots')
+    const response = await api.get('/spots', { params: { size: 100 } })
     const spots = Array.isArray(response.data) ? response.data : (response.data.content || [])
     
     const data = spots
@@ -32,6 +64,11 @@ const loadChartData = async () => {
         name: spot.name,
         value: [spot.longitude, spot.latitude, spot.visitCount || 1]
       }))
+
+    spotsData = data
+
+    if (fluctuationTimer) clearInterval(fluctuationTimer)
+    fluctuationTimer = setInterval(updateChartData, 2500)
 
     const option: any = {
       title: {
@@ -235,14 +272,15 @@ const handleZoomChange = (event: Event) => {
 
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
+  if (fluctuationTimer) clearInterval(fluctuationTimer)
   chart?.dispose()
 })
 </script>
 
 <template>
-  <div class="relative w-full h-[600px] bg-white rounded-2xl shadow-lg border border-gray-200">
+  <div class="relative w-full h-[600px] bg-white rounded-2xl shadow-lg border border-tibet-gold/25">
     <div ref="chartRef" class="w-full h-full"></div>
-    <div class="absolute left-4 bottom-4 bg-white/90 backdrop-blur-sm rounded-lg shadow-lg border border-gray-200 p-4 min-w-[200px]">
+    <div class="absolute left-4 bottom-4 bg-white/90 backdrop-blur-sm rounded-lg shadow-lg border border-tibet-gold/25 p-4 min-w-[200px]">
       <div class="flex items-center justify-between mb-2">
         <span class="text-sm font-medium text-gray-700">{{ t('heatmap.zoomLevel') }}</span>
         <span class="text-sm font-bold text-blue-600">{{ zoomLevel.toFixed(1) }}x</span>

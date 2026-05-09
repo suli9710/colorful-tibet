@@ -1,9 +1,21 @@
 server:
   port: 8080
+  compression:
+    enabled: true
+    mime-types: application/json,application/xml,text/html,text/xml,text/plain,text/css,text/javascript,application/javascript
+    min-response-size: 1024
 
 spring:
+  profiles:
+    active: local
   application:
     name: colorful-tibet-tourism
+  data:
+    web:
+      pageable:
+        default-page-size: 20
+        max-page-size: 100
+        one-indexed-parameters: false
   mvc:
     async:
       request-timeout: 120000  # 120秒异步请求超时，适应AI生成时间

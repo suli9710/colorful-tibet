@@ -1,8 +1,16 @@
 <template>
   <footer class="relative bg-gradient-to-br from-tibet-dark via-tibet-brown to-tibet-dark text-white mt-20 overflow-hidden">
+    <!-- Mountain silhouette top edge -->
+    <div class="relative h-16 -mt-16 overflow-hidden pointer-events-none z-10">
+      <svg viewBox="0 0 1440 80" preserveAspectRatio="none" class="w-full h-full">
+        <path d="M0,80 L0,15 Q180,0 360,10 Q540,25 720,8 Q900,-5 1080,15 Q1260,5 1440,12 L1440,80 Z" fill="#1A1520" opacity="0.95" />
+        <path d="M0,80 L0,30 Q240,18 480,28 Q720,38 960,22 Q1200,8 1440,25 L1440,80 Z" fill="#1A1520" opacity="0.6" />
+      </svg>
+    </div>
+
     <!-- 顶部经幡色带 -->
-    <div class="h-1 tibet-prayer-flag opacity-80"></div>
-    <div class="absolute inset-0 opacity-10">
+    <div class="h-1 tibet-prayer-flag opacity-80 tibet-flag-wave"></div>
+    <div class="absolute inset-0 opacity-5">
       <div class="absolute top-0 left-0 w-96 h-96 bg-tibet-red rounded-full blur-3xl"></div>
       <div class="absolute bottom-0 right-0 w-96 h-96 bg-tibet-gold rounded-full blur-3xl"></div>
     </div>
@@ -49,7 +57,7 @@
               :key="link.to"
               :to="link.to" 
               class="block text-gray-400 hover:text-white transition-all duration-300 group relative pl-4">
-              <span class="absolute left-0 top-1/2 -translate-y-1/2 w-0 h-0.5 bg-gradient-to-r from-blue-400 to-purple-400 group-hover:w-2 transition-all duration-300"></span>
+              <span class="absolute left-0 top-1/2 -translate-y-1/2 w-0 h-0.5 bg-gradient-to-r from-tibet-gold to-tibet-red group-hover:w-2 transition-all duration-300"></span>
               <span class="flex items-center">
                 <span>{{ link.label }}</span>
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 ml-2 opacity-0 group-hover:opacity-100 transform group-hover:translate-x-1 transition-all duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -64,7 +72,7 @@
           <div class="flex items-center justify-between mb-6">
             <h4 class="text-lg font-semibold text-white">{{ t('footer.contactUs') }}</h4>
             <button @click="showContactModal = true" 
-                    class="text-xs text-blue-400 hover:text-blue-300 transition-all duration-300 flex items-center space-x-1 px-3 py-1.5 rounded-lg hover:bg-white/10 backdrop-blur-sm border border-white/10 hover:border-blue-400/50">
+                    class="text-xs text-tibet-gold hover:text-tibet-gold/80 transition-all duration-300 flex items-center space-x-1 px-3 py-1.5 rounded-lg hover:bg-white/10 backdrop-blur-sm border border-white/10 hover:border-tibet-gold/50">
               <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
               </svg>
@@ -73,8 +81,8 @@
           </div>
           <div class="space-y-4">
             <a href="tel:19532458802" class="flex items-start space-x-3 group hover:translate-x-1 transition-transform duration-300">
-              <div class="w-10 h-10 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center flex-shrink-0 group-hover:bg-blue-500/20 transition-colors">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div class="w-10 h-10 rounded-lg bg-tibet-gold/10 border border-tibet-gold/20 flex items-center justify-center flex-shrink-0 group-hover:bg-tibet-gold/20 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-tibet-gold" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                 </svg>
               </div>
@@ -85,8 +93,8 @@
             </a>
 
             <a href="mailto:lengzhehao@gmail.com" class="flex items-start space-x-3 group hover:translate-x-1 transition-transform duration-300">
-              <div class="w-10 h-10 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center flex-shrink-0 group-hover:bg-purple-500/20 transition-colors">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div class="w-10 h-10 rounded-lg bg-tibet-red/10 border border-tibet-red/20 flex items-center justify-center flex-shrink-0 group-hover:bg-tibet-red/20 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-tibet-gold" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                 </svg>
               </div>
@@ -97,8 +105,8 @@
             </a>
 
             <div class="flex items-start space-x-3">
-              <div class="w-10 h-10 rounded-lg bg-green-500/10 border border-green-500/20 flex items-center justify-center flex-shrink-0">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div class="w-10 h-10 rounded-lg bg-tibet-gold/10 border border-tibet-gold/20 flex items-center justify-center flex-shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-tibet-gold" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>

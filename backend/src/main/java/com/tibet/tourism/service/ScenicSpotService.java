@@ -3,6 +3,8 @@ package com.tibet.tourism.service;
 import com.tibet.tourism.entity.ScenicSpot;
 import com.tibet.tourism.repository.ScenicSpotRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
@@ -16,6 +18,11 @@ public class ScenicSpotService {
     @Transactional(readOnly = true)
     public List<ScenicSpot> getAllSpots() {
         return scenicSpotRepository.findAll();
+    }
+
+    @Transactional(readOnly = true)
+    public Page<ScenicSpot> getAllSpots(Pageable pageable) {
+        return scenicSpotRepository.findAllWithoutTags(pageable);
     }
 
     @Transactional(readOnly = true)
@@ -34,7 +41,17 @@ public class ScenicSpotService {
     }
 
     @Transactional(readOnly = true)
+    public Page<ScenicSpot> searchSpots(String keyword, Pageable pageable) {
+        return scenicSpotRepository.findByNameContaining(keyword, pageable);
+    }
+
+    @Transactional(readOnly = true)
     public List<ScenicSpot> getSpotsByCategory(ScenicSpot.Category category) {
         return scenicSpotRepository.findByCategory(category);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<ScenicSpot> getSpotsByCategory(ScenicSpot.Category category, Pageable pageable) {
+        return scenicSpotRepository.findByCategory(category, pageable);
     }
 }

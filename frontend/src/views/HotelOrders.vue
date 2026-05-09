@@ -1,16 +1,16 @@
 <template>
-  <div class="min-h-screen bg-apple-gray-50">
+  <div class="min-h-screen bg-tibet-white">
     <section class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16 space-y-6">
-      <div class="bg-white rounded-3xl shadow-xl border border-gray-100 p-8">
+      <div class="bg-white rounded-3xl shadow-xl border border-tibet-gold/20 p-8">
         <h1 class="text-3xl font-bold text-gray-900 mb-4">{{ t('hotel.ordersTitle') }}</h1>
         <p class="text-gray-600">{{ t('hotel.ordersSubtitle') }}</p>
       </div>
 
-      <div class="bg-white rounded-3xl shadow-xl border border-gray-100 p-8">
+      <div class="bg-white rounded-3xl shadow-xl border border-tibet-gold/20 p-8">
         <div v-if="loading" class="text-center text-gray-500 py-8">{{ t('hotel.ordersLoading') }}</div>
         <div v-else-if="sortedOrders.length === 0" class="text-center text-gray-500 py-8">{{ t('hotel.noOrders') }}</div>
         <div v-else class="space-y-4">
-          <div v-for="order in sortedOrders" :key="order.id" class="rounded-2xl border border-gray-100 p-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div v-for="order in sortedOrders" :key="order.id" class="rounded-2xl border border-tibet-gold/20 p-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
               <h2 class="text-lg font-semibold text-gray-900">{{ order.hotelName }} · {{ order.roomName }}</h2>
               <p class="text-sm text-gray-500 mt-1">{{ order.checkInDate }} {{ t('hotel.dateConnector') }} {{ order.checkOutDate }} · {{ order.guests }}{{ t('hotel.guests') }}</p>
@@ -61,7 +61,7 @@ const loadOrders = async () => {
   loading.value = true
   try {
     const response = await api.get(endpoints.hotelBookings.my)
-    orders.value = Array.isArray(response.data) ? response.data : []
+    orders.value = Array.isArray(response.data?.content) ? response.data.content : (Array.isArray(response.data) ? response.data : [])
   } catch {
     try {
       orders.value = JSON.parse(localStorage.getItem('hotel-orders') || '[]') as HotelOrder[]

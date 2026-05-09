@@ -1,6 +1,8 @@
 package com.tibet.tourism.repository;
 
 import com.tibet.tourism.entity.HotelBooking;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
@@ -10,8 +12,10 @@ import java.util.List;
 @Repository
 public interface HotelBookingRepository extends JpaRepository<HotelBooking, Long> {
     List<HotelBooking> findByUserIdOrderByCreatedAtDesc(Long userId);
+    Page<HotelBooking> findByUserIdOrderByCreatedAtDesc(Long userId, Pageable pageable);
 
     List<HotelBooking> findAllByOrderByCreatedAtDesc();
+    Page<HotelBooking> findAllByOrderByCreatedAtDesc(Pageable pageable);
 
     @Query("SELECT COUNT(hb) FROM HotelBooking hb")
     long countAll();

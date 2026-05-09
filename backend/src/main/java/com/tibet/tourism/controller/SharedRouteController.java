@@ -21,7 +21,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/routes")
-@CrossOrigin(origins = "*")
 public class SharedRouteController {
 
     @Autowired

@@ -55,12 +55,14 @@
           <!-- Rooms — 藏式房型卡片 -->
           <div class="tibet-card rounded-2xl p-8">
             <h2 class="tibet-heading text-xl font-bold text-tibet-dark mb-5">{{ t('hotel.roomSelection') }}</h2>
-            <div class="space-y-4">
-              <div v-for="room in hotel.rooms" :key="room.id"
+            <div v-if="loadingRooms" class="text-center py-4 text-stone-500">加载中...</div>
+            <div v-else-if="roomTypes.length === 0" class="text-center py-4 text-stone-500">暂无房型信息</div>
+            <div v-else class="space-y-4">
+              <div v-for="room in roomTypes" :key="room.id"
                    class="group rounded-xl border border-tibet-gold/15 p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 hover:border-tibet-gold/40 hover:shadow-lg hover:shadow-tibet-red/5 transition-all duration-300">
                 <div class="flex-1">
                   <h3 class="text-lg font-semibold text-tibet-dark">{{ room.name }}</h3>
-                  <p class="text-sm text-tibet-brown/50 mt-1">{{ room.desc }}</p>
+                  <p class="text-sm text-tibet-brown/50 mt-1">{{ room.amenities || (room.capacity ? room.capacity + '人' : '') }}</p>
                 </div>
                 <div class="flex items-center gap-5">
                   <div class="text-right">
@@ -79,13 +81,13 @@
 
         <!-- Sidebar -->
         <div>
-          <div class="sticky top-28 space-y-6">
+          <div class="sticky top-24 space-y-6">
             <!-- Price Card — 藏式金边 -->
             <div class="tibet-card rounded-2xl p-8">
               <p class="text-sm text-tibet-brown/50 mb-1">{{ t('hotel.startingPrice') }}</p>
               <div class="flex items-baseline gap-1 mb-6">
                 <span class="text-xs text-tibet-brown/40">¥</span>
-                <span class="text-4xl font-bold text-tibet-red">{{ hotel.priceMin }}</span>
+                <span class="text-4xl font-bold text-tibet-red">{{ displayPrice }}</span>
                 <span class="text-sm text-tibet-brown/40">{{ t('hotel.perNightCompact') }}</span>
               </div>
               <div class="space-y-3 mb-6">
@@ -98,7 +100,7 @@
                   <span class="text-tibet-brown/50">{{ hotel.reviewCount }}{{ t('hotel.reviewCountUnit') }}</span>
                 </div>
               </div>
-              <router-link :to="`/hotel-booking/${hotel.id}?roomId=${hotel.rooms[0]?.id || 1}`"
+              <router-link :to="`/hotel-booking/${hotel.id}?roomId=${roomTypes[0]?.id || 1}`"
                            class="w-full flex items-center justify-center gap-2 px-5 py-3.5 rounded-full bg-tibet-red text-tibet-yellow font-semibold hover:bg-tibet-red/90 transition-colors shadow-lg shadow-tibet-red/20">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
                 {{ t('hotel.bookNow') }}
@@ -132,13 +134,86 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { getHotelById, hotels } from '../data/hotels'
+import api, { endpoints } from '../api'
 
 const { t } = useI18n()
 const route = useRoute()
 const hotelId = Number(route.params.id || 1)
-const hotel = computed(() => getHotelById(hotelId) || hotels[0])
+const hotel = ref<any>({})
+const roomTypes = ref<any[]>([])
+const loadingRooms = ref(true)
+
+const displayPrice = computed(() => {
+  if (hotel.value.priceRange) return hotel.value.priceRange
+  if (hotel.value.priceMin) return String(hotel.value.priceMin)
+  return '咨询'
+})
+
+const resolveRegion = (location: string): string => {
+  for (const r of ['拉萨', '林芝', '日喀则', '阿里', '那曲']) {
+    if (location.includes(r)) return r
+  }
+  return '拉萨'
+}
+
+onMounted(async () => {
+  // 1. Try static data first for rich display fields
+  const { getHotelById, hotels } = await import('../data/hotels')
+  const staticHotel = getHotelById(hotelId)
+
+  if (staticHotel) {
+    hotel.value = staticHotel
+  }
+
+  // 2. Fetch API room types (try for all hotels)
+  try {
+    const roomRes = await api.get(endpoints.hotels.roomTypes(hotelId))
+    if (roomRes.data && roomRes.data.length > 0) {
+      roomTypes.value = roomRes.data
+    } else if (staticHotel?.rooms) {
+      roomTypes.value = staticHotel.rooms
+    }
+  } catch {
+    if (staticHotel?.rooms) {
+      roomTypes.value = staticHotel.rooms
+    }
+  }
+
+  // 3. If no static data, fetch from API and map fields
+  if (!staticHotel) {
+    try {
+      const hotelRes = await api.get(endpoints.hotels.detail(hotelId))
+      const apiHotel = hotelRes.data
+      const region = resolveRegion(apiHotel.location || '')
+      const facilities = apiHotel.facilities
+        ? apiHotel.facilities.split(',').map((f: string) => f.trim()).filter(Boolean)
+        : []
+      let priceMin = 300
+      const m = (apiHotel.priceRange || '').match(/(\d+)/)
+      if (m) priceMin = parseInt(m[1]) || 300
+
+      hotel.value = {
+        ...apiHotel,
+        coverImage: apiHotel.imageUrl || '',
+        stars: Math.min(5, Math.max(3, Math.round(Number(apiHotel.rating) || 4))),
+        city: region,
+        address: apiHotel.location || '',
+        description: `${apiHotel.name}位于${apiHotel.location || '西藏'}，电话：${apiHotel.phone || '暂无'}`,
+        tags: facilities.slice(0, 4),
+        amenities: facilities,
+        reviewCount: 0,
+        priceMin,
+        lng: 91.0,
+        lat: 29.6,
+      }
+    } catch {
+      hotel.value = hotels[0]
+    }
+  }
+
+  loadingRooms.value = false
+})
 </script>

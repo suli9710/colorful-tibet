@@ -1,11 +1,16 @@
 package com.tibet.tourism.controller;
 
 import com.tibet.tourism.entity.HotelBooking;
+import com.tibet.tourism.entity.RoomType;
 import com.tibet.tourism.entity.User;
 import com.tibet.tourism.repository.HotelBookingRepository;
 import com.tibet.tourism.repository.HotelRepository;
+import com.tibet.tourism.repository.RoomTypeRepository;
 import com.tibet.tourism.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -18,7 +23,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/hotel-bookings")
-@CrossOrigin(origins = "*")
 public class HotelBookingController {
 
     @Autowired
@@ -29,6 +33,26 @@ public class HotelBookingController {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private RoomTypeRepository roomTypeRepository;
+
+    @GetMapping("/room-types/{hotelId}")
+    public ResponseEntity<?> getRoomTypes(@PathVariable Long hotelId) {
+        return ResponseEntity.ok(roomTypeRepository.findByHotelIdOrderBySortOrderAsc(hotelId));
+    }
+
+    @GetMapping("/hotels")
+    public ResponseEntity<?> getAllHotels() {
+        return ResponseEntity.ok(hotelRepository.findAll());
+    }
+
+    @GetMapping("/hotels/{id}")
+    public ResponseEntity<?> getHotel(@PathVariable Long id) {
+        return hotelRepository.findById(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
 
     @PostMapping
     public ResponseEntity<?> createBooking(@RequestBody Map<String, Object> payload) {
@@ -81,29 +105,35 @@ public class HotelBookingController {
     }
 
     @GetMapping("/my")
-    public ResponseEntity<?> getMyBookings() {
+    public ResponseEntity<?> getMyBookings(@PageableDefault(size = 20) Pageable pageable) {
         User user = getCurrentUser();
         if (user == null) {
             return ResponseEntity.status(401).body(Map.of("error", "User not authenticated"));
         }
-        List<HotelBooking> bookings = hotelBookingRepository.findByUserIdOrderByCreatedAtDesc(user.getId());
+        Page<HotelBooking> bookings = hotelBookingRepository.findByUserIdOrderByCreatedAtDesc(user.getId(), pageable);
         return ResponseEntity.ok(bookings);
     }
 
     @GetMapping
-    public ResponseEntity<?> getAllBookings() {
+    public ResponseEntity<?> getAllBookings(@PageableDefault(size = 20) Pageable pageable) {
         User user = getCurrentUser();
-        if (user == null || !"ADMIN".equals(user.getRole())) {
+        if (user == null) {
+            return ResponseEntity.status(401).body(Map.of("error", "User not authenticated"));
+        }
+        if (user.getRole() != User.Role.ADMIN) {
             return ResponseEntity.status(403).body(Map.of("error", "Admin access required"));
         }
-        List<HotelBooking> bookings = hotelBookingRepository.findAllByOrderByCreatedAtDesc();
+        Page<HotelBooking> bookings = hotelBookingRepository.findAllByOrderByCreatedAtDesc(pageable);
         return ResponseEntity.ok(bookings);
     }
 
     @PutMapping("/{id}/status")
     public ResponseEntity<?> updateStatus(@PathVariable Long id, @RequestBody Map<String, String> payload) {
         User user = getCurrentUser();
-        if (user == null || !"ADMIN".equals(user.getRole())) {
+        if (user == null) {
+            return ResponseEntity.status(401).body(Map.of("error", "User not authenticated"));
+        }
+        if (user.getRole() != User.Role.ADMIN) {
             return ResponseEntity.status(403).body(Map.of("error", "Admin access required"));
         }
         HotelBooking booking = hotelBookingRepository.findById(id)
@@ -122,7 +152,7 @@ public class HotelBookingController {
         }
         HotelBooking booking = hotelBookingRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Booking not found"));
-        if (!booking.getUser().getId().equals(user.getId()) && !"ADMIN".equals(user.getRole())) {
+        if (!booking.getUser().getId().equals(user.getId()) && user.getRole() != User.Role.ADMIN) {
             return ResponseEntity.status(403).body(Map.of("error", "Unauthorized"));
         }
         booking.setStatus(HotelBooking.Status.CANCELLED);

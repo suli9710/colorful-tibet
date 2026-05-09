@@ -270,10 +270,15 @@ public class RecommendationService {
             return Collections.emptyMap();
         }
 
-        List<ScenicSpot> allSpots = spotRepository.findAll();
-        
-        // 使用并行流处理以提高性能
-        return allSpots.parallelStream()
+        List<String> topTags = tagProfile.entrySet().stream()
+                .sorted(Map.Entry.<String, Double>comparingByValue().reversed())
+                .limit(10)
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toList());
+
+        List<ScenicSpot> candidateSpots = spotRepository.findByTagsInAndIdNotIn(topTags, visitedSpotIds);
+
+        return candidateSpots.parallelStream()
                 .filter(spot -> spot.getId() != null && !visitedSpotIds.contains(spot.getId()))
                 .filter(spot -> spot.getTags() != null && !spot.getTags().isEmpty())
                 .collect(Collectors.toConcurrentMap(

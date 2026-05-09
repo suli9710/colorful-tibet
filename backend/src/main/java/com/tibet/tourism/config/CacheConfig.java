@@ -1,16 +1,14 @@
 package com.tibet.tourism.config;
 
+import com.github.benmanes.caffeine.cache.Caffeine;
 import org.springframework.cache.CacheManager;
-import org.springframework.cache.concurrent.ConcurrentMapCacheManager;
+import org.springframework.cache.caffeine.CaffeineCacheManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 
-/**
- * 缓存配置
- * 使用内存缓存（ConcurrentHashMap），适合中小型应用
- * 生产环境可替换为 Redis CacheManager
- */
+import java.util.concurrent.TimeUnit;
+
 @Configuration
 public class CacheConfig {
 
@@ -22,12 +20,27 @@ public class CacheConfig {
     @Bean
     @Primary
     public CacheManager cacheManager() {
-        ConcurrentMapCacheManager cacheManager = new ConcurrentMapCacheManager(
-                IP_LOCATION_CACHE,
-                SPOT_CACHE,
-                POPULAR_SPOTS_CACHE,
-                DICTIONARY_CACHE
-        );
+        CaffeineCacheManager cacheManager = new CaffeineCacheManager();
+        cacheManager.registerCustomCache(IP_LOCATION_CACHE,
+                Caffeine.newBuilder()
+                        .expireAfterWrite(24, TimeUnit.HOURS)
+                        .maximumSize(200)
+                        .build());
+        cacheManager.registerCustomCache(SPOT_CACHE,
+                Caffeine.newBuilder()
+                        .expireAfterWrite(30, TimeUnit.MINUTES)
+                        .maximumSize(500)
+                        .build());
+        cacheManager.registerCustomCache(POPULAR_SPOTS_CACHE,
+                Caffeine.newBuilder()
+                        .expireAfterWrite(15, TimeUnit.MINUTES)
+                        .maximumSize(50)
+                        .build());
+        cacheManager.registerCustomCache(DICTIONARY_CACHE,
+                Caffeine.newBuilder()
+                        .expireAfterWrite(1, TimeUnit.HOURS)
+                        .maximumSize(500)
+                        .build());
         cacheManager.setAllowNullValues(false);
         return cacheManager;
     }

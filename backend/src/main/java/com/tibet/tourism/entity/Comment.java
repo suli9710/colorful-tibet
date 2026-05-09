@@ -5,7 +5,9 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "comments")
+@Table(name = "comments", indexes = {
+    @Index(name = "idx_comments_spot_created", columnList = "spot_id, created_at")
+})
 public class Comment {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

@@ -27,10 +27,12 @@ if (typeof window !== 'undefined') {
     </div>
 
     <NavBar />
-    <main class="flex-grow pt-24 md:pt-28">
+    <main class="flex-grow pt-20 md:pt-24">
       <router-view v-slot="{ Component, route }">
         <transition name="page" mode="out-in">
-          <component :is="Component" :key="route.fullPath" />
+          <keep-alive include="RoutePlanner">
+            <component :is="Component" :key="route.name" />
+          </keep-alive>
         </transition>
       </router-view>
     </main>

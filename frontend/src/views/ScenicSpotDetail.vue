@@ -1,7 +1,7 @@
 <template>
-  <div class="min-h-screen bg-apple-gray-50">
+  <div class="min-h-screen bg-tibet-white">
     <div v-if="loading" class="flex justify-center items-center h-screen">
-      <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-apple-blue"></div>
+      <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-tibet-gold"></div>
     </div>
 
     <div v-else-if="spot" class="relative">
@@ -18,7 +18,7 @@
             <path v-else stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
           </svg>
         </div>
-        <div class="absolute inset-0 bg-gradient-to-t from-apple-gray-900/80 via-transparent to-transparent"></div>
+        <div class="absolute inset-0 bg-gradient-to-t from-tibet-dark/80 via-transparent to-transparent"></div>
         
         <div class="absolute bottom-0 left-0 w-full p-8 md:p-16 text-white animate-slide-up">
           <div class="max-w-7xl mx-auto">
@@ -41,7 +41,7 @@
                 </svg>
                 {{ t('spotDetail.tibetAutonomousRegion') }}
               </span>
-              <span class="text-2xl font-bold text-apple-blue">¥{{ unitPrice }}</span>
+              <span class="text-2xl font-bold text-tibet-gold">¥{{ unitPrice }}</span>
             </div>
           </div>
         </div>
@@ -52,16 +52,16 @@
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-12">
           <!-- Left Column: Description -->
           <div class="lg:col-span-2 space-y-8 animate-slide-up" style="animation-delay: 0.2s">
-            <div class="bg-white rounded-3xl p-8 shadow-xl border border-gray-100">
-              <h2 class="text-2xl font-bold text-apple-gray-900 mb-6 tibetan-font">{{ t('spotDetail.introduction') }}</h2>
-              <p class="text-apple-gray-600 leading-loose text-lg whitespace-pre-line tibetan-font">
+            <div class="bg-white rounded-3xl p-8 shadow-xl border border-tibet-gold/20">
+              <h2 class="text-2xl font-bold text-tibet-dark mb-6 tibetan-font">{{ t('spotDetail.introduction') }}</h2>
+              <p class="text-tibet-brown/80 leading-loose text-lg whitespace-pre-line tibetan-font">
                 {{ spot.description }}
               </p>
             </div>
 
             <!-- Comments Section -->
-            <div class="bg-white rounded-3xl p-8 shadow-xl border border-gray-100">
-              <h2 class="text-2xl font-bold text-apple-gray-900 mb-6 tibetan-font">{{ t('spotDetail.comments') }}</h2>
+            <div class="bg-white rounded-3xl p-8 shadow-xl border border-tibet-gold/20">
+              <h2 class="text-2xl font-bold text-tibet-dark mb-6 tibetan-font">{{ t('spotDetail.comments') }}</h2>
               
               <!-- Comment Form -->
               <div v-if="user" class="mb-8 p-6 bg-gray-50 rounded-2xl">
@@ -77,13 +77,13 @@
                   </div>
                 </div>
                 <textarea v-model="commentForm.content" rows="3" 
-                          class="w-full p-4 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all duration-300 input-focus mb-3 resize-none tibetan-font"
+                          class="w-full p-4 rounded-xl border border-tibet-gold/25 focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all duration-300 input-focus mb-3 resize-none tibetan-font"
                           :placeholder="t('spotDetail.shareExperience')"></textarea>
                 <div class="mb-4">
                   <label class="block text-sm font-medium text-gray-600 mb-2 tibetan-font">{{ t('spotDetail.addPhoto') }}</label>
                   <div class="flex items-center space-x-4">
                     <label for="comment-image-input"
-                           class="inline-flex items-center px-4 py-2 rounded-full bg-white border border-gray-200 text-sm font-medium text-gray-600 cursor-pointer hover:bg-blue-50 hover:text-blue-600 transition-colors tibetan-font">
+                           class="inline-flex items-center px-4 py-2 rounded-full bg-white border border-tibet-gold/25 text-sm font-medium text-gray-600 cursor-pointer hover:bg-blue-50 hover:text-blue-600 transition-colors tibetan-font">
                       <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M3 15a4 4 0 004 4h10a4 4 0 004-4m-4-8h-4m0 0V3m0 4l3-3m-3 3L9 4" />
                       </svg>
@@ -95,7 +95,7 @@
                   <input id="comment-image-input" type="file" accept="image/*" class="hidden" @change="handleCommentImageChange">
                   <p class="text-xs text-gray-400 mt-1 tibetan-font">{{ t('spotDetail.imageSizeHint') }}</p>
                   <div v-if="commentImagePreview" class="mt-4 relative w-40 h-28">
-                    <img :src="commentImagePreview" :alt="t('spotDetail.comments')" class="w-full h-full object-cover rounded-2xl border border-gray-100 shadow-sm">
+                    <img :src="commentImagePreview" :alt="t('spotDetail.comments')" class="w-full h-full object-cover rounded-2xl border border-tibet-gold/20 shadow-sm">
                     <button type="button" @click="removeSelectedCommentImage"
                             class="absolute -top-2 -right-2 bg-white text-gray-500 hover:text-red-500 rounded-full p-1 shadow">
                       <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -106,9 +106,8 @@
                 </div>
                 <div class="mt-4 text-right">
                   <button @click="submitComment" :disabled="submittingComment"
-                          class="bg-apple-blue text-white px-6 py-3 rounded-full font-medium hover:bg-blue-600 transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-blue-500/30 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none relative overflow-hidden group tibetan-font">
-                    <span class="relative z-10">{{ submittingComment ? t('spotDetail.submitting') : t('spotDetail.publishComment') }}</span>
-                    <span class="absolute inset-0 bg-gradient-to-r from-blue-400 to-purple-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
+                          class="bg-tibet-red text-tibet-yellow px-6 py-3 rounded-full font-semibold hover:bg-tibet-red/85 transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-tibet-red/25 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none tibetan-font">
+                    {{ submittingComment ? t('spotDetail.submitting') : t('spotDetail.publishComment') }}
                   </button>
                 </div>
               </div>
@@ -119,7 +118,7 @@
 
               <!-- Comment List -->
               <div class="space-y-6">
-                <div v-for="comment in comments" :key="comment.id" class="border-b border-gray-100 pb-6 last:border-0">
+                <div v-for="comment in comments" :key="comment.id" class="border-b border-tibet-gold/20 pb-6 last:border-0">
                   <div class="flex items-center justify-between mb-2">
                     <div class="flex items-center space-x-3">
                       <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold">
@@ -177,11 +176,11 @@
             </div>
 
             <!-- Interactive Map -->
-            <div class="bg-white rounded-3xl p-8 shadow-xl border border-gray-100 overflow-hidden">
+            <div class="bg-white rounded-3xl p-8 shadow-xl border border-tibet-gold/20 overflow-hidden">
               <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
                 <div>
-                  <h2 class="text-2xl font-bold text-apple-gray-900 tibetan-font">{{ t('spotDetail.location') }}</h2>
-                  <p class="text-sm text-apple-gray-500 mt-1 tibetan-font">{{ t('spotDetail.mapHint') }}</p>
+                  <h2 class="text-2xl font-bold text-tibet-dark tibetan-font">{{ t('spotDetail.location') }}</h2>
+                  <p class="text-sm text-tibet-brown/70 mt-1 tibetan-font">{{ t('spotDetail.mapHint') }}</p>
                 </div>
                 <button
                   @click="recenterMap"
@@ -200,7 +199,7 @@
                 </button>
               </div>
               <div class="relative rounded-2xl overflow-hidden">
-                <div v-if="!hasValidLocation" class="bg-apple-gray-100 h-72 flex items-center justify-center text-apple-gray-400 text-center px-6">
+                <div v-if="!hasValidLocation" class="bg-tibet-gold/5 h-72 flex items-center justify-center text-tibet-brown/50 text-center px-6">
                   <div class="tibetan-font">
                     <p>{{ t('spotDetail.noLocationInfo') }}</p>
                     <p class="text-sm mt-2">{{ t('spotDetail.tryLater') }}</p>
@@ -210,7 +209,7 @@
                   <div ref="mapContainer" class="h-72 w-full"></div>
                   <div
                     v-if="mapLoading"
-                    class="absolute inset-0 bg-white/70 backdrop-blur-sm flex flex-col items-center justify-center text-apple-gray-500 text-sm tibetan-font">
+                    class="absolute inset-0 bg-white/70 backdrop-blur-sm flex flex-col items-center justify-center text-tibet-brown/70 text-sm tibetan-font">
                     <svg class="animate-spin h-6 w-6 text-blue-500 mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                       <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                       <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
@@ -219,17 +218,17 @@
                   </div>
                 </div>
               </div>
-              <div class="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm text-apple-gray-600">
-                <div class="bg-apple-gray-50 rounded-2xl px-4 py-3">
-                  <p class="text-xs text-apple-gray-400 tibetan-font">{{ t('spotDetail.longitude') }}</p>
+              <div class="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm text-tibet-brown/80">
+                <div class="bg-tibet-white rounded-2xl px-4 py-3">
+                  <p class="text-xs text-tibet-brown/50 tibetan-font">{{ t('spotDetail.longitude') }}</p>
                   <p class="font-semibold mt-1">{{ spot.longitude || '—' }}</p>
                 </div>
-                <div class="bg-apple-gray-50 rounded-2xl px-4 py-3">
-                  <p class="text-xs text-apple-gray-400 tibetan-font">{{ t('spotDetail.latitude') }}</p>
+                <div class="bg-tibet-white rounded-2xl px-4 py-3">
+                  <p class="text-xs text-tibet-brown/50 tibetan-font">{{ t('spotDetail.latitude') }}</p>
                   <p class="font-semibold mt-1">{{ spot.latitude || '—' }}</p>
                 </div>
-                <div class="bg-apple-gray-50 rounded-2xl px-4 py-3">
-                  <p class="text-xs text-apple-gray-400 tibetan-font">{{ t('spotDetail.altitude') }}</p>
+                <div class="bg-tibet-white rounded-2xl px-4 py-3">
+                  <p class="text-xs text-tibet-brown/50 tibetan-font">{{ t('spotDetail.altitude') }}</p>
                   <p class="font-semibold mt-1">{{ spot.altitude ? spot.altitude + ' m' : '—' }}</p>
                 </div>
               </div>
@@ -238,42 +237,41 @@
 
           <!-- Right Column: Booking Form -->
           <div class="lg:col-span-1 animate-slide-up" style="animation-delay: 0.4s">
-              <div class="sticky top-24">
-              <div class="glass rounded-3xl p-8 shadow-2xl border border-white/50">
-                <h2 class="text-2xl font-bold text-apple-gray-900 mb-6 tibetan-font">{{ t('spotDetail.bookNow') }}</h2>
+              <div class="sticky top-20">
+              <div class="glass-card rounded-3xl p-8 border border-white/50">
+                <h2 class="text-2xl font-bold text-tibet-dark mb-6 tibetan-font">{{ t('spotDetail.bookNow') }}</h2>
                 
                 <form @submit.prevent="handleBooking" class="space-y-6">
                   <div>
-                    <label class="block text-sm font-medium text-apple-gray-700 mb-2 tibetan-font">{{ t('spotDetail.visitDate') }}</label>
+                    <label class="block text-sm font-medium text-tibet-dark/80 mb-2 tibetan-font">{{ t('spotDetail.visitDate') }}</label>
                     <input type="date" v-model="bookingForm.visitDate" required
-                           class="w-full px-4 py-3 rounded-xl bg-white/50 border border-gray-200 focus:border-apple-blue focus:ring-2 focus:ring-blue-100 outline-none transition-all">
+                           class="w-full px-4 py-3 rounded-xl bg-white/50 border border-tibet-gold/25 focus:border-tibet-gold focus:ring-2 focus:ring-blue-100 outline-none transition-all">
                   </div>
 
                   <div>
-                    <label class="block text-sm font-medium text-apple-gray-700 mb-2 tibetan-font">{{ t('spotDetail.ticketCount') }}</label>
+                    <label class="block text-sm font-medium text-tibet-dark/80 mb-2 tibetan-font">{{ t('spotDetail.ticketCount') }}</label>
                     <div class="flex items-center space-x-4">
                       <button type="button" @click="bookingForm.ticketCount > 1 && bookingForm.ticketCount--" 
-                              class="w-10 h-10 rounded-full bg-apple-gray-100 hover:bg-apple-gray-200 flex items-center justify-center text-apple-gray-600 transition-all duration-300 transform hover:scale-110 active:scale-95">
+                              class="w-10 h-10 rounded-full bg-tibet-gold/5 hover:bg-tibet-gold/15 flex items-center justify-center text-tibet-brown/80 transition-all duration-300 transform hover:scale-110 active:scale-95">
                         -
                       </button>
-                      <span class="text-xl font-bold text-apple-gray-900 w-8 text-center transition-all duration-300">{{ bookingForm.ticketCount }}</span>
+                      <span class="text-xl font-bold text-tibet-dark w-8 text-center transition-all duration-300">{{ bookingForm.ticketCount }}</span>
                       <button type="button" @click="bookingForm.ticketCount++" 
-                              class="w-10 h-10 rounded-full bg-apple-gray-100 hover:bg-apple-gray-200 flex items-center justify-center text-apple-gray-600 transition-all duration-300 transform hover:scale-110 active:scale-95">
+                              class="w-10 h-10 rounded-full bg-tibet-gold/5 hover:bg-tibet-gold/15 flex items-center justify-center text-tibet-brown/80 transition-all duration-300 transform hover:scale-110 active:scale-95">
                         +
                       </button>
                     </div>
                   </div>
 
-                  <div class="pt-6 border-t border-gray-200">
+                  <div class="pt-6 border-t border-tibet-gold/25">
                     <div class="flex justify-between items-center mb-6">
-                      <span class="text-apple-gray-600 tibetan-font">{{ t('spotDetail.totalAmount') }}</span>
-                      <span class="text-3xl font-bold text-apple-blue">¥{{ totalPrice }}</span>
+                      <span class="text-tibet-brown/80 tibetan-font">{{ t('spotDetail.totalAmount') }}</span>
+                      <span class="text-3xl font-bold text-tibet-gold">¥{{ totalPrice }}</span>
                     </div>
                     
                     <button type="submit" :disabled="submitting"
-                            class="w-full bg-apple-blue hover:bg-apple-blue-hover text-white font-bold py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-[1.03] hover:-translate-y-1 active:scale-[0.98] shadow-lg hover:shadow-blue-500/50 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none relative overflow-hidden group tibetan-font">
-                      <span class="relative z-10">{{ submitting ? t('spotDetail.processing') : t('spotDetail.confirmPayment') }}</span>
-                      <span class="absolute inset-0 bg-gradient-to-r from-blue-400 to-purple-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
+                            class="w-full bg-tibet-red text-tibet-yellow font-bold py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-[1.02] hover:-translate-y-0.5 active:scale-[0.98] shadow-lg hover:shadow-tibet-red/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none tibetan-font">
+                      {{ submitting ? t('spotDetail.processing') : t('spotDetail.confirmPayment') }}
                     </button>
                   </div>
                 </form>
@@ -398,13 +396,52 @@ watch(
   }
 )
 
+// WGS-84 → GCJ-02 坐标转换（国内地图需要）
+const PI = Math.PI
+const A = 6378245.0
+const EE = 0.00669342162296594323
+
+const outOfChina = (lng: number, lat: number): boolean =>
+  lng < 72.004 || lng > 137.8347 || lat < 0.8293 || lat > 55.8271
+
+const transformLat = (x: number, y: number): number => {
+  let ret = -100.0 + 2.0 * x + 3.0 * y + 0.2 * y * y + 0.1 * x * y + 0.2 * Math.sqrt(Math.abs(x))
+  ret += (20.0 * Math.sin(6.0 * x * PI) + 20.0 * Math.sin(2.0 * x * PI)) * 2.0 / 3.0
+  ret += (20.0 * Math.sin(y * PI) + 40.0 * Math.sin(y / 3.0 * PI)) * 2.0 / 3.0
+  ret += (160.0 * Math.sin(y / 12.0 * PI) + 320 * Math.sin(y * PI / 30.0)) * 2.0 / 3.0
+  return ret
+}
+
+const transformLon = (x: number, y: number): number => {
+  let ret = 300.0 + x + 2.0 * y + 0.1 * x * x + 0.1 * x * y + 0.1 * Math.sqrt(Math.abs(x))
+  ret += (20.0 * Math.sin(6.0 * x * PI) + 20.0 * Math.sin(2.0 * x * PI)) * 2.0 / 3.0
+  ret += (20.0 * Math.sin(x * PI) + 40.0 * Math.sin(x / 3.0 * PI)) * 2.0 / 3.0
+  ret += (150.0 * Math.sin(x / 12.0 * PI) + 300.0 * Math.sin(x / 30.0 * PI)) * 2.0 / 3.0
+  return ret
+}
+
+const wgs84ToGcj02 = (lng: number, lat: number): [number, number] => {
+  if (outOfChina(lng, lat)) return [lng, lat]
+  const dlat = transformLat(lng - 105.0, lat - 35.0)
+  const dlng = transformLon(lng - 105.0, lat - 35.0)
+  const radlat = lat / 180.0 * PI
+  let magic = Math.sin(radlat)
+  magic = 1 - EE * magic * magic
+  const sqrtmagic = Math.sqrt(magic)
+  const mglat = (dlat * 180.0) / ((A * (1 - EE)) / (magic * sqrtmagic) * PI)
+  const mglng = (dlng * 180.0) / (A / sqrtmagic * Math.cos(radlat) * PI)
+  return [lng + mglng, lat + mglat]
+}
+
 const initOrUpdateMap = async () => {
   if (!hasValidLocation.value || !mapContainer.value) {
     return
   }
 
-  const lat = Number(spot.value.latitude)
-  const lng = Number(spot.value.longitude)
+  const wgsLat = Number(spot.value.latitude)
+  const wgsLng = Number(spot.value.longitude)
+  // 转为 GCJ-02 以匹配高德地图瓦片
+  const [lng, lat] = wgs84ToGcj02(wgsLng, wgsLat)
 
   await nextTick()
 
@@ -415,14 +452,32 @@ const initOrUpdateMap = async () => {
       attributionControl: false
     })
 
-    const tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    // 高德地图瓦片（国内加载快，无需 API Key）
+    const tileLayer = L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}', {
       maxZoom: 18,
-      minZoom: 3
+      minZoom: 3,
+      subdomains: '1234'
     })
 
-    tileLayer.on('load', () => (mapLoading.value = false))
-    tileLayer.on('loading', () => (mapLoading.value = true))
+    let tilesLoaded = false
+    tileLayer.on('load', () => {
+      tilesLoaded = true
+      mapLoading.value = false
+    })
+    tileLayer.on('loading', () => {
+      mapLoading.value = true
+    })
+    tileLayer.on('tileerror', () => {
+      // 单个瓦片失败不阻塞
+    })
     tileLayer.addTo(map)
+
+    // 8 秒超时兜底
+    setTimeout(() => {
+      if (!tilesLoaded) {
+        mapLoading.value = false
+      }
+    }, 8000)
   }
 
   mapReady.value = true
@@ -440,13 +495,14 @@ const initOrUpdateMap = async () => {
     fillOpacity: 0.7
   }).addTo(map)
 
-  marker.bindPopup(`<strong>${spot.value.name || t('spotDetail.location')}</strong><br/>${t('spotDetail.longitude')} ${lng}, ${t('spotDetail.latitude')} ${lat}`)
+  marker.bindPopup(`<strong>${spot.value.name || t('spotDetail.location')}</strong><br/>${t('spotDetail.longitude')} ${wgsLng}, ${t('spotDetail.latitude')} ${wgsLat}`)
 }
 
 const recenterMap = () => {
   if (!map || !hasValidLocation.value) return
-  const lat = Number(spot.value.latitude)
-  const lng = Number(spot.value.longitude)
+  const wgsLat = Number(spot.value.latitude)
+  const wgsLng = Number(spot.value.longitude)
+  const [lng, lat] = wgs84ToGcj02(wgsLng, wgsLat)
   map.flyTo([lat, lng], 9, { duration: 0.6 })
   marker?.openPopup()
 }
@@ -499,7 +555,7 @@ const commentImageFileName = computed(() => commentImageFile.value?.name || '')
 const fetchComments = async () => {
   try {
     const response = await api.get(endpoints.comments.list(Number(route.params.id)))
-    comments.value = response.data
+    comments.value = response.data?.content || response.data || []
     
     // 如果用户已登录，检查每条评论的点赞状态
     if (user.value) {

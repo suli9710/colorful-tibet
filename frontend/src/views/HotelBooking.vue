@@ -1,6 +1,6 @@
 <template>
-  <div class="min-h-screen bg-apple-gray-50">
-    <section class="relative overflow-hidden bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 text-white">
+  <div class="min-h-screen bg-tibet-white">
+    <section class="relative overflow-hidden bg-gradient-to-br from-tibet-dark via-tibet-brown to-tibet-red text-white">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 relative z-10">
         <div class="max-w-3xl">
           <span class="inline-flex items-center px-4 py-1.5 rounded-full bg-white/15 backdrop-blur-md border border-white/20 text-sm font-medium mb-6">{{ t('hotel.badge') }}</span>
@@ -18,66 +18,66 @@
 
       <div v-else class="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div class="lg:col-span-2 space-y-6">
-          <div class="bg-white rounded-3xl p-7 border border-gray-100 shadow-sm">
+          <div class="bg-white rounded-3xl p-7 border border-tibet-gold/20 shadow-sm">
             <h2 class="text-xl font-bold text-gray-900 mb-6">{{ t('hotel.checkIn') }} / {{ t('hotel.checkOut') }}</h2>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">{{ t('hotel.checkIn') }}</label>
-                <input v-model="form.checkInDate" type="date" class="w-full px-4 py-3 rounded-2xl border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all" />
+                <input v-model="form.checkInDate" type="date" class="w-full px-4 py-3 rounded-2xl border border-tibet-gold/25 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all" />
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">{{ t('hotel.checkOut') }}</label>
-                <input v-model="form.checkOutDate" type="date" class="w-full px-4 py-3 rounded-2xl border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all" />
+                <input v-model="form.checkOutDate" type="date" class="w-full px-4 py-3 rounded-2xl border border-tibet-gold/25 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all" />
               </div>
             </div>
             <div class="mt-4">
               <label class="block text-sm font-medium text-gray-700 mb-2">{{ t('hotel.guests') }}</label>
-              <select v-model="form.guests" class="w-full px-4 py-3 rounded-2xl border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all">
+              <select v-model="form.guests" class="w-full px-4 py-3 rounded-2xl border border-tibet-gold/25 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all">
                 <option v-for="n in 6" :key="n" :value="n">{{ n }}{{ t('hotel.guests') }}</option>
               </select>
             </div>
           </div>
 
-          <div class="bg-white rounded-3xl p-7 border border-gray-100 shadow-sm">
+          <div class="bg-white rounded-3xl p-7 border border-tibet-gold/20 shadow-sm">
             <h2 class="text-xl font-bold text-gray-900 mb-6">{{ t('hotel.booker') }}</h2>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">{{ t('contact.name') }}</label>
-                <input v-model="form.guestName" type="text" :placeholder="t('contact.namePlaceholder')" class="w-full px-4 py-3 rounded-2xl border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all" />
+                <input v-model="form.guestName" type="text" :placeholder="t('contact.namePlaceholder')" class="w-full px-4 py-3 rounded-2xl border border-tibet-gold/25 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all" />
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">电话</label>
-                <input v-model="form.phone" type="tel" placeholder="请输入联系电话" class="w-full px-4 py-3 rounded-2xl border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all" />
+                <label class="block text-sm font-medium text-gray-700 mb-2">{{ t('hotel.phone') || '电话' }}</label>
+                <input v-model="form.phone" type="tel" :placeholder="t('hotel.phonePlaceholder') || '请输入联系电话'" class="w-full px-4 py-3 rounded-2xl border border-tibet-gold/25 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all" />
               </div>
             </div>
             <div class="mt-4">
-              <label class="block text-sm font-medium text-gray-700 mb-2">备注（选填）</label>
-              <textarea v-model="form.note" rows="3" placeholder="如有特殊需求请在此说明..." class="w-full px-4 py-3 rounded-2xl border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all resize-none"></textarea>
+              <label class="block text-sm font-medium text-gray-700 mb-2">{{ t('hotel.noteLabel') || '备注（选填）' }}</label>
+              <textarea v-model="form.note" rows="3" :placeholder="t('hotel.notePlaceholder') || '如有特殊需求请在此说明...'" class="w-full px-4 py-3 rounded-2xl border border-tibet-gold/25 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all resize-none"></textarea>
             </div>
           </div>
 
           <div v-if="submitError" class="bg-red-50 border border-red-200 rounded-2xl p-4 text-red-700 text-sm">{{ submitError }}</div>
 
-          <button @click="submitBooking" :disabled="submitting" class="w-full py-4 rounded-full bg-blue-600 text-white font-bold text-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-            {{ submitting ? '提交中...' : '确认预订' }}
+          <button @click="submitBooking" :disabled="submitting" class="w-full py-4 rounded-full bg-tibet-red text-tibet-yellow font-bold text-lg hover:bg-tibet-red/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+            {{ submitting ? t('common.submitting') : t('common.confirmBook') }}
           </button>
         </div>
 
         <div>
-          <div class="sticky top-28 bg-white rounded-3xl p-7 border border-gray-100 shadow-lg">
+          <div class="sticky top-24 bg-white rounded-3xl p-7 border border-tibet-gold/20 shadow-lg">
             <div class="h-40 rounded-2xl overflow-hidden mb-4 bg-gray-100">
               <img :src="hotel.coverImage" :alt="hotel.name" class="w-full h-full object-cover" />
             </div>
             <h3 class="text-xl font-bold text-gray-900">{{ hotel.name }}</h3>
             <p class="text-sm text-gray-500 mt-1">{{ hotel.city }} · {{ hotel.address }}</p>
 
-            <div v-if="selectedRoom" class="mt-4 pt-4 border-t border-gray-100 space-y-2 text-sm">
+            <div v-if="selectedRoom" class="mt-4 pt-4 border-t border-tibet-gold/20 space-y-2 text-sm">
               <div class="flex justify-between"><span class="text-gray-500">房型</span><span class="font-medium">{{ selectedRoom.name }}</span></div>
               <div class="flex justify-between"><span class="text-gray-500">{{ t('hotel.perNight') }}</span><span class="font-medium">¥{{ selectedRoom.price }}</span></div>
               <div class="flex justify-between"><span class="text-gray-500">晚数</span><span class="font-medium">{{ nights }} 晚</span></div>
               <div class="flex justify-between"><span class="text-gray-500">入住</span><span class="font-medium">{{ form.checkInDate || '-' }}</span></div>
               <div class="flex justify-between"><span class="text-gray-500">离店</span><span class="font-medium">{{ form.checkOutDate || '-' }}</span></div>
-              <div class="flex justify-between border-t border-gray-100 pt-2 mt-2"><span class="font-semibold">合计</span><span class="text-xl font-bold text-blue-600">¥{{ totalPrice }}</span></div>
+              <div class="flex justify-between border-t border-tibet-gold/20 pt-2 mt-2"><span class="font-semibold">合计</span><span class="text-xl font-bold text-blue-600">¥{{ totalPrice }}</span></div>
             </div>
           </div>
         </div>
@@ -99,9 +99,26 @@ const router = useRouter()
 
 const hotelId = Number(route.params.id || 1)
 const roomId = Number(route.query.roomId || 1)
+const apiHotel = ref<any>(null)
+const apiRoomTypes = ref<any[]>([])
 
-const hotel = computed(() => getHotelById(hotelId))
-const selectedRoom = computed(() => getRoomById(hotelId, roomId))
+;(async () => {
+  try {
+    const [hotelRes, roomRes] = await Promise.all([
+      api.get(endpoints.hotels.detail(hotelId)),
+      api.get(endpoints.hotels.roomTypes(hotelId))
+    ])
+    apiHotel.value = hotelRes.data
+    apiRoomTypes.value = Array.isArray(roomRes.data) ? roomRes.data : []
+  } catch (e) { /* fallback */ }
+})()
+
+const hotel = computed(() => apiHotel.value || getHotelById(hotelId))
+const selectedRoom = computed(() => {
+  const apiRoom = apiRoomTypes.value.find((r: any) => r.id === roomId)
+  if (apiRoom) return { ...apiRoom, price: apiRoom.price, desc: apiRoom.amenities }
+  return getRoomById(hotelId, roomId)
+})
 
 const form = ref({
   checkInDate: '',
