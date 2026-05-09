@@ -1,17 +1,17 @@
 <template>
-  <div class="min-h-screen bg-apple-gray-50 py-24">
+  <div class="min-h-screen bg-tibet-white py-24">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <!-- Header -->
       <div class="text-center mb-16 animate-fade-in">
-        <h1 class="text-4xl font-bold text-apple-gray-900 mb-4 tibetan-font">{{ t('spots.title') }}</h1>
-        <p class="text-lg text-apple-gray-500 max-w-2xl mx-auto tibetan-font">
+        <h1 class="text-4xl font-bold text-tibet-dark mb-4 tibetan-font">{{ t('spots.title') }}</h1>
+        <p class="text-lg text-tibet-brown/70 max-w-2xl mx-auto tibetan-font">
           {{ t('spots.subtitle') }}
         </p>
       </div>
 
       <!-- Filters -->
       <div class="flex justify-center mb-12 animate-slide-up will-change-transform" style="animation-delay: 0.1s">
-        <div class="bg-white p-1.5 rounded-full shadow-lg border border-gray-200 flex space-x-2">
+        <div class="bg-white p-1.5 rounded-full shadow-lg border border-tibet-gold/25 flex space-x-2">
           <button 
             v-for="cat in categories" 
             :key="cat.value"
@@ -19,8 +19,8 @@
             :class="[
               'px-6 py-2.5 rounded-full text-sm font-medium transition-all duration-300 ease-out-expo relative overflow-hidden will-change-transform tibetan-font',
               selectedCategory === cat.value 
-                ? 'bg-apple-gray-900 text-white shadow-md transform scale-105' 
-                : 'text-apple-gray-600 hover:bg-apple-gray-100 hover:text-apple-gray-900 hover:scale-105'
+                ? 'bg-tibet-dark text-white shadow-md transform scale-105' 
+                : 'text-tibet-brown/80 hover:bg-tibet-gold/5 hover:text-tibet-dark hover:scale-105'
             ]"
           >
             <span class="relative z-10">{{ cat.label }}</span>
@@ -32,7 +32,7 @@
 
       <!-- Loading State with Skeleton -->
       <div v-if="loading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        <div v-for="i in 6" :key="i" class="bg-white rounded-3xl shadow-sm overflow-hidden border border-gray-100 animate-pulse">
+        <div v-for="i in 6" :key="i" class="bg-white rounded-3xl shadow-sm overflow-hidden border border-tibet-gold/20 animate-pulse">
           <div class="h-72 bg-gray-200"></div>
           <div class="p-8">
             <div class="h-6 bg-gray-200 rounded mb-4 w-3/4"></div>
@@ -70,13 +70,13 @@
 
       <!-- No spots match the current category filter -->
       <div v-else-if="filteredSpots.length === 0" class="text-center py-20">
-        <div class="bg-gray-50 border-2 border-gray-200 rounded-2xl p-8 max-w-md mx-auto">
+        <div class="bg-gray-50 border-2 border-tibet-gold/25 rounded-2xl p-8 max-w-md mx-auto">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-gray-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
           <h3 class="text-lg font-bold text-gray-700 mb-2 tibetan-font">{{ t('spots.noCategoryTitle') }}</h3>
           <p class="text-gray-500 mb-4 tibetan-font">{{ t('spots.noCategoryMessage') }}</p>
-          <button @click="selectedCategory = 'ALL'" class="bg-apple-gray-900 text-white px-6 py-2 rounded-full hover:bg-black transition-colors tibetan-font">
+          <button @click="selectedCategory = 'ALL'" class="bg-tibet-dark text-white px-6 py-2 rounded-full hover:bg-black transition-colors tibetan-font">
             {{ t('spots.showAll') }}
           </button>
         </div>
@@ -85,7 +85,7 @@
       <!-- Spots Grid -->
       <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
         <div v-for="(spot, index) in filteredSpots" :key="spot.id" 
-             class="group bg-white rounded-3xl shadow-sm hover:shadow-2xl card-hover overflow-hidden border border-gray-100 animate-on-scroll hover:border-apple-blue/20 gpu-accelerated"
+             class="group bg-white rounded-3xl shadow-sm hover:shadow-2xl card-hover overflow-hidden border border-tibet-gold/20 animate-on-scroll hover:border-tibet-gold/20 gpu-accelerated"
              :style="{ animationDelay: `${index * 80}ms` }">
           
           <!-- Image Container -->
@@ -107,7 +107,7 @@
             <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 ease-out-expo"></div>
             
             <!-- Category Badge -->
-            <div class="absolute top-4 right-4 bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-bold text-apple-gray-900 shadow-xl transform group-hover:scale-110 transition-transform duration-300 ease-out-expo will-change-transform tibetan-font">
+            <div class="absolute top-4 right-4 bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-bold text-tibet-dark shadow-xl transform group-hover:scale-110 transition-transform duration-300 ease-out-expo will-change-transform tibetan-font">
               {{ spot.category === 'NATURAL' ? t('spots.category.natural') : t('spots.category.cultural') }}
             </div>
           </div>
@@ -115,26 +115,26 @@
           <!-- Content -->
           <div class="p-8">
             <div class="flex justify-between items-start mb-4">
-              <h3 class="text-xl font-bold text-apple-gray-900 group-hover:text-apple-blue transition-colors duration-300 ease-out-expo flex-1 tibetan-font">
+              <h3 class="text-xl font-bold text-tibet-dark group-hover:text-tibet-gold transition-colors duration-300 ease-out-expo flex-1 tibetan-font">
                 {{ spot.name }}
               </h3>
-              <span class="text-lg font-semibold text-apple-blue shrink-0 ml-3 transform group-hover:scale-110 transition-transform duration-300 ease-out-expo will-change-transform">¥{{ spot.ticketPrice }}</span>
+              <span class="text-lg font-semibold text-tibet-gold shrink-0 ml-3 transform group-hover:scale-110 transition-transform duration-300 ease-out-expo will-change-transform">¥{{ spot.ticketPrice }}</span>
             </div>
             
-            <p class="text-apple-gray-500 mb-6 line-clamp-3 leading-relaxed tibetan-font">
+            <p class="text-tibet-brown/70 mb-6 line-clamp-3 leading-relaxed tibetan-font">
               {{ spot.description }}
             </p>
             
             <!-- Tags & Action -->
-            <div class="flex items-center justify-between pt-6 border-t border-gray-100">
+            <div class="flex items-center justify-between pt-6 border-t border-tibet-gold/20">
               <div class="flex space-x-2 overflow-hidden">
                 <span v-for="tag in spot.tags?.slice(0, 2)" :key="tag.id" 
-                      class="px-3 py-1 bg-apple-gray-100 text-apple-gray-600 rounded-full text-xs font-medium whitespace-nowrap transform group-hover:scale-105 transition-transform duration-300 ease-out-expo will-change-transform">
+                      class="px-3 py-1 bg-tibet-gold/5 text-tibet-brown/80 rounded-full text-xs font-medium whitespace-nowrap transform group-hover:scale-105 transition-transform duration-300 ease-out-expo will-change-transform">
                   {{ tag.tag }}
                 </span>
               </div>
               <button @click="router.push(`/spots/${spot.id}`)" 
-                      class="text-apple-blue font-medium hover:text-apple-blue-hover transition-all duration-300 ease-out-expo flex items-center shrink-0 ml-4 group/btn tibetan-font">
+                      class="text-tibet-gold font-medium hover:text-tibet-gold/80 transition-all duration-300 ease-out-expo flex items-center shrink-0 ml-4 group/btn tibetan-font">
                 {{ t('spots.viewDetails') }}
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-1 transform group-hover/btn:translate-x-2 transition-transform duration-300 ease-out-expo will-change-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
@@ -170,9 +170,9 @@ const fetchSpots = async () => {
   try {
     loading.value = true
     const response = await api.get(endpoints.spots.list)
-    spots.value = response.data
-    
-    if (!response.data || response.data.length === 0) {
+    spots.value = response.data?.content || response.data || []
+
+    if (!spots.value || spots.value.length === 0) {
       console.warn('后端返回了空数据')
     }
   } catch (error: any) {
@@ -194,7 +194,7 @@ const fetchSpots = async () => {
       }
     } else if (error.response) {
       errorMessage += `${t('common.error')}: ${error.response.status}\n`
-      errorMessage += `${error.response.data?.message || error.response.statusText}`
+      errorMessage += `${error.response?.data?.message || error.response?.statusText || ''}`
     } else {
       errorMessage += `${error.message || error}`
     }

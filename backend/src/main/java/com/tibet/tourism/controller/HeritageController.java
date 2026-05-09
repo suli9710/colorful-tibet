@@ -1,33 +1,40 @@
 package com.tibet.tourism.controller;
 
-import com.tibet.tourism.entity.HeritageItem;
+import com.tibet.tourism.dto.HeritageItemDTO;
 import com.tibet.tourism.service.HeritageService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/heritage")
-@CrossOrigin(origins = "*")
 public class HeritageController {
 
     @Autowired
     private HeritageService heritageService;
 
     @GetMapping
-    public List<HeritageItem> getAllItems(@RequestParam(required = false, defaultValue = "zh") String locale) {
-        List<HeritageItem> items = heritageService.getAllItems();
-        if ("bo".equals(locale)) {
-            items.forEach(item -> {
-                if (item.getNameTibetan() != null && !item.getNameTibetan().isEmpty()) {
-                    item.setName(item.getNameTibetan());
-                }
-                if (item.getDescriptionTibetan() != null && !item.getDescriptionTibetan().isEmpty()) {
-                    item.setDescription(item.getDescriptionTibetan());
-                }
-            });
+    public Page<HeritageItemDTO> getAllItems(
+            @RequestParam(required = false, defaultValue = "zh") String locale,
+            @RequestParam(required = false) String category,
+            @PageableDefault(size = 20) Pageable pageable) {
+        if (category != null && !category.isEmpty()) {
+            return heritageService.getItemsByCategory(category, pageable)
+                    .map(item -> HeritageItemDTO.fromEntity(item, locale));
         }
-        return items;
+        return heritageService.getAllItems(pageable)
+                .map(item -> HeritageItemDTO.fromEntity(item, locale));
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<HeritageItemDTO> getItemById(
+            @PathVariable Long id,
+            @RequestParam(required = false, defaultValue = "zh") String locale) {
+        return heritageService.getItemById(id)
+                .map(item -> ResponseEntity.ok(HeritageItemDTO.fromEntity(item, locale)))
+                .orElse(ResponseEntity.notFound().build());
     }
 }

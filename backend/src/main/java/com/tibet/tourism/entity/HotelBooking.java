@@ -6,7 +6,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "hotel_bookings")
+@Table(name = "hotel_bookings", indexes = {
+    @Index(name = "idx_hb_user_created", columnList = "user_id, created_at")
+})
 public class HotelBooking {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

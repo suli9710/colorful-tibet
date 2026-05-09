@@ -7,7 +7,9 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Inter', 'Noto Sans SC', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+        sans: ['Noto Sans SC', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
+        display: ['Noto Serif SC', 'Noto Sans SC', 'serif'],
+        tibetan: ['Noto Sans Tibetan', 'Noto Sans SC', 'sans-serif'],
       },
       colors: {
         'tibet': {

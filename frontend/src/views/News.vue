@@ -132,7 +132,7 @@ const fetchNews = async () => {
   try {
     // API拦截器会自动添加locale参数，根据localStorage中的locale设置
     const response = await api.get(endpoints.news.list)
-    newsItems.value = response.data
+    newsItems.value = response.data?.content || response.data || []
   } catch (error) {
     console.error('Failed to fetch news:', error)
   } finally {

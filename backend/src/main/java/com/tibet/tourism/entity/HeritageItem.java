@@ -31,6 +31,9 @@ public class HeritageItem {
     @Column(columnDefinition = "TEXT")
     private String significance;
 
+    @Column(name = "baike_url", length = 512)
+    private String baikeUrl;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
@@ -118,6 +121,14 @@ public class HeritageItem {
 
     public void setSignificance(String significance) {
         this.significance = significance;
+    }
+
+    public String getBaikeUrl() {
+        return baikeUrl;
+    }
+
+    public void setBaikeUrl(String baikeUrl) {
+        this.baikeUrl = baikeUrl;
     }
 
     public LocalDateTime getCreatedAt() {

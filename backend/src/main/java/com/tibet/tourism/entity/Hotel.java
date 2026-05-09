@@ -1,11 +1,14 @@
 package com.tibet.tourism.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Entity
 @Table(name = "hotels")
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "roomTypes"})
 public class Hotel {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -21,6 +24,9 @@ public class Hotel {
 
     @Column(columnDefinition = "TEXT")
     private String facilities;
+
+    @OneToMany(mappedBy = "hotel", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<RoomType> roomTypes;
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;
@@ -94,6 +100,9 @@ public class Hotel {
     public void setFacilities(String facilities) {
         this.facilities = facilities;
     }
+
+    public List<RoomType> getRoomTypes() { return roomTypes; }
+    public void setRoomTypes(List<RoomType> roomTypes) { this.roomTypes = roomTypes; }
 
     public LocalDateTime getCreatedAt() {
         return createdAt;

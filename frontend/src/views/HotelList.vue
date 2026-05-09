@@ -37,6 +37,7 @@
           <option value="林芝">{{ t('hotel.city.nyingchi') }}</option>
           <option value="日喀则">{{ t('hotel.city.shigatse') }}</option>
           <option value="阿里">{{ t('hotel.city.ngari') }}</option>
+          <option value="那曲">{{ t('hotel.city.naqu') }}</option>
         </select>
         <select v-model="star" class="px-4 py-3 bg-tibet-white rounded-xl border-none outline-none focus:ring-2 focus:ring-tibet-red/20 transition-all text-tibet-dark cursor-pointer">
           <option value="">{{ t('hotel.allStars') }}</option>
@@ -122,7 +123,7 @@
                        :title="t('hotel.navigate')">
                       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                     </a>
-                    <router-link :to="`/hotels/${hotel.id}`" class="tibet-btn text-sm">{{ t('hotel.viewDetails') }}</router-link>
+                    <router-link :to="`/hotels/${hotel.id}`" class="tibet-btn text-sm">查看详情</router-link>
                   </div>
                 </div>
               </div>
@@ -149,26 +150,99 @@
 import { computed, ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { hotelsByRegion, hotelRegions, type HotelItem } from '../data/hotels'
+import api, { endpoints } from '../api'
 
 const { t } = useI18n()
 const keyword = ref('')
 const city = ref('')
 const star = ref('')
 
-const matchHotel = (hotel: HotelItem) =>
-  (!keyword.value || hotel.name.includes(keyword.value) || hotel.city.includes(keyword.value) || hotel.tags.some(tag => tag.includes(keyword.value))) &&
-  (!city.value || hotel.city === city.value) &&
-  (!star.value || hotel.stars === Number(star.value))
+// --- Merge API hotels into static data ---
+
+const resolveRegion = (location: string): string => {
+  for (const region of hotelRegions) {
+    if (location.includes(region)) return region
+  }
+  if (location.includes('那曲')) return '那曲'
+  return '拉萨'
+}
+
+const mapApiHotel = (apiHotel: any, idOffset: number): HotelItem => {
+  const region = resolveRegion(apiHotel.location || '')
+  const amenities = apiHotel.facilities
+    ? apiHotel.facilities.split(',').map((f: string) => f.trim()).filter(Boolean)
+    : []
+  let priceMin = 300
+  if (apiHotel.priceRange) {
+    const m = (apiHotel.priceRange as string).match(/(\d+)/)
+    if (m) priceMin = parseInt(m[1]) || 300
+  }
+
+  return {
+    id: apiHotel.id + idOffset,
+    region,
+    name: apiHotel.name,
+    city: region,
+    address: apiHotel.location || '西藏',
+    lng: 91.0,
+    lat: 29.6,
+    stars: Math.min(5, Math.max(3, Math.round(Number(apiHotel.rating) || 4))),
+    rating: Number(apiHotel.rating) || 4.0,
+    reviewCount: 0,
+    priceMin,
+    available: true,
+    tags: ['可预订'],
+    coverImage: apiHotel.imageUrl || '',
+    description: `${apiHotel.name}位于${apiHotel.location || '西藏'}，电话：${apiHotel.phone || '暂无'}`,
+    amenities,
+    rooms: [],
+  }
+}
+
+// Reactive deep copy of static data that we merge API hotels into
+const mergedByRegion = ref<Record<string, HotelItem[]>>(
+  JSON.parse(JSON.stringify(hotelsByRegion))
+)
+
+const staticNames = new Set(
+  Object.values(hotelsByRegion).flat().map(h => h.name)
+)
+
+onMounted(async () => {
+  try {
+    const res = await api.get(endpoints.hotels.list)
+    if (res.data && res.data.length > 0) {
+      const offset = 10000 // push API ids far above static range
+      for (const apiHotel of res.data) {
+        if (staticNames.has(apiHotel.name)) continue
+        const mapped = mapApiHotel(apiHotel, offset)
+        const region = mapped.region
+        if (!mergedByRegion.value[region]) {
+          mergedByRegion.value[region] = []
+        }
+        mergedByRegion.value[region].push(mapped)
+      }
+    }
+  } catch (_) { /* fallback to static data */ }
+  setTimeout(initScrollAnimations, 100)
+})
+
+// --- Filtering ---
 
 const hotelsByRegionVisible = computed(() =>
   hotelRegions
-    .map(region => ({ region, hotels: hotelsByRegion[region].filter(matchHotel) }))
+    .map(region => ({
+      region,
+      hotels: (mergedByRegion.value[region] || []).filter((h: HotelItem) =>
+        (!keyword.value || h.name.includes(keyword.value) || h.city.includes(keyword.value) || h.tags.some(tag => tag.includes(keyword.value))) &&
+        (!city.value || h.city === city.value) &&
+        (!star.value || h.stars === Number(star.value))
+      )
+    }))
     .filter(group => group.hotels.length > 0)
 )
 
-onMounted(() => {
-  setTimeout(initScrollAnimations, 100)
-})
+// --- Scroll animations ---
 
 const initScrollAnimations = () => {
   const observer = new IntersectionObserver(entries => {

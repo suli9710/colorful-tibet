@@ -25,7 +25,7 @@ export interface HotelItem {
   rooms: HotelRoom[]
 }
 
-export const hotelRegions = ['拉萨', '林芝', '日喀则', '阿里'] as const
+export const hotelRegions = ['拉萨', '林芝', '日喀则', '阿里', '那曲'] as const
 
 export const hotels: HotelItem[] = [
   // ===== 拉萨 4家 =====
@@ -43,7 +43,7 @@ export const hotels: HotelItem[] = [
     priceMin: 1280,
     available: true,
     tags: ['奢华', '布宫景观', '供氧'],
-    coverImage: 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?w=1200&q=80',
+    coverImage: '/images/hotels/hotel-lhasa-ruiji.jpg',
     description: '全球海拔最高的瑞吉酒店，步行可达八廓街与大昭寺，配备独立制氧机与24小时医务室，宝格丽备品、戴森吹风机，藏式博物馆设计。',
     amenities: ['免费Wi-Fi', '早餐', '制氧机', '停车场', '医务室'],
     rooms: [
@@ -66,7 +66,7 @@ export const hotels: HotelItem[] = [
     priceMin: 980,
     available: true,
     tags: ['国际品牌', '园林', '供氧'],
-    coverImage: 'https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=1200&q=80',
+    coverImage: '/images/hotels/hotel-lhasa-xianggelila.jpg',
     description: '毗邻罗布林卡与西藏博物馆，藏式园林风格，289间客房配备弥散式供氧系统，设有特色藏餐厅与庭院花园。',
     amenities: ['免费Wi-Fi', '早餐', '供氧', '泳池', '藏餐厅'],
     rooms: [
@@ -89,7 +89,7 @@ export const hotels: HotelItem[] = [
     priceMin: 680,
     available: true,
     tags: ['新开业', '藏式美学', '疗愈'],
-    coverImage: 'https://images.unsplash.com/photo-1445019980597-93fa8acb246c?w=1200&q=80',
+    coverImage: '/images/hotels/hotel-lhasa-interior.jpg',
     description: '2025年新开业，藏式极简美学设计，24小时管家服务，星空疗愈中心与颂钵音疗，全屋弥散供氧，可远眺布达拉宫。',
     amenities: ['免费Wi-Fi', '早餐', '供氧', '管家服务', '疗愈中心'],
     rooms: [
@@ -112,7 +112,7 @@ export const hotels: HotelItem[] = [
     priceMin: 350,
     available: true,
     tags: ['新开业', '商务', '性价比'],
-    coverImage: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=1200&q=80',
+    coverImage: '/images/hotels/hotel-luxury-1.jpg',
     description: '2025年新开业，华住集团旗下高端商务品牌，紧邻拉萨河畔与柳梧万达广场，免费供氧10小时，距拉萨站仅4.5公里。',
     amenities: ['免费Wi-Fi', '早餐', '供氧', '停车场', '健身房'],
     rooms: [
@@ -137,7 +137,7 @@ export const hotels: HotelItem[] = [
     priceMin: 220,
     available: true,
     tags: ['新开业', '市中心', '供氧'],
-    coverImage: 'https://images.unsplash.com/photo-1445019980597-93fa8acb246c?w=1200&q=80',
+    coverImage: '/images/hotels/hotel-nyingchi-hilton.jpg',
     description: '2025年新开业，市中心核心位置，全屋弥散式供氧系统，金可儿床垫，智能客控，推窗可见雪山云雾与尼洋河风光，120间客房。',
     amenities: ['免费Wi-Fi', '早餐', '供氧', '停车场', '智能客控'],
     rooms: [
@@ -160,7 +160,7 @@ export const hotels: HotelItem[] = [
     priceMin: 880,
     available: true,
     tags: ['国际品牌', '尼洋河景', '度假'],
-    coverImage: 'https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=1200&q=80',
+    coverImage: '/images/hotels/hotel-luxury-1.jpg',
     description: '国际全服务型奢华度假酒店，坐落于尼洋河西岸，比日神山环绕，360°全透明星空房，融合英式与藏式文化，距机场40分钟车程。',
     amenities: ['免费Wi-Fi', '早餐', '泳池', '停车场', '星空房'],
     rooms: [
@@ -183,7 +183,7 @@ export const hotels: HotelItem[] = [
     priceMin: 780,
     available: true,
     tags: ['鲁朗', '湖景别墅', '度假'],
-    coverImage: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=1200&q=80',
+    coverImage: '/images/hotels/hotel-lhasa-ruiji.jpg',
     description: '位于"东方小瑞士"鲁朗，扎塘鲁措湖畔独栋临湖别墅，开窗即见雪山与牧场，藏式风格与现代配置完美结合。',
     amenities: ['免费Wi-Fi', '早餐', '停车场', '观景台', '藏餐厅'],
     rooms: [
@@ -206,7 +206,7 @@ export const hotels: HotelItem[] = [
     priceMin: 140,
     available: true,
     tags: ['新开业', '景区', '高性价比'],
-    coverImage: 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?w=1200&q=80',
+    coverImage: '/images/hotels/hotel-naqu-caoyuan.jpg',
     description: '2025年新开业，紧邻尼洋河景区，免费停车与洗衣服务，机器人送物，推窗见雪山，性价比极高的舒适型住宿。',
     amenities: ['免费Wi-Fi', '停车场', '洗衣', '机器人服务'],
     rooms: [
@@ -231,7 +231,7 @@ export const hotels: HotelItem[] = [
     priceMin: 420,
     available: true,
     tags: ['新开业', '供氧', '智能客控'],
-    coverImage: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=1200&q=80',
+    coverImage: '/images/hotels/hotel-lhasa-xianggelila.jpg',
     description: '2025年新开业，107间客房，双模式供氧（全屋弥散+床头鼻吸），360°雪山青稞景观，全屋智能语音控制，距日喀则火车站约2.8公里。',
     amenities: ['免费Wi-Fi', '早餐', '供氧', '停车场', '充电桩'],
     rooms: [
@@ -254,7 +254,7 @@ export const hotels: HotelItem[] = [
     priceMin: 680,
     available: true,
     tags: ['藏文化', '豪华', '近扎寺'],
-    coverImage: 'https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=1200&q=80',
+    coverImage: '/images/hotels/hotel-shigatse-qiaomu.jpg',
     description: '藏文化主题豪华酒店，位于市区上海中路核心地段，邻近扎什伦布寺，藏式装饰风格浓郁，配套完善的高原度假设施。',
     amenities: ['免费Wi-Fi', '早餐', '供氧', '藏餐厅', '停车场'],
     rooms: [
@@ -277,7 +277,7 @@ export const hotels: HotelItem[] = [
     priceMin: 380,
     available: true,
     tags: ['市中心', '富氧', '近扎寺'],
-    coverImage: 'https://images.unsplash.com/photo-1445019980597-93fa8acb246c?w=1200&q=80',
+    coverImage: '/images/hotels/hotel-lhasa-interior.jpg',
     description: '位于珠峰路核心地段，步行可达扎什伦布寺，全富氧生态客房，地暖覆盖，适合高原旅途休整与文化探访。',
     amenities: ['免费Wi-Fi', '早餐', '供氧', '地暖', '停车场'],
     rooms: [
@@ -300,7 +300,7 @@ export const hotels: HotelItem[] = [
     priceMin: 260,
     available: true,
     tags: ['雪山景观', '供氧', '219国道'],
-    coverImage: 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?w=1200&q=80',
+    coverImage: '/images/hotels/hotel-ngari-wenquan.jpg',
     description: '2025年新开业，客房内可观世界第三高峰干城章嘉峰日照金山，配备空调+电热毯+制氧机，219国道沿线优质中转站。',
     amenities: ['免费Wi-Fi', '供氧', '电热毯', '停车场'],
     rooms: [
@@ -325,7 +325,7 @@ export const hotels: HotelItem[] = [
     priceMin: 560,
     available: true,
     tags: ['冈仁波齐', '朝圣', '供氧'],
-    coverImage: 'https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=1200&q=80',
+    coverImage: '/images/hotels/hotel-ngari-wenquan.jpg',
     description: '冈仁波齐神山区域内唯一四星级酒店，位于塔尔钦镇转山环线上，200间客房，提供中餐、藏餐与南亚风味餐饮，朝圣者的首选住宿。',
     amenities: ['免费Wi-Fi', '早餐', '供氧', '停车场', '餐厅'],
     rooms: [
@@ -348,7 +348,7 @@ export const hotels: HotelItem[] = [
     priceMin: 380,
     available: true,
     tags: ['新开业', '狮泉河', '商务'],
-    coverImage: 'https://images.unsplash.com/photo-1445019980597-93fa8acb246c?w=1200&q=80',
+    coverImage: '/images/hotels/hotel-luxury-1.jpg',
     description: '2025年新开业，位于阿里地区行政中心狮泉河镇核心地段，房间宽敞舒适，配备弥散式供氧，是阿里高原旅途中的品质中转站。',
     amenities: ['免费Wi-Fi', '早餐', '供氧', '停车场'],
     rooms: [
@@ -371,7 +371,7 @@ export const hotels: HotelItem[] = [
     priceMin: 320,
     available: true,
     tags: ['狮泉河', '舒适', '配套成熟'],
-    coverImage: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=1200&q=80',
+    coverImage: '/images/hotels/hotel-lhasa-interior.jpg',
     description: '紧邻狮泉河体育场，2022年开业，设施较新，配套成熟，是阿里地区较为可靠的住宿选择，适合自驾与商务出行。',
     amenities: ['免费Wi-Fi', '早餐', '供氧', '停车场'],
     rooms: [
@@ -394,7 +394,7 @@ export const hotels: HotelItem[] = [
     priceMin: 280,
     available: true,
     tags: ['札达土林', '古格遗址', '文化'],
-    coverImage: 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?w=1200&q=80',
+    coverImage: '/images/hotels/hotel-naqu-caoyuan.jpg',
     description: '位于札达县城中心，紧邻札达广场，是探访古格王朝遗址与札达土林国家地质公园的便捷住宿选择，藏式风情浓郁。',
     amenities: ['免费Wi-Fi', '早餐', '停车场', '藏式庭院'],
     rooms: [

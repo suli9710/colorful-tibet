@@ -1,8 +1,8 @@
 <template>
-  <div class="min-h-screen bg-apple-gray-50 py-24">
+  <div class="min-h-screen bg-tibet-white py-24">
     <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
       <div v-if="loading" class="text-center py-12">
-        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-apple-blue mx-auto"></div>
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-tibet-gold mx-auto"></div>
       </div>
       
       <div v-else-if="route" class="animate-fade-in">
@@ -26,8 +26,8 @@
         </div>
 
         <!-- Content -->
-        <div class="glass rounded-3xl p-8 mb-8">
-          <div class="prose prose-lg max-w-none prose-headings:text-apple-gray-900 prose-p:text-apple-gray-600 prose-strong:text-apple-blue">
+        <div class="glass-card rounded-3xl p-8 mb-8">
+          <div class="prose prose-lg max-w-none prose-headings:text-tibet-dark prose-p:text-tibet-brown/80 prose-strong:text-tibet-gold">
             <div v-html="renderedContent"></div>
           </div>
         </div>
@@ -37,20 +37,20 @@
           <button 
             @click="toggleLike" 
             class="flex items-center gap-2 px-6 py-3 rounded-full transition-all duration-300 shadow-sm hover:shadow-md"
-            :class="isLiked ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'"
+            :class="isLiked ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-white text-gray-600 border border-tibet-gold/25 hover:bg-gray-50'"
           >
             <span class="text-xl">{{ isLiked ? '❤️' : '🤍' }}</span>
             <span class="font-medium">{{ route.likeCount }}</span>
           </button>
           
-          <div class="flex items-center gap-2 px-6 py-3 bg-white text-gray-600 rounded-full border border-gray-200 shadow-sm">
+          <div class="flex items-center gap-2 px-6 py-3 bg-white text-gray-600 rounded-full border border-tibet-gold/25 shadow-sm">
             <span class="text-xl">👁️</span>
             <span class="font-medium">{{ route.viewCount }}</span>
           </div>
         </div>
 
         <!-- Comments -->
-        <div class="glass rounded-3xl p-8">
+        <div class="glass-card rounded-3xl p-8">
           <h3 class="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
             {{ t('routeDetail.comments') }} <span class="text-sm font-normal text-gray-500">({{ comments.length }})</span>
           </h3>
@@ -60,14 +60,14 @@
             <textarea 
               v-model="newComment" 
               rows="3"
-              class="w-full px-4 py-3 rounded-xl bg-white/50 border border-gray-200 focus:border-apple-blue outline-none transition-all resize-none mb-4"
+              class="w-full px-4 py-3 rounded-xl bg-white/50 border border-tibet-gold/25 focus:border-tibet-gold outline-none transition-all resize-none mb-4"
               :placeholder="t('routeDetail.commentPlaceholder')"
             ></textarea>
             <div class="flex justify-end">
               <button 
                 @click="submitComment" 
                 :disabled="!newComment.trim() || submitting"
-                class="px-6 py-2 bg-apple-blue text-white rounded-xl hover:bg-apple-blue-hover transition-colors disabled:opacity-50"
+                class="px-6 py-2 bg-tibet-gold text-white rounded-xl hover:bg-tibet-gold/80 transition-colors disabled:opacity-50"
               >
                 {{ submitting ? t('routeDetail.submitting') : t('routeDetail.postComment') }}
               </button>
@@ -76,7 +76,7 @@
           
           <!-- Comment List -->
           <div class="space-y-6">
-            <div v-for="comment in comments" :key="comment.id" class="border-b border-gray-100 last:border-0 pb-6 last:pb-0">
+            <div v-for="comment in comments" :key="comment.id" class="border-b border-tibet-gold/20 last:border-0 pb-6 last:pb-0">
               <div class="flex justify-between items-start mb-2">
                 <span class="font-medium text-gray-900">{{ comment.user?.username || t('routeDetail.anonymous') }}</span>
                 <span class="text-xs text-gray-500">{{ formatDate(comment.createdAt) }}</span>

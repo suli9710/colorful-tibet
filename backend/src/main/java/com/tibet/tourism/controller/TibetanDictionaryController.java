@@ -18,7 +18,6 @@ import java.util.Optional;
  */
 @RestController
 @RequestMapping("/api/admin/tibetan-dictionary")
-@CrossOrigin(origins = "*")
 public class TibetanDictionaryController {
 
     @Autowired

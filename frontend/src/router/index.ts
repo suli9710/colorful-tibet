@@ -50,6 +50,11 @@ const router = createRouter({
             component: () => import('../views/RouteCommunity.vue')
         },
         {
+            path: '/community/question/:id',
+            name: 'question-detail',
+            component: () => import('../views/QuestionDetail.vue')
+        },
+        {
             path: '/community/:id',
             name: 'route-detail',
             component: () => import('../views/RouteDetail.vue')
@@ -88,6 +93,12 @@ const router = createRouter({
             path: '/hotel-booking/:id',
             name: 'hotel-booking',
             component: () => import('../views/HotelBooking.vue'),
+            meta: { requiresAuth: true }
+        },
+        {
+            path: '/favorites',
+            name: 'favorites',
+            component: () => import('../views/Favorites.vue'),
             meta: { requiresAuth: true }
         },
         {

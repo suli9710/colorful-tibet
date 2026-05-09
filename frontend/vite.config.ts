@@ -29,6 +29,16 @@ export default defineConfig({
     outDir: 'dist',
     sourcemap: false,
     minify: 'esbuild',
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'echarts': ['echarts'],
+          'leaflet': ['leaflet'],
+          'vendor': ['vue', 'vue-router', 'pinia'],
+          'ui': ['lucide-vue-next'],
+        },
+      },
+    },
   },
   css: {
     postcss: './postcss.config.js',

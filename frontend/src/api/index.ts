@@ -8,30 +8,63 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' }
 })
 
-const getStoredToken = () => {
+// Module-level memoization to avoid localStorage reads on every request
+let memoizedToken: string | null = null
+let tokenMemoExpiry = 0
+
+let memoizedLocale: string = localStorage.getItem('locale') || 'zh'
+
+export const updateMemoizedLocale = (locale: string) => {
+  memoizedLocale = locale
+  localStorage.setItem('locale', locale)
+}
+
+export const clearTokenCache = () => {
+  memoizedToken = null
+  tokenMemoExpiry = 0
+}
+
+const getToken = (): string => {
+  const now = Date.now()
+  if (now < tokenMemoExpiry && memoizedToken !== null) {
+    return memoizedToken
+  }
+
   const token = localStorage.getItem('token')
-  if (token) return token
+  if (token) {
+    memoizedToken = token
+    tokenMemoExpiry = now + 60_000
+    return token
+  }
 
   const userStr = localStorage.getItem('user')
-  if (!userStr) return ''
+  if (!userStr) {
+    memoizedToken = ''
+    tokenMemoExpiry = now + 60_000
+    return ''
+  }
 
   try {
     const user = JSON.parse(userStr)
-    return user?.token || user?.accessToken || user?.jwt || user?.data?.token || user?.data?.accessToken || ''
+    const resolved = user?.token || user?.accessToken || user?.jwt || user?.data?.token || user?.data?.accessToken || ''
+    memoizedToken = resolved
+    tokenMemoExpiry = now + 60_000
+    return resolved
   } catch {
+    memoizedToken = ''
+    tokenMemoExpiry = now + 60_000
     return ''
   }
 }
 
 api.interceptors.request.use(config => {
-  const token = getStoredToken()
+  const token = getToken()
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
-    localStorage.setItem('token', token)
   }
 
   if (config.method?.toLowerCase() === 'get') {
-    config.params = { ...(config.params || {}), locale: localStorage.getItem('locale') || 'zh' }
+    config.params = { ...(config.params || {}), locale: memoizedLocale }
   }
 
   if (config.data instanceof FormData) {
@@ -46,6 +79,14 @@ api.interceptors.response.use(
     if (error.response && error.response.status === 401) {
       const method = String(error.config?.method || '').toLowerCase()
       const requestUrl = String(error.config?.url || '')
+      console.error(`[401] ${method.toUpperCase()} ${requestUrl}`, error.response.data)
+
+      // 对于 /admin 路径的请求，不自动跳转，由各页面自己处理
+      const isAdminRequest = requestUrl.includes('/admin')
+      if (isAdminRequest) {
+        return Promise.reject(error)
+      }
+
       const isBookingCreate = method === 'post' && requestUrl.includes('/bookings')
       const isAiRouteGenerate = method === 'post' && requestUrl.includes('/routes/generate')
       const isRouteShare = method === 'post' && requestUrl.includes('/routes/share')
@@ -55,6 +96,7 @@ api.interceptors.response.use(
         if (currentPath !== '/login') {
           localStorage.removeItem('user')
           localStorage.removeItem('token')
+          clearTokenCache()
           window.dispatchEvent(new CustomEvent('auth-expired'))
           if (!window.location.pathname.startsWith('/login')) {
             window.location.href = '/login'
@@ -109,7 +151,8 @@ export const endpoints = {
     list: '/news'
   },
   heritage: {
-    list: '/heritage'
+    list: '/heritage',
+    detail: (id: number) => `/heritage/${id}`
   },
   admin: {
     stats: '/admin/stats',
@@ -125,17 +168,51 @@ export const endpoints = {
     updateNews: (id: number) => `/admin/news/${id}`,
     deleteNews: (id: number) => `/admin/news/${id}`
   },
+  carousels: {
+    list: '/carousels',
+    adminList: '/admin/carousels',
+    adminCreate: '/admin/carousels',
+    adminUpdate: (id: number) => `/admin/carousels/${id}`,
+    adminDelete: (id: number) => `/admin/carousels/${id}`
+  },
+  favorites: {
+    list: '/favorites',
+    add: (routeId: number) => `/favorites/${routeId}`,
+    remove: (routeId: number) => `/favorites/${routeId}`,
+    status: (routeId: number) => `/favorites/${routeId}/status`
+  },
   bookings: {
     create: '/bookings',
     my: '/bookings/my',
     cancel: (id: number) => `/bookings/${id}/cancel`
   },
+  hotels: {
+    list: '/hotel-bookings/hotels',
+    detail: (id: number) => `/hotel-bookings/hotels/${id}`,
+    roomTypes: (hotelId: number) => `/hotel-bookings/room-types/${hotelId}`
+  },
   hotelBookings: {
     create: '/hotel-bookings',
     my: '/hotel-bookings/my',
     all: '/hotel-bookings',
+    roomTypes: (hotelId: number) => `/hotel-bookings/room-types/${hotelId}`,
     updateStatus: (id: number) => `/hotel-bookings/${id}/status`,
     cancel: (id: number) => `/hotel-bookings/${id}`
+  },
+  adminRoutes: {
+    list: '/admin/routes',
+    create: '/admin/routes',
+    update: (id: number) => `/admin/routes/${id}`,
+    delete: (id: number) => `/admin/routes/${id}`
+  },
+  adminHotels: {
+    list: '/admin/hotels',
+    create: '/admin/hotels',
+    update: (id: number) => `/admin/hotels/${id}`,
+    delete: (id: number) => `/admin/hotels/${id}`,
+    roomTypes: (hotelId: number) => `/admin/hotels/${hotelId}/room-types`,
+    updateRoomType: (id: number) => `/admin/room-types/${id}`,
+    deleteRoomType: (id: number) => `/admin/room-types/${id}`
   },
   comments: {
     list: (spotId: number) => `/comments/spot/${spotId}`,

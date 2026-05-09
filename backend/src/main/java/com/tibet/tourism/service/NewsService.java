@@ -3,6 +3,8 @@ package com.tibet.tourism.service;
 import com.tibet.tourism.entity.News;
 import com.tibet.tourism.repository.NewsRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,6 +19,10 @@ public class NewsService {
 
     public List<News> getAllNews() {
         return newsRepository.findAll();
+    }
+
+    public Page<News> getAllNews(Pageable pageable) {
+        return newsRepository.findAll(pageable);
     }
 
     public News createNews(@NonNull News news) {

@@ -9,7 +9,12 @@ import com.tibet.tourism.service.CompanionInferenceService;
 import com.tibet.tourism.service.ItemBasedRecommendationService;
 import com.tibet.tourism.service.RecommendationService;
 import com.tibet.tourism.service.ScenicSpotService;
+import com.tibet.tourism.util.LocaleHelper;
+import com.tibet.tourism.util.RecommendationContextBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -17,7 +22,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/spots")
-@CrossOrigin(origins = "*")
 public class ScenicSpotController {
 
     @Autowired
@@ -36,59 +40,35 @@ public class ScenicSpotController {
     private ColdStartOptimizationService coldStartOptimizationService;
 
     @GetMapping
-    public List<ScenicSpot> getAllSpots(
+    public Page<ScenicSpot> getAllSpots(
             @RequestParam(required = false) String category,
-            @RequestParam(required = false, defaultValue = "zh") String locale) {
-        List<ScenicSpot> spots;
+            @RequestParam(required = false, defaultValue = "zh") String locale,
+            @PageableDefault(size = 20) Pageable pageable) {
+        Page<ScenicSpot> spots;
         if (category != null) {
-            spots = scenicSpotService.getSpotsByCategory(ScenicSpot.Category.valueOf(category.toUpperCase()));
+            spots = scenicSpotService.getSpotsByCategory(ScenicSpot.Category.valueOf(category.toUpperCase()), pageable);
         } else {
-            spots = scenicSpotService.getAllSpots();
+            spots = scenicSpotService.getAllSpots(pageable);
         }
-        
-        // 根据语言设置返回相应的字段
-        if ("bo".equals(locale)) {
-            spots.forEach(spot -> {
-                if (spot.getNameTibetan() != null && !spot.getNameTibetan().isEmpty()) {
-                    spot.setName(spot.getNameTibetan());
-                }
-                if (spot.getDescriptionTibetan() != null && !spot.getDescriptionTibetan().isEmpty()) {
-                    spot.setDescription(spot.getDescriptionTibetan());
-                }
-            });
-        }
+
+        spots.forEach(spot -> LocaleHelper.resolveScenicSpotLocale(spot, locale));
         return spots;
     }
 
     @GetMapping("/{id}")
     public ScenicSpot getSpotById(@PathVariable Long id, @RequestParam(required = false, defaultValue = "zh") String locale) {
         ScenicSpot spot = scenicSpotService.getSpotById(id);
-        if (spot != null && "bo".equals(locale)) {
-            if (spot.getNameTibetan() != null && !spot.getNameTibetan().isEmpty()) {
-                spot.setName(spot.getNameTibetan());
-            }
-            if (spot.getDescriptionTibetan() != null && !spot.getDescriptionTibetan().isEmpty()) {
-                spot.setDescription(spot.getDescriptionTibetan());
-            }
-        }
+        LocaleHelper.resolveScenicSpotLocale(spot, locale);
         return spot;
     }
 
     @GetMapping("/search")
-    public List<ScenicSpot> searchSpots(
+    public Page<ScenicSpot> searchSpots(
             @RequestParam String keyword,
-            @RequestParam(required = false, defaultValue = "zh") String locale) {
-        List<ScenicSpot> spots = scenicSpotService.searchSpots(keyword);
-        if ("bo".equals(locale)) {
-            spots.forEach(spot -> {
-                if (spot.getNameTibetan() != null && !spot.getNameTibetan().isEmpty()) {
-                    spot.setName(spot.getNameTibetan());
-                }
-                if (spot.getDescriptionTibetan() != null && !spot.getDescriptionTibetan().isEmpty()) {
-                    spot.setDescription(spot.getDescriptionTibetan());
-                }
-            });
-        }
+            @RequestParam(required = false, defaultValue = "zh") String locale,
+            @PageableDefault(size = 20) Pageable pageable) {
+        Page<ScenicSpot> spots = scenicSpotService.searchSpots(keyword, pageable);
+        spots.forEach(spot -> LocaleHelper.resolveScenicSpotLocale(spot, locale));
         return spots;
     }
 
@@ -110,38 +90,13 @@ public class ScenicSpotController {
             @RequestParam(required = false, defaultValue = "true") Boolean considerDistance,
             @RequestParam(required = false, defaultValue = "true") Boolean considerBudget) {
         
-        // 构建上下文对象
-        RecommendationContext context = null;
-        if (season != null || weather != null || currentLocation != null || 
-            currentLatitude != null || currentLongitude != null || 
-            timeOfDay != null || companion != null || budget != null || 
-            travelDays != null || preferredActivities != null) {
-            context = new RecommendationContext();
-            context.setSeason(season);
-            context.setWeather(weather);
-            context.setCurrentLocation(currentLocation);
-            context.setCurrentLatitude(currentLatitude);
-            context.setCurrentLongitude(currentLongitude);
-            context.setTimeOfDay(timeOfDay);
-            context.setCompanion(companion);
-            context.setBudget(budget);
-            context.setTravelDays(travelDays);
-            context.setPreferredActivities(preferredActivities);
-            context.setConsiderDistance(considerDistance);
-            context.setConsiderBudget(considerBudget);
-        }
+        RecommendationContext context = RecommendationContextBuilder.buildFromParams(
+                season, weather, currentLocation, currentLatitude, currentLongitude,
+                timeOfDay, companion, budget, travelDays, preferredActivities,
+                considerDistance, considerBudget);
         
         List<ScenicSpot> spots = recommendationService.recommendSpotsForUser(userId, context);
-        if ("bo".equals(locale)) {
-            spots.forEach(spot -> {
-                if (spot.getNameTibetan() != null && !spot.getNameTibetan().isEmpty()) {
-                    spot.setName(spot.getNameTibetan());
-                }
-                if (spot.getDescriptionTibetan() != null && !spot.getDescriptionTibetan().isEmpty()) {
-                    spot.setDescription(spot.getDescriptionTibetan());
-                }
-            });
-        }
+        spots.forEach(spot -> LocaleHelper.resolveScenicSpotLocale(spot, locale));
         return spots;
     }
     
@@ -152,16 +107,7 @@ public class ScenicSpotController {
             @RequestBody(required = false) RecommendationContext context) {
         
         List<ScenicSpot> spots = recommendationService.recommendSpotsForUser(userId, context);
-        if ("bo".equals(locale)) {
-            spots.forEach(spot -> {
-                if (spot.getNameTibetan() != null && !spot.getNameTibetan().isEmpty()) {
-                    spot.setName(spot.getNameTibetan());
-                }
-                if (spot.getDescriptionTibetan() != null && !spot.getDescriptionTibetan().isEmpty()) {
-                    spot.setDescription(spot.getDescriptionTibetan());
-                }
-            });
-        }
+        spots.forEach(spot -> LocaleHelper.resolveScenicSpotLocale(spot, locale));
         return spots;
     }
 
@@ -183,57 +129,27 @@ public class ScenicSpotController {
             @RequestParam(required = false, defaultValue = "true") Boolean considerDistance,
             @RequestParam(required = false, defaultValue = "true") Boolean considerBudget) {
         
-        // 构建上下文对象
-        RecommendationContext context = null;
-        if (season != null || weather != null || currentLocation != null || 
-            currentLatitude != null || currentLongitude != null || 
-            timeOfDay != null || companion != null || budget != null || 
-            travelDays != null || preferredActivities != null) {
-            context = new RecommendationContext();
-            context.setSeason(season);
-            context.setWeather(weather);
-            context.setCurrentLocation(currentLocation);
-            context.setCurrentLatitude(currentLatitude);
-            context.setCurrentLongitude(currentLongitude);
-            context.setTimeOfDay(timeOfDay);
-            context.setCompanion(companion);
-            context.setBudget(budget);
-            context.setTravelDays(travelDays);
-            context.setPreferredActivities(preferredActivities);
-            context.setConsiderDistance(considerDistance);
-            context.setConsiderBudget(considerBudget);
-        }
+        RecommendationContext context = RecommendationContextBuilder.buildFromParams(
+                season, weather, currentLocation, currentLatitude, currentLongitude,
+                timeOfDay, companion, budget, travelDays, preferredActivities,
+                considerDistance, considerBudget);
         
         RecommendationDebugResponse response = recommendationService.recommendWithDebug(userId, context);
-        if ("bo".equals(locale) && response.getRecommendations() != null) {
-            response.getRecommendations().forEach(spot -> {
-                if (spot.getNameTibetan() != null && !spot.getNameTibetan().isEmpty()) {
-                    spot.setName(spot.getNameTibetan());
-                }
-                if (spot.getDescriptionTibetan() != null && !spot.getDescriptionTibetan().isEmpty()) {
-                    spot.setDescription(spot.getDescriptionTibetan());
-                }
-            });
+        if (response.getRecommendations() != null) {
+            response.getRecommendations().forEach(spot -> LocaleHelper.resolveScenicSpotLocale(spot, locale));
         }
         return response;
     }
-    
+
     @PostMapping("/recommendations/debug")
     public RecommendationDebugResponse getRecommendationDebugWithContext(
             @RequestParam Long userId,
             @RequestParam(required = false, defaultValue = "zh") String locale,
             @RequestBody(required = false) RecommendationContext context) {
-        
+
         RecommendationDebugResponse response = recommendationService.recommendWithDebug(userId, context);
-        if ("bo".equals(locale) && response.getRecommendations() != null) {
-            response.getRecommendations().forEach(spot -> {
-                if (spot.getNameTibetan() != null && !spot.getNameTibetan().isEmpty()) {
-                    spot.setName(spot.getNameTibetan());
-                }
-                if (spot.getDescriptionTibetan() != null && !spot.getDescriptionTibetan().isEmpty()) {
-                    spot.setDescription(spot.getDescriptionTibetan());
-                }
-            });
+        if (response.getRecommendations() != null) {
+            response.getRecommendations().forEach(spot -> LocaleHelper.resolveScenicSpotLocale(spot, locale));
         }
         return response;
     }
@@ -310,21 +226,10 @@ public class ScenicSpotController {
             recommendations = coldStartOptimizationService.recommendForNewUserByAttributes(userId);
         }
         
-        // 根据语言设置返回相应的字段
-        if ("bo".equals(locale)) {
-            recommendations.forEach(spot -> {
-                if (spot.getNameTibetan() != null && !spot.getNameTibetan().isEmpty()) {
-                    spot.setName(spot.getNameTibetan());
-                }
-                if (spot.getDescriptionTibetan() != null && !spot.getDescriptionTibetan().isEmpty()) {
-                    spot.setDescription(spot.getDescriptionTibetan());
-                }
-            });
-        }
-        
+        recommendations.forEach(spot -> LocaleHelper.resolveScenicSpotLocale(spot, locale));
         return recommendations;
     }
-    
+
     /**
      * 基于位置的冷启动推荐
      */
@@ -335,22 +240,10 @@ public class ScenicSpotController {
             @RequestParam Double longitude,
             @RequestParam(required = false, defaultValue = "50.0") Double maxDistanceKm,
             @RequestParam(required = false, defaultValue = "zh") String locale) {
-        
+
         List<ScenicSpot> recommendations = coldStartOptimizationService
                 .recommendForNewUserByLocation(latitude, longitude, maxDistanceKm);
-        
-        // 根据语言设置返回相应的字段
-        if ("bo".equals(locale)) {
-            recommendations.forEach(spot -> {
-                if (spot.getNameTibetan() != null && !spot.getNameTibetan().isEmpty()) {
-                    spot.setName(spot.getNameTibetan());
-                }
-                if (spot.getDescriptionTibetan() != null && !spot.getDescriptionTibetan().isEmpty()) {
-                    spot.setDescription(spot.getDescriptionTibetan());
-                }
-            });
-        }
-        
+        recommendations.forEach(spot -> LocaleHelper.resolveScenicSpotLocale(spot, locale));
         return recommendations;
     }
     

@@ -12,7 +12,6 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @RestController
 @RequestMapping("/api/routes")
-@CrossOrigin(origins = "*")
 public class AiRouteController {
 
     private final AiRouteService aiRouteService;

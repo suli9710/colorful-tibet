@@ -89,7 +89,14 @@ export async function generateRouteStream(
               break
             case 'delta':
               if (event.text) {
-                fullText += event.text
+                // Handle both incremental and cumulative deltas from different API formats.
+                // If the incoming text starts with what we already have, it's cumulative —
+                // replace instead of append to avoid duplication.
+                if (fullText && event.text.startsWith(fullText)) {
+                  fullText = event.text
+                } else {
+                  fullText += event.text
+                }
                 callbacks.onDelta?.(event.text)
               }
               break

@@ -1,5 +1,6 @@
 package com.tibet.tourism.controller;
 
+import com.tibet.tourism.dto.CommentDTO;
 import com.tibet.tourism.entity.Comment;
 import com.tibet.tourism.entity.CommentLike;
 import com.tibet.tourism.entity.ScenicSpot;
@@ -10,6 +11,9 @@ import com.tibet.tourism.repository.ScenicSpotRepository;
 import com.tibet.tourism.repository.UserRepository;
 import com.tibet.tourism.service.FileStorageService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
@@ -21,7 +25,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/comments")
-@CrossOrigin(origins = "*")
 public class CommentController {
 
     @Autowired
@@ -40,8 +43,11 @@ public class CommentController {
     private FileStorageService fileStorageService;
 
     @GetMapping("/spot/{spotId}")
-    public List<Comment> getCommentsBySpot(@PathVariable long spotId) {
-        return commentRepository.findBySpotIdOrderByCreatedAtDesc(spotId);
+    public Page<CommentDTO> getCommentsBySpot(
+            @PathVariable long spotId,
+            @PageableDefault(size = 20) Pageable pageable) {
+        return commentRepository.findBySpotIdOrderByCreatedAtDesc(spotId, pageable)
+                .map(CommentDTO::fromEntity);
     }
 
     @PostMapping

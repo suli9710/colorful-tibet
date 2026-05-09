@@ -119,7 +119,7 @@ const fetchBookings = async () => {
 const fetchHotelBookings = async () => {
   try {
     const response = await api.get(endpoints.hotelBookings.my)
-    hotelBookings.value = response.data || []
+    hotelBookings.value = response.data?.content || response.data || []
   } catch (e) {
     console.error('Failed to fetch hotel bookings:', e)
     hotelBookings.value = []
@@ -315,17 +315,17 @@ const getAvatarUrl = () => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-apple-gray-50">
+  <div class="min-h-screen bg-tibet-white">
     <NavBar />
     
     <main class="max-w-7xl mx-auto px-4 py-8 mt-24">
       <!-- User Info Card -->
-      <div class="glass rounded-3xl p-8 mb-8 animate-slide-up shadow-xl border border-white/50">
+      <div class="glass-card rounded-3xl p-8 mb-8 animate-slide-up shadow-xl border border-white/50">
         <div class="flex flex-col md:flex-row items-center md:items-start gap-6">
           <div class="relative group">
             <div 
               @click="handleAvatarClick"
-              class="w-24 h-24 rounded-full flex items-center justify-center text-3xl text-white font-bold shadow-lg cursor-pointer overflow-hidden transition-all hover:ring-4 hover:ring-apple-blue/50"
+              class="w-24 h-24 rounded-full flex items-center justify-center text-3xl text-white font-bold shadow-lg cursor-pointer overflow-hidden transition-all hover:ring-4 hover:ring-tibet-gold/60/50"
               :class="getAvatarUrl() ? '' : 'bg-gradient-to-br from-blue-500 to-purple-600'"
             >
               <img 
@@ -355,12 +355,12 @@ const getAvatarUrl = () => {
           </div>
           <div class="flex-1 text-center md:text-left">
             <div class="flex items-center justify-center md:justify-start gap-2 mb-2">
-              <h1 class="text-3xl font-bold text-apple-gray-900">
+              <h1 class="text-3xl font-bold text-tibet-dark">
                 {{ userInfo?.nickname || userInfo?.username || user?.username }}
               </h1>
               <button 
                 @click="openNicknameModal"
-                class="text-apple-gray-500 hover:text-apple-blue transition-colors"
+                class="text-tibet-brown/70 hover:text-tibet-gold transition-colors"
                 :title="t('profile.editNickname')"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -368,24 +368,24 @@ const getAvatarUrl = () => {
                 </svg>
               </button>
             </div>
-            <p class="text-apple-gray-500 mb-4">
+            <p class="text-tibet-brown/70 mb-4">
               {{ userInfo?.role === 'ADMIN' ? t('profile.admin') : t('profile.member') }} · 
               {{ t('profile.registeredAt') }} {{ userInfo?.createdAt ? formatDate(userInfo.createdAt) : '' }}
             </p>
             <div class="flex flex-wrap gap-4 justify-center md:justify-start mb-4">
               <div class="flex items-center gap-2 px-4 py-2 bg-white/50 rounded-xl">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-apple-blue" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-tibet-gold" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
                 </svg>
-                <span class="text-sm font-medium text-apple-gray-700">
-                  <span class="text-apple-blue font-bold">{{ stats?.routeCount || 0 }}</span> {{ t('profile.routesCount') }}
+                <span class="text-sm font-medium text-tibet-dark/80">
+                  <span class="text-tibet-gold font-bold">{{ stats?.routeCount || 0 }}</span> {{ t('profile.routesCount') }}
                 </span>
               </div>
               <div class="flex items-center gap-2 px-4 py-2 bg-white/50 rounded-xl">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                 </svg>
-                <span class="text-sm font-medium text-apple-gray-700">
+                <span class="text-sm font-medium text-tibet-dark/80">
                   <span class="text-green-500 font-bold">{{ stats?.commentCount || 0 }}</span> {{ t('profile.commentsCount') }}
                 </span>
               </div>
@@ -393,14 +393,14 @@ const getAvatarUrl = () => {
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                 </svg>
-                <span class="text-sm font-medium text-apple-gray-700">
+                <span class="text-sm font-medium text-tibet-dark/80">
                   <span class="text-orange-500 font-bold">{{ stats?.bookingCount || 0 }}</span> {{ t('profile.bookingsCount') }}
                 </span>
               </div>
             </div>
             <button 
               @click="showPasswordModal = true"
-              class="px-4 py-2 bg-apple-blue hover:bg-apple-blue-hover text-white rounded-xl transition-colors text-sm font-medium"
+              class="px-4 py-2 bg-tibet-gold hover:bg-tibet-gold/80 text-white rounded-xl transition-colors text-sm font-medium"
             >
               {{ t('profile.changePassword') }}
             </button>
@@ -411,16 +411,16 @@ const getAvatarUrl = () => {
       <!-- Nickname Edit Modal -->
       <div v-if="showNicknameModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="showNicknameModal = false">
         <div class="glass rounded-3xl p-8 max-w-md w-full mx-4 shadow-2xl border border-white/50">
-          <h2 class="text-2xl font-bold text-apple-gray-900 mb-6">{{ t('profile.editNickname') }}</h2>
+          <h2 class="text-2xl font-bold text-tibet-dark mb-6">{{ t('profile.editNickname') }}</h2>
           <form @submit.prevent="updateNickname" class="space-y-4">
             <div>
-              <label class="block text-sm font-medium text-apple-gray-700 mb-2">{{ t('profile.nickname') }}</label>
+              <label class="block text-sm font-medium text-tibet-dark/80 mb-2">{{ t('profile.nickname') }}</label>
               <input 
                 v-model="nicknameForm.nickname" 
                 type="text" 
                 required
                 maxlength="20"
-                class="w-full px-4 py-2 rounded-xl bg-white/50 border border-gray-200 focus:border-apple-blue focus:ring-2 focus:ring-blue-100 outline-none"
+                class="w-full px-4 py-2 rounded-xl bg-white/50 border border-tibet-gold/25 focus:border-tibet-gold focus:ring-2 focus:ring-blue-100 outline-none"
                 :placeholder="t('profile.nicknamePlaceholder')"
               />
               <p class="mt-1 text-xs text-gray-500">{{ nicknameForm.nickname.length }}/20</p>
@@ -429,14 +429,14 @@ const getAvatarUrl = () => {
               <button 
                 type="button"
                 @click="showNicknameModal = false"
-                class="flex-1 px-4 py-2 rounded-xl border border-gray-200 hover:bg-gray-50 text-gray-700 font-medium transition-colors"
+                class="flex-1 px-4 py-2 rounded-xl border border-tibet-gold/25 hover:bg-gray-50 text-gray-700 font-medium transition-colors"
               >
                 {{ t('profile.cancel') }}
               </button>
               <button 
                 type="submit"
                 :disabled="updatingNickname"
-                class="flex-1 px-4 py-2 rounded-xl bg-apple-blue hover:bg-apple-blue-hover text-white font-medium transition-colors disabled:opacity-50"
+                class="flex-1 px-4 py-2 rounded-xl bg-tibet-gold hover:bg-tibet-gold/80 text-white font-medium transition-colors disabled:opacity-50"
               >
                 {{ updatingNickname ? t('profile.updating') : t('profile.confirmUpdate') }}
               </button>
@@ -448,35 +448,35 @@ const getAvatarUrl = () => {
       <!-- Password Change Modal -->
       <div v-if="showPasswordModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="showPasswordModal = false">
         <div class="glass rounded-3xl p-8 max-w-md w-full mx-4 shadow-2xl border border-white/50">
-          <h2 class="text-2xl font-bold text-apple-gray-900 mb-6">{{ t('profile.changePassword') }}</h2>
+          <h2 class="text-2xl font-bold text-tibet-dark mb-6">{{ t('profile.changePassword') }}</h2>
           <form @submit.prevent="changePassword" class="space-y-4">
             <div>
-              <label class="block text-sm font-medium text-apple-gray-700 mb-2">{{ t('profile.currentPassword') }}</label>
+              <label class="block text-sm font-medium text-tibet-dark/80 mb-2">{{ t('profile.currentPassword') }}</label>
               <input 
                 v-model="passwordForm.oldPassword" 
                 type="password" 
                 required
-                class="w-full px-4 py-2 rounded-xl bg-white/50 border border-gray-200 focus:border-apple-blue focus:ring-2 focus:ring-blue-100 outline-none"
+                class="w-full px-4 py-2 rounded-xl bg-white/50 border border-tibet-gold/25 focus:border-tibet-gold focus:ring-2 focus:ring-blue-100 outline-none"
                 :placeholder="t('profile.currentPasswordPlaceholder')"
               />
             </div>
             <div>
-              <label class="block text-sm font-medium text-apple-gray-700 mb-2">{{ t('profile.newPassword') }}</label>
+              <label class="block text-sm font-medium text-tibet-dark/80 mb-2">{{ t('profile.newPassword') }}</label>
               <input 
                 v-model="passwordForm.newPassword" 
                 type="password" 
                 required
-                class="w-full px-4 py-2 rounded-xl bg-white/50 border border-gray-200 focus:border-apple-blue focus:ring-2 focus:ring-blue-100 outline-none"
+                class="w-full px-4 py-2 rounded-xl bg-white/50 border border-tibet-gold/25 focus:border-tibet-gold focus:ring-2 focus:ring-blue-100 outline-none"
                 :placeholder="t('profile.newPasswordPlaceholder')"
               />
             </div>
             <div>
-              <label class="block text-sm font-medium text-apple-gray-700 mb-2">{{ t('profile.confirmNewPassword') }}</label>
+              <label class="block text-sm font-medium text-tibet-dark/80 mb-2">{{ t('profile.confirmNewPassword') }}</label>
               <input 
                 v-model="passwordForm.confirmPassword" 
                 type="password" 
                 required
-                class="w-full px-4 py-2 rounded-xl bg-white/50 border border-gray-200 focus:border-apple-blue focus:ring-2 focus:ring-blue-100 outline-none"
+                class="w-full px-4 py-2 rounded-xl bg-white/50 border border-tibet-gold/25 focus:border-tibet-gold focus:ring-2 focus:ring-blue-100 outline-none"
                 :placeholder="t('profile.confirmNewPasswordPlaceholder')"
               />
             </div>
@@ -484,14 +484,14 @@ const getAvatarUrl = () => {
               <button 
                 type="button"
                 @click="showPasswordModal = false"
-                class="flex-1 px-4 py-2 rounded-xl border border-gray-200 hover:bg-gray-50 text-gray-700 font-medium transition-colors"
+                class="flex-1 px-4 py-2 rounded-xl border border-tibet-gold/25 hover:bg-gray-50 text-gray-700 font-medium transition-colors"
               >
                 {{ t('profile.cancel') }}
               </button>
               <button 
                 type="submit"
                 :disabled="changingPassword"
-                class="flex-1 px-4 py-2 rounded-xl bg-apple-blue hover:bg-apple-blue-hover text-white font-medium transition-colors disabled:opacity-50"
+                class="flex-1 px-4 py-2 rounded-xl bg-tibet-gold hover:bg-tibet-gold/80 text-white font-medium transition-colors disabled:opacity-50"
               >
                 {{ changingPassword ? t('profile.changing') : t('profile.confirmChange') }}
               </button>
@@ -501,15 +501,15 @@ const getAvatarUrl = () => {
       </div>
 
       <!-- Tabs -->
-      <div class="glass rounded-2xl p-6 mb-8 animate-slide-up shadow-xl border border-white/50">
-        <div class="flex gap-4 border-b border-gray-200 mb-6 overflow-x-auto">
+      <div class="glass-card rounded-2xl p-6 mb-8 animate-slide-up shadow-xl border border-white/50">
+        <div class="flex gap-4 border-b border-tibet-gold/25 mb-6 overflow-x-auto">
           <button 
             @click="activeTab = 'routes'"
             :class="[
               'px-6 py-3 font-medium transition-all duration-300 border-b-2 whitespace-nowrap',
               activeTab === 'routes' 
-                ? 'text-apple-blue border-apple-blue' 
-                : 'text-apple-gray-500 border-transparent hover:text-apple-gray-700'
+                ? 'text-tibet-gold border-tibet-gold' 
+                : 'text-tibet-brown/70 border-transparent hover:text-tibet-dark/80'
             ]"
           >
             {{ t('profile.myRoutesTab') }} ({{ myRoutes.length }})
@@ -519,8 +519,8 @@ const getAvatarUrl = () => {
             :class="[
               'px-6 py-3 font-medium transition-all duration-300 border-b-2 whitespace-nowrap',
               activeTab === 'bookings' 
-                ? 'text-apple-blue border-apple-blue' 
-                : 'text-apple-gray-500 border-transparent hover:text-apple-gray-700'
+                ? 'text-tibet-gold border-tibet-gold' 
+                : 'text-tibet-brown/70 border-transparent hover:text-tibet-dark/80'
             ]"
           >
             {{ t('profile.myBookingsTab') }} ({{ bookings.length }})
@@ -530,8 +530,8 @@ const getAvatarUrl = () => {
             :class="[
               'px-6 py-3 font-medium transition-all duration-300 border-b-2 whitespace-nowrap',
               activeTab === 'hotel-bookings' 
-                ? 'text-apple-blue border-apple-blue' 
-                : 'text-apple-gray-500 border-transparent hover:text-apple-gray-700'
+                ? 'text-tibet-gold border-tibet-gold' 
+                : 'text-tibet-brown/70 border-transparent hover:text-tibet-dark/80'
             ]"
           >
             {{ t('profile.myHotelBookingsTab') }} ({{ hotelBookings.length }})
@@ -541,8 +541,8 @@ const getAvatarUrl = () => {
             :class="[
               'px-6 py-3 font-medium transition-all duration-300 border-b-2 whitespace-nowrap',
               activeTab === 'comments' 
-                ? 'text-apple-blue border-apple-blue' 
-                : 'text-apple-gray-500 border-transparent hover:text-apple-gray-700'
+                ? 'text-tibet-gold border-tibet-gold' 
+                : 'text-tibet-brown/70 border-transparent hover:text-tibet-dark/80'
             ]"
           >
             {{ t('profile.myCommentsTab') }} ({{ spotComments.length + routeComments.length }})
@@ -551,14 +551,14 @@ const getAvatarUrl = () => {
 
         <!-- Loading -->
         <div v-if="loading" class="text-center py-12">
-          <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-apple-blue mx-auto"></div>
+          <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-tibet-gold mx-auto"></div>
         </div>
 
         <!-- My Routes -->
         <div v-else-if="activeTab === 'routes'">
           <div v-if="myRoutes.length === 0" class="text-center py-12">
             <p class="text-gray-500 mb-4">{{ t('profile.noRoutes') }}</p>
-            <router-link to="/create-route" class="text-apple-blue hover:text-apple-blue-hover font-medium">
+            <router-link to="/create-route" class="text-tibet-gold hover:text-tibet-gold/80 font-medium">
               {{ t('profile.createRouteLink') }}
             </router-link>
           </div>
@@ -567,12 +567,12 @@ const getAvatarUrl = () => {
             <div 
               v-for="route in myRoutes" 
               :key="route.id"
-              class="glass rounded-2xl p-6 hover:shadow-2xl transition-all duration-500 ease-out border border-white/20 group"
+              class="glass-card rounded-2xl p-6 hover:shadow-2xl transition-all duration-500 ease-out border border-white/20 group"
             >
               <div class="flex justify-between items-start mb-4">
                 <h3 
                   @click="router.push(`/community/${route.id}`)"
-                  class="text-xl font-bold text-gray-900 group-hover:text-apple-blue transition-colors duration-300 line-clamp-2 flex-1 cursor-pointer"
+                  class="text-xl font-bold text-gray-900 group-hover:text-tibet-gold transition-colors duration-300 line-clamp-2 flex-1 cursor-pointer"
                 >
                   {{ route.title }}
                 </h3>
@@ -593,7 +593,7 @@ const getAvatarUrl = () => {
                 <span class="px-3 py-1.5 bg-gray-100 rounded-lg">{{ route.preference }}</span>
               </div>
               
-              <div class="flex justify-between items-center text-sm text-gray-500 pt-4 border-t border-gray-100">
+              <div class="flex justify-between items-center text-sm text-gray-500 pt-4 border-t border-tibet-gold/20">
                 <div class="flex items-center gap-4">
                   <span class="flex items-center gap-1.5">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -625,7 +625,7 @@ const getAvatarUrl = () => {
         <div v-else-if="activeTab === 'bookings'">
           <div v-if="bookings.length === 0" class="text-center py-12">
             <p class="text-gray-500 mb-4">{{ t('profile.noBookings') }}</p>
-            <router-link to="/spots" class="text-apple-blue hover:text-apple-blue-hover font-medium">
+            <router-link to="/spots" class="text-tibet-gold hover:text-tibet-gold/80 font-medium">
               {{ t('profile.browseSpotsLink') }}
             </router-link>
           </div>
@@ -634,7 +634,7 @@ const getAvatarUrl = () => {
             <div 
               v-for="booking in bookings" 
               :key="booking.id" 
-              class="glass rounded-2xl p-6 flex flex-col md:flex-row justify-between items-center transition-all hover:shadow-lg border border-white/20"
+              class="glass-card rounded-2xl p-6 flex flex-col md:flex-row justify-between items-center transition-all hover:shadow-lg border border-white/20"
             >
               <div class="flex items-center space-x-4 mb-4 md:mb-0 w-full md:w-auto">
                 <div class="h-16 w-16 rounded-xl bg-gray-100 overflow-hidden flex-shrink-0">
@@ -651,7 +651,7 @@ const getAvatarUrl = () => {
               
               <div class="flex items-center space-x-6 w-full md:w-auto justify-between md:justify-end">
                 <div class="text-right">
-                  <div class="text-xl font-bold text-apple-blue mb-1">¥{{ booking.totalPrice }}</div>
+                  <div class="text-xl font-bold text-tibet-gold mb-1">¥{{ booking.totalPrice }}</div>
                   <span :class="{
                     'bg-green-100 text-green-800': booking.status === 'CONFIRMED',
                     'bg-yellow-100 text-yellow-800': booking.status === 'PENDING',
@@ -677,7 +677,7 @@ const getAvatarUrl = () => {
         <div v-else-if="activeTab === 'hotel-bookings'">
           <div v-if="hotelBookings.length === 0" class="text-center py-12">
             <p class="text-gray-500 mb-4">{{ t('profile.noHotelBookings') }}</p>
-            <router-link to="/hotels" class="text-apple-blue hover:text-apple-blue-hover font-medium">
+            <router-link to="/hotels" class="text-tibet-gold hover:text-tibet-gold/80 font-medium">
               {{ t('profile.browseHotelsLink') }}
             </router-link>
           </div>
@@ -686,7 +686,7 @@ const getAvatarUrl = () => {
             <div 
               v-for="booking in hotelBookings" 
               :key="booking.id" 
-              class="glass rounded-2xl p-6 flex flex-col md:flex-row justify-between items-center transition-all hover:shadow-lg border border-white/20"
+              class="glass-card rounded-2xl p-6 flex flex-col md:flex-row justify-between items-center transition-all hover:shadow-lg border border-white/20"
             >
               <div class="flex items-center space-x-4 mb-4 md:mb-0 w-full md:w-auto">
                 <div class="h-16 w-16 rounded-xl bg-gray-100 overflow-hidden flex-shrink-0">
@@ -712,7 +712,7 @@ const getAvatarUrl = () => {
               
               <div class="flex items-center space-x-6 w-full md:w-auto justify-between md:justify-end">
                 <div class="text-right">
-                  <div class="text-xl font-bold text-apple-blue mb-1">¥{{ booking.totalPrice }}</div>
+                  <div class="text-xl font-bold text-tibet-gold mb-1">¥{{ booking.totalPrice }}</div>
                   <span :class="{
                     'bg-green-100 text-green-800': booking.status === 'CONFIRMED',
                     'bg-yellow-100 text-yellow-800': booking.status === 'PENDING',
@@ -738,7 +738,7 @@ const getAvatarUrl = () => {
         <div v-else-if="activeTab === 'comments'">
           <div v-if="spotComments.length === 0 && routeComments.length === 0" class="text-center py-12">
             <p class="text-gray-500 mb-4">{{ t('profile.noComments') }}</p>
-            <router-link to="/spots" class="text-apple-blue hover:text-apple-blue-hover font-medium">
+            <router-link to="/spots" class="text-tibet-gold hover:text-tibet-gold/80 font-medium">
               {{ t('profile.browseSpotsLink') }}
             </router-link>
           </div>
@@ -746,19 +746,19 @@ const getAvatarUrl = () => {
           <div v-else class="space-y-6">
             <!-- Spot Comments -->
             <div v-if="spotComments.length > 0">
-              <h3 class="text-lg font-bold text-apple-gray-900 mb-4">{{ t('profile.spotComments') }} ({{ spotComments.length }})</h3>
+              <h3 class="text-lg font-bold text-tibet-dark mb-4">{{ t('profile.spotComments') }} ({{ spotComments.length }})</h3>
               <div class="space-y-4">
                 <div 
                   v-for="comment in spotComments" 
                   :key="comment.id"
-                  class="glass rounded-2xl p-6 border border-white/20 hover:shadow-lg transition-all"
+                  class="glass-card rounded-2xl p-6 border border-white/20 hover:shadow-lg transition-all"
                 >
                   <div class="flex items-start gap-4">
                     <div class="flex-1">
                       <div class="flex items-center gap-2 mb-2">
                         <router-link 
                           :to="`/spots/${comment.spot?.id}`"
-                          class="font-bold text-apple-blue hover:text-apple-blue-hover"
+                          class="font-bold text-tibet-gold hover:text-tibet-gold/80"
                         >
                           {{ comment.spot?.name }}
                         </router-link>
@@ -784,19 +784,19 @@ const getAvatarUrl = () => {
 
             <!-- Route Comments -->
             <div v-if="routeComments.length > 0">
-              <h3 class="text-lg font-bold text-apple-gray-900 mb-4 mt-6">{{ t('profile.routeComments') }} ({{ routeComments.length }})</h3>
+              <h3 class="text-lg font-bold text-tibet-dark mb-4 mt-6">{{ t('profile.routeComments') }} ({{ routeComments.length }})</h3>
               <div class="space-y-4">
                 <div 
                   v-for="comment in routeComments" 
                   :key="comment.id"
-                  class="glass rounded-2xl p-6 border border-white/20 hover:shadow-lg transition-all"
+                  class="glass-card rounded-2xl p-6 border border-white/20 hover:shadow-lg transition-all"
                 >
                   <div class="flex items-start gap-4">
                     <div class="flex-1">
                       <div class="flex items-center gap-2 mb-2">
                         <router-link 
                           :to="`/community/${comment.route?.id}`"
-                          class="font-bold text-apple-blue hover:text-apple-blue-hover"
+                          class="font-bold text-tibet-gold hover:text-tibet-gold/80"
                         >
                           {{ comment.route?.title }}
                         </router-link>

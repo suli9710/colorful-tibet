@@ -101,7 +101,7 @@
               </div>
             </div>
 
-            <div class="mt-6 pt-6 border-t border-gray-200/50 text-center">
+            <div class="mt-6 pt-6 border-t border-tibet-gold/25/50 text-center">
               <p class="text-xs text-gray-500">{{ t('contact.closingMessage') }}</p>
             </div>
           </div>

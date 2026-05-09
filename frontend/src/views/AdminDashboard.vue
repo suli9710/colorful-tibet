@@ -59,19 +59,21 @@
         </div>
 
         <!-- Hotel Orders Management -->
-        <div class="bg-white rounded-lg shadow overflow-hidden">
-          <div class="px-6 py-4 border-b border-stone-200 flex justify-between items-center cursor-pointer hover:bg-stone-50 transition-colors" @click="showAllHotelOrders = !showAllHotelOrders">
-            <h3 class="text-lg font-bold text-stone-800">酒店订单 <span class="text-sm font-normal text-stone-500">(共{{ hotelOrders.length }}条)</span></h3>
-            <div class="flex items-center space-x-3">
-              <button @click.stop="fetchHotelOrders" class="text-sm text-blue-600 hover:text-blue-800" :disabled="loadingHotelOrders">
-                {{ loadingHotelOrders ? '加载中……' : '刷新列表' }}
+        <div class="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden">
+          <div class="px-6 py-4 border-b border-stone-100 flex justify-between items-center bg-gradient-to-r from-stone-50 to-white cursor-pointer hover:bg-stone-100/50 transition-colors" @click="showAllHotelOrders = !showAllHotelOrders">
+            <div class="flex items-center gap-3">
+              <div class="w-9 h-9 rounded-lg bg-amber-100 flex items-center justify-center">
+                <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+              </div>
+              <h3 class="text-lg font-bold text-stone-800">酒店订单 <span class="text-sm font-normal text-stone-400">({{ hotelOrders.length }}条)</span></h3>
+            </div>
+            <div class="flex items-center gap-2">
+              <button @click.stop="fetchHotelOrders" :disabled="loadingHotelOrders" class="text-xs px-3 py-1.5 rounded-lg bg-stone-100 text-stone-600 hover:bg-stone-200 transition-colors">
+                {{ loadingHotelOrders ? '加载中...' : '刷新' }}
               </button>
-              <button @click.stop="showAllHotelOrders = !showAllHotelOrders" class="text-sm text-stone-600 hover:text-stone-800 flex items-center">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 transition-transform duration-200" :class="{ 'rotate-180': showAllHotelOrders }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                </svg>
-                <span class="ml-1">{{ showAllHotelOrders ? '收起' : '展开' }}</span>
-              </button>
+              <svg class="w-5 h-5 text-stone-400 transition-transform duration-200" :class="{ 'rotate-180': showAllHotelOrders }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+              </svg>
             </div>
           </div>
 
@@ -144,15 +146,23 @@
           </div>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-8">
           <!-- Recent Bookings -->
-          <div class="bg-white rounded-lg shadow overflow-hidden">
-            <div class="px-6 py-4 border-b border-stone-200">
-              <h3 class="text-lg font-bold text-stone-800">最新订单</h3>
+          <div class="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden">
+            <div class="px-6 py-4 border-b border-stone-100 flex justify-between items-center bg-gradient-to-r from-stone-50 to-white cursor-pointer hover:bg-stone-100/50 transition-colors" @click="showRecentOrders = !showRecentOrders">
+              <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-lg bg-blue-100 flex items-center justify-center">
+                  <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
+                </div>
+                <h3 class="text-lg font-bold text-stone-800">最新订单 <span class="text-sm font-normal text-stone-400">({{ recentOrders.length }}条)</span></h3>
+              </div>
+              <svg class="w-5 h-5 text-stone-400 transition-transform duration-200" :class="{ 'rotate-180': showRecentOrders }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+              </svg>
             </div>
-            <div class="divide-y divide-stone-200">
+            <div v-if="showRecentOrders" class="divide-y divide-stone-100">
               <template v-if="recentOrders.length > 0">
-                <div v-for="order in recentOrders" :key="order.id" class="px-6 py-4 flex items-center justify-between">
+                <div v-for="order in recentOrders" :key="order.id" class="px-6 py-4 flex items-center justify-between hover:bg-stone-50 transition-colors">
                   <div>
                     <div class="flex items-center gap-2">
                       <span v-if="order.hotel" class="text-xs px-2 py-0.5 rounded bg-blue-100 text-blue-700">酒店</span>
@@ -167,107 +177,128 @@
                   </div>
                 </div>
               </template>
-              <div v-else class="px-6 py-4 text-center text-stone-500">
-                暂无订单
-              </div>
+              <div v-else class="px-6 py-4 text-center text-stone-400 text-sm">暂无订单</div>
             </div>
           </div>
 
           <!-- Popular Spots -->
-          <div class="bg-white rounded-lg shadow overflow-hidden">
-            <div class="px-6 py-4 border-b border-stone-200">
-              <h3 class="text-lg font-bold text-stone-800">热门景点</h3>
+          <div class="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden">
+            <div class="px-6 py-4 border-b border-stone-100 flex justify-between items-center bg-gradient-to-r from-stone-50 to-white cursor-pointer hover:bg-stone-100/50 transition-colors" @click="showPopularSpots = !showPopularSpots">
+              <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-lg bg-rose-100 flex items-center justify-center">
+                  <svg class="w-5 h-5 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>
+                </div>
+                <h3 class="text-lg font-bold text-stone-800">热门景点 <span class="text-sm font-normal text-stone-400">({{ sortedPopularSpots.length }}个)</span></h3>
+              </div>
+              <svg class="w-5 h-5 text-stone-400 transition-transform duration-200" :class="{ 'rotate-180': showPopularSpots }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+              </svg>
             </div>
-            <div class="divide-y divide-stone-200">
-              <div v-for="(spot, index) in sortedPopularSpots" :key="spot.id" class="px-6 py-4 flex items-center">
-                <span class="text-lg font-bold text-stone-400 w-8">{{ index + 1 }}</span>
-                <img :src="spot.imageUrl" class="w-10 h-10 rounded object-cover mr-4" alt="">
+            <div v-if="showPopularSpots" class="divide-y divide-stone-100">
+              <div v-for="(spot, index) in sortedPopularSpots" :key="spot.id" class="px-6 py-4 flex items-center hover:bg-stone-50 transition-colors">
+                <span class="text-lg font-bold text-stone-300 w-8">{{ index + 1 }}</span>
+                <img :src="spot.imageUrl" class="w-10 h-10 rounded-lg object-cover mr-4" alt="">
                 <div class="flex-1 min-w-0">
-                  <p class="text-sm font-medium text-stone-800">{{ spot.name }}</p>
+                  <p class="text-sm font-medium text-stone-800 truncate">{{ spot.name }}</p>
                   <p class="text-xs text-stone-500 mb-2">{{ spot.location }}</p>
-                  <!-- 点击量条 -->
                   <div class="flex items-center gap-2 mt-1">
                     <div class="flex-1 bg-stone-100 rounded-full h-2 overflow-hidden">
-                      <div 
-                        class="h-full bg-gradient-to-r from-blue-400 to-blue-600 rounded-full transition-all duration-500"
+                      <div
+                        class="h-full bg-gradient-to-r from-rose-400 to-rose-600 rounded-full transition-all duration-500"
                         :style="{ width: getClickCountPercentage(spot) + '%' }"
                       ></div>
                     </div>
-                    <span class="text-xs text-stone-600 font-medium whitespace-nowrap">
-                      {{ spot.visitCount || 0 }}次
-                    </span>
+                    <span class="text-xs text-stone-500 font-medium whitespace-nowrap">{{ spot.visitCount || 0 }}次</span>
                   </div>
                 </div>
                 <div class="text-right ml-4">
                   <p class="text-sm font-bold text-red-600">¥{{ spot.ticketPrice }}</p>
                 </div>
               </div>
-              <div v-if="!sortedPopularSpots?.length" class="px-6 py-4 text-center text-stone-500">
-                暂无数据
-              </div>
+              <div v-if="!sortedPopularSpots?.length" class="px-6 py-4 text-center text-stone-400 text-sm">暂无数据</div>
             </div>
           </div>
         </div>
         
         <!-- Spots Management Section -->
-        <div class="bg-white rounded-lg shadow overflow-hidden mt-8">
-          <div class="px-6 py-4 border-b border-stone-200 flex justify-between items-center">
-            <h3 class="text-lg font-bold text-stone-800">景点管理 <span class="text-sm font-normal text-stone-500">(共{{ spots.length }}个)</span></h3>
-            <div class="flex space-x-3">
-              <button @click="fetchSpots" class="text-sm text-blue-600 hover:text-blue-800" :disabled="loadingSpots">
-                {{ loadingSpots ? '加载中...' : '刷新列表' }}
+        <div class="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden mt-8">
+          <div class="px-6 py-4 border-b border-stone-100 flex justify-between items-center bg-gradient-to-r from-stone-50 to-white">
+            <div class="flex items-center gap-3">
+              <div class="w-9 h-9 rounded-lg bg-emerald-100 flex items-center justify-center">
+                <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+              </div>
+              <h3 class="text-lg font-bold text-stone-800">景点管理 <span class="text-sm font-normal text-stone-400">({{ spots.length }}个)</span></h3>
+            </div>
+            <div class="flex items-center gap-2">
+              <button @click="fetchSpots" :disabled="loadingSpots" class="text-xs px-3 py-1.5 rounded-lg bg-stone-100 text-stone-600 hover:bg-stone-200 transition-colors">
+                {{ loadingSpots ? '加载中...' : '刷新' }}
               </button>
-              <button v-if="spots.length > 6 && !showAllSpots" @click="showAllSpots = true" class="text-sm text-blue-600 hover:text-blue-800">
-                查看全部
-              </button>
-              <button v-if="showAllSpots" @click="showAllSpots = false" class="text-sm text-stone-600 hover:text-stone-800">
-                收起
+              <button v-if="spots.length > 6" @click="showAllSpots = !showAllSpots" class="text-xs px-3 py-1.5 rounded-lg bg-stone-100 text-stone-600 hover:bg-stone-200 transition-colors">
+                {{ showAllSpots ? '收起' : '查看全部(' + spots.length + ')' }}
               </button>
             </div>
           </div>
-          
-          <!-- 加载状态 -->
-          <div v-if="loadingSpots" class="p-8 text-center text-stone-500">
-            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-            <p>正在加载景点数据...</p>
+
+          <!-- Loading State -->
+          <div v-if="loadingSpots" class="p-12 text-center">
+            <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-500 mx-auto mb-4"></div>
+            <p class="text-stone-400 text-sm">正在加载景点数据...</p>
           </div>
-          
+
           <!-- Error State -->
-          <div v-else-if="spotsError" class="p-8 text-center text-red-500">
-            <p class="mb-2">❌ 加载失败</p>
-            <p class="text-sm">{{ spotsError }}</p>
-            <button @click="fetchSpots" class="mt-4 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">
-              重试
-            </button>
+          <div v-else-if="spotsError" class="p-12 text-center">
+            <div class="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
+              <svg class="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+            </div>
+            <p class="text-red-500 text-sm mb-1">加载失败</p>
+            <p class="text-stone-400 text-xs mb-4">{{ spotsError }}</p>
+            <button @click="fetchSpots" class="text-sm px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors">重试</button>
           </div>
-          
+
           <!-- Empty State -->
-          <div v-else-if="spots.length === 0" class="p-8 text-center text-stone-500">
-            <p>暂无景点数据</p>
-            <p class="text-sm mt-2">请确保后端服务已启动并且数据库中有景点数据</p>
+          <div v-else-if="spots.length === 0" class="p-16 text-center">
+            <svg class="w-16 h-16 text-stone-200 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>
+            <p class="text-stone-400">暂无景点数据</p>
           </div>
-          
-          <!-- Spots Grid (Compact View) -->
-          <div v-else class="p-6">
-            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-              <div v-for="spot in displayedSpots" :key="spot.id" 
-                   class="group cursor-pointer border border-stone-200 rounded-lg overflow-hidden hover:shadow-lg hover:border-blue-400 transition-all"
-                   @click="openEditModal(spot)">
-                <div class="relative h-24 bg-gray-200">
-                  <img v-if="spot.imageUrl" :src="spot.imageUrl" :alt="spot.name" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300">
-                  <div v-else class="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-500 to-purple-600 text-white text-2xl font-bold">
-                    {{ spot.name.charAt(0) }}
-                  </div>
-                  <!-- Overlay on hover -->
-                  <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all flex items-center justify-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-white opacity-0 group-hover:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                    </svg>
-                  </div>
+
+          <!-- Spots Card Grid -->
+          <div v-else class="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div v-for="spot in displayedSpots" :key="spot.id"
+                 class="group bg-white rounded-xl border border-stone-200 overflow-hidden hover:shadow-lg hover:border-emerald-300 transition-all duration-200 cursor-pointer"
+                 @click="openEditModal(spot)">
+              <!-- Thumbnail -->
+              <div class="relative h-40 overflow-hidden bg-stone-100">
+                <img v-if="spot.imageUrl" :src="spot.imageUrl" :alt="spot.name"
+                     class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                     @error="($event.target as HTMLImageElement).style.display='none'" />
+                <div v-if="!spot.imageUrl" class="w-full h-full flex items-center justify-center bg-gradient-to-br from-emerald-400 to-teal-600">
+                  <span class="text-4xl font-bold text-white/80">{{ spot.name?.charAt(0) }}</span>
                 </div>
-                <div class="p-2">
-                  <h4 class="font-bold text-stone-800 text-sm truncate">{{ spot.name }}</h4>
-                  <p class="text-xs text-red-600 font-semibold">¥{{ spot.ticketPrice }}</p>
+                <!-- Price badge -->
+                <div class="absolute top-3 right-3 px-2.5 py-1 rounded-full bg-white/90 backdrop-blur text-emerald-700 text-xs font-bold shadow-sm">
+                  ¥{{ spot.ticketPrice || '-' }}
+                </div>
+                <!-- Edit overlay on hover -->
+                <div class="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all flex items-center justify-center">
+                  <span class="px-4 py-2 rounded-lg bg-white/90 text-stone-700 text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity shadow-lg backdrop-blur">
+                    点击编辑
+                  </span>
+                </div>
+              </div>
+              <!-- Info -->
+              <div class="p-4">
+                <h4 class="font-semibold text-stone-800 truncate mb-1">{{ spot.name }}</h4>
+                <div class="flex items-center gap-2 text-xs text-stone-400 mb-2">
+                  <span v-if="spot.city" class="flex items-center gap-0.5">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>
+                    {{ spot.city }}
+                  </span>
+                  <span v-if="spot.visitCount > 0">· 👁 {{ spot.visitCount }}</span>
+                </div>
+                <p v-if="spot.description" class="text-xs text-stone-500 line-clamp-2 leading-relaxed">{{ spot.description }}</p>
+                <div class="mt-3 pt-3 border-t border-stone-100 flex items-center justify-between">
+                  <span class="text-xs text-stone-400">ID: {{ spot.id }}</span>
+                  <span class="text-xs font-medium text-emerald-600 group-hover:text-emerald-700 transition-colors">编辑 →</span>
                 </div>
               </div>
             </div>
@@ -276,10 +307,19 @@
 
         <!-- User Management Section -->
         <div class="bg-white rounded-lg shadow overflow-hidden mt-8">
-          <div class="px-6 py-4 border-b border-stone-200 flex justify-between items-center">
-            <h3 class="text-lg font-bold text-stone-800">用户管理</h3>
-            <button @click="fetchUsers" class="text-sm text-blue-600 hover:text-blue-800">刷新列表</button>
+          <div class="px-6 py-4 border-b border-stone-100 flex justify-between items-center bg-gradient-to-r from-stone-50 to-white cursor-pointer hover:bg-stone-100/50 transition-colors" @click="showUsers = !showUsers">
+            <div class="flex items-center gap-3">
+              <div class="w-9 h-9 rounded-lg bg-violet-100 flex items-center justify-center">
+                <svg class="w-5 h-5 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"/></svg>
+              </div>
+              <h3 class="text-lg font-bold text-stone-800">用户管理 <span class="text-sm font-normal text-stone-400">({{ users.length }}人)</span></h3>
+            </div>
+            <div class="flex items-center gap-2">
+              <button @click.stop="fetchUsers" class="text-xs px-3 py-1.5 rounded-lg bg-stone-100 text-stone-600 hover:bg-stone-200 transition-colors">刷新</button>
+              <svg class="w-5 h-5 text-stone-400 transition-transform duration-200" :class="{ 'rotate-180': showUsers }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </div>
           </div>
+          <div v-if="showUsers">
           <div class="overflow-x-auto">
             <div class="overflow-x-auto">
               <table class="min-w-full divide-y divide-stone-200">
@@ -396,25 +436,24 @@
               </tbody>
             </table>
           </div>
+          </div>
         </div>
-
-        <!-- News Management Section -->
-        <div class="bg-white rounded-lg shadow overflow-hidden mt-8">
-          <div class="px-6 py-4 border-b border-stone-200 flex justify-between items-center cursor-pointer hover:bg-stone-50 transition-colors" @click="showAllNews = !showAllNews">
-            <h3 class="text-lg font-bold text-stone-800">旅游资讯管理 <span class="text-sm font-normal text-stone-500">(共{{ newsList.length }}条)</span></h3>
-            <div class="flex items-center space-x-3">
-              <button @click.stop="fetchNews" class="text-sm text-blue-600 hover:text-blue-800" :disabled="loadingNews">
-                {{ loadingNews ? '加载中...' : '刷新列表' }}
+        <div class="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden mt-8">
+          <div class="px-6 py-4 border-b border-stone-100 flex justify-between items-center bg-gradient-to-r from-stone-50 to-white cursor-pointer hover:bg-stone-100/50 transition-colors" @click="showAllNews = !showAllNews">
+            <div class="flex items-center gap-3">
+              <div class="w-9 h-9 rounded-lg bg-cyan-100 flex items-center justify-center">
+                <svg class="w-5 h-5 text-cyan-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"/></svg>
+              </div>
+              <h3 class="text-lg font-bold text-stone-800">旅游资讯管理 <span class="text-sm font-normal text-stone-400">({{ newsList.length }}条)</span></h3>
+            </div>
+            <div class="flex items-center gap-2">
+              <button @click.stop="fetchNews" :disabled="loadingNews" class="text-xs px-3 py-1.5 rounded-lg bg-stone-100 text-stone-600 hover:bg-stone-200 transition-colors">
+                {{ loadingNews ? '加载中...' : '刷新' }}
               </button>
-              <button @click.stop="openCreateNewsModal" class="text-sm bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors">
-                创建资讯
-              </button>
-              <button @click.stop="showAllNews = !showAllNews" class="text-sm text-stone-600 hover:text-stone-800 flex items-center">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 transition-transform duration-200" :class="{ 'rotate-180': showAllNews }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                </svg>
-                <span class="ml-1">{{ showAllNews ? '收起' : '展开' }}</span>
-              </button>
+              <button @click.stop="openCreateNewsModal" class="text-xs px-3 py-1.5 rounded-lg bg-cyan-500 text-white hover:bg-cyan-600 transition-colors">+ 创建</button>
+              <svg class="w-5 h-5 text-stone-400 transition-transform duration-200" :class="{ 'rotate-180': showAllNews }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+              </svg>
             </div>
           </div>
           
@@ -465,6 +504,270 @@
           </div>
           <div v-else-if="!loadingNews && newsList.length > 0" class="px-6 py-4 text-center text-stone-500 text-sm">
             点击上方标题栏展开查看全部资讯（共{{ newsList.length }}条）
+          </div>
+        </div>
+
+        <!-- Carousel Management Section -->
+        <div class="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden mt-8">
+          <div class="px-6 py-4 border-b border-stone-100 flex justify-between items-center bg-gradient-to-r from-stone-50 to-white cursor-pointer hover:bg-stone-100/50 transition-colors" @click="showCarousels = !showCarousels">
+            <div class="flex items-center gap-3">
+              <div class="w-9 h-9 rounded-lg bg-pink-100 flex items-center justify-center">
+                <svg class="w-5 h-5 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+              </div>
+              <h3 class="text-lg font-bold text-stone-800">轮播图管理 <span class="text-sm font-normal text-stone-400">({{ carousels.length }}张)</span></h3>
+            </div>
+            <div class="flex items-center gap-2">
+              <button @click.stop="openCreateCarouselModal" class="text-xs px-3 py-1.5 rounded-lg bg-pink-500 text-white hover:bg-pink-600 transition-colors">+ 添加</button>
+              <svg class="w-5 h-5 text-stone-400 transition-transform duration-200" :class="{ 'rotate-180': showCarousels }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </div>
+          </div>
+          <div v-if="showCarousels" class="p-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div v-for="c in carousels" :key="c.id" class="border rounded-lg overflow-hidden">
+                <img :src="c.imageUrl" class="w-full h-32 object-cover">
+                <div class="p-3">
+                  <h4 class="font-bold text-sm">{{ c.title }}</h4>
+                  <p class="text-xs text-stone-500">{{ c.subtitle }}</p>
+                  <div class="flex justify-between items-center mt-2">
+                    <span :class="c.active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'" class="text-xs px-2 py-0.5 rounded">{{ c.active ? '启用' : '禁用' }}</span>
+                    <div class="space-x-2">
+                      <button @click="openEditCarouselModal(c)" class="text-blue-600 text-xs">编辑</button>
+                      <button @click="deleteCarousel(c.id)" class="text-red-600 text-xs">删除</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Route Management Section -->
+        <div class="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden mt-8">
+          <div class="px-6 py-4 border-b border-stone-100 flex justify-between items-center bg-gradient-to-r from-stone-50 to-white cursor-pointer hover:bg-stone-100/50 transition-colors" @click="showRoutes = !showRoutes">
+            <div class="flex items-center gap-3">
+              <div class="w-9 h-9 rounded-lg bg-teal-100 flex items-center justify-center">
+                <svg class="w-5 h-5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
+              </div>
+              <h3 class="text-lg font-bold text-stone-800">线路管理 <span class="text-sm font-normal text-stone-400">({{ adminRoutes.length }}条)</span></h3>
+            </div>
+            <div class="flex items-center gap-2">
+              <button @click.stop="fetchAdminRoutes" class="text-xs px-3 py-1.5 rounded-lg bg-stone-100 text-stone-600 hover:bg-stone-200 transition-colors">刷新</button>
+              <button @click.stop="openCreateRouteModal" class="text-xs px-3 py-1.5 rounded-lg bg-teal-500 text-white hover:bg-teal-600 transition-colors">+ 新增</button>
+              <svg class="w-5 h-5 text-stone-400 transition-transform duration-200" :class="{ 'rotate-180': showRoutes }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </div>
+          </div>
+          <div v-if="showRoutes" class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-stone-200">
+              <thead class="bg-stone-50">
+                <tr>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-stone-500 uppercase">名称</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-stone-500 uppercase">天数</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-stone-500 uppercase">价格</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-stone-500 uppercase">难度</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-stone-500 uppercase">温度</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-stone-500 uppercase">地理</th>
+                  <th class="px-4 py-3 text-right text-xs font-medium text-stone-500 uppercase">操作</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-stone-200">
+                <tr v-for="r in adminRoutes" :key="r.id" class="hover:bg-stone-50">
+                  <td class="px-4 py-3 text-sm font-medium">{{ r.name }}</td>
+                  <td class="px-4 py-3 text-sm">{{ r.days }}天</td>
+                  <td class="px-4 py-3 text-sm text-red-600">¥{{ r.price }}</td>
+                  <td class="px-4 py-3 text-sm">{{ r.difficulty }}</td>
+                  <td class="px-4 py-3 text-sm">{{ r.temperature || '-' }}</td>
+                  <td class="px-4 py-3 text-sm">{{ r.geography || '-' }}</td>
+                  <td class="px-4 py-3 text-right text-sm space-x-2">
+                    <button @click="openEditRouteModal(r)" class="text-blue-600">编辑</button>
+                    <button @click="deleteRoute(r.id)" class="text-red-600">删除</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Hotel Management Section -->
+        <div class="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden mt-8">
+          <div class="px-6 py-4 border-b border-stone-100 flex justify-between items-center bg-gradient-to-r from-stone-50 to-white">
+            <div class="flex items-center gap-3">
+              <div class="w-9 h-9 rounded-lg bg-indigo-100 flex items-center justify-center">
+                <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+              </div>
+              <h3 class="text-lg font-bold text-stone-800">酒店管理 <span class="text-sm font-normal text-stone-400">({{ adminHotels.length }}家)</span></h3>
+            </div>
+            <div class="flex items-center gap-2">
+              <button @click.stop="fetchAdminHotels" class="text-xs px-3 py-1.5 rounded-lg bg-stone-100 text-stone-600 hover:bg-stone-200 transition-colors">刷新</button>
+              <button @click.stop="openCreateHotelModal" class="text-xs px-4 py-2 rounded-lg bg-indigo-500 text-white hover:bg-indigo-600 transition-colors shadow-sm">+ 新增酒店</button>
+            </div>
+          </div>
+
+          <!-- Card Grid -->
+          <div class="p-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div v-for="h in adminHotels" :key="h.id"
+                 class="bg-white rounded-xl border border-stone-200 overflow-hidden hover:shadow-md transition-all duration-200"
+                 :class="{ 'ring-2 ring-indigo-200 shadow-md': expandedHotelId === h.id }">
+              <!-- Card Header (always visible) -->
+              <div class="flex gap-4 p-4 cursor-pointer" @click="toggleHotelExpand(h)">
+                <!-- Thumbnail -->
+                <div class="w-24 h-24 shrink-0 rounded-lg overflow-hidden bg-stone-100">
+                  <img v-if="h.imageUrl" :src="h.imageUrl" :alt="h.name"
+                       class="w-full h-full object-cover"
+                       @error="($event.target as HTMLImageElement).style.display='none'" />
+                  <div v-if="!h.imageUrl" class="w-full h-full flex items-center justify-center text-stone-300">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                  </div>
+                </div>
+                <!-- Info -->
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-start justify-between gap-2">
+                    <h4 class="font-semibold text-stone-800 truncate">{{ h.name }}</h4>
+                    <span class="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 text-xs font-medium">
+                      ★ {{ h.rating || '-' }}
+                    </span>
+                  </div>
+                  <div class="mt-1.5 space-y-1 text-xs text-stone-500">
+                    <div class="flex items-center gap-1">
+                      <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>
+                      <span class="truncate">{{ h.location || '未知位置' }}</span>
+                    </div>
+                    <div v-if="h.phone" class="flex items-center gap-1">
+                      <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+                      {{ h.phone }}
+                    </div>
+                  </div>
+                  <div class="mt-2 flex items-center gap-2">
+                    <span class="text-xs font-semibold text-red-600 bg-red-50 px-2 py-0.5 rounded">{{ h.priceRange || '咨询' }}</span>
+                    <span v-if="h.facilities" class="text-xs text-stone-400 truncate">{{ h.facilities.split(',')[0] }}{{ h.facilities.split(',').length > 1 ? '...' : '' }}</span>
+                  </div>
+                </div>
+                <!-- Expand chevron -->
+                <div class="shrink-0 self-center text-stone-300 transition-transform duration-200" :class="{ 'rotate-180': expandedHotelId === h.id }">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                </div>
+              </div>
+
+              <!-- Expanded Room Type Management -->
+              <div v-if="expandedHotelId === h.id" class="border-t border-stone-100 bg-stone-50/50 px-4 py-3 animate-slide-up">
+                <div class="flex items-center justify-between mb-3">
+                  <span class="text-xs font-semibold text-stone-500 uppercase tracking-wide">房型管理</span>
+                  <span class="text-xs text-stone-400">{{ expandedRoomTypes.length }}个房型</span>
+                </div>
+
+                <!-- Room type list -->
+                <div class="space-y-2 mb-3">
+                  <div v-if="loadingRoomTypes" class="text-center py-2 text-xs text-stone-400">加载中...</div>
+                  <div v-else-if="expandedRoomTypes.length === 0" class="text-center py-2 text-xs text-stone-400">暂无房型，请在下方添加</div>
+                  <div v-else v-for="rt in expandedRoomTypes" :key="rt.id"
+                       class="flex items-center justify-between bg-white rounded-lg border border-stone-200 px-3 py-2.5 text-sm">
+                    <div class="flex-1 min-w-0">
+                      <span class="font-medium text-stone-700">{{ rt.name }}</span>
+                      <span class="ml-2 text-xs text-stone-400">¥{{ rt.price }} / 晚 · {{ rt.capacity }}人</span>
+                      <span v-if="rt.amenities" class="ml-2 text-xs text-stone-300">· {{ rt.amenities }}</span>
+                    </div>
+                    <button @click="deleteRoomTypeInline(rt.id, h.id)" class="shrink-0 ml-2 text-xs text-red-400 hover:text-red-600 transition-colors">删除</button>
+                  </div>
+                </div>
+
+                <!-- Add room type form -->
+                <div class="flex items-center gap-1.5 bg-white rounded-lg border border-stone-200 px-2.5 py-2">
+                  <input v-model="roomTypeForm.name" placeholder="名称" class="flex-1 min-w-0 text-xs border-0 outline-none px-1" @keyup.enter="addRoomTypeInline(h.id)">
+                  <input v-model.number="roomTypeForm.price" type="number" placeholder="¥" class="w-14 text-xs border-0 outline-none text-right px-1" @keyup.enter="addRoomTypeInline(h.id)">
+                  <input v-model.number="roomTypeForm.capacity" type="number" placeholder="人" class="w-8 text-xs border-0 outline-none text-right px-1" @keyup.enter="addRoomTypeInline(h.id)">
+                  <button @click="addRoomTypeInline(h.id)" class="shrink-0 text-xs px-2.5 py-1.5 rounded-md bg-green-500 text-white hover:bg-green-600 transition-colors">+</button>
+                </div>
+              </div>
+
+              <!-- Card Actions -->
+              <div class="flex border-t border-stone-100 divide-x divide-stone-100">
+                <button @click="openEditHotelModal(h)"
+                        class="flex-1 py-2.5 text-xs text-stone-500 hover:text-blue-600 hover:bg-blue-50 transition-colors flex items-center justify-center gap-1">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                  编辑
+                </button>
+                <button @click="toggleHotelExpand(h)"
+                        class="flex-1 py-2.5 text-xs text-stone-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors flex items-center justify-center gap-1">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                  {{ expandedHotelId === h.id ? '收起' : '房型' }}
+                </button>
+                <button @click="deleteHotel(h.id)"
+                        class="flex-1 py-2.5 text-xs text-stone-500 hover:text-red-600 hover:bg-red-50 transition-colors flex items-center justify-center gap-1">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                  删除
+                </button>
+              </div>
+            </div>
+
+            <!-- Empty state -->
+            <div v-if="adminHotels.length === 0" class="col-span-full text-center py-16">
+              <svg class="w-16 h-16 text-stone-200 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+              <p class="text-stone-400">暂无酒店数据</p>
+              <button @click="openCreateHotelModal" class="mt-3 text-sm text-indigo-500 hover:text-indigo-700">+ 添加第一家酒店</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Carousel Edit/Create Modal -->
+        <div v-if="showCarouselModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" @click.self="closeCarouselModal">
+          <div class="bg-white rounded-2xl max-w-lg w-full p-6 animate-scale-in">
+            <h2 class="text-xl font-bold mb-4">{{ editingCarousel.id ? '编辑' : '创建' }}轮播图</h2>
+            <div class="space-y-3">
+              <div><label class="block text-sm font-medium mb-1">标题 *</label><input v-model="carouselForm.title" class="w-full border rounded px-3 py-2" placeholder="轮播标题"></div>
+              <div><label class="block text-sm font-medium mb-1">副标题</label><input v-model="carouselForm.subtitle" class="w-full border rounded px-3 py-2" placeholder="副标题"></div>
+              <div><label class="block text-sm font-medium mb-1">标签</label><input v-model="carouselForm.tag" class="w-full border rounded px-3 py-2" placeholder="如：热门推荐"></div>
+              <div><label class="block text-sm font-medium mb-1">图片URL</label><input v-model="carouselForm.imageUrl" class="w-full border rounded px-3 py-2" placeholder="/images/banner.jpg"></div>
+              <div><label class="block text-sm font-medium mb-1">链接URL</label><input v-model="carouselForm.linkUrl" class="w-full border rounded px-3 py-2" placeholder="/spots"></div>
+              <div class="flex items-center gap-2"><label class="text-sm font-medium">排序</label><input v-model.number="carouselForm.sortOrder" type="number" class="border rounded px-2 py-1 w-20"></div>
+              <div class="flex items-center gap-2"><input v-model="carouselForm.active" type="checkbox" id="carousel-active"><label for="carousel-active" class="text-sm">启用</label></div>
+            </div>
+            <div class="flex space-x-3 mt-6">
+              <button @click="saveCarousel" class="flex-1 bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600">保存</button>
+              <button @click="closeCarouselModal" class="flex-1 bg-stone-200 py-2 rounded-lg">取消</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Route Edit/Create Modal -->
+        <div v-if="showRouteModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" @click.self="closeRouteModal">
+          <div class="bg-white rounded-2xl max-w-2xl w-full p-6 max-h-[85vh] overflow-y-auto animate-scale-in">
+            <h2 class="text-xl font-bold mb-4">{{ editingRoute.id ? '编辑' : '创建' }}线路</h2>
+            <div class="grid grid-cols-2 gap-3">
+              <div><label class="block text-sm font-medium mb-1">名称 *</label><input v-model="routeForm.name" class="w-full border rounded px-3 py-2"></div>
+              <div><label class="block text-sm font-medium mb-1">天数</label><input v-model.number="routeForm.days" type="number" class="w-full border rounded px-3 py-2"></div>
+              <div><label class="block text-sm font-medium mb-1">价格</label><input v-model.number="routeForm.price" type="number" class="w-full border rounded px-3 py-2"></div>
+              <div><label class="block text-sm font-medium mb-1">难度</label>
+                <select v-model="routeForm.difficulty" class="w-full border rounded px-3 py-2">
+                  <option value="EASY">简单</option><option value="MEDIUM">中等</option><option value="HARD">困难</option>
+                </select>
+              </div>
+              <div><label class="block text-sm font-medium mb-1">温度</label><input v-model="routeForm.temperature" class="w-full border rounded px-3 py-2" placeholder="如: 15°C - 25°C"></div>
+              <div><label class="block text-sm font-medium mb-1">地理特征</label><input v-model="routeForm.geography" class="w-full border rounded px-3 py-2" placeholder="如: 高原河谷地带"></div>
+              <div class="col-span-2"><label class="block text-sm font-medium mb-1">描述</label><textarea v-model="routeForm.description" rows="3" class="w-full border rounded px-3 py-2"></textarea></div>
+            </div>
+            <div class="flex space-x-3 mt-6">
+              <button @click="saveRoute" class="flex-1 bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600">保存</button>
+              <button @click="closeRouteModal" class="flex-1 bg-stone-200 py-2 rounded-lg">取消</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Hotel Edit/Create Modal -->
+        <div v-if="showHotelModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" @click.self="closeHotelModal">
+          <div class="bg-white rounded-2xl max-w-2xl w-full p-6 max-h-[85vh] overflow-y-auto animate-scale-in">
+            <h2 class="text-xl font-bold mb-4">{{ editingHotel.id ? '编辑' : '创建' }}酒店</h2>
+            <div class="grid grid-cols-2 gap-3">
+              <div><label class="block text-sm font-medium mb-1">名称 *</label><input v-model="hotelForm.name" class="w-full border rounded px-3 py-2"></div>
+              <div><label class="block text-sm font-medium mb-1">位置</label><input v-model="hotelForm.location" class="w-full border rounded px-3 py-2"></div>
+              <div><label class="block text-sm font-medium mb-1">电话</label><input v-model="hotelForm.phone" class="w-full border rounded px-3 py-2"></div>
+              <div><label class="block text-sm font-medium mb-1">价格区间</label><input v-model="hotelForm.priceRange" class="w-full border rounded px-3 py-2" placeholder="¥500 - ¥1500"></div>
+              <div><label class="block text-sm font-medium mb-1">评分</label><input v-model.number="hotelForm.rating" type="number" step="0.1" class="w-full border rounded px-3 py-2"></div>
+              <div><label class="block text-sm font-medium mb-1">图片URL</label><input v-model="hotelForm.imageUrl" class="w-full border rounded px-3 py-2"></div>
+              <div class="col-span-2"><label class="block text-sm font-medium mb-1">设施</label><input v-model="hotelForm.facilities" class="w-full border rounded px-3 py-2" placeholder="WiFi, 停车场, 餐厅..."></div>
+            </div>
+            <div class="flex space-x-3 mt-6">
+              <button @click="saveHotel" class="flex-1 bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600">保存</button>
+              <button @click="closeHotelModal" class="flex-1 bg-stone-200 py-2 rounded-lg">取消</button>
+            </div>
           </div>
         </div>
       </div>
@@ -653,7 +956,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import AdminAnalyticsPanel from '../components/AdminAnalyticsPanel.vue'
-import api, { endpoints } from '../api'
+import api, { endpoints, clearTokenCache } from '../api'
 
 interface Stats {
   userCount: number
@@ -685,44 +988,56 @@ const analyticsData = ref<Stats | null>(null)
 
 const fetchStats = async () => {
   try {
-    // 检查用户登录状态
     const userStr = localStorage.getItem('user')
     if (!userStr) {
-      alert('未登录，请先登录管理员账户')
       window.location.href = '/login'
       return
     }
-    
+
     const user = JSON.parse(userStr)
     if (!user.token) {
-      alert('登录已过期，请重新登录')
       localStorage.removeItem('user')
+      localStorage.removeItem('token')
       window.location.href = '/login'
       return
     }
-    
+
+    // 简单检查 token 是否过期（JWT payload 中间段包含 exp）
+    try {
+      const payload = JSON.parse(atob(user.token.split('.')[1]))
+      if (payload.exp && payload.exp * 1000 < Date.now()) {
+        localStorage.removeItem('user')
+        localStorage.removeItem('token')
+        window.location.href = '/login'
+        return
+      }
+    } catch (_) { /* 解析失败继续尝试请求 */ }
+
     if (user.role !== 'ADMIN') {
-      alert('您没有管理员权限')
+      alert('您没有管理员权限，请使用管理员账户登录')
       window.location.href = '/'
       return
     }
-    
-    console.log('开始获取统计数据，用户：', user.username, '角色：', user.role)
+
     analyticsError.value = ''
     const response = await api.get(endpoints.admin.stats)
     stats.value = response.data
     analyticsData.value = response.data
-    console.log('统计数据获取成功')
   } catch (error: any) {
     console.error('获取统计数据失败：', error)
-    analyticsError.value = error.response?.data?.error || '统计面板加载失败，请稍后重试'
-    if (error.response?.status === 401) {
-      alert('未授权：请先登录管理员账户')
+    const status = error.response?.status
+    if (status === 401) {
       localStorage.removeItem('user')
+      localStorage.removeItem('token')
+      clearTokenCache()
       window.location.href = '/login'
-    } else if (error.response?.status === 403) {
-      alert('禁止访问：您没有管理员权限')
+      return
+    }
+    if (status === 403) {
+      alert('禁止访问：您没有管理员权限，请使用管理员账户登录')
       window.location.href = '/'
+    } else {
+      analyticsError.value = error.response?.data?.message || error.response?.data?.error || '统计面板加载失败，请稍后重试'
     }
   } finally {
     loading.value = false
@@ -877,8 +1192,9 @@ const fetchSpots = async () => {
     console.log('景点数据响应数据:', response.data)
     console.log('数据类型:', Array.isArray(response.data) ? '数组' : typeof response.data)
     
-    if (Array.isArray(response.data)) {
-      spots.value = response.data
+    const spotsData = response.data?.content || response.data
+    if (Array.isArray(spotsData)) {
+      spots.value = spotsData
       console.log(`✅ 成功加载 ${spots.value.length} 个景点`)
       if (spots.value.length > 0) {
         console.log('第一个景点示例:', spots.value[0])
@@ -1064,12 +1380,15 @@ const fetchAuditLogs = async () => {
 const hotelOrders = ref<any[]>([])
 const loadingHotelOrders = ref(false)
 const showAllHotelOrders = ref(false)
+const showRecentOrders = ref(true)
+const showPopularSpots = ref(true)
+const showUsers = ref(false)
 
 const fetchHotelOrders = async () => {
   loadingHotelOrders.value = true
   try {
     const response = await api.get(endpoints.hotelBookings.all)
-    hotelOrders.value = Array.isArray(response.data) ? response.data : []
+    hotelOrders.value = Array.isArray(response.data?.content) ? response.data.content : (Array.isArray(response.data) ? response.data : [])
   } catch (error: any) {
     console.error('Failed to fetch hotel orders:', error)
     hotelOrders.value = []
@@ -1136,8 +1455,9 @@ const fetchNews = async () => {
     console.log('资讯数据响应数据:', response.data)
     console.log('数据类型:', Array.isArray(response.data) ? '数组' : typeof response.data)
     
-    if (Array.isArray(response.data)) {
-      newsList.value = response.data
+    const newsData = response.data?.content || response.data
+    if (Array.isArray(newsData)) {
+      newsList.value = newsData
       console.log(`✅ 成功加载 ${newsList.value.length} 条资讯`)
     } else {
       console.error('❌ 响应数据格式错误:', response.data)
@@ -1342,6 +1662,195 @@ const loadCurrentUser = () => {
   }
 }
 
+// Carousel management
+const carousels = ref<any[]>([])
+const showCarousels = ref(false)
+const showCarouselModal = ref(false)
+const editingCarousel = ref<any>({})
+const carouselForm = ref({ title: '', subtitle: '', tag: '', imageUrl: '', linkUrl: '', sortOrder: 0, active: true })
+
+const fetchCarousels = async () => {
+  try {
+    const res = await api.get(endpoints.carousels.adminList)
+    carousels.value = Array.isArray(res.data) ? res.data : []
+  } catch (e) { carousels.value = [] }
+}
+
+const openCreateCarouselModal = () => {
+  editingCarousel.value = {}
+  carouselForm.value = { title: '', subtitle: '', tag: '', imageUrl: '', linkUrl: '', sortOrder: 0, active: true }
+  showCarouselModal.value = true
+}
+
+const openEditCarouselModal = (c: any) => {
+  editingCarousel.value = { ...c }
+  carouselForm.value = { title: c.title || '', subtitle: c.subtitle || '', tag: c.tag || '', imageUrl: c.imageUrl || '', linkUrl: c.linkUrl || '', sortOrder: c.sortOrder || 0, active: c.active !== false }
+  showCarouselModal.value = true
+}
+
+const closeCarouselModal = () => { showCarouselModal.value = false }
+
+const saveCarousel = async () => {
+  try {
+    const payload = { ...carouselForm.value }
+    if (editingCarousel.value.id) {
+      await api.put(endpoints.carousels.adminUpdate(editingCarousel.value.id), payload)
+    } else {
+      await api.post(endpoints.carousels.adminCreate, payload)
+    }
+    await fetchCarousels()
+    closeCarouselModal()
+    alert('保存成功')
+  } catch (e) { alert('保存失败') }
+}
+
+const deleteCarousel = async (id: number) => {
+  if (!confirm('确定删除？')) return
+  try {
+    await api.delete(endpoints.carousels.adminDelete(id))
+    await fetchCarousels()
+  } catch (e) { alert('删除失败') }
+}
+
+// Route management
+const adminRoutes = ref<any[]>([])
+const showRoutes = ref(false)
+const showRouteModal = ref(false)
+const editingRoute = ref<any>({})
+const routeForm = ref({ name: '', days: 1, price: 0, difficulty: 'EASY', description: '', temperature: '', geography: '' })
+
+const fetchAdminRoutes = async () => {
+  try {
+    const res = await api.get(endpoints.adminRoutes.list)
+    adminRoutes.value = Array.isArray(res.data) ? res.data : []
+  } catch (e) { adminRoutes.value = [] }
+}
+
+const openCreateRouteModal = () => {
+  editingRoute.value = {}
+  routeForm.value = { name: '', days: 1, price: 0, difficulty: 'EASY', description: '', temperature: '', geography: '' }
+  showRouteModal.value = true
+}
+
+const openEditRouteModal = (r: any) => {
+  editingRoute.value = { ...r }
+  routeForm.value = { name: r.name || '', days: r.days || 1, price: r.price || 0, difficulty: r.difficulty || 'EASY', description: r.description || '', temperature: r.temperature || '', geography: r.geography || '' }
+  showRouteModal.value = true
+}
+
+const closeRouteModal = () => { showRouteModal.value = false }
+
+const saveRoute = async () => {
+  try {
+    const payload = { ...routeForm.value }
+    if (editingRoute.value.id) {
+      await api.put(endpoints.adminRoutes.update(editingRoute.value.id), payload)
+    } else {
+      await api.post(endpoints.adminRoutes.create, payload)
+    }
+    await fetchAdminRoutes()
+    closeRouteModal()
+    alert('保存成功')
+  } catch (e) { alert('保存失败') }
+}
+
+const deleteRoute = async (id: number) => {
+  if (!confirm('确定删除？')) return
+  try {
+    await api.delete(endpoints.adminRoutes.delete(id))
+    await fetchAdminRoutes()
+  } catch (e) { alert('删除失败') }
+}
+
+// Hotel management
+const adminHotels = ref<any[]>([])
+const showHotelModal = ref(false)
+const editingHotel = ref<any>({})
+const hotelForm = ref({ name: '', location: '', phone: '', priceRange: '', rating: 0, imageUrl: '', facilities: '' })
+
+const fetchAdminHotels = async () => {
+  try {
+    const res = await api.get(endpoints.adminHotels.list)
+    adminHotels.value = Array.isArray(res.data) ? res.data : []
+  } catch (e) { adminHotels.value = [] }
+}
+
+const openCreateHotelModal = () => {
+  editingHotel.value = {}
+  hotelForm.value = { name: '', location: '', phone: '', priceRange: '', rating: 0, imageUrl: '', facilities: '' }
+  showHotelModal.value = true
+}
+
+const openEditHotelModal = (h: any) => {
+  editingHotel.value = { ...h }
+  hotelForm.value = { name: h.name || '', location: h.location || '', phone: h.phone || '', priceRange: h.priceRange || '', rating: h.rating || 0, imageUrl: h.imageUrl || '', facilities: h.facilities || '' }
+  showHotelModal.value = true
+}
+
+const closeHotelModal = () => { showHotelModal.value = false }
+
+const saveHotel = async () => {
+  try {
+    const payload = { ...hotelForm.value }
+    if (editingHotel.value.id) {
+      await api.put(endpoints.adminHotels.update(editingHotel.value.id), payload)
+    } else {
+      await api.post(endpoints.adminHotels.create, payload)
+    }
+    await fetchAdminHotels()
+    closeHotelModal()
+    alert('保存成功')
+  } catch (e) { alert('保存失败') }
+}
+
+const deleteHotel = async (id: number) => {
+  if (!confirm('确定删除？')) return
+  try {
+    await api.delete(endpoints.adminHotels.delete(id))
+    await fetchAdminHotels()
+  } catch (e) { alert('删除失败') }
+}
+
+// Room type management (inline in expanded cards)
+const expandedHotelId = ref<number | null>(null)
+const expandedRoomTypes = ref<any[]>([])
+const loadingRoomTypes = ref(false)
+const roomTypeForm = ref({ name: '', price: 0, capacity: 2, amenities: '' })
+
+const toggleHotelExpand = async (hotel: any) => {
+  if (expandedHotelId.value === hotel.id) {
+    expandedHotelId.value = null
+    expandedRoomTypes.value = []
+  } else {
+    expandedHotelId.value = hotel.id
+    loadingRoomTypes.value = true
+    try {
+      const res = await api.get(endpoints.adminHotels.roomTypes(hotel.id))
+      expandedRoomTypes.value = Array.isArray(res.data) ? res.data : []
+    } catch (e) { expandedRoomTypes.value = [] }
+    loadingRoomTypes.value = false
+  }
+}
+
+const addRoomTypeInline = async (hotelId: number) => {
+  if (!roomTypeForm.value.name) return
+  try {
+    await api.post(endpoints.adminHotels.roomTypes(hotelId), roomTypeForm.value)
+    roomTypeForm.value = { name: '', price: 0, capacity: 2, amenities: '' }
+    const res = await api.get(endpoints.adminHotels.roomTypes(hotelId))
+    expandedRoomTypes.value = Array.isArray(res.data) ? res.data : []
+  } catch (e) { alert('添加失败') }
+}
+
+const deleteRoomTypeInline = async (roomTypeId: number, hotelId: number) => {
+  if (!confirm('确定删除该房型？')) return
+  try {
+    await api.delete(endpoints.adminHotels.deleteRoomType(roomTypeId))
+    const res = await api.get(endpoints.adminHotels.roomTypes(hotelId))
+    expandedRoomTypes.value = Array.isArray(res.data) ? res.data : []
+  } catch (e) { alert('删除失败') }
+}
+
 onMounted(() => {
   loadCurrentUser()
   fetchStats()
@@ -1349,6 +1858,9 @@ onMounted(() => {
   fetchSpots()
   fetchHotelOrders()
   fetchNews()
+  fetchCarousels()
+  fetchAdminRoutes()
+  fetchAdminHotels()
   fetchAuditLogs()
 })
 

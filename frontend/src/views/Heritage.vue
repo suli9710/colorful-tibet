@@ -80,9 +80,24 @@
                   :key="item.id"
                   class="border-b border-stone-100 last:border-b-0 pb-1.5 last:pb-0"
                 >
-                  <p class="font-medium text-stone-900 mb-0.5">
-                    {{ item.name }}
-                  </p>
+                  <div class="flex items-center justify-between gap-2">
+                    <p class="font-medium text-stone-900 mb-0.5 truncate">
+                      {{ item.name }}
+                    </p>
+                    <a
+                      :href="buildBaikeUrl(item.name)"
+                      target="_blank"
+                      rel="noopener"
+                      class="flex-shrink-0 inline-flex items-center gap-0.5 text-[10px] text-red-500 hover:text-red-700 hover:underline transition"
+                      :title="t('heritage.openBaike') + ': ' + item.name"
+                      @click.stop
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                      </svg>
+                      {{ t('heritage.openBaike') }}
+                    </a>
+                  </div>
                   <p class="text-[11px] leading-snug text-stone-600 line-clamp-2">
                     {{ item.description }}
                   </p>
@@ -125,18 +140,31 @@
             <p class="text-sm text-stone-600 mb-3 line-clamp-3">
               {{ item.description }}
             </p>
-            <span class="inline-flex items-center text-sm font-medium text-red-600">
-              {{ t('heritage.viewDetails') }}
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                class="h-4 w-4 ml-1"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
+            <div class="flex items-center justify-between gap-2">
+              <span class="inline-flex items-center text-sm font-medium text-red-600">
+                {{ t('heritage.viewDetails') }}
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  class="h-4 w-4 ml-1"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                </svg>
+              </span>
+              <span
+                v-if="item.baikeUrl"
+                class="inline-flex items-center gap-0.5 text-xs text-stone-400 hover:text-red-500 transition cursor-pointer"
+                :title="t('heritage.openBaike')"
+                @click.stop="openBaikeUrl(item.baikeUrl)"
               >
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-              </svg>
-            </span>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+                {{ t('heritage.openBaike') }}
+              </span>
+            </div>
           </button>
         </div>
       </section>
@@ -154,7 +182,7 @@
           <!-- 顶部大图 -->
           <div class="relative h-56 md:h-72 bg-stone-100">
             <img
-              :src="selectedItem.imageUrl || '/images/heritage/default-heritage.jpg'"
+              :src="selectedItem.imageUrl || 'https://images.unsplash.com/photo-1559827291-baf8ef4d3285?w=800&q=60'"
               :alt="selectedItem.name"
               class="w-full h-full object-cover"
             >
@@ -189,6 +217,22 @@
           <!-- 文字内容区：分段更详细介绍 + 线下体验模块 -->
           <div class="px-6 py-5 text-sm text-stone-700 space-y-5 max-h-[65vh] overflow-y-auto">
             <div class="space-y-4">
+              <!-- 百度百科跳转按钮 -->
+              <a
+                v-if="selectedItem.baikeUrl"
+                :href="selectedItem.baikeUrl"
+                target="_blank"
+                rel="noopener"
+                class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-600 hover:text-white hover:border-blue-600 transition font-medium text-sm shadow-sm"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+                {{ t('heritage.viewOnBaike') }}
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                </svg>
+              </a>
               <p class="text-[13px] text-stone-500">
                 {{ t('heritage.detailNote') }}
               </p>
@@ -405,6 +449,12 @@ interface HeritageItem {
   videoUrl: string
   originStory: string
   significance: string
+  baikeUrl: string
+}
+
+// 根据名称构造百度百科链接
+const buildBaikeUrl = (name: string): string => {
+  return 'https://baike.baidu.com/search?word=' + encodeURIComponent(name)
 }
 
 const heritageItems = ref<HeritageItem[]>([])
@@ -484,27 +534,30 @@ const representativeItems = computed<HeritageItem[]>(() => {
       imageUrl: '/heritage/藏药.jpg',
       videoUrl: '',
       originStory: '',
-      significance: '体现了藏族人民与高原自然环境长期博弈中形成的健康智慧，是中华传统医学宝库的重要组成部分。'
+      significance: '体现了藏族人民与高原自然环境长期博弈中形成的健康智慧，是中华传统医学宝库的重要组成部分。',
+      baikeUrl: 'https://baike.baidu.com/item/%E8%97%8F%E5%8C%BB%E8%8D%AF%E6%B5%B4%E6%B3%95'
     },
     {
       id: 10002,
       name: '格萨尔史诗',
-      description: '被誉为“世界上最长的史诗”，通过艺人口耳相传、即兴说唱的方式一代代流传下来。',
+      description: '被誉为”世界上最长的史诗”，通过艺人口耳相传、即兴说唱的方式一代代流传下来。',
       category: '民间文学',
       imageUrl: '/heritage/格萨尔史诗.jpg',
       videoUrl: '',
       originStory: '',
-      significance: '记录了藏族社会的历史记忆、英雄理想与价值观，是中华民族口头传统中的璀璨明珠。'
+      significance: '记录了藏族社会的历史记忆、英雄理想与价值观，是中华民族口头传统中的璀璨明珠。',
+      baikeUrl: 'https://baike.baidu.com/item/%E6%A0%BC%E8%90%A8%E5%B0%94%E7%8E%8B%E4%BC%A0'
     },
     {
       id: 10003,
       name: '藏戏',
-      description: '被誉为“藏文化的活化石”，集歌舞、说唱、表演于一体，常在寺院法会和民间节日中演出。',
+      description: '被誉为”藏文化的活化石”，集歌舞、说唱、表演于一体，常在寺院法会和民间节日中演出。',
       category: '传统戏剧',
       imageUrl: '/heritage/藏戏.jpg',
       videoUrl: '',
       originStory: '',
-      significance: '藏戏综合了宗教仪式、历史故事与民间传说，是研究藏族社会生活与信仰体系的重要窗口。'
+      significance: '藏戏综合了宗教仪式、历史故事与民间传说，是研究藏族社会生活与信仰体系的重要窗口。',
+      baikeUrl: 'https://baike.baidu.com/item/%E8%97%8F%E6%88%8F'
     },
     {
       id: 10004,
@@ -514,7 +567,8 @@ const representativeItems = computed<HeritageItem[]>(() => {
       imageUrl: '/heritage/唐卡.jpg',
       videoUrl: '',
       originStory: '',
-      significance: '唐卡承载着藏传佛教教义、历史人物与宇宙观，被视为“可以卷起来带走的宫殿壁画”，是西藏艺术的代表符号之一。'
+      significance: '唐卡承载着藏传佛教教义、历史人物与宇宙观，被视为”可以卷起来带走的宫殿壁画”，是西藏艺术的代表符号之一。',
+      baikeUrl: 'https://baike.baidu.com/item/%E5%94%90%E5%8D%A1'
     }
   ]
 
@@ -696,7 +750,7 @@ const fetchHeritageItems = async () => {
   try {
     // API拦截器会自动添加locale参数
     const response = await api.get(endpoints.heritage.list)
-    heritageItems.value = response.data
+    heritageItems.value = response.data?.content || response.data || []
   } catch (error) {
     console.error('Failed to fetch heritage items:', error)
   } finally {
@@ -715,6 +769,10 @@ const toggleCategory = (categoryName: string) => {
 
 const openDetail = (item: HeritageItem) => {
   selectedItem.value = item
+}
+
+const openBaikeUrl = (url: string) => {
+  window.open(url, '_blank', 'noopener')
 }
 
 // 构建地图导航链接（这里以高德地图 Web 导航链接为例，可根据实际需要切换为百度地图等）
