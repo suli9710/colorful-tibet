@@ -82,21 +82,40 @@
                 <div class="mb-4">
                   <label class="block text-sm font-medium text-gray-600 mb-2 tibetan-font">{{ t('spotDetail.addPhoto') }}</label>
                   <div class="flex items-center space-x-4">
-                    <label for="comment-image-input"
+                    <label v-if="!commentImageFile" for="comment-image-input"
                            class="inline-flex items-center px-4 py-2 rounded-full bg-white border border-tibet-gold/25 text-sm font-medium text-gray-600 cursor-pointer hover:bg-blue-50 hover:text-blue-600 transition-colors tibetan-font">
                       <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M3 15a4 4 0 004 4h10a4 4 0 004-4m-4-8h-4m0 0V3m0 4l3-3m-3 3L9 4" />
                       </svg>
                       {{ t('spotDetail.selectImage') }}
                     </label>
-                    <span class="text-sm text-gray-500 truncate max-w-[200px]" v-if="commentImageFileName">{{ commentImageFileName }}</span>
-                    <span class="text-sm text-gray-400 tibetan-font" v-else>{{ t('spotDetail.imageFormats') }}</span>
+                    <span v-if="uploadingCommentImage" class="text-sm text-blue-500 tibetan-font flex items-center">
+                      <svg class="animate-spin w-4 h-4 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                      </svg>
+                      {{ t('spotDetail.uploading') }}
+                    </span>
+                    <span v-else-if="uploadedCommentImageUrl" class="text-sm text-green-600 tibetan-font flex items-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                      {{ t('spotDetail.imageUploaded') }}
+                    </span>
+                    <span v-else-if="commentImageFileName" class="text-sm text-gray-500 truncate max-w-[200px]">{{ commentImageFileName }}</span>
+                    <span v-else class="text-sm text-gray-400 tibetan-font">{{ t('spotDetail.imageFormats') }}</span>
                   </div>
-                  <input id="comment-image-input" type="file" accept="image/*" class="hidden" @change="handleCommentImageChange">
+                  <input id="comment-image-input" type="file" accept="image/*" class="hidden" @change="handleCommentImageChange" :disabled="uploadingCommentImage">
                   <p class="text-xs text-gray-400 mt-1 tibetan-font">{{ t('spotDetail.imageSizeHint') }}</p>
                   <div v-if="commentImagePreview" class="mt-4 relative w-40 h-28">
                     <img :src="commentImagePreview" :alt="t('spotDetail.comments')" class="w-full h-full object-cover rounded-2xl border border-tibet-gold/20 shadow-sm">
-                    <button type="button" @click="removeSelectedCommentImage"
+                    <div v-if="uploadingCommentImage" class="absolute inset-0 bg-black/40 rounded-2xl flex items-center justify-center">
+                      <svg class="animate-spin w-6 h-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                      </svg>
+                    </div>
+                    <button v-if="!uploadingCommentImage" type="button" @click="removeSelectedCommentImage"
                             class="absolute -top-2 -right-2 bg-white text-gray-500 hover:text-red-500 rounded-full p-1 shadow">
                       <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -105,7 +124,7 @@
                   </div>
                 </div>
                 <div class="mt-4 text-right">
-                  <button @click="submitComment" :disabled="submittingComment"
+                  <button @click="submitComment" :disabled="submittingComment || uploadingCommentImage"
                           class="bg-tibet-red text-tibet-yellow px-6 py-3 rounded-full font-semibold hover:bg-tibet-red/85 transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-tibet-red/25 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none tibetan-font">
                     {{ submittingComment ? t('spotDetail.submitting') : t('spotDetail.publishComment') }}
                   </button>
@@ -550,6 +569,8 @@ const commentForm = ref({
 })
 const commentImageFile = ref<File | null>(null)
 const commentImagePreview = ref('')
+const uploadedCommentImageUrl = ref<string | null>(null)
+const uploadingCommentImage = ref(false)
 const commentImageFileName = computed(() => commentImageFile.value?.name || '')
 
 const fetchComments = async () => {
@@ -583,6 +604,7 @@ function clearCommentImagePreview() {
 
 function removeSelectedCommentImage() {
   commentImageFile.value = null
+  uploadedCommentImageUrl.value = null
   const input = document.getElementById('comment-image-input') as HTMLInputElement | null
   if (input) {
     input.value = ''
@@ -590,7 +612,7 @@ function removeSelectedCommentImage() {
   clearCommentImagePreview()
 }
 
-function handleCommentImageChange(event: Event) {
+async function handleCommentImageChange(event: Event) {
   const target = event.target as HTMLInputElement
   const file = target.files?.[0]
 
@@ -612,8 +634,24 @@ function handleCommentImageChange(event: Event) {
   }
 
   commentImageFile.value = file
+  uploadedCommentImageUrl.value = null
   clearCommentImagePreview()
   commentImagePreview.value = URL.createObjectURL(file)
+
+  // Upload immediately after selection
+  uploadingCommentImage.value = true
+  try {
+    const formData = new FormData()
+    formData.append('file', file)
+    const uploadResponse = await api.post(endpoints.comments.uploadImage, formData)
+    uploadedCommentImageUrl.value = uploadResponse.data.imageUrl
+  } catch (error) {
+    console.error('Failed to upload image:', error)
+    alert(t('spotDetail.commentFailed'))
+    removeSelectedCommentImage()
+  } finally {
+    uploadingCommentImage.value = false
+  }
 }
 
 const submitComment = async () => {
@@ -626,22 +664,12 @@ const submitComment = async () => {
 
   submittingComment.value = true
   try {
-    let uploadedImageUrl: string | null = null
-    if (commentImageFile.value) {
-      const formData = new FormData()
-      formData.append('file', commentImageFile.value)
-      const uploadResponse = await api.post(endpoints.comments.uploadImage, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      })
-      uploadedImageUrl = uploadResponse.data.imageUrl
-    }
-
     await api.post(endpoints.comments.create, {
       userId: user.value.id,
       spotId: spot.value.id,
       content: commentForm.value.content,
       rating: commentForm.value.rating,
-      imageUrl: uploadedImageUrl
+      imageUrl: uploadedCommentImageUrl.value
     })
     
     // Reset form and refresh list
@@ -691,16 +719,12 @@ const getGradientClass = (spot: any) => {
   if (!spot) return 'bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-700'
   
   const gradients = [
-    'bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-700',
-    'bg-gradient-to-br from-purple-500 via-purple-600 to-pink-600',
-    'bg-gradient-to-br from-green-500 via-teal-600 to-cyan-700',
-    'bg-gradient-to-br from-orange-500 via-red-500 to-pink-600',
-    'bg-gradient-to-br from-indigo-500 via-purple-600 to-blue-700',
-    'bg-gradient-to-br from-teal-500 via-green-600 to-emerald-700',
-    'bg-gradient-to-br from-rose-500 via-pink-600 to-purple-700',
-    'bg-gradient-to-br from-amber-500 via-orange-600 to-red-700',
-    'bg-gradient-to-br from-cyan-500 via-blue-600 to-indigo-700',
-    'bg-gradient-to-br from-emerald-500 via-teal-600 to-cyan-700'
+    'bg-gradient-to-br from-tibet-blue via-tibet-dark to-tibet-red',
+    'bg-gradient-to-br from-tibet-red via-tibet-gold to-tibet-yellow',
+    'bg-gradient-to-br from-tibet-turquoise via-tibet-blue to-tibet-dark',
+    'bg-gradient-to-br from-tibet-brown via-tibet-red to-tibet-gold',
+    'bg-gradient-to-br from-tibet-dark via-tibet-blue to-tibet-turquoise',
+    'bg-gradient-to-br from-tibet-gold via-tibet-yellow to-tibet-white'
   ]
   
   const index = spot.id % gradients.length

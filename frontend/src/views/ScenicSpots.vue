@@ -1,9 +1,9 @@
 <template>
-  <div class="min-h-screen bg-tibet-white py-24">
+  <div class="min-h-screen tibet-page-shell py-24">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <!-- Header -->
       <div class="text-center mb-16 animate-fade-in">
-        <h1 class="text-4xl font-bold text-tibet-dark mb-4 tibetan-font">{{ t('spots.title') }}</h1>
+        <h1 class="tibet-heading inline-flex justify-center text-4xl font-bold text-tibet-dark mb-4 tibetan-font">{{ t('spots.title') }}</h1>
         <p class="text-lg text-tibet-brown/70 max-w-2xl mx-auto tibetan-font">
           {{ t('spots.subtitle') }}
         </p>
@@ -11,7 +11,7 @@
 
       <!-- Filters -->
       <div class="flex justify-center mb-12 animate-slide-up will-change-transform" style="animation-delay: 0.1s">
-        <div class="bg-white p-1.5 rounded-full shadow-lg border border-tibet-gold/25 flex space-x-2">
+        <div class="tibet-panel p-1.5 rounded-full flex space-x-2">
           <button 
             v-for="cat in categories" 
             :key="cat.value"
@@ -85,7 +85,7 @@
       <!-- Spots Grid -->
       <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
         <div v-for="(spot, index) in filteredSpots" :key="spot.id" 
-             class="group bg-white rounded-3xl shadow-sm hover:shadow-2xl card-hover overflow-hidden border border-tibet-gold/20 animate-on-scroll hover:border-tibet-gold/20 gpu-accelerated"
+             class="group tibet-card-elevated rounded-3xl shadow-sm hover:shadow-2xl card-hover overflow-hidden border border-tibet-gold/20 animate-on-scroll scroll-pop-card hover:border-tibet-gold/20 gpu-accelerated"
              :style="{ animationDelay: `${index * 80}ms` }">
           
           <!-- Image Container -->
@@ -217,22 +217,18 @@ const handleImageError = (event: Event) => {
   img.style.display = 'none'
   const parent = img.parentElement
   if (parent) {
-    parent.classList.add('bg-gradient-to-br', 'from-blue-500', 'to-purple-600')
+    parent.classList.add('bg-gradient-to-br', 'from-tibet-blue', 'to-tibet-red')
   }
 }
 
 const getGradientClass = (spot: any) => {
   const gradients = [
-    'bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-700',
-    'bg-gradient-to-br from-purple-500 via-purple-600 to-pink-600',
-    'bg-gradient-to-br from-green-500 via-teal-600 to-cyan-700',
-    'bg-gradient-to-br from-orange-500 via-red-500 to-pink-600',
-    'bg-gradient-to-br from-indigo-500 via-purple-600 to-blue-700',
-    'bg-gradient-to-br from-teal-500 via-green-600 to-emerald-700',
-    'bg-gradient-to-br from-rose-500 via-pink-600 to-purple-700',
-    'bg-gradient-to-br from-amber-500 via-orange-600 to-red-700',
-    'bg-gradient-to-br from-cyan-500 via-blue-600 to-indigo-700',
-    'bg-gradient-to-br from-emerald-500 via-teal-600 to-cyan-700'
+    'bg-gradient-to-br from-tibet-blue via-tibet-dark to-tibet-red',
+    'bg-gradient-to-br from-tibet-red via-tibet-gold to-tibet-yellow',
+    'bg-gradient-to-br from-tibet-turquoise via-tibet-blue to-tibet-dark',
+    'bg-gradient-to-br from-tibet-brown via-tibet-red to-tibet-gold',
+    'bg-gradient-to-br from-tibet-dark via-tibet-blue to-tibet-turquoise',
+    'bg-gradient-to-br from-tibet-gold via-tibet-yellow to-tibet-white'
   ]
   const index = spot.id % gradients.length
   return gradients[index]

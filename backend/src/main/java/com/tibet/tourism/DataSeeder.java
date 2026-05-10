@@ -10,8 +10,8 @@ import org.springframework.stereotype.Component;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
 import java.math.BigDecimal;
-import java.util.Arrays;
-import java.util.List;
+import java.time.LocalDateTime;
+import java.util.*;
 
 @Component
 public class DataSeeder implements CommandLineRunner {
@@ -204,6 +204,54 @@ public class DataSeeder implements CommandLineRunner {
                 System.out.println("已创建 user2 用户");
             }
         );
+
+        // 批量生成模拟用户（user3 ~ user98，共96个），使数据集达到100用户规模
+        long existingUserCount = userRepository.count();
+        if (existingUserCount < 100) {
+            System.out.println("批量生成模拟用户（user3 ~ user98）...");
+            String[][] nicknamesPool = {
+                {"丹增", "索朗", "格桑", "次仁", "巴桑", "普布", "洛桑", "拉姆", "央金", "米玛"},
+                {"张伟", "李娜", "王芳", "刘洋", "陈静", "杨帆", "赵敏", "黄磊", "周洁", "吴鑫"},
+                {"李明", "王丽", "张强", "刘娟", "陈鹏", "杨雪", "赵勇", "黄丽", "周明", "吴峰"},
+                {"王磊", "李婷", "张雪", "刘宇", "陈默", "杨光", "赵鑫", "黄慧", "周洋", "吴静"},
+                {"顿珠", "益西", "晋美", "曲珍", "达瓦", "尼玛", "卓嘎", "白玛", "琼达", "桑姆"},
+                {"林志", "何云", "高峰", "段宁", "贺敏", "许杰", "孙悦", "马超", "宋佳", "冯磊"},
+                {"钱进", "蒋华", "沈浩", "韩雪", "曹磊", "彭丹", "贾玲", "郭栋", "唐静", "顾涛"},
+                {"扎巴", "更敦", "夏迦", "朗杰", "丹巴", "仁增", "阿旺", "达杰", "多吉", "边巴"},
+                {"苏梅", "郑伟", "潘文", "蔡俊", "蒋丽", "余磊", "邓超", "方正", "石璐", "胡彬"},
+                {"熊光", "罗燕", "董磊", "袁静", "邹文", "文峰", "范娟", "秦勇", "柳刚", "易菲"}
+            };
+            String[] cities = {
+                "拉萨", "拉萨", "拉萨", "拉萨", // 拉萨 20%
+                "日喀则", "日喀则", "山南", "山南", "那曲", "那曲", "林芝", "林芝", "昌都", "昌都", "阿里", // 其他藏区 30%
+                "成都", "北京", "上海", "广州", "深圳", "杭州", "重庆", "武汉", "西安", "南京",
+                "天津", "长沙", "郑州", "青岛", "大连", "昆明", "苏州", "无锡", "宁波", "福州",
+                "厦门", "合肥", "沈阳", "长春", "哈尔滨", "兰州", "济南", "石家庄", "呼和浩特", "南宁" // 内地 50%
+            };
+
+            Random rand = new Random(42); // 固定种子保证可重复
+            int userNum = 3;
+            for (int i = 0; i < 96 && userRepository.count() < 100; i++) {
+                String username = "user" + userNum;
+                if (userRepository.existsByUsername(username)) {
+                    userNum++;
+                    continue;
+                }
+                String[] pool = nicknamesPool[rand.nextInt(nicknamesPool.length)];
+                String nickname = pool[rand.nextInt(pool.length)];
+                String city = cities[rand.nextInt(cities.length)];
+                User u = new User();
+                u.setUsername(username);
+                u.setPassword(passwordEncoder.encode("123456"));
+                u.setEncryptedPassword(passwordEncryptionService.encrypt("123456"));
+                u.setNickname(nickname);
+                u.setCity(city);
+                u.setRole(User.Role.USER);
+                userRepository.save(u);
+                userNum++;
+            }
+            System.out.println("批量生成模拟用户完成，当前用户总数: " + userRepository.count());
+        }
     }
 
     private void seedSpots() {
@@ -634,17 +682,129 @@ public class DataSeeder implements CommandLineRunner {
     }
 
     private void seedHistory() {
-        User user1 = userRepository.findByUsername("user1").get();
+        System.out.println("开始生成用户访问历史数据（目标：1000+条记录）...");
         List<ScenicSpot> spots = spotRepository.findAll();
-        
-        if (!spots.isEmpty()) {
-            createHistory(user1, spots.get(0), 5, 6, 240);
-            createHistory(user1, spots.get(1), 4, 3, 120);
-            
-            User user2 = userRepository.findByUsername("user2").get();
-            createHistory(user2, spots.get(2), 5, 8, 360);
-            createHistory(user2, spots.get(3), 5, 2, 90);
+        if (spots.isEmpty()) return;
+
+        List<User> users = userRepository.findAll();
+        if (users.size() < 2) return;
+
+        // 已有4条手动记录，补充至1000+条
+        long existingCount = historyRepository.count();
+        int targetTotal = 1200;
+        int toGenerate = targetTotal - (int) existingCount;
+        if (toGenerate <= 0) {
+            System.out.println("历史记录已足够: " + existingCount + " 条");
+            return;
         }
+
+        System.out.println("当前历史记录: " + existingCount + " 条，需生成: " + toGenerate + " 条");
+
+        Random rand = new Random(42);
+        LocalDateTime now = LocalDateTime.now();
+
+        // 景点索引分组：0-9热门，10-19中等，20-34冷门
+        int hotCount = Math.min(10, spots.size());
+        int midCount = Math.min(20, spots.size());
+
+        // 按用户分组生成不同行为模式
+        List<Long> tibetLhasaUsers = new ArrayList<>(); // 拉萨本地用户
+        List<Long> tibetOtherUsers = new ArrayList<>(); // 其他藏区用户
+        List<Long> inlandUsers = new ArrayList<>(); // 内地用户
+
+        for (User user : users) {
+            String city = user.getCity();
+            if (city == null || city.isEmpty()) continue;
+            if (city.equals("拉萨")) tibetLhasaUsers.add(user.getId());
+            else if (Arrays.asList("日喀则", "山南", "那曲", "林芝", "昌都", "阿里").contains(city)) tibetOtherUsers.add(user.getId());
+            else inlandUsers.add(user.getId());
+        }
+
+        List<UserVisitHistory> batch = new ArrayList<>(200);
+        int generated = 0;
+
+        while (generated < toGenerate) {
+            // 随机挑选用户
+            User user = users.get(rand.nextInt(users.size()));
+            String city = user.getCity();
+
+            // 根据用户画像决定景点偏好
+            int spotIdx;
+            double r = rand.nextDouble();
+            if ("拉萨".equals(city) || "日喀则".equals(city) || "山南".equals(city)) {
+                // 本地用户：偏好中等和冷门景点（短途可达）
+                spotIdx = r < 0.15 ? rand.nextInt(hotCount)
+                        : r < 0.6 ? rand.nextInt(midCount - hotCount) + hotCount
+                        : rand.nextInt(spots.size() - midCount) + midCount;
+            } else if ("那曲".equals(city) || "林芝".equals(city) || "昌都".equals(city) || "阿里".equals(city)) {
+                // 藏区用户：均衡分布
+                spotIdx = r < 0.3 ? rand.nextInt(hotCount)
+                        : r < 0.6 ? rand.nextInt(midCount - hotCount) + hotCount
+                        : rand.nextInt(spots.size() - midCount) + midCount;
+            } else {
+                // 内地用户：偏好热门景点
+                spotIdx = r < 0.55 ? rand.nextInt(hotCount)
+                        : r < 0.85 ? rand.nextInt(midCount - hotCount) + hotCount
+                        : rand.nextInt(spots.size() - midCount) + midCount;
+            }
+
+            ScenicSpot spot = spots.get(Math.min(spotIdx, spots.size() - 1));
+
+            // 检查是否已有该用户对该景点的记录
+            boolean exists = historyRepository.findByUserId(user.getId()).stream()
+                    .anyMatch(h -> h.getSpot() != null && h.getSpot().getId().equals(spot.getId()));
+            if (exists) continue;
+
+            // 评分分布：4-5分60%，3分25%，1-2分15%
+            double ratingRoll = rand.nextDouble();
+            int rating;
+            if (ratingRoll < 0.35) rating = 5;
+            else if (ratingRoll < 0.60) rating = 4;
+            else if (ratingRoll < 0.85) rating = 3;
+            else if (ratingRoll < 0.95) rating = 2;
+            else rating = 1;
+
+            // 点击数和停留时间与评分正相关
+            int clickCount = rating >= 4 ? rand.nextInt(8) + 3
+                    : rating == 3 ? rand.nextInt(5) + 2
+                    : rand.nextInt(3) + 1;
+            int dwellSeconds = rating >= 4 ? rand.nextInt(300) + 60
+                    : rating == 3 ? rand.nextInt(150) + 30
+                    : rand.nextInt(60) + 10;
+
+            // 访问时间在过去365天内
+            int daysAgo = rand.nextInt(365);
+            // 旺季(5-10月)概率更高
+            int monthRoll = rand.nextInt(12) + 1;
+            if (monthRoll >= 5 && monthRoll <= 10 && rand.nextDouble() < 0.7) {
+                daysAgo = rand.nextInt(180);
+            }
+
+            int actualDays = Math.min(daysAgo, 365);
+
+            UserVisitHistory h = new UserVisitHistory();
+            h.setUser(user);
+            h.setSpot(spot);
+            h.setRating(rating);
+            h.setClickCount(clickCount);
+            h.setDwellSeconds(dwellSeconds);
+            h.setVisitDate(now.minusDays(actualDays).minusHours(rand.nextInt(24)).minusMinutes(rand.nextInt(60)));
+
+            batch.add(h);
+            generated++;
+
+            if (batch.size() >= 200) {
+                historyRepository.saveAll(batch);
+                batch.clear();
+                if (generated % 400 == 0) {
+                    System.out.println("  已生成 " + generated + " 条记录...");
+                }
+            }
+        }
+        if (!batch.isEmpty()) {
+            historyRepository.saveAll(batch);
+        }
+        System.out.println("用户访问历史数据生成完成，总计: " + historyRepository.count() + " 条");
     }
 
     private void createHistory(User user, ScenicSpot spot, Integer rating, Integer clickCount, Integer dwellSeconds) {

@@ -1,19 +1,19 @@
 <template>
-  <div class="min-h-screen bg-stone-50 py-12">
+  <div class="min-h-screen tibet-page-shell py-24">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="text-center mb-10">
-        <h1 class="text-4xl font-bold text-stone-800 mb-4">{{ t('heritage.title') }}</h1>
-        <p class="text-lg text-stone-600 max-w-3xl mx-auto mb-3">
+        <h1 class="tibet-heading inline-flex justify-center text-4xl font-bold text-tibet-dark mb-4">{{ t('heritage.title') }}</h1>
+        <p class="text-lg text-tibet-brown/70 max-w-3xl mx-auto mb-3">
           {{ t('heritage.description') }}
         </p>
-        <p class="text-sm text-stone-500 max-w-3xl mx-auto">
+        <p class="text-sm text-tibet-brown/50 max-w-3xl mx-auto">
           {{ t('heritage.description2') }}
         </p>
       </div>
 
       <!-- 非遗大类一览（简洁卡片设计） -->
       <section class="mb-14">
-        <div class="bg-white rounded-3xl border border-stone-200 shadow-sm px-5 sm:px-8 lg:px-10 py-8 lg:py-10">
+        <div class="tibet-panel rounded-3xl px-5 sm:px-8 lg:px-10 py-8 lg:py-10">
           <!-- 区块标题 -->
           <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-8">
             <div>
@@ -37,14 +37,14 @@
               v-for="(category, index) in heritageCategories"
               :key="category.name"
               type="button"
-              class="group bg-stone-50 rounded-2xl border border-stone-200 px-4 py-4 sm:px-5 sm:py-5 flex flex-col gap-3 hover:border-red-200 hover:bg-white hover:shadow-md transition duration-200 text-left w-full cursor-pointer"
+              class="group tibet-card-elevated rounded-2xl border border-tibet-gold/20 px-4 py-4 sm:px-5 sm:py-5 flex flex-col gap-3 hover:border-tibet-red/25 hover:shadow-md transition duration-200 text-left w-full cursor-pointer"
               :style="{ transitionDelay: (index * 60) + 'ms' }"
               @click="toggleCategory(category.name)"
             >
               <div class="flex items-center gap-4 w-full">
                 <!-- 图标 -->
                 <div class="flex-shrink-0">
-                  <div class="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-red-500/90 to-amber-400/90 text-white flex items-center justify-center shadow-sm group-hover:shadow-md group-hover:scale-[1.03] transform transition">
+                  <div class="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-tibet-red via-tibet-gold to-tibet-yellow text-white flex items-center justify-center shadow-sm group-hover:shadow-md group-hover:scale-[1.03] transform transition">
                     <span class="text-xl sm:text-2xl">
                       {{ category.icon }}
                     </span>
@@ -54,14 +54,14 @@
                 <!-- 文本 -->
                 <div class="min-w-0 flex-1">
                   <div class="flex items-center gap-2 mb-1">
-                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-red-50 text-red-700 border border-red-100">
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-tibet-red/10 text-tibet-red border border-tibet-red/15">
                       {{ category.prefix }}
                     </span>
                   </div>
-                  <p class="text-base sm:text-lg font-semibold text-stone-900 truncate">
+                  <p class="text-base sm:text-lg font-semibold text-tibet-dark truncate">
                     {{ category.name }}
                   </p>
-                  <p class="text-xs text-stone-400 mt-0.5">
+                  <p class="text-xs text-tibet-brown/45 mt-0.5">
                     {{ t('heritage.clickToExpand') }}
                   </p>
                 </div>
@@ -70,25 +70,25 @@
               <!-- 卡片内部可滚动的国家级非遗项目列表 -->
               <div
                 v-if="activeCategory === category.name"
-                class="mt-1 w-full rounded-xl bg-white border border-red-100/70 px-3 py-2 max-h-44 overflow-y-auto text-xs sm:text-sm text-stone-700 space-y-2"
+                class="mt-1 w-full rounded-xl bg-tibet-white/70 border border-tibet-gold/25 px-3 py-2 max-h-44 overflow-y-auto text-xs sm:text-sm text-tibet-brown/80 space-y-2"
               >
-                <p class="text-[11px] text-stone-400">
+                <p class="text-[11px] text-tibet-brown/45">
                   {{ t('heritage.nationalItems') }} · {{ getItemsByCategory(category.name).length }} {{ t('heritage.items') }}
                 </p>
                 <div
                   v-for="item in getItemsByCategory(category.name)"
                   :key="item.id"
-                  class="border-b border-stone-100 last:border-b-0 pb-1.5 last:pb-0"
+                  class="border-b border-tibet-gold/15 last:border-b-0 pb-1.5 last:pb-0"
                 >
                   <div class="flex items-center justify-between gap-2">
-                    <p class="font-medium text-stone-900 mb-0.5 truncate">
+                    <p class="font-medium text-tibet-dark mb-0.5 truncate">
                       {{ item.name }}
                     </p>
                     <a
                       :href="buildBaikeUrl(item.name)"
                       target="_blank"
                       rel="noopener"
-                      class="flex-shrink-0 inline-flex items-center gap-0.5 text-[10px] text-red-500 hover:text-red-700 hover:underline transition"
+                      class="flex-shrink-0 inline-flex items-center gap-0.5 text-[10px] text-tibet-red hover:text-tibet-brown hover:underline transition"
                       :title="t('heritage.openBaike') + ': ' + item.name"
                       @click.stop
                     >
@@ -98,7 +98,7 @@
                       {{ t('heritage.openBaike') }}
                     </a>
                   </div>
-                  <p class="text-[11px] leading-snug text-stone-600 line-clamp-2">
+                  <p class="text-[11px] leading-snug text-tibet-brown/70 line-clamp-2">
                     {{ item.description }}
                   </p>
                 </div>
@@ -117,8 +117,8 @@
       <!-- 代表性非遗项目：上来先展示几个可以点击的典型案例 -->
       <section v-if="!loading && heritageItems.length" class="mb-12">
         <div class="flex items-center justify-between mb-4">
-          <h2 class="text-2xl font-bold text-stone-800">{{ t('heritage.representativeTitle') }}</h2>
-          <p class="text-sm text-stone-500 hidden md:block">
+          <h2 class="tibet-heading text-2xl font-bold text-tibet-dark">{{ t('heritage.representativeTitle') }}</h2>
+          <p class="text-sm text-tibet-brown/50 hidden md:block">
             {{ t('heritage.representativeDescription') }}
           </p>
         </div>
@@ -127,21 +127,21 @@
             v-for="item in representativeItems"
             :key="item.id"
             @click="openDetail(item)"
-            class="bg-white rounded-xl shadow-sm border border-stone-200 p-5 text-left hover:shadow-lg hover:border-red-200 transition duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+            class="tibet-card-elevated rounded-2xl p-5 text-left hover:shadow-lg hover:border-tibet-red/25 transition duration-200 focus:outline-none focus:ring-2 focus:ring-tibet-gold focus:ring-offset-2"
           >
             <div class="mb-3">
-              <span class="inline-block px-3 py-1 rounded-full text-xs font-medium bg-red-50 text-red-700">
+              <span class="inline-block px-3 py-1 rounded-full text-xs font-medium bg-tibet-red/10 text-tibet-red border border-tibet-red/15">
                 {{ item.category }}
               </span>
             </div>
-            <h3 class="text-lg font-semibold text-stone-900 mb-2 line-clamp-1">
+            <h3 class="text-lg font-semibold text-tibet-dark mb-2 line-clamp-1">
               {{ item.name }}
             </h3>
-            <p class="text-sm text-stone-600 mb-3 line-clamp-3">
+            <p class="text-sm text-tibet-brown/70 mb-3 line-clamp-3">
               {{ item.description }}
             </p>
             <div class="flex items-center justify-between gap-2">
-              <span class="inline-flex items-center text-sm font-medium text-red-600">
+              <span class="inline-flex items-center text-sm font-medium text-tibet-red">
                 {{ t('heritage.viewDetails') }}
                 <svg
                   xmlns="http://www.w3.org/2000/svg"

@@ -1,20 +1,20 @@
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-purple-50/30">
+  <div class="min-h-screen tibet-page-shell">
     <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
       <!-- 页面标题 -->
       <div class="text-center mb-12">
-        <h1 class="text-4xl md:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 mb-4">
+        <h1 class="tibet-heading inline-flex justify-center text-4xl md:text-5xl font-bold text-tibet-dark mb-4">
           隐私政策
         </h1>
-        <p class="text-gray-500 text-sm">最后更新日期：2025年11月</p>
+        <p class="text-tibet-brown/50 text-sm">最后更新日期：2025年11月</p>
       </div>
 
       <!-- 内容区域 -->
-      <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl p-8 md:p-12 space-y-8">
+      <div class="tibet-panel rounded-2xl p-8 md:p-12 space-y-8">
         <!-- 引言 -->
         <section>
           <h2 class="text-2xl font-semibold text-gray-900 mb-4 flex items-center">
-            <span class="w-1 h-8 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full mr-3"></span>
+            <span class="w-1 h-8 bg-gradient-to-b from-tibet-gold to-tibet-red rounded-full mr-3"></span>
             引言
           </h2>
           <p class="text-gray-700 leading-relaxed">
@@ -25,7 +25,7 @@
         <!-- 信息收集 -->
         <section>
           <h2 class="text-2xl font-semibold text-gray-900 mb-4 flex items-center">
-            <span class="w-1 h-8 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full mr-3"></span>
+            <span class="w-1 h-8 bg-gradient-to-b from-tibet-gold to-tibet-red rounded-full mr-3"></span>
             一、我们收集的信息
           </h2>
           <div class="space-y-4 text-gray-700">
@@ -59,7 +59,7 @@
         <!-- 信息使用 -->
         <section>
           <h2 class="text-2xl font-semibold text-gray-900 mb-4 flex items-center">
-            <span class="w-1 h-8 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full mr-3"></span>
+            <span class="w-1 h-8 bg-gradient-to-b from-tibet-gold to-tibet-red rounded-full mr-3"></span>
             二、信息的使用目的
           </h2>
           <ul class="space-y-3 text-gray-700 list-disc list-inside">
@@ -76,7 +76,7 @@
         <!-- 信息共享 -->
         <section>
           <h2 class="text-2xl font-semibold text-gray-900 mb-4 flex items-center">
-            <span class="w-1 h-8 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full mr-3"></span>
+            <span class="w-1 h-8 bg-gradient-to-b from-tibet-gold to-tibet-red rounded-full mr-3"></span>
             三、信息的共享与披露
           </h2>
           <div class="space-y-4 text-gray-700">
@@ -105,7 +105,7 @@
         <!-- 信息安全 -->
         <section>
           <h2 class="text-2xl font-semibold text-gray-900 mb-4 flex items-center">
-            <span class="w-1 h-8 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full mr-3"></span>
+            <span class="w-1 h-8 bg-gradient-to-b from-tibet-gold to-tibet-red rounded-full mr-3"></span>
             四、信息安全
           </h2>
           <p class="text-gray-700 leading-relaxed">
@@ -116,7 +116,7 @@
         <!-- 您的权利 -->
         <section>
           <h2 class="text-2xl font-semibold text-gray-900 mb-4 flex items-center">
-            <span class="w-1 h-8 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full mr-3"></span>
+            <span class="w-1 h-8 bg-gradient-to-b from-tibet-gold to-tibet-red rounded-full mr-3"></span>
             五、您的权利
           </h2>
           <div class="space-y-3 text-gray-700">
@@ -135,7 +135,7 @@
         <!-- Cookie和追踪技术 -->
         <section>
           <h2 class="text-2xl font-semibold text-gray-900 mb-4 flex items-center">
-            <span class="w-1 h-8 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full mr-3"></span>
+            <span class="w-1 h-8 bg-gradient-to-b from-tibet-gold to-tibet-red rounded-full mr-3"></span>
             六、Cookie和追踪技术
           </h2>
           <p class="text-gray-700 leading-relaxed mb-3">
@@ -146,7 +146,7 @@
         <!-- 未成年人保护 -->
         <section>
           <h2 class="text-2xl font-semibold text-gray-900 mb-4 flex items-center">
-            <span class="w-1 h-8 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full mr-3"></span>
+            <span class="w-1 h-8 bg-gradient-to-b from-tibet-gold to-tibet-red rounded-full mr-3"></span>
             七、未成年人保护
           </h2>
           <p class="text-gray-700 leading-relaxed">
@@ -157,7 +157,7 @@
         <!-- 政策更新 -->
         <section>
           <h2 class="text-2xl font-semibold text-gray-900 mb-4 flex items-center">
-            <span class="w-1 h-8 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full mr-3"></span>
+            <span class="w-1 h-8 bg-gradient-to-b from-tibet-gold to-tibet-red rounded-full mr-3"></span>
             八、隐私政策的更新
           </h2>
           <p class="text-gray-700 leading-relaxed">
@@ -168,7 +168,7 @@
         <!-- 联系我们 -->
         <section class="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-6 border border-blue-100">
           <h2 class="text-2xl font-semibold text-gray-900 mb-4 flex items-center">
-            <span class="w-1 h-8 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full mr-3"></span>
+            <span class="w-1 h-8 bg-gradient-to-b from-tibet-gold to-tibet-red rounded-full mr-3"></span>
             九、联系我们
           </h2>
           <p class="text-gray-700 leading-relaxed mb-4">
@@ -186,7 +186,7 @@
       <div class="text-center mt-8">
         <router-link 
           to="/" 
-          class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-full font-semibold hover:from-blue-600 hover:to-purple-600 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl">
+          class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-tibet-gold to-tibet-red text-white rounded-full font-semibold hover:from-blue-600 hover:to-purple-600 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
           </svg>

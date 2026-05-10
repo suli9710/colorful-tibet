@@ -1,20 +1,15 @@
 <template>
-  <div class="route-planner-page min-h-screen relative overflow-hidden">
-    <!-- Background ambient orbs -->
-    <div class="absolute inset-0 pointer-events-none overflow-hidden">
-      <div class="absolute -top-32 left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full bg-gradient-to-b from-sky-400/12 via-indigo-400/8 to-transparent blur-3xl"></div>
-      <div class="absolute top-1/3 -right-32 w-80 h-80 rounded-full bg-amber-300/8 blur-3xl"></div>
-      <div class="absolute bottom-0 left-0 w-96 h-96 rounded-full bg-rose-300/6 blur-3xl"></div>
-    </div>
+  <div class="route-planner-page tibet-page-shell min-h-screen relative overflow-hidden">
+    <div class="absolute inset-0 pointer-events-none overflow-hidden opacity-45 tibet-cloud-pattern"></div>
 
     <div class="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-20">
       <!-- ===== HEADER ===== -->
       <header class="text-center mb-12 animate-fade-in">
-        <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/60 border border-white/80 backdrop-blur text-xs font-semibold text-tibet-red tracking-widest uppercase mb-6">
+        <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/70 border border-tibet-gold/30 backdrop-blur text-xs font-semibold text-tibet-red tracking-widest uppercase mb-6">
           <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
           {{ t('routePlanner.aiGeneratorLabel') }}
         </div>
-        <h1 class="text-4xl md:text-5xl lg:text-6xl font-bold text-tibet-dark tracking-tight leading-tight">
+        <h1 class="tibet-heading inline-flex justify-center text-4xl md:text-5xl lg:text-6xl font-bold text-tibet-dark tracking-tight leading-tight">
           {{ t('routePlanner.title') }}
         </h1>
         <p class="mt-4 text-lg text-tibet-brown/70 max-w-2xl mx-auto leading-relaxed">
@@ -23,7 +18,7 @@
         <!-- Tibetan ornament divider -->
         <div class="mt-6 flex items-center justify-center gap-3">
           <span class="h-px w-12 bg-gradient-to-r from-transparent to-tibet-gold/50"></span>
-          <span class="text-tibet-gold/60 text-sm">✦</span>
+          <span class="h-2.5 w-2.5 rotate-45 border border-tibet-gold/70 bg-tibet-gold/20"></span>
           <span class="h-px w-12 bg-gradient-to-l from-transparent to-tibet-gold/50"></span>
         </div>
       </header>
@@ -183,15 +178,15 @@
                 <div class="flex items-center gap-3 mb-3">
                   <span class="relative flex h-3 w-3">
                     <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
-                    <span class="relative inline-flex rounded-full h-3 w-3 bg-sky-500"></span>
+                    <span class="relative inline-flex rounded-full h-3 w-3 bg-tibet-turquoise"></span>
                   </span>
-                  <span class="text-sm font-semibold text-sky-700">{{ streaming ? t('routePlanner.aiStreamingLabel') : t('routePlanner.preparingLabel') }}</span>
-                  <span v-if="charCount > 0" class="ml-auto text-xs text-sky-500 font-mono">{{ charCount }} {{ t('routePlanner.charCountUnit') }}</span>
+                  <span class="text-sm font-semibold text-tibet-blue">{{ streaming ? t('routePlanner.aiStreamingLabel') : t('routePlanner.preparingLabel') }}</span>
+                  <span v-if="charCount > 0" class="ml-auto text-xs text-tibet-blue/70 font-mono">{{ charCount }} {{ t('routePlanner.charCountUnit') }}</span>
                 </div>
-                <div class="h-1.5 rounded-full bg-sky-100 overflow-hidden">
-                  <div class="h-full rounded-full bg-gradient-to-r from-sky-400 via-indigo-400 to-purple-400 animate-shimmer-stream" :class="{ 'w-full': !streaming, 'animate-pulse': streaming }"></div>
+                <div class="h-1.5 rounded-full bg-tibet-gold/15 overflow-hidden">
+                  <div class="h-full rounded-full bg-gradient-to-r from-tibet-blue via-tibet-turquoise to-tibet-gold animate-shimmer-stream" :class="{ 'w-full': !streaming, 'animate-pulse': streaming }"></div>
                 </div>
-                <p class="mt-2 text-xs text-sky-600/70">{{ t('routePlanner.waitingTime') }}</p>
+                <p class="mt-2 text-xs text-tibet-brown/60">{{ t('routePlanner.waitingTime') }}</p>
               </div>
             </transition>
           </div>
@@ -560,10 +555,7 @@ onBeforeUnmount(() => {
 
 /* ===== Page Background ===== */
 .route-planner-page {
-  background:
-    radial-gradient(ellipse at top, rgba(14, 165, 233, 0.06), transparent 50%),
-    radial-gradient(ellipse at bottom left, rgba(245, 158, 11, 0.04), transparent 40%),
-    linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+  background-color: #F7F3EE;
 }
 
 /* ===== Prose overrides ===== */
@@ -577,9 +569,7 @@ onBeforeUnmount(() => {
 /* ===== Responsive ===== */
 @media (max-width: 640px) {
   .route-planner-page {
-    background:
-      radial-gradient(ellipse at top, rgba(14, 165, 233, 0.04), transparent 40%),
-      linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+    background-color: #F7F3EE;
   }
 }
 </style>

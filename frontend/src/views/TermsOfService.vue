@@ -1,20 +1,20 @@
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-purple-50/30">
+  <div class="min-h-screen tibet-page-shell">
     <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
       <!-- 页面标题 -->
       <div class="text-center mb-12">
-        <h1 class="text-4xl md:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 mb-4">
+        <h1 class="tibet-heading inline-flex justify-center text-4xl md:text-5xl font-bold text-tibet-dark mb-4">
           {{ t('terms.title') }}
         </h1>
-        <p class="text-gray-500 text-sm">{{ t('terms.lastUpdated') }}</p>
+        <p class="text-tibet-brown/50 text-sm">{{ t('terms.lastUpdated') }}</p>
       </div>
 
       <!-- 内容区域 -->
-      <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl p-8 md:p-12 space-y-8">
+      <div class="tibet-panel rounded-2xl p-8 md:p-12 space-y-8">
         <!-- 引言 -->
         <section>
           <h2 class="text-2xl font-semibold text-gray-900 mb-4 flex items-center">
-            <span class="w-1 h-8 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full mr-3"></span>
+            <span class="w-1 h-8 bg-gradient-to-b from-tibet-gold to-tibet-red rounded-full mr-3"></span>
             引言
           </h2>
           <p class="text-gray-700 leading-relaxed">
@@ -25,7 +25,7 @@
         <!-- 服务描述 -->
         <section>
           <h2 class="text-2xl font-semibold text-gray-900 mb-4 flex items-center">
-            <span class="w-1 h-8 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full mr-3"></span>
+            <span class="w-1 h-8 bg-gradient-to-b from-tibet-gold to-tibet-red rounded-full mr-3"></span>
             一、服务描述
           </h2>
           <div class="space-y-3 text-gray-700">
@@ -45,7 +45,7 @@
         <!-- 用户账户 -->
         <section>
           <h2 class="text-2xl font-semibold text-gray-900 mb-4 flex items-center">
-            <span class="w-1 h-8 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full mr-3"></span>
+            <span class="w-1 h-8 bg-gradient-to-b from-tibet-gold to-tibet-red rounded-full mr-3"></span>
             二、用户账户
           </h2>
           <div class="space-y-4 text-gray-700">
@@ -73,7 +73,7 @@
         <!-- 用户行为规范 -->
         <section>
           <h2 class="text-2xl font-semibold text-gray-900 mb-4 flex items-center">
-            <span class="w-1 h-8 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full mr-3"></span>
+            <span class="w-1 h-8 bg-gradient-to-b from-tibet-gold to-tibet-red rounded-full mr-3"></span>
             三、用户行为规范
           </h2>
           <div class="space-y-4 text-gray-700">
@@ -96,7 +96,7 @@
         <!-- 知识产权 -->
         <section>
           <h2 class="text-2xl font-semibold text-gray-900 mb-4 flex items-center">
-            <span class="w-1 h-8 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full mr-3"></span>
+            <span class="w-1 h-8 bg-gradient-to-b from-tibet-gold to-tibet-red rounded-full mr-3"></span>
             四、知识产权
           </h2>
           <div class="space-y-4 text-gray-700">
@@ -124,7 +124,7 @@
         <!-- 服务变更和中断 -->
         <section>
           <h2 class="text-2xl font-semibold text-gray-900 mb-4 flex items-center">
-            <span class="w-1 h-8 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full mr-3"></span>
+            <span class="w-1 h-8 bg-gradient-to-b from-tibet-gold to-tibet-red rounded-full mr-3"></span>
             五、服务变更和中断
           </h2>
           <p class="text-gray-700 leading-relaxed">
@@ -135,7 +135,7 @@
         <!-- 免责声明 -->
         <section>
           <h2 class="text-2xl font-semibold text-gray-900 mb-4 flex items-center">
-            <span class="w-1 h-8 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full mr-3"></span>
+            <span class="w-1 h-8 bg-gradient-to-b from-tibet-gold to-tibet-red rounded-full mr-3"></span>
             六、免责声明
           </h2>
           <div class="space-y-4 text-gray-700">
@@ -155,7 +155,7 @@
         <!-- 第三方链接和服务 -->
         <section>
           <h2 class="text-2xl font-semibold text-gray-900 mb-4 flex items-center">
-            <span class="w-1 h-8 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full mr-3"></span>
+            <span class="w-1 h-8 bg-gradient-to-b from-tibet-gold to-tibet-red rounded-full mr-3"></span>
             七、第三方链接和服务
           </h2>
           <p class="text-gray-700 leading-relaxed">
@@ -166,7 +166,7 @@
         <!-- 赔偿 -->
         <section>
           <h2 class="text-2xl font-semibold text-gray-900 mb-4 flex items-center">
-            <span class="w-1 h-8 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full mr-3"></span>
+            <span class="w-1 h-8 bg-gradient-to-b from-tibet-gold to-tibet-red rounded-full mr-3"></span>
             八、赔偿
           </h2>
           <p class="text-gray-700 leading-relaxed">
@@ -177,7 +177,7 @@
         <!-- 适用法律和争议解决 -->
         <section>
           <h2 class="text-2xl font-semibold text-gray-900 mb-4 flex items-center">
-            <span class="w-1 h-8 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full mr-3"></span>
+            <span class="w-1 h-8 bg-gradient-to-b from-tibet-gold to-tibet-red rounded-full mr-3"></span>
             九、适用法律和争议解决
           </h2>
           <p class="text-gray-700 leading-relaxed">
@@ -188,7 +188,7 @@
         <!-- 条款修改 -->
         <section>
           <h2 class="text-2xl font-semibold text-gray-900 mb-4 flex items-center">
-            <span class="w-1 h-8 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full mr-3"></span>
+            <span class="w-1 h-8 bg-gradient-to-b from-tibet-gold to-tibet-red rounded-full mr-3"></span>
             十、条款的修改
           </h2>
           <p class="text-gray-700 leading-relaxed">
@@ -199,7 +199,7 @@
         <!-- 联系我们 -->
         <section class="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-6 border border-blue-100">
           <h2 class="text-2xl font-semibold text-gray-900 mb-4 flex items-center">
-            <span class="w-1 h-8 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full mr-3"></span>
+            <span class="w-1 h-8 bg-gradient-to-b from-tibet-gold to-tibet-red rounded-full mr-3"></span>
             十一、联系我们
           </h2>
           <p class="text-gray-700 leading-relaxed mb-4">
@@ -217,7 +217,7 @@
       <div class="text-center mt-8">
         <router-link 
           to="/" 
-          class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-full font-semibold hover:from-blue-600 hover:to-purple-600 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl">
+          class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-tibet-gold to-tibet-red text-white rounded-full font-semibold hover:from-blue-600 hover:to-purple-600 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
           </svg>

@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-tibet-white">
+  <div class="min-h-screen tibet-page-shell">
     <!-- Hero Section: Multi-layer Parallax -->
     <div class="relative h-[calc(100vh-5rem)] md:h-[calc(100vh-6rem)] flex items-center justify-center overflow-hidden -mt-20 md:-mt-24">
       <!-- Layer 0: Sky gradient base -->
@@ -70,13 +70,13 @@
         <p class="text-lg text-tibet-brown/70 tibetan-font">{{ t('home.hotSpotsDescription') }}</p>
       </div>
       
-      <div class="bg-white rounded-3xl p-6 shadow-2xl animate-on-scroll">
+      <div class="rounded-3xl p-6 shadow-2xl animate-on-scroll scroll-pop-card tibet-panel">
         <HeatMap />
       </div>
     </div>
 
     <!-- Recommendations Section -->
-    <div class="py-24 bg-white">
+    <div class="py-24 tibet-section-band">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between items-end mb-12 animate-on-scroll">
           <div>
@@ -97,7 +97,7 @@
 
         <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           <div v-for="(spot, index) in recommendedSpots" :key="spot.id"
-               class="group tibet-card-elevated overflow-hidden animate-on-scroll gpu-accelerated"
+               class="group tibet-card-elevated overflow-hidden animate-on-scroll scroll-pop-card gpu-accelerated"
                :style="{ animationDelay: `${index * 100}ms` }">
             <div class="relative h-72 overflow-hidden">
               <img :src="spot.imageUrl" :alt="spot.name"

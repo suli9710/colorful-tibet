@@ -14,6 +14,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 
 @Configuration
 @EnableMethodSecurity
@@ -68,7 +69,9 @@ public class WebSecurityConfig {
                     .requestMatchers("/api/heritage/**").permitAll()
                     .requestMatchers("/images/**").permitAll()
                     .requestMatchers("/uploads/**").permitAll()
-                    .requestMatchers("/api/routes/generate/**").permitAll() // AI生成及流式端点公开
+                    // AI生成及流式端点公开 — 使用 AntPathRequestMatcher 避免 MvcRequestMatcher 匹配不到
+                    .requestMatchers(new AntPathRequestMatcher("/api/routes/generate", "POST")).permitAll()
+                    .requestMatchers(new AntPathRequestMatcher("/api/routes/generate/**", "POST")).permitAll()
                     // 分享路线相关的GET请求允许匿名访问（必须在 /api/routes/** 之前）
                     .requestMatchers(HttpMethod.GET, "/api/routes/shared").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/routes/shared/**").permitAll()

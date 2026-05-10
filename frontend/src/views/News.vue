@@ -1,21 +1,21 @@
 <template>
-  <div class="min-h-screen bg-stone-50 py-12">
+  <div class="min-h-screen tibet-page-shell py-24">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="text-center mb-12 animate-on-scroll">
-        <h1 class="text-4xl font-bold text-stone-800 mb-4">{{ t('news.title') }}</h1>
-        <p class="text-lg text-stone-600">{{ t('news.description') }}</p>
+        <h1 class="tibet-heading inline-flex justify-center text-4xl font-bold text-tibet-dark mb-4">{{ t('news.title') }}</h1>
+        <p class="text-lg text-tibet-brown/70">{{ t('news.description') }}</p>
       </div>
 
-      <div class="flex justify-center mb-8 space-x-4 animate-on-scroll">
+      <div class="flex justify-center mb-8 gap-3 animate-on-scroll flex-wrap">
         <button 
           v-for="cat in categories" 
           :key="cat.value"
           @click="selectedCategory = cat.value"
           :class="[
-            'px-4 py-2 rounded-full text-sm font-medium transition-colors duration-200',
-            selectedCategory === cat.value 
-              ? 'bg-red-600 text-white' 
-              : 'bg-white text-stone-600 hover:bg-stone-100 border border-stone-200'
+              'px-4 py-2 rounded-full text-sm font-medium transition-colors duration-200 border',
+              selectedCategory === cat.value
+                ? 'bg-tibet-red text-tibet-yellow border-tibet-red shadow-md shadow-tibet-red/15'
+                : 'bg-white/80 text-tibet-brown/80 hover:bg-tibet-gold/10 hover:text-tibet-dark border-tibet-gold/25'
           ]"
         >
           {{ cat.label }}
@@ -27,20 +27,20 @@
       </div>
 
       <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div v-for="(item, index) in filteredNews" :key="item.id" class="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300 flex flex-col h-full animate-on-scroll"
+        <div v-for="(item, index) in filteredNews" :key="item.id" class="tibet-card-elevated rounded-2xl overflow-hidden hover:shadow-lg transition-shadow duration-300 flex flex-col h-full animate-on-scroll scroll-pop-card"
              :style="{ animationDelay: `${index * 80}ms` }">
           <div class="w-full h-48 relative flex-shrink-0">
             <img :src="item.imageUrl || '/images/news/default-news.jpg'" :alt="item.title" class="w-full h-full object-cover" onerror="this.src='/images/spots/布达拉宫.jpg'">
-            <div class="absolute top-0 left-0 bg-red-600 text-white px-3 py-1 m-4 rounded-full text-xs font-medium">
+            <div class="absolute top-0 left-0 bg-tibet-red text-tibet-yellow px-3 py-1 m-4 rounded-full text-xs font-medium shadow-lg">
               {{ getCategoryLabel(item.category) }}
             </div>
           </div>
           <div class="p-6 flex flex-col flex-grow">
-            <h3 class="text-xl font-bold text-stone-800 mb-2 line-clamp-2">{{ item.title }}</h3>
-            <p class="text-stone-500 text-sm mb-3">{{ formatDate(item.createdAt) }} · {{ item.viewCount }} {{ t('news.viewCount') }}</p>
-            <p class="text-stone-600 line-clamp-3 mb-4 flex-grow">{{ item.content }}</p>
+            <h3 class="text-xl font-bold text-tibet-dark mb-2 line-clamp-2">{{ item.title }}</h3>
+            <p class="text-tibet-brown/50 text-sm mb-3">{{ formatDate(item.createdAt) }} · {{ item.viewCount }} {{ t('news.viewCount') }}</p>
+            <p class="text-tibet-brown/70 line-clamp-3 mb-4 flex-grow">{{ item.content }}</p>
             <div class="mt-auto">
-              <button @click="openDetail(item)" class="text-red-600 hover:text-red-700 font-medium flex items-center">
+              <button @click="openDetail(item)" class="tibet-link font-medium flex items-center">
                 {{ t('common.readMore') || '阅读全文' }}
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
@@ -55,7 +55,7 @@
       <transition name="modal">
         <div v-if="selectedItem" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50" @click="closeDetail">
           <transition name="modal-content" appear>
-            <div v-if="selectedItem" class="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto" @click.stop>
+            <div v-if="selectedItem" class="tibet-card-elevated rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto" @click.stop>
               <div class="relative h-64 md:h-96">
                 <img :src="selectedItem.imageUrl || '/images/news/default-news.jpg'" :alt="selectedItem.title" class="w-full h-full object-cover" onerror="this.src='/images/spots/布达拉宫.jpg'">
                 <button @click="closeDetail" class="absolute top-4 right-4 bg-black/50 text-white p-2 rounded-full hover:bg-black/70 transition-colors">
@@ -66,11 +66,11 @@
               </div>
               <div class="p-8">
                 <div class="flex items-center justify-between mb-4">
-                  <span class="bg-red-100 text-red-800 px-3 py-1 rounded-full text-sm font-medium">{{ getCategoryLabel(selectedItem.category) }}</span>
-                  <span class="text-stone-500 text-sm">{{ formatDate(selectedItem.createdAt) }}</span>
+                  <span class="bg-tibet-red/10 text-tibet-red border border-tibet-red/15 px-3 py-1 rounded-full text-sm font-medium">{{ getCategoryLabel(selectedItem.category) }}</span>
+                  <span class="text-tibet-brown/50 text-sm">{{ formatDate(selectedItem.createdAt) }}</span>
                 </div>
-                <h2 class="text-3xl font-bold text-stone-800 mb-6">{{ selectedItem.title }}</h2>
-                <div class="prose max-w-none text-stone-600 whitespace-pre-line">
+                <h2 class="text-3xl font-bold text-tibet-dark mb-6">{{ selectedItem.title }}</h2>
+                <div class="prose max-w-none text-tibet-brown/75 whitespace-pre-line">
                   {{ selectedItem.content }}
                 </div>
               </div>

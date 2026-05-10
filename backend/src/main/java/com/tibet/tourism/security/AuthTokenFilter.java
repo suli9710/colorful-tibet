@@ -76,12 +76,18 @@ public class AuthTokenFilter extends OncePerRequestFilter {
             || path.startsWith("/api/news/")
             || path.equals("/api/heritage")
             || path.startsWith("/api/heritage/")
-            || path.startsWith("/api/routes/generate")
+            || path.equals("/api/routes/generate")
+            || path.startsWith("/api/routes/generate/")
             || (path.startsWith("/api/routes/shared") && "GET".equals(request.getMethod()))
             || path.equals("/api/carousels")
             || path.startsWith("/api/test/")
             || path.startsWith("/h2-console/")
-            || (path.startsWith("/api/community/questions") && "GET".equals(request.getMethod()));
+            || (path.startsWith("/api/community/questions") && "GET".equals(request.getMethod()))
+            || path.startsWith("/api/hotel-bookings/hotels")
+            || path.startsWith("/api/hotel-bookings/room-types")
+            || path.startsWith("/api/comments/")
+            || path.startsWith("/images/")
+            || path.startsWith("/uploads/");
     }
 
     private String parseJwt(HttpServletRequest request) {

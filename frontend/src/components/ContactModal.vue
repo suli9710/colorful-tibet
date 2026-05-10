@@ -9,8 +9,8 @@
              @click.stop
              class="relative w-full max-w-lg overflow-hidden rounded-3xl shadow-2xl animate-float">
           
-          <div class="absolute inset-0 bg-gradient-to-br from-white/90 via-white/80 to-white/70 backdrop-blur-2xl"></div>
-          <div class="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-purple-500/10 to-pink-500/10 animate-gradient"></div>
+          <div class="absolute inset-0 bg-gradient-to-br from-white/95 via-tibet-white/90 to-white/80 backdrop-blur-2xl"></div>
+          <div class="absolute inset-0 tibet-cloud-pattern opacity-55"></div>
           
           <div class="relative z-10 p-8">
             <button @click="close" 
@@ -21,24 +21,24 @@
             </button>
 
             <div class="text-center mb-8">
-              <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 mb-4 shadow-lg animate-pulse-slow">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-tibet-red via-tibet-gold to-tibet-yellow mb-4 shadow-lg animate-pulse-slow">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-tibet-dark" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                 </svg>
               </div>
-              <h2 class="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 mb-2">
+              <h2 class="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-tibet-red via-tibet-gold to-tibet-blue mb-2">
                 {{ t('contact.title') }}
               </h2>
               <p class="text-sm text-gray-600">{{ t('contact.subtitle') }}</p>
             </div>
 
             <div class="space-y-4">
-              <div class="group relative overflow-hidden rounded-2xl bg-white/40 backdrop-blur-sm border border-white/50 p-5 shadow-sm hover:shadow-lg hover:scale-[1.02] transition-all duration-300">
-                <div class="absolute inset-0 bg-gradient-to-r from-blue-500/0 via-blue-500/5 to-blue-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+              <div class="group relative overflow-hidden rounded-2xl bg-white/60 backdrop-blur-sm border border-tibet-gold/25 p-5 shadow-sm hover:shadow-lg hover:scale-[1.02] transition-all duration-300">
+                <div class="absolute inset-0 tibet-prayer-flag opacity-0 group-hover:opacity-10 transition-opacity duration-300"></div>
                 <div class="relative flex items-start space-x-4">
                   <div class="flex-shrink-0">
-                    <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center shadow-md group-hover:scale-110 transition-transform duration-300">
-                      <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <div class="w-12 h-12 rounded-xl bg-tibet-blue/10 text-tibet-blue border border-tibet-blue/20 flex items-center justify-center shadow-md group-hover:scale-110 transition-transform duration-300">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                       </svg>
                     </div>
@@ -57,12 +57,12 @@
                 </div>
               </div>
 
-              <div class="group relative overflow-hidden rounded-2xl bg-white/40 backdrop-blur-sm border border-white/50 p-5 shadow-sm hover:shadow-lg hover:scale-[1.02] transition-all duration-300">
-                <div class="absolute inset-0 bg-gradient-to-r from-purple-500/0 via-purple-500/5 to-purple-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+              <div class="group relative overflow-hidden rounded-2xl bg-white/60 backdrop-blur-sm border border-tibet-gold/25 p-5 shadow-sm hover:shadow-lg hover:scale-[1.02] transition-all duration-300">
+                <div class="absolute inset-0 tibet-prayer-flag opacity-0 group-hover:opacity-10 transition-opacity duration-300"></div>
                 <div class="relative flex items-start space-x-4">
                   <div class="flex-shrink-0">
-                    <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center shadow-md group-hover:scale-110 transition-transform duration-300">
-                      <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <div class="w-12 h-12 rounded-xl bg-tibet-red/10 text-tibet-red border border-tibet-red/20 flex items-center justify-center shadow-md group-hover:scale-110 transition-transform duration-300">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                       </svg>
                     </div>
@@ -81,12 +81,12 @@
                 </div>
               </div>
 
-              <div class="group relative overflow-hidden rounded-2xl bg-white/40 backdrop-blur-sm border border-white/50 p-5 shadow-sm hover:shadow-lg hover:scale-[1.02] transition-all duration-300">
-                <div class="absolute inset-0 bg-gradient-to-r from-green-500/0 via-green-500/5 to-green-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+              <div class="group relative overflow-hidden rounded-2xl bg-white/60 backdrop-blur-sm border border-tibet-gold/25 p-5 shadow-sm hover:shadow-lg hover:scale-[1.02] transition-all duration-300">
+                <div class="absolute inset-0 tibet-prayer-flag opacity-0 group-hover:opacity-10 transition-opacity duration-300"></div>
                 <div class="relative flex items-start space-x-4">
                   <div class="flex-shrink-0">
-                    <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center shadow-md group-hover:scale-110 transition-transform duration-300">
-                      <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <div class="w-12 h-12 rounded-xl bg-tibet-turquoise/10 text-tibet-turquoise border border-tibet-turquoise/20 flex items-center justify-center shadow-md group-hover:scale-110 transition-transform duration-300">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                       </svg>
@@ -101,13 +101,12 @@
               </div>
             </div>
 
-            <div class="mt-6 pt-6 border-t border-tibet-gold/25/50 text-center">
+            <div class="mt-6 pt-6 border-t border-tibet-gold/25 text-center">
               <p class="text-xs text-gray-500">{{ t('contact.closingMessage') }}</p>
             </div>
           </div>
 
-          <div class="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-blue-400/20 to-transparent rounded-full blur-3xl"></div>
-          <div class="absolute bottom-0 left-0 w-40 h-40 bg-gradient-to-tr from-purple-400/20 to-transparent rounded-full blur-3xl"></div>
+          <div class="absolute bottom-0 left-0 right-0 h-1 tibet-prayer-flag opacity-80"></div>
         </div>
       </Transition>
     </div>

@@ -1,13 +1,9 @@
 <template>
-  <div class="min-h-screen tibet-bg-subtle">
+  <div class="min-h-screen tibet-page-shell">
     <!-- Hero — 藏式深色渐变 -->
     <section class="relative overflow-hidden bg-gradient-to-br from-tibet-dark via-tibet-red to-tibet-brown text-tibet-white">
       <!-- 装饰暗纹 -->
-      <div class="absolute inset-0 opacity-10">
-        <div class="absolute top-10 left-10 w-80 h-80 bg-tibet-gold rounded-full blur-3xl"></div>
-        <div class="absolute bottom-10 right-10 w-96 h-96 bg-tibet-turquoise rounded-full blur-3xl"></div>
-        <div class="absolute top-1/2 left-1/3 w-64 h-64 bg-tibet-yellow rounded-full blur-3xl"></div>
-      </div>
+      <div class="absolute inset-0 opacity-35 tibet-hero-pattern"></div>
       <!-- 经幡色彩带 -->
       <div class="absolute bottom-0 left-0 right-0 h-1 tibet-prayer-flag opacity-80 z-20"></div>
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 relative z-10">
@@ -26,7 +22,7 @@
 
     <!-- Filter Bar — 藏式金边 -->
     <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-8 relative z-20">
-      <div class="bg-white rounded-2xl shadow-xl shadow-tibet-red/5 border border-tibet-gold/30 p-5 flex flex-col sm:flex-row gap-3">
+      <div class="tibet-panel rounded-2xl p-5 flex flex-col sm:flex-row gap-3">
         <div class="flex-1 relative">
           <svg class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-tibet-gold/60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
           <input v-model="keyword" type="text" :placeholder="t('hotel.searchPlaceholder')" class="w-full pl-12 pr-4 py-3 bg-tibet-white rounded-xl border-none outline-none focus:ring-2 focus:ring-tibet-red/20 transition-all text-tibet-dark placeholder-tibet-brown/30" />
@@ -67,7 +63,7 @@
           <!-- Hotel Cards -->
           <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
             <article v-for="(hotel, index) in group.hotels" :key="hotel.id"
-                     class="tibet-card group rounded-2xl overflow-hidden hover:shadow-2xl hover:shadow-tibet-red/8 hover:-translate-y-1.5 transition-all duration-500 ease-out-expo animate-on-scroll"
+                     class="tibet-card group rounded-2xl overflow-hidden hover:shadow-2xl hover:shadow-tibet-red/8 hover:-translate-y-1.5 transition-all duration-500 ease-out-expo animate-on-scroll scroll-pop-card"
                      :style="{ animationDelay: `${index * 80}ms` }">
               <!-- Image -->
               <div class="relative h-52 overflow-hidden bg-tibet-brown/10">
