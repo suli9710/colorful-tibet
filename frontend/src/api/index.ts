@@ -159,7 +159,6 @@ export const endpoints = {
     users: '/admin/users',
     updateRole: (id: number) => `/admin/users/${id}/role`,
     deleteUser: (id: number) => `/admin/users/${id}`,
-    decryptPassword: (id: number) => `/admin/users/${id}/decrypt-password`,
     auditLogs: '/admin/audit-logs/list',
     spots: '/admin/spots',
     updateSpot: (id: number) => `/admin/spots/${id}`,

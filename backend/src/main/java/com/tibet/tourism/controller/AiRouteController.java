@@ -27,15 +27,7 @@ public class AiRouteController {
                                            HttpServletRequest httpServletRequest) {
         try {
             AiRouteGenerateRequest safeRequest = request == null ? new AiRouteGenerateRequest() : request;
-            User currentUser = null;
-
-            try {
-                if (jwtAuthSupport.resolveToken(httpServletRequest) != null) {
-                    currentUser = jwtAuthSupport.resolveCurrentUser(httpServletRequest);
-                }
-            } catch (Exception ignored) {
-                // ignore invalid token for anonymous generation
-            }
+            User currentUser = jwtAuthSupport.resolveCurrentUser(httpServletRequest);
 
             return ResponseEntity.ok(
                     aiRouteService.generateRoute(
@@ -58,15 +50,7 @@ public class AiRouteController {
             HttpServletRequest httpServletRequest) {
 
         AiRouteGenerateRequest safeRequest = request == null ? new AiRouteGenerateRequest() : request;
-        User currentUser = null;
-
-        try {
-            if (jwtAuthSupport.resolveToken(httpServletRequest) != null) {
-                currentUser = jwtAuthSupport.resolveCurrentUser(httpServletRequest);
-            }
-        } catch (Exception ignored) {
-            // anonymous streaming also supported
-        }
+        User currentUser = jwtAuthSupport.resolveCurrentUser(httpServletRequest);
 
         SseEmitter emitter = new SseEmitter(180_000L);
 

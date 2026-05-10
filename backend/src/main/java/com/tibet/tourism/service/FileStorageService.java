@@ -16,6 +16,12 @@ import java.util.UUID;
 public class FileStorageService {
 
     private final Path uploadRoot;
+    private static final java.util.Set<String> ALLOWED_IMAGE_TYPES = java.util.Set.of(
+            "image/jpeg", "image/png", "image/webp", "image/gif"
+    );
+    private static final java.util.Set<String> ALLOWED_EXTENSIONS = java.util.Set.of(
+            ".jpg", ".jpeg", ".png", ".webp", ".gif"
+    );
 
     public FileStorageService(@Value("${file.upload-dir:uploads}") String uploadDir) {
         this.uploadRoot = Paths.get(uploadDir).toAbsolutePath().normalize();
@@ -55,8 +61,13 @@ public class FileStorageService {
         }
 
         String contentType = file.getContentType();
-        if (contentType == null || !contentType.toLowerCase(Locale.ROOT).startsWith("image/")) {
+        if (contentType == null || !ALLOWED_IMAGE_TYPES.contains(contentType.toLowerCase(Locale.ROOT))) {
             throw new IllegalArgumentException("仅支持图片文件上传");
+        }
+
+        String extension = getFileExtension(file.getOriginalFilename());
+        if (!ALLOWED_EXTENSIONS.contains(extension)) {
+            throw new IllegalArgumentException("仅支持 JPG、PNG、WebP 或 GIF 图片");
         }
 
         if (file.getSize() > 5 * 1024 * 1024) { // 5MB
@@ -75,7 +86,6 @@ public class FileStorageService {
         return originalFilename.substring(dotIndex).toLowerCase(Locale.ROOT);
     }
 }
-
 
 
 

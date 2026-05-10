@@ -343,23 +343,8 @@
                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-stone-900">{{ u.username }}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-500 font-mono">
                       <div class="flex items-center gap-2">
-                        <span class="text-xs bg-gray-100 px-2 py-1 rounded" title="密码已加密存储">
-                          已加密存储
-                        </span>
-                        <button 
-                          v-if="isSuperAdmin" 
-                          @click="openPasswordModal(u)"
-                          class="text-xs text-blue-600 hover:text-blue-800 hover:underline"
-                          title="点击查看原始密码（仅超级管理员）"
-                        >
-                          查看密码
-                        </button>
-                        <span 
-                          v-else
-                          class="text-xs text-gray-400"
-                          title="仅超级管理员可以查看密码"
-                        >
-                          无权限
+                        <span class="text-xs bg-gray-100 px-2 py-1 rounded" title="密码仅保存 BCrypt 哈希，无法查看明文">
+                          BCrypt 哈希
                         </span>
                       </div>
                     </td>
@@ -402,7 +387,7 @@
         <!-- 审计日志（仅超级管理员） -->
         <div v-if="isSuperAdmin" class="bg-white rounded-lg shadow overflow-hidden mt-8">
           <div class="px-6 py-4 border-b border-stone-200 flex justify-between items-center">
-            <h3 class="text-lg font-bold text-stone-800">密码解密审计日志</h3>
+            <h3 class="text-lg font-bold text-stone-800">用户操作审计日志</h3>
             <button @click="fetchAuditLogs" class="text-sm text-blue-600 hover:text-blue-800" :disabled="loadingAuditLogs">
               {{ loadingAuditLogs ? '加载中...' : '刷新日志' }}
             </button>
@@ -773,31 +758,6 @@
       </div>
     </div>
 
-    <!-- 查看密码弹窗 -->
-    <div
-      v-if="showPasswordModal"
-      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
-      @click.self="closePasswordModal"
-    >
-      <div class="bg-white rounded-2xl max-w-md w-full p-6">
-        <h2 class="text-xl font-bold mb-4 text-stone-800">查看用户密码</h2>
-        <p class="text-sm text-stone-600 mb-3">用户：{{ selectedUserForPassword?.username }}</p>
-
-        <div v-if="passwordModalLoading" class="text-sm text-stone-500">正在解密，请稍候...</div>
-        <div v-else-if="passwordModalError" class="text-sm text-red-600 bg-red-50 p-3 rounded">{{ passwordModalError }}</div>
-        <div v-else class="bg-green-50 border border-green-200 rounded p-3">
-          <p class="text-xs text-green-700 mb-1">明文密码</p>
-          <p class="font-mono text-base text-green-900 break-all">{{ revealedPassword }}</p>
-        </div>
-
-        <div class="mt-5 flex justify-end">
-          <button @click="closePasswordModal" class="px-4 py-2 bg-stone-200 text-stone-700 rounded-lg hover:bg-stone-300">
-            关闭
-          </button>
-        </div>
-      </div>
-    </div>
-
     <!-- Edit/Create News Modal -->
     <div
       v-if="showNewsModal"
@@ -1106,11 +1066,6 @@ const users = ref<any[]>([])
 const currentUser = ref<any>(null) // 当前登录用户信息
 const auditLogs = ref<any[]>([])
 const loadingAuditLogs = ref(false)
-const showPasswordModal = ref(false)
-const passwordModalLoading = ref(false)
-const passwordModalError = ref('')
-const selectedUserForPassword = ref<any>(null)
-const revealedPassword = ref('')
 const spots = ref<any[]>([])
 const loadingSpots = ref(false)
 const spotsError = ref('')
@@ -1325,41 +1280,6 @@ const deleteUser = async (user: any) => {
     console.error('Failed to delete user:', error)
     alert(error.response?.data?.error || '删除失败')
   }
-}
-
-const openPasswordModal = async (user: any) => {
-  if (!isSuperAdmin.value) {
-    alert('权限不足：仅超级管理员可以查看密码')
-    return
-  }
-
-  selectedUserForPassword.value = user
-  revealedPassword.value = ''
-  passwordModalError.value = ''
-  showPasswordModal.value = true
-  passwordModalLoading.value = true
-
-  try {
-    const response = await api.post(endpoints.admin.decryptPassword(user.id))
-    if (response.data.password) {
-      revealedPassword.value = response.data.password
-    } else {
-      passwordModalError.value = response.data.message || '该用户没有可解密密码'
-    }
-  } catch (error: any) {
-    console.error('Failed to decrypt password:', error)
-    passwordModalError.value = error.response?.data?.error || error.response?.data?.message || '解密失败，请重试'
-  } finally {
-    passwordModalLoading.value = false
-    await fetchAuditLogs()
-  }
-}
-
-const closePasswordModal = () => {
-  showPasswordModal.value = false
-  selectedUserForPassword.value = null
-  revealedPassword.value = ''
-  passwordModalError.value = ''
 }
 
 const fetchAuditLogs = async () => {
@@ -1614,8 +1534,6 @@ const getCategoryLabel = (category: string) => {
 
 const getAuditActionLabel = (action: string) => {
   switch (action) {
-    case 'DECRYPT_PASSWORD': return '查看密码成功'
-    case 'DECRYPT_PASSWORD_DENIED': return '查看密码拒绝'
     case 'DELETE_USER': return '删除用户成功'
     case 'DELETE_USER_DENIED': return '删除用户拒绝'
     default: return action
@@ -1624,10 +1542,8 @@ const getAuditActionLabel = (action: string) => {
 
 const getAuditActionClass = (action: string) => {
   switch (action) {
-    case 'DECRYPT_PASSWORD':
     case 'DELETE_USER':
       return 'bg-green-100 text-green-800'
-    case 'DECRYPT_PASSWORD_DENIED':
     case 'DELETE_USER_DENIED':
       return 'bg-red-100 text-red-800'
     default:

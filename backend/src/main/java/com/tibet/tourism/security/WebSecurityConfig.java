@@ -14,7 +14,6 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 
 @Configuration
 @EnableMethodSecurity
@@ -64,14 +63,21 @@ public class WebSecurityConfig {
                     .requestMatchers("/api/auth/register").permitAll()
                     .requestMatchers("/api/auth/me").authenticated()
                     .requestMatchers("/api/auth/me/**").authenticated()
-                    .requestMatchers("/api/spots/**").permitAll()
+                    .requestMatchers("/api/spots/admin/**").hasRole("ADMIN")
+                    .requestMatchers("/api/spots/recommendations/**").authenticated()
+                    .requestMatchers("/api/spots/companion-type").authenticated()
+                    .requestMatchers("/api/spots/user/**").authenticated()
+                    .requestMatchers(HttpMethod.POST, "/api/spots/**").authenticated()
+                    .requestMatchers(HttpMethod.GET, "/api/spots").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/spots/search").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/spots/*").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/spots/*/similar").permitAll()
                     .requestMatchers("/api/news/**").permitAll()
                     .requestMatchers("/api/heritage/**").permitAll()
                     .requestMatchers("/images/**").permitAll()
                     .requestMatchers("/uploads/**").permitAll()
-                    // AI生成及流式端点公开 — 使用 AntPathRequestMatcher 避免 MvcRequestMatcher 匹配不到
-                    .requestMatchers(new AntPathRequestMatcher("/api/routes/generate", "POST")).permitAll()
-                    .requestMatchers(new AntPathRequestMatcher("/api/routes/generate/**", "POST")).permitAll()
+                    .requestMatchers(HttpMethod.POST, "/api/routes/generate").authenticated()
+                    .requestMatchers(HttpMethod.POST, "/api/routes/generate/**").authenticated()
                     // 分享路线相关的GET请求允许匿名访问（必须在 /api/routes/** 之前）
                     .requestMatchers(HttpMethod.GET, "/api/routes/shared").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/routes/shared/**").permitAll()
@@ -87,19 +93,19 @@ public class WebSecurityConfig {
                     .requestMatchers(HttpMethod.GET, "/api/carousels").permitAll()
                     .requestMatchers("/api/hotel-bookings/hotels/**").permitAll()
                     .requestMatchers("/api/hotel-bookings/room-types/**").permitAll()
-                    .requestMatchers("/api/comments/**").permitAll()
-                    .requestMatchers("/api/test/**").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/comments/spot/**").permitAll()
+                    .requestMatchers("/api/comments/**").authenticated()
+                    .requestMatchers("/api/test/**").authenticated()
                     // 社区问答 — GET 请求公开，写操作需认证
                     .requestMatchers(HttpMethod.GET, "/api/community/questions").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/community/questions/**").permitAll()
                     .requestMatchers("/api/community/questions/**").authenticated()
-                    .requestMatchers("/h2-console/**").permitAll()
-                    .requestMatchers("/api/admin/**").authenticated()
+                    .requestMatchers("/h2-console/**").hasRole("ADMIN")
+                    .requestMatchers("/api/admin/**").hasRole("ADMIN")
                     .anyRequest().authenticated()
             );
         
-        // Fix for H2 console
-        http.headers(headers -> headers.frameOptions(frameOptions -> frameOptions.disable()));
+        http.headers(headers -> headers.frameOptions(frameOptions -> frameOptions.sameOrigin()));
 
         http.authenticationProvider(authenticationProvider());
 

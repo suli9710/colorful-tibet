@@ -61,9 +61,6 @@ public class AuthController {
     @Autowired
     com.tibet.tourism.service.IpLocationService ipLocationService;
 
-    @Autowired
-    com.tibet.tourism.service.PasswordEncryptionService passwordEncryptionService;
-
     private Long getCurrentUserId(HttpServletRequest request) {
         return jwtAuthSupport.resolveCurrentUserId(request);
     }
@@ -277,9 +274,7 @@ public class AuthController {
         // Create new user's account
         User user = new User();
         user.setUsername(username);
-        // 双重存储：BCrypt用于验证，AES用于管理员查看
         user.setPassword(passwordEncoder.encode(plainPassword)); // BCrypt哈希
-        user.setEncryptedPassword(passwordEncryptionService.encrypt(plainPassword)); // AES加密
         user.setNickname(StringUtils.hasText(nickname) ? nickname : username);
         user.setRole(User.Role.USER);
 

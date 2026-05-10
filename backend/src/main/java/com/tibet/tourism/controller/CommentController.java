@@ -8,8 +8,9 @@ import com.tibet.tourism.entity.User;
 import com.tibet.tourism.repository.CommentLikeRepository;
 import com.tibet.tourism.repository.CommentRepository;
 import com.tibet.tourism.repository.ScenicSpotRepository;
-import com.tibet.tourism.repository.UserRepository;
+import com.tibet.tourism.security.JwtAuthSupport;
 import com.tibet.tourism.service.FileStorageService;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -31,9 +32,6 @@ public class CommentController {
     private CommentRepository commentRepository;
 
     @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
     private ScenicSpotRepository spotRepository;
     
     @Autowired
@@ -41,6 +39,9 @@ public class CommentController {
 
     @Autowired
     private FileStorageService fileStorageService;
+
+    @Autowired
+    private JwtAuthSupport jwtAuthSupport;
 
     @GetMapping("/spot/{spotId}")
     public Page<CommentDTO> getCommentsBySpot(
@@ -51,15 +52,20 @@ public class CommentController {
     }
 
     @PostMapping
-    public ResponseEntity<?> addComment(@RequestBody Map<String, Object> payload) {
-        long userId = Long.parseLong(payload.get("userId").toString());
+    public ResponseEntity<?> addComment(@RequestBody Map<String, Object> payload, HttpServletRequest request) {
+        User user = jwtAuthSupport.resolveCurrentUser(request);
         long spotId = Long.parseLong(payload.get("spotId").toString());
-        String content = (String) payload.get("content");
+        String content = payload.get("content") == null ? "" : payload.get("content").toString().trim();
         Integer rating = Integer.valueOf(payload.get("rating").toString());
         String imageUrl = payload.get("imageUrl") != null ? payload.get("imageUrl").toString() : null;
 
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+        if (content.isEmpty() || content.length() > 1000) {
+            return ResponseEntity.badRequest().body(Map.of("error", "评论内容长度不合法"));
+        }
+        if (rating < 1 || rating > 5) {
+            return ResponseEntity.badRequest().body(Map.of("error", "评分必须在1到5之间"));
+        }
+
         ScenicSpot spot = spotRepository.findById(spotId)
                 .orElseThrow(() -> new RuntimeException("Spot not found"));
 
@@ -77,11 +83,10 @@ public class CommentController {
     
     @PostMapping("/{commentId}/like")
     @Transactional
-    public ResponseEntity<?> toggleLike(@PathVariable long commentId, @RequestBody Map<String, Object> payload) {
-        long userId = Long.parseLong(payload.get("userId").toString());
-        
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+    public ResponseEntity<?> toggleLike(@PathVariable long commentId, HttpServletRequest request) {
+        User user = jwtAuthSupport.resolveCurrentUser(request);
+        long userId = user.getId();
+
         Comment comment = commentRepository.findById(commentId)
                 .orElseThrow(() -> new RuntimeException("Comment not found"));
         
@@ -110,7 +115,8 @@ public class CommentController {
     }
     
     @GetMapping("/{commentId}/liked")
-    public ResponseEntity<?> checkLiked(@PathVariable long commentId, @RequestParam long userId) {
+    public ResponseEntity<?> checkLiked(@PathVariable long commentId, HttpServletRequest request) {
+        long userId = jwtAuthSupport.resolveCurrentUserId(request);
         boolean liked = commentLikeRepository.existsByUserIdAndCommentId(userId, commentId);
         Map<String, Object> response = new HashMap<>();
         response.put("liked", liked);
