@@ -48,7 +48,7 @@ const logout = () => {
 
 <template>
   <div class="fixed top-0 left-0 w-full z-50 flex justify-center pt-4 px-4 pointer-events-none">
-    <nav class="pointer-events-auto will-change-transform rounded-full border py-2.5 px-6"
+    <nav class="pointer-events-auto will-change-transform rounded-full border py-2.5 px-6 tibet-nav-shell"
       :style="{
         maxWidth: 1280 - scrollProgress * 256 + 'px',
         backgroundColor: `rgba(247, 243, 238, ${Math.max(0.15, scrollProgress * 0.85)})`,
@@ -62,6 +62,7 @@ const logout = () => {
       <div class="flex justify-between items-center">
         <div class="flex-shrink-0 flex items-center">
           <router-link to="/" class="flex items-center space-x-2 group">
+            <span class="tibet-brand-sigil flex-shrink-0"></span>
             <span class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-tibet-yellow via-tibet-gold to-tibet-red tibetan-font"
               :style="{ opacity: 0.8 + scrollProgress * 0.2 }">
               {{ t('common.brandName') }}

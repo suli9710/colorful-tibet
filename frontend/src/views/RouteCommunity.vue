@@ -1,19 +1,19 @@
 <template>
-  <div class="min-h-screen bg-tibet-white py-24">
+  <div class="min-h-screen tibet-page-shell py-24">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <!-- Header -->
       <div class="text-center mb-12 animate-fade-in">
-        <h1 class="text-4xl font-bold text-tibet-dark mb-4">{{ t('community.title') }}</h1>
+        <h1 class="tibet-heading inline-flex justify-center text-4xl font-bold text-tibet-dark mb-4">{{ t('community.title') }}</h1>
         <p class="text-lg text-tibet-brown/70">{{ t('community.subtitle') }}</p>
       </div>
 
       <!-- Tabs -->
       <div class="flex justify-center mb-8">
-        <div class="glass-card rounded-2xl p-1.5 inline-flex gap-1 animate-slide-up">
+        <div class="tibet-panel rounded-2xl p-1.5 inline-flex gap-1 animate-slide-up">
           <button
             @click="activeTab = 'routes'"
             class="px-6 py-2.5 rounded-xl font-semibold text-sm transition-all duration-300 flex items-center gap-2"
-            :class="activeTab === 'routes' ? 'bg-white shadow-md text-tibet-dark' : 'text-tibet-brown/70 hover:text-tibet-dark/80'"
+            :class="activeTab === 'routes' ? 'bg-tibet-red text-tibet-yellow shadow-md' : 'text-tibet-brown/70 hover:text-tibet-dark/80'"
           >
             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l5.447 2.724A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
@@ -23,7 +23,7 @@
           <button
             @click="activeTab = 'qa'"
             class="px-6 py-2.5 rounded-xl font-semibold text-sm transition-all duration-300 flex items-center gap-2"
-            :class="activeTab === 'qa' ? 'bg-white shadow-md text-tibet-dark' : 'text-tibet-brown/70 hover:text-tibet-dark/80'"
+            :class="activeTab === 'qa' ? 'bg-tibet-red text-tibet-yellow shadow-md' : 'text-tibet-brown/70 hover:text-tibet-dark/80'"
           >
             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
@@ -35,7 +35,7 @@
 
       <!-- ==================== ROUTE SHARING TAB ==================== -->
       <template v-if="activeTab === 'routes'">
-        <div class="glass rounded-2xl p-6 mb-8 flex flex-wrap gap-4 items-center justify-between animate-slide-up">
+        <div class="tibet-panel rounded-2xl p-6 mb-8 flex flex-wrap gap-4 items-center justify-between animate-slide-up">
           <div class="flex flex-wrap gap-4">
             <select v-model="routeFilters.days" @change="loadRoutes" class="px-4 py-2 rounded-xl bg-white/50 border border-tibet-gold/25 focus:border-tibet-gold outline-none text-sm">
               <option value="">{{ t('community.allDays') }}</option>
@@ -53,7 +53,7 @@
               <option v-for="opt in preferenceOptions" :key="opt.key" :value="opt.key">{{ opt.label }}</option>
             </select>
           </div>
-          <button @click="router.push('/create-route')" class="px-4 py-2.5 bg-tibet-gold text-white rounded-xl hover:bg-tibet-gold/80 transition-all duration-300 transform hover:scale-105 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-tibet-gold/20 active:scale-95 font-medium text-sm">
+          <button @click="router.push('/create-route')" class="px-4 py-2.5 bg-tibet-red text-tibet-yellow rounded-xl hover:bg-tibet-red/90 transition-all duration-300 transform hover:scale-105 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-tibet-red/20 active:scale-95 font-medium text-sm">
             {{ t('community.createMyRoute') }}
           </button>
         </div>
@@ -68,7 +68,7 @@
 
         <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <div v-for="(route, index) in routes" :key="route.id"
-               class="glass-card rounded-2xl p-6 hover:shadow-2xl transition-all duration-500 ease-out cursor-pointer group transform hover:-translate-y-2 hover:border-tibet-gold/30 border border-white/20 animate-on-scroll"
+               class="tibet-card-elevated rounded-2xl p-6 hover:shadow-2xl transition-all duration-500 ease-out cursor-pointer group transform hover:-translate-y-2 hover:border-tibet-gold/30 animate-on-scroll scroll-pop-card"
                :style="{ animationDelay: `${index * 80}ms` }"
                @click="viewRoute(route.id)">
             <div class="flex justify-between items-start mb-4">
@@ -118,7 +118,7 @@
 
       <!-- ==================== Q&A TAB ==================== -->
       <template v-if="activeTab === 'qa'">
-        <div class="glass-card rounded-2xl p-6 mb-8 flex flex-wrap gap-4 items-center justify-between animate-slide-up">
+        <div class="tibet-panel rounded-2xl p-6 mb-8 flex flex-wrap gap-4 items-center justify-between animate-slide-up">
           <div class="flex flex-wrap gap-3 items-center">
             <!-- Tag filter -->
             <div class="flex flex-wrap gap-1.5">
@@ -142,7 +142,7 @@
               <option value="unsolved">{{ t('community.sortUnanswered') }}</option>
             </select>
           </div>
-          <button @click="showAskModal = true" class="px-4 py-2.5 bg-tibet-red text-white rounded-xl hover:bg-tibet-red/90 transition-all duration-300 transform hover:scale-105 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-red-500/30 active:scale-95 font-medium text-sm">
+          <button @click="showAskModal = true" class="px-4 py-2.5 bg-tibet-red text-tibet-yellow rounded-xl hover:bg-tibet-red/90 transition-all duration-300 transform hover:scale-105 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-red-500/30 active:scale-95 font-medium text-sm">
             {{ t('community.askQuestion') }}
           </button>
         </div>
@@ -157,7 +157,7 @@
 
         <div v-else class="space-y-4">
           <div v-for="(q, index) in questions" :key="q.id"
-               class="glass-card rounded-2xl p-6 hover:shadow-xl transition-all duration-300 cursor-pointer group border border-white/20 animate-on-scroll"
+               class="tibet-card-elevated rounded-2xl p-6 hover:shadow-xl transition-all duration-300 cursor-pointer group animate-on-scroll scroll-pop-card"
                :style="{ animationDelay: `${index * 60}ms` }"
                @click="viewQuestion(q.id)">
             <div class="flex items-start justify-between gap-4">

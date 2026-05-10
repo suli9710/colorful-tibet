@@ -1,5 +1,5 @@
 <template>
-  <footer class="relative bg-gradient-to-br from-tibet-dark via-tibet-brown to-tibet-dark text-white mt-20 overflow-hidden">
+  <footer class="relative bg-gradient-to-br from-tibet-dark via-tibet-brown to-tibet-dark text-white mt-20 overflow-hidden tibet-footer-pattern">
     <!-- Mountain silhouette top edge -->
     <div class="relative h-16 -mt-16 overflow-hidden pointer-events-none z-10">
       <svg viewBox="0 0 1440 80" preserveAspectRatio="none" class="w-full h-full">
@@ -10,10 +10,7 @@
 
     <!-- 顶部经幡色带 -->
     <div class="h-1 tibet-prayer-flag opacity-80 tibet-flag-wave"></div>
-    <div class="absolute inset-0 opacity-5">
-      <div class="absolute top-0 left-0 w-96 h-96 bg-tibet-red rounded-full blur-3xl"></div>
-      <div class="absolute bottom-0 right-0 w-96 h-96 bg-tibet-gold rounded-full blur-3xl"></div>
-    </div>
+    <div class="absolute inset-0 opacity-10 tibet-cloud-pattern"></div>
 
     <div class="relative h-px bg-gradient-to-r from-transparent via-tibet-gold/40 to-transparent"></div>
 
@@ -123,7 +120,7 @@
       <div class="border-t border-white/10 pt-8">
         <div class="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
           <p class="text-sm text-gray-400">
-            &copy; 2025 <span class="text-white font-medium">{{ t('footer.copyright') }}</span>. All rights reserved.
+            &copy; 2026 <span class="text-white font-medium">{{ t('footer.copyright') }}</span>. All rights reserved.
           </p>
           <div class="flex items-center space-x-6 text-xs text-gray-500">
             <router-link to="/privacy" class="hover:text-gray-300 transition-colors">{{ t('footer.privacyPolicy') }}</router-link>

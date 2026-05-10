@@ -397,7 +397,9 @@
     "selectImageFile": "པར་ཡིག་ཆ་འདེམས་རོགས།",
     "imageTooLarge": "པར་ཆེ་ཆུང་ 5MB ལས་བརྒལ་མི་ཆོག",
     "operationFailed": "བྱེད་སྒོ་མ་ཐུབ། བསྐྱར་ཚོད་ལྟ་གནང་རོགས།",
-    "imageLoadFailed": "པར་འཇུག་མ་ཐུབ།"
+    "imageLoadFailed": "པར་འཇུག་མ་ཐུབ།",
+    "uploading": "ཡར་འཇུག་བྱེད་བཞིན་པ་...",
+    "imageUploaded": "ཡར་འཇུག་ལེགས་གྲུབ།"
   },
   "hotel": {
     "badge": "དམིགས་བསལ་མགྲོན་ཁང་།",
