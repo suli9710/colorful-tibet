@@ -3,6 +3,7 @@ package com.tibet.tourism;
 import com.tibet.tourism.entity.*;
 import com.tibet.tourism.repository.*;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
@@ -51,12 +52,12 @@ public class DataSeeder implements CommandLineRunner {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
-
-    @Autowired
-    private com.tibet.tourism.service.PasswordEncryptionService passwordEncryptionService;
     
     @Autowired
     private com.tibet.tourism.service.TibetanTranslationService tibetanTranslationService;
+
+    @Value("${app.seed.demo-users.enabled:false}")
+    private boolean seedDemoUsersEnabled;
 
     @Override
     public void run(String... args) throws Exception {
@@ -64,7 +65,11 @@ public class DataSeeder implements CommandLineRunner {
         System.out.println("初始化藏语词典...");
         tibetanTranslationService.initializeDefaultDictionary();
         
-        seedUsers();
+        if (seedDemoUsersEnabled) {
+            seedUsers();
+        } else {
+            System.out.println("Demo user seeding disabled; existing users are left unchanged.");
+        }
         
         // 只在数据库为空时才播种景点和资讯数据，避免破坏已有数据
         if (spotRepository.count() == 0) {
@@ -92,29 +97,14 @@ public class DataSeeder implements CommandLineRunner {
     }
 
     private void seedUsers() {
-        // 创建或更新 admin 用户
+        // 创建演示 admin 用户；已有用户永不覆盖密码
         userRepository.findByUsername("admin").ifPresentOrElse(
-            existing -> {
-                // 如果密码未加密（长度小于20，BCrypt hash通常更长），则更新
-                if (existing.getPassword().length() < 20 || !passwordEncoder.matches("admin123", existing.getPassword())) {
-                    String plainPassword = "admin123";
-                    existing.setPassword(passwordEncoder.encode(plainPassword)); // BCrypt
-                    existing.setEncryptedPassword(passwordEncryptionService.encrypt(plainPassword)); // AES
-                    userRepository.save(existing);
-                    System.out.println("已更新 admin 用户密码");
-                } else if (existing.getEncryptedPassword() == null || existing.getEncryptedPassword().isEmpty()) {
-                    // 如果BCrypt已存在但AES加密不存在，补充AES加密
-                    existing.setEncryptedPassword(passwordEncryptionService.encrypt("admin123"));
-                    userRepository.save(existing);
-                    System.out.println("已补充 admin 用户AES加密密码");
-                }
-            },
+            existing -> System.out.println("admin 用户已存在，跳过默认密码写入"),
             () -> {
                 String plainPassword = "admin123";
                 User admin = new User();
                 admin.setUsername("admin");
                 admin.setPassword(passwordEncoder.encode(plainPassword)); // BCrypt
-                admin.setEncryptedPassword(passwordEncryptionService.encrypt(plainPassword)); // AES
                 admin.setRole(User.Role.ADMIN);
                 admin.setNickname("管理员");
                 userRepository.save(admin);
@@ -122,28 +112,14 @@ public class DataSeeder implements CommandLineRunner {
             }
         );
 
-        // 创建或更新 lzh 超级管理员
+        // 创建演示 lzh 超级管理员；已有用户永不覆盖密码
         userRepository.findByUsername("lzh").ifPresentOrElse(
-            existing -> {
-                // 强制验证：密码长度<20 或 BCrypt验证不通过，都强制重设
-                if (existing.getPassword().length() < 20 || !passwordEncoder.matches("031224", existing.getPassword())) {
-                    String plainPassword = "031224";
-                    existing.setPassword(passwordEncoder.encode(plainPassword)); // BCrypt
-                    existing.setEncryptedPassword(passwordEncryptionService.encrypt(plainPassword)); // AES
-                    userRepository.save(existing);
-                    System.out.println("已更新 lzh 用户密码");
-                } else if (existing.getEncryptedPassword() == null || existing.getEncryptedPassword().isEmpty()) {
-                    existing.setEncryptedPassword(passwordEncryptionService.encrypt("031224"));
-                    userRepository.save(existing);
-                    System.out.println("已补充 lzh 用户AES加密密码");
-                }
-            },
+            existing -> System.out.println("lzh 用户已存在，跳过默认密码写入"),
             () -> {
                 String plainPassword = "031224";
                 User superAdmin = new User();
                 superAdmin.setUsername("lzh");
                 superAdmin.setPassword(passwordEncoder.encode(plainPassword)); // BCrypt
-                superAdmin.setEncryptedPassword(passwordEncryptionService.encrypt(plainPassword)); // AES
                 superAdmin.setRole(User.Role.ADMIN);
                 superAdmin.setNickname("超级管理员");
                 userRepository.save(superAdmin);
@@ -151,54 +127,28 @@ public class DataSeeder implements CommandLineRunner {
             }
         );
 
-        // 创建或更新 user1
+        // 创建演示 user1；已有用户永不覆盖密码
         userRepository.findByUsername("user1").ifPresentOrElse(
-            existing -> {
-                if (existing.getPassword().length() < 20 || !passwordEncoder.matches("123456", existing.getPassword())) {
-                    String plainPassword = "123456";
-                    existing.setPassword(passwordEncoder.encode(plainPassword)); // BCrypt
-                    existing.setEncryptedPassword(passwordEncryptionService.encrypt(plainPassword)); // AES
-                    userRepository.save(existing);
-                    System.out.println("已更新 user1 用户密码");
-                } else if (existing.getEncryptedPassword() == null || existing.getEncryptedPassword().isEmpty()) {
-                    existing.setEncryptedPassword(passwordEncryptionService.encrypt("123456"));
-                    userRepository.save(existing);
-                    System.out.println("已补充 user1 用户AES加密密码");
-                }
-            },
+            existing -> System.out.println("user1 已存在，跳过默认密码写入"),
             () -> {
                 String plainPassword = "123456";
                 User user1 = new User();
                 user1.setUsername("user1");
                 user1.setPassword(passwordEncoder.encode(plainPassword)); // BCrypt
-                user1.setEncryptedPassword(passwordEncryptionService.encrypt(plainPassword)); // AES
                 user1.setNickname("扎西");
                 userRepository.save(user1);
                 System.out.println("已创建 user1 用户");
             }
         );
 
-        // 创建或更新 user2
+        // 创建演示 user2；已有用户永不覆盖密码
         userRepository.findByUsername("user2").ifPresentOrElse(
-            existing -> {
-                if (existing.getPassword().length() < 20 || !passwordEncoder.matches("123456", existing.getPassword())) {
-                    String plainPassword = "123456";
-                    existing.setPassword(passwordEncoder.encode(plainPassword)); // BCrypt
-                    existing.setEncryptedPassword(passwordEncryptionService.encrypt(plainPassword)); // AES
-                    userRepository.save(existing);
-                    System.out.println("已更新 user2 用户密码");
-                } else if (existing.getEncryptedPassword() == null || existing.getEncryptedPassword().isEmpty()) {
-                    existing.setEncryptedPassword(passwordEncryptionService.encrypt("123456"));
-                    userRepository.save(existing);
-                    System.out.println("已补充 user2 用户AES加密密码");
-                }
-            },
+            existing -> System.out.println("user2 已存在，跳过默认密码写入"),
             () -> {
                 String plainPassword = "123456";
                 User user2 = new User();
                 user2.setUsername("user2");
                 user2.setPassword(passwordEncoder.encode(plainPassword)); // BCrypt
-                user2.setEncryptedPassword(passwordEncryptionService.encrypt(plainPassword)); // AES
                 user2.setNickname("卓玛");
                 userRepository.save(user2);
                 System.out.println("已创建 user2 用户");
@@ -243,7 +193,6 @@ public class DataSeeder implements CommandLineRunner {
                 User u = new User();
                 u.setUsername(username);
                 u.setPassword(passwordEncoder.encode("123456"));
-                u.setEncryptedPassword(passwordEncryptionService.encrypt("123456"));
                 u.setNickname(nickname);
                 u.setCity(city);
                 u.setRole(User.Role.USER);

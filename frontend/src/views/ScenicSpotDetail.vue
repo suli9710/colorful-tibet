@@ -545,7 +545,6 @@ const handleBooking = async () => {
 
   try {
     await api.post('/bookings', {
-      userId: user.id,
       spotId: spot.value.id,
       visitDate: bookingForm.value.visitDate,
       ticketCount: bookingForm.value.ticketCount
@@ -582,7 +581,7 @@ const fetchComments = async () => {
     if (user.value) {
       for (const comment of comments.value) {
         try {
-          const likedResponse = await api.get(`/comments/${comment.id}/liked?userId=${user.value.id}`)
+          const likedResponse = await api.get(`/comments/${comment.id}/liked`)
           comment.liked = likedResponse.data.liked
         } catch (error) {
           console.error('Failed to check liked status:', error)
@@ -665,7 +664,6 @@ const submitComment = async () => {
   submittingComment.value = true
   try {
     await api.post(endpoints.comments.create, {
-      userId: user.value.id,
       spotId: spot.value.id,
       content: commentForm.value.content,
       rating: commentForm.value.rating,
@@ -693,9 +691,7 @@ const toggleLike = async (comment: any) => {
   }
   
   try {
-    const response = await api.post(`/comments/${comment.id}/like`, {
-      userId: user.value.id
-    })
+    const response = await api.post(`/comments/${comment.id}/like`)
     
     comment.liked = response.data.liked
     comment.likeCount = response.data.likeCount

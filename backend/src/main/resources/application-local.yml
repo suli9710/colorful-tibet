@@ -68,11 +68,12 @@ jwt:
   secret: ${JWT_SECRET:tibetTourismSecretKey12345678901234567890}
   expiration: 86400000  # 24小时
 
-# 密码加密配置 + H2 -> MySQL 一次性迁移开关
+# 演示用户播种 + H2 -> MySQL 一次性迁移开关
 app:
   super-admin-username: ${SUPER_ADMIN_USERNAME:lzh}
-  encryption:
-    key: ${ADMIN_ENCRYPTION_KEY:tibetTourismSecretKey12345678901234567890}
+  seed:
+    demo-users:
+      enabled: ${SEED_DEMO_USERS:false}
   migration:
     h2-to-mysql:
       enabled: ${H2_TO_MYSQL_MIGRATION_ENABLED:false}

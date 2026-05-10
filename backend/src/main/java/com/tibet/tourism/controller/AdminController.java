@@ -27,7 +27,6 @@ import com.tibet.tourism.repository.UserVisitHistoryRepository;
 import org.springframework.data.domain.Sort;
 import com.tibet.tourism.repository.ScenicSpotRepository;
 import com.tibet.tourism.repository.UserRepository;
-import com.tibet.tourism.service.PasswordEncryptionService;
 import com.tibet.tourism.service.TibetanTranslationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -100,9 +99,6 @@ public class AdminController {
 
     @Autowired
     private TibetanTranslationService translationService;
-
-    @Autowired
-    private PasswordEncryptionService passwordEncryptionService;
 
     @Value("${app.super-admin-username:lzh}")
     private String superAdminUsername;
@@ -240,50 +236,6 @@ public class AdminController {
         recordAudit(AuditLog.Action.DELETE_USER, operatorUsername, targetUser, "成功删除用户: " + targetUser.getUsername());
         userRepository.delete(targetUser);
         return ResponseEntity.ok(Map.of("message", "用户删除成功"));
-    }
-
-    /**
-     * 解密用户密码（仅超级管理员可用）
-     */
-    @PostMapping("/users/{id}/decrypt-password")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> decryptPassword(@PathVariable Long id, Authentication authentication) {
-        Optional<User> userOpt = userRepository.findById(id);
-        if (userOpt.isEmpty()) {
-            return ResponseEntity.notFound().build();
-        }
-
-        User user = userOpt.get();
-        String operatorUsername = authentication == null ? "anonymous" : authentication.getName();
-
-        if (authentication == null || !superAdminUsername.equals(operatorUsername)) {
-            recordAudit(AuditLog.Action.DECRYPT_PASSWORD_DENIED, operatorUsername, user, "仅超级管理员可查看用户密码");
-            return ResponseEntity.status(403).body(Map.of(
-                    "error", "只有超级管理员可以查看用户密码"
-            ));
-        }
-
-        if (user.getEncryptedPassword() == null || user.getEncryptedPassword().isEmpty()) {
-            recordAudit(AuditLog.Action.DECRYPT_PASSWORD_DENIED, operatorUsername, user, "目标用户没有可解密的密码");
-            return ResponseEntity.ok(Map.of(
-                    "message", "该用户没有可解密的密码（可能是旧用户）",
-                    "hasEncryptedPassword", false
-            ));
-        }
-
-        try {
-            String decryptedPassword = passwordEncryptionService.decrypt(user.getEncryptedPassword());
-            recordAudit(AuditLog.Action.DECRYPT_PASSWORD, operatorUsername, user, "成功解密用户密码");
-            return ResponseEntity.ok(Map.of(
-                    "password", decryptedPassword,
-                    "hasEncryptedPassword", true
-            ));
-        } catch (Exception e) {
-            recordAudit(AuditLog.Action.DECRYPT_PASSWORD_DENIED, operatorUsername, user, "密码解密失败: " + e.getMessage());
-            return ResponseEntity.status(500).body(Map.of(
-                    "error", "密码解密失败: " + e.getMessage()
-            ));
-        }
     }
 
     @GetMapping("/audit-logs")

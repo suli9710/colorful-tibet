@@ -103,6 +103,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { marked } from 'marked'
+import DOMPurify from 'dompurify'
 import api from '../api'
 
 const { t } = useI18n()
@@ -119,7 +120,7 @@ const newComment = ref('')
 const submitting = ref(false)
 
 const renderedContent = computed(() => {
-  return routeData.value ? marked(routeData.value.content) : ''
+  return routeData.value ? DOMPurify.sanitize(marked(routeData.value.content) as string) : ''
 })
 
 const loadRouteDetail = async () => {

@@ -281,6 +281,7 @@ import { ref, computed, shallowRef, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { marked } from 'marked'
+import DOMPurify from 'dompurify'
 import { generateRouteStream } from '../api/stream'
 import api from '../api'
 
@@ -335,7 +336,22 @@ const result = shallowRef('')
 const statusMessage = ref('')
 const errorMessage = ref('')
 
-const renderedResult = computed(() => marked.parse(result.value || ''))
+const renderedResult = computed(() => DOMPurify.sanitize(marked.parse(result.value || '') as string))
+
+const hasStoredToken = () => {
+  const token = localStorage.getItem('token')
+  if (token) return true
+
+  const userStr = localStorage.getItem('user')
+  if (!userStr) return false
+
+  try {
+    const user = JSON.parse(userStr)
+    return !!(user?.token || user?.accessToken || user?.jwt || user?.data?.token || user?.data?.accessToken)
+  } catch {
+    return false
+  }
+}
 
 const adjustDays = (delta: number) => {
   form.value.days = Math.min(30, Math.max(1, form.value.days + delta))
@@ -351,6 +367,13 @@ const applyPreset = (preset: { label: string; days: number; budget: string; pref
 }
 
 const generateRoute = async () => {
+  if (!hasStoredToken()) {
+    if (confirm(t('routePlanner.loginRequired'))) {
+      router.push('/login')
+    }
+    return
+  }
+
   loading.value = true
   streaming.value = true
   result.value = ''
@@ -450,18 +473,7 @@ const getPreferenceText = (key: string) => {
 const shareRoute = async () => {
   if (!result.value) return
 
-  const userStr = localStorage.getItem('user')
-  let hasToken = false
-  if (userStr) {
-    try {
-      const user = JSON.parse(userStr)
-      hasToken = !!(user?.token || user?.accessToken || user?.jwt || user?.data?.token || user?.data?.accessToken)
-    } catch (e) {
-      console.error('Failed to parse user info:', e)
-    }
-  }
-
-  if (!hasToken) {
+  if (!hasStoredToken()) {
     if (confirm(t('routePlanner.loginRequired'))) {
       router.push('/login')
     }

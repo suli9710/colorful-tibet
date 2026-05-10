@@ -67,27 +67,36 @@ public class AuthTokenFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getServletPath();
+        String method = request.getMethod();
 
         // 完全不需要认证的公开路径
         return (path.startsWith("/api/auth/") && !path.startsWith("/api/auth/me"))
-            || path.equals("/api/spots")
-            || path.startsWith("/api/spots/")
+            || isPublicSpotRequest(path, method)
             || path.equals("/api/news")
             || path.startsWith("/api/news/")
             || path.equals("/api/heritage")
             || path.startsWith("/api/heritage/")
-            || path.equals("/api/routes/generate")
-            || path.startsWith("/api/routes/generate/")
-            || (path.startsWith("/api/routes/shared") && "GET".equals(request.getMethod()))
+            || (path.startsWith("/api/routes/shared") && "GET".equals(method))
             || path.equals("/api/carousels")
-            || path.startsWith("/api/test/")
-            || path.startsWith("/h2-console/")
-            || (path.startsWith("/api/community/questions") && "GET".equals(request.getMethod()))
+            || (path.startsWith("/api/community/questions") && "GET".equals(method))
             || path.startsWith("/api/hotel-bookings/hotels")
             || path.startsWith("/api/hotel-bookings/room-types")
-            || path.startsWith("/api/comments/")
+            || (path.startsWith("/api/comments/spot/") && "GET".equals(method))
             || path.startsWith("/images/")
             || path.startsWith("/uploads/");
+    }
+
+    private boolean isPublicSpotRequest(String path, String method) {
+        if (!"GET".equals(method)) {
+            return false;
+        }
+        if (path.equals("/api/spots") || path.equals("/api/spots/search")) {
+            return true;
+        }
+        if (path.matches("^/api/spots/\\d+$")) {
+            return true;
+        }
+        return path.matches("^/api/spots/\\d+/similar$");
     }
 
     private String parseJwt(HttpServletRequest request) {

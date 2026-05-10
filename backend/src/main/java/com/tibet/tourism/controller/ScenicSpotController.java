@@ -3,7 +3,9 @@ package com.tibet.tourism.controller;
 import com.tibet.tourism.dto.RecommendationContext;
 import com.tibet.tourism.dto.RecommendationDebugResponse;
 import com.tibet.tourism.entity.ScenicSpot;
+import com.tibet.tourism.entity.User;
 import com.tibet.tourism.dto.UserPreferenceDTO;
+import com.tibet.tourism.repository.UserRepository;
 import com.tibet.tourism.service.ColdStartOptimizationService;
 import com.tibet.tourism.service.CompanionInferenceService;
 import com.tibet.tourism.service.ItemBasedRecommendationService;
@@ -15,6 +17,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -38,6 +43,9 @@ public class ScenicSpotController {
     
     @Autowired
     private ColdStartOptimizationService coldStartOptimizationService;
+
+    @Autowired
+    private UserRepository userRepository;
 
     @GetMapping
     public Page<ScenicSpot> getAllSpots(
@@ -88,7 +96,9 @@ public class ScenicSpotController {
             @RequestParam(required = false) Integer travelDays,
             @RequestParam(required = false) String preferredActivities,
             @RequestParam(required = false, defaultValue = "true") Boolean considerDistance,
-            @RequestParam(required = false, defaultValue = "true") Boolean considerBudget) {
+            @RequestParam(required = false, defaultValue = "true") Boolean considerBudget,
+            Authentication authentication) {
+        requireSelfOrAdmin(userId, authentication);
         
         RecommendationContext context = RecommendationContextBuilder.buildFromParams(
                 season, weather, currentLocation, currentLatitude, currentLongitude,
@@ -104,7 +114,9 @@ public class ScenicSpotController {
     public List<ScenicSpot> getRecommendationsWithContext(
             @RequestParam Long userId,
             @RequestParam(required = false, defaultValue = "zh") String locale,
-            @RequestBody(required = false) RecommendationContext context) {
+            @RequestBody(required = false) RecommendationContext context,
+            Authentication authentication) {
+        requireSelfOrAdmin(userId, authentication);
         
         List<ScenicSpot> spots = recommendationService.recommendSpotsForUser(userId, context);
         spots.forEach(spot -> LocaleHelper.resolveScenicSpotLocale(spot, locale));
@@ -127,7 +139,9 @@ public class ScenicSpotController {
             @RequestParam(required = false) Integer travelDays,
             @RequestParam(required = false) String preferredActivities,
             @RequestParam(required = false, defaultValue = "true") Boolean considerDistance,
-            @RequestParam(required = false, defaultValue = "true") Boolean considerBudget) {
+            @RequestParam(required = false, defaultValue = "true") Boolean considerBudget,
+            Authentication authentication) {
+        requireSelfOrAdmin(userId, authentication);
         
         RecommendationContext context = RecommendationContextBuilder.buildFromParams(
                 season, weather, currentLocation, currentLatitude, currentLongitude,
@@ -145,7 +159,9 @@ public class ScenicSpotController {
     public RecommendationDebugResponse getRecommendationDebugWithContext(
             @RequestParam Long userId,
             @RequestParam(required = false, defaultValue = "zh") String locale,
-            @RequestBody(required = false) RecommendationContext context) {
+            @RequestBody(required = false) RecommendationContext context,
+            Authentication authentication) {
+        requireSelfOrAdmin(userId, authentication);
 
         RecommendationDebugResponse response = recommendationService.recommendWithDebug(userId, context);
         if (response.getRecommendations() != null) {
@@ -158,7 +174,8 @@ public class ScenicSpotController {
      * 获取用户推断的旅伴类型
      */
     @GetMapping("/companion-type")
-    public Map<String, Object> getCompanionType(@RequestParam Long userId) {
+    public Map<String, Object> getCompanionType(@RequestParam Long userId, Authentication authentication) {
+        requireSelfOrAdmin(userId, authentication);
         return companionInferenceService.getCompanionTypeWithConfidence(userId);
     }
     
@@ -167,6 +184,7 @@ public class ScenicSpotController {
      * 建议每天凌晨执行一次
      */
     @PostMapping("/admin/precompute-similarity")
+    @PreAuthorize("hasRole('ADMIN')")
     public Map<String, Object> precomputeItemSimilarity() {
         long startTime = System.currentTimeMillis();
         try {
@@ -207,7 +225,9 @@ public class ScenicSpotController {
     public List<ScenicSpot> getColdStartRecommendations(
             @RequestParam Long userId,
             @RequestParam(required = false, defaultValue = "zh") String locale,
-            @RequestBody(required = false) UserPreferenceDTO preferences) {
+            @RequestBody(required = false) UserPreferenceDTO preferences,
+            Authentication authentication) {
+        requireSelfOrAdmin(userId, authentication);
         
         List<ScenicSpot> recommendations;
         
@@ -239,7 +259,9 @@ public class ScenicSpotController {
             @RequestParam Double latitude,
             @RequestParam Double longitude,
             @RequestParam(required = false, defaultValue = "50.0") Double maxDistanceKm,
-            @RequestParam(required = false, defaultValue = "zh") String locale) {
+            @RequestParam(required = false, defaultValue = "zh") String locale,
+            Authentication authentication) {
+        requireSelfOrAdmin(userId, authentication);
 
         List<ScenicSpot> recommendations = coldStartOptimizationService
                 .recommendForNewUserByLocation(latitude, longitude, maxDistanceKm);
@@ -251,11 +273,23 @@ public class ScenicSpotController {
      * 检查用户是否为新用户
      */
     @GetMapping("/user/{userId}/is-new")
-    public Map<String, Object> checkIfNewUser(@PathVariable Long userId) {
+    public Map<String, Object> checkIfNewUser(@PathVariable Long userId, Authentication authentication) {
+        requireSelfOrAdmin(userId, authentication);
         boolean isNew = coldStartOptimizationService.isNewUser(userId);
         return Map.of(
             "userId", userId,
             "isNewUser", isNew
         );
+    }
+
+    private void requireSelfOrAdmin(Long userId, Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new AccessDeniedException("Authentication required");
+        }
+        User currentUser = userRepository.findByUsername(authentication.getName())
+                .orElseThrow(() -> new AccessDeniedException("User not found"));
+        if (currentUser.getRole() != User.Role.ADMIN && !currentUser.getId().equals(userId)) {
+            throw new AccessDeniedException("Cannot access another user's recommendation data");
+        }
     }
 }

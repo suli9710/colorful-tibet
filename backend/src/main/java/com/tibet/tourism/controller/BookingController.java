@@ -40,8 +40,16 @@ public class BookingController {
         }
 
         Long spotId = Long.valueOf(payload.get("spotId").toString());
-        String dateStr = (String) payload.get("visitDate");
-        Integer ticketCount = (Integer) payload.get("ticketCount");
+        String dateStr = payload.get("visitDate").toString();
+        Integer ticketCount = Integer.valueOf(payload.get("ticketCount").toString());
+        LocalDate visitDate = LocalDate.parse(dateStr);
+
+        if (ticketCount < 1 || ticketCount > 20) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Ticket count must be between 1 and 20"));
+        }
+        if (visitDate.isBefore(LocalDate.now())) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Visit date cannot be in the past"));
+        }
 
         ScenicSpot spot = scenicSpotRepository.findById(spotId)
                 .orElseThrow(() -> new RuntimeException("Spot not found"));
@@ -49,7 +57,6 @@ public class BookingController {
         Booking booking = new Booking();
         booking.setUser(user);
         booking.setSpot(spot);
-        LocalDate visitDate = LocalDate.parse(dateStr);
         booking.setVisitDate(visitDate);
         booking.setTicketCount(ticketCount);
         booking.setStatus(Booking.Status.CONFIRMED); // Auto-confirm for now

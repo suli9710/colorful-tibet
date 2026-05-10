@@ -100,8 +100,6 @@ public class AuditLog {
     }
 
     public enum Action {
-        DECRYPT_PASSWORD,
-        DECRYPT_PASSWORD_DENIED,
         DELETE_USER,
         DELETE_USER_DENIED
     }

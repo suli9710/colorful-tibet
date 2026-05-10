@@ -18,10 +18,6 @@ public class User {
     @Column(nullable = false)
     private String password; // BCrypt哈希，用于登录验证
 
-    @JsonIgnore
-    @Column(name = "encrypted_password")
-    private String encryptedPassword; // AES加密的原始密码，仅超级管理员可解密
-
     private String nickname;
     private String avatar;
     private String phone;
@@ -127,14 +123,6 @@ public class User {
 
     public void setLastLoginAt(LocalDateTime lastLoginAt) {
         this.lastLoginAt = lastLoginAt;
-    }
-
-    public String getEncryptedPassword() {
-        return encryptedPassword;
-    }
-
-    public void setEncryptedPassword(String encryptedPassword) {
-        this.encryptedPassword = encryptedPassword;
     }
 
     public enum Role {
