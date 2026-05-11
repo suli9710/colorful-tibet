@@ -1,6 +1,10 @@
 import type { HotelItem, HotelRoom } from './hotels'
 
 type LocaleCode = 'zh' | 'bo'
+type LocalizableHotel = Partial<Omit<HotelItem, 'rooms'>> & {
+  id: number
+  rooms?: HotelRoom[]
+}
 
 const regionLabels: Record<LocaleCode, Record<string, string>> = {
   zh: {
@@ -270,18 +274,18 @@ export const localizeApiRoom = (room: any, locale: string) => {
   }
 }
 
-export const localizeHotel = <T extends HotelItem | any>(hotel: T, locale: string): T => {
+export const localizeHotel = <T extends LocalizableHotel | null | undefined>(hotel: T, locale: string): T => {
   if (!hotel || normalizeHotelLocale(locale) !== 'bo') return hotel
   const translation = hotelTranslations[hotel.id] || {}
   return {
     ...hotel,
     ...translation,
-    region: localizeRegion(hotel.region, locale),
-    city: localizeRegion(hotel.city, locale),
+    region: hotel.region ? localizeRegion(hotel.region, locale) : hotel.region,
+    city: hotel.city ? localizeRegion(hotel.city, locale) : hotel.city,
     tags: translateArray(hotel.tags || [], tagLabels),
     amenities: translateArray(hotel.amenities || [], amenityLabels),
     rooms: (hotel.rooms || []).map((room: HotelRoom) => localizeHotelRoom(room, locale))
-  }
+  } as T
 }
 
 export const getCanonicalRegion = (value: string) => {

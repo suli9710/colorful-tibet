@@ -49,7 +49,13 @@
       <div class="space-y-16">
         <div v-for="group in hotelsByRegionVisible" :key="group.region">
           <!-- Region Header — 藏式标题 -->
-          <div class="flex items-center gap-6 mb-8 animate-on-scroll">
+          <motion.div
+            class="flex items-center gap-6 mb-8"
+            :initial="revealInitial"
+            :whileInView="revealInView"
+            :inViewOptions="inViewOnce"
+            :transition="revealTransition"
+          >
             <div class="flex-1 h-px bg-gradient-to-r from-transparent via-tibet-gold/50 to-transparent"></div>
             <div class="text-center shrink-0">
               <h2 class="tibet-heading text-2xl md:text-3xl font-bold text-tibet-dark tibetan-font">
@@ -58,13 +64,23 @@
               <p class="text-sm text-tibet-brown/50 mt-1">{{ t('hotel.hotelsCount', { count: group.hotels.length }) }}</p>
             </div>
             <div class="flex-1 h-px bg-gradient-to-r from-transparent via-tibet-gold/50 to-transparent"></div>
-          </div>
+          </motion.div>
 
           <!-- Hotel Cards -->
           <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-            <article v-for="(hotel, index) in group.hotels" :key="hotel.id"
-                     class="tibet-card group rounded-2xl overflow-hidden animate-on-scroll scroll-pop-card"
-                     :style="{ animationDelay: `${index * 80}ms` }">
+            <AnimatePresence mode="popLayout">
+            <motion.article
+                     v-for="(hotel, index) in group.hotels"
+                     :key="hotel.id"
+                     layout
+                     class="tibet-card group rounded-2xl overflow-hidden"
+                     :initial="cardInitial"
+                     :whileInView="cardInView"
+                     :exit="cardExit"
+                     :inViewOptions="inViewOnce"
+                     :transition="cardTransition(index)"
+                     :whileHover="{ y: -5, scale: 1.012 }"
+                     :whilePress="{ scale: 0.996 }">
               <!-- Image -->
               <div class="relative h-52 overflow-hidden bg-tibet-brown/10">
                 <img
@@ -129,7 +145,8 @@
                   </div>
                 </div>
               </div>
-            </article>
+            </motion.article>
+            </AnimatePresence>
           </div>
         </div>
       </div>
@@ -150,10 +167,21 @@
 
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue'
+import { AnimatePresence, motion } from 'motion-v'
 import { useI18n } from 'vue-i18n'
 import { hotels, hotelsByRegion, hotelRegions, type HotelItem } from '../data/hotels'
 import { getCanonicalRegion, localizeHotel, localizeRegion } from '../data/hotelTranslations'
 import api, { endpoints } from '../api'
+import {
+  cardExit,
+  cardInitial,
+  cardInView,
+  cardTransition,
+  inViewOnce,
+  revealInitial,
+  revealInView,
+  revealTransition
+} from '../motion/presets'
 
 const { t, locale } = useI18n()
 const keyword = ref('')
@@ -245,7 +273,6 @@ onMounted(async () => {
       mergedByRegion.value = nextByRegion
     }
   } catch (_) { /* fallback to static data */ }
-  setTimeout(initScrollAnimations, 100)
 })
 
 // --- Filtering ---
@@ -296,18 +323,4 @@ const hotelsByRegionVisible = computed(() =>
     .filter(group => group.hotels.length > 0)
 )
 
-// --- Scroll animations ---
-
-const initScrollAnimations = () => {
-  const observer = new IntersectionObserver(entries => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        entry.target.classList.add('revealed')
-        observer.unobserve(entry.target)
-      }
-    })
-  }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' })
-
-  document.querySelectorAll('.animate-on-scroll:not(.revealed)').forEach(el => observer.observe(el))
-}
 </script>

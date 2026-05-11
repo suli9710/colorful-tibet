@@ -1,16 +1,31 @@
 <template>
   <div class="min-h-screen tibet-page-shell py-24">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="text-center mb-12 animate-on-scroll">
+      <motion.div
+        class="text-center mb-12"
+        :initial="revealInitial"
+        :whileInView="revealInView"
+        :inViewOptions="inViewOnce"
+        :transition="revealTransition"
+      >
         <h1 class="tibet-heading inline-flex justify-center text-4xl font-bold text-tibet-dark mb-4">{{ t('news.title') }}</h1>
         <p class="text-lg text-tibet-brown/70">{{ t('news.description') }}</p>
-      </div>
+      </motion.div>
 
-      <div class="flex justify-center mb-8 gap-3 animate-on-scroll flex-wrap">
-        <button 
+      <motion.div
+        class="flex justify-center mb-8 gap-3 flex-wrap"
+        :initial="revealInitial"
+        :whileInView="revealInView"
+        :inViewOptions="inViewOnce"
+        :transition="revealTransition"
+      >
+        <motion.button 
           v-for="cat in categories" 
           :key="cat.value"
           @click="selectedCategory = cat.value"
+          layout
+          :whileHover="{ y: -2, scale: 1.04 }"
+          :whilePress="{ scale: 0.94 }"
           :class="[
               'px-4 py-2 rounded-full text-sm font-medium transition-colors duration-200 border',
               selectedCategory === cat.value
@@ -19,16 +34,27 @@
           ]"
         >
           {{ cat.label }}
-        </button>
-      </div>
+        </motion.button>
+      </motion.div>
 
       <div v-if="loading" class="flex justify-center items-center h-64">
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
       </div>
 
       <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div v-for="(item, index) in filteredNews" :key="item.id" class="group tibet-card-elevated rounded-2xl overflow-hidden flex flex-col h-full animate-on-scroll scroll-pop-card"
-             :style="{ animationDelay: `${index * 80}ms` }">
+        <AnimatePresence mode="popLayout">
+        <motion.div
+             v-for="(item, index) in filteredNews"
+             :key="item.id"
+             layout
+             class="group tibet-card-elevated rounded-2xl overflow-hidden flex flex-col h-full"
+             :initial="cardInitial"
+             :whileInView="cardInView"
+             :exit="cardExit"
+             :inViewOptions="inViewOnce"
+             :transition="cardTransition(index)"
+             :whileHover="{ y: -5, scale: 1.012 }"
+             :whilePress="{ scale: 0.996 }">
           <div class="w-full h-48 relative flex-shrink-0">
             <img :src="item.imageUrl || '/images/news/default-news.jpg'" :alt="item.title" class="w-full h-full object-cover tibet-image-hover will-change-transform" onerror="this.src='/images/spots/布达拉宫.jpg'">
             <div class="absolute top-0 left-0 bg-tibet-red text-tibet-yellow px-3 py-1 m-4 rounded-full text-xs font-medium shadow-lg">
@@ -48,14 +74,29 @@
               </button>
             </div>
           </div>
-        </div>
+        </motion.div>
+        </AnimatePresence>
       </div>
 
       <!-- Modal for details -->
-      <transition name="modal">
-        <div v-if="selectedItem" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50" @click="closeDetail">
-          <transition name="modal-content" appear>
-            <div v-if="selectedItem" class="tibet-card-elevated rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto" @click.stop>
+      <AnimatePresence>
+        <motion.div
+          v-if="selectedItem"
+          key="news-detail-backdrop"
+          class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50"
+          :initial="{ opacity: 0 }"
+          :animate="{ opacity: 1 }"
+          :exit="{ opacity: 0 }"
+          @click="closeDetail">
+            <motion.div
+              v-if="selectedItem"
+              key="news-detail-card"
+              class="tibet-card-elevated rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+              :initial="{ opacity: 0, y: 24, scale: 0.96, filter: 'blur(8px)' }"
+              :animate="{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }"
+              :exit="{ opacity: 0, y: 16, scale: 0.97, filter: 'blur(6px)' }"
+              :transition="{ duration: 0.34, ease: [0.16, 1, 0.3, 1] }"
+              @click.stop>
               <div class="relative h-64 md:h-96">
                 <img :src="selectedItem.imageUrl || '/images/news/default-news.jpg'" :alt="selectedItem.title" class="w-full h-full object-cover" onerror="this.src='/images/spots/布达拉宫.jpg'">
                 <button @click="closeDetail" class="absolute top-4 right-4 bg-black/50 text-white p-2 rounded-full hover:bg-black/70 transition-colors">
@@ -74,18 +115,28 @@
                   {{ selectedItem.content }}
                 </div>
               </div>
-            </div>
-          </transition>
-        </div>
-      </transition>
+            </motion.div>
+        </motion.div>
+      </AnimatePresence>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
+import { AnimatePresence, motion } from 'motion-v'
 import { useI18n } from 'vue-i18n'
 import api, { endpoints } from '../api'
+import {
+  cardExit,
+  cardInitial,
+  cardInView,
+  cardTransition,
+  inViewOnce,
+  revealInitial,
+  revealInView,
+  revealTransition
+} from '../motion/presets'
 
 const { t, locale } = useI18n()
 
@@ -164,21 +215,5 @@ watch(locale, () => {
 
 onMounted(() => {
   fetchNews()
-  setTimeout(initScrollAnimations, 100)
 })
-
-const initScrollAnimations = () => {
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        entry.target.classList.add('revealed')
-        observer.unobserve(entry.target)
-      }
-    })
-  }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' })
-
-  document.querySelectorAll('.animate-on-scroll:not(.revealed)').forEach(el => {
-    observer.observe(el)
-  })
-}
 </script>

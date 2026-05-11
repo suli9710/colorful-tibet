@@ -128,7 +128,8 @@
       "Bash(docker --version)",
       "Bash(/c/Users/Suli/Redis/redis-cli.exe *)",
       "Bash(echo \"HTTP Status: $\\(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/api/spots\\)\")",
-      "Bash(where redis-cli *)"
+      "Bash(where redis-cli *)",
+      "Bash(tasklist)"
     ]
   }
 }

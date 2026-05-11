@@ -68,7 +68,20 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import * as echarts from 'echarts'
+import { graphic, init, use, type ECharts } from 'echarts/core'
+import { BarChart, LineChart, PieChart } from 'echarts/charts'
+import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components'
+import { CanvasRenderer } from 'echarts/renderers'
+
+use([
+  BarChart,
+  LineChart,
+  PieChart,
+  GridComponent,
+  LegendComponent,
+  TooltipComponent,
+  CanvasRenderer
+])
 
 interface AnalyticsStats {
   userCount: number
@@ -96,7 +109,7 @@ const trendChartEl = ref<HTMLElement | null>(null)
 const categoryChartEl = ref<HTMLElement | null>(null)
 const spotChartEl = ref<HTMLElement | null>(null)
 const growthChartEl = ref<HTMLElement | null>(null)
-const charts: echarts.ECharts[] = []
+const charts: ECharts[] = []
 const { t, locale } = useI18n()
 
 const getCategoryLabel = (category: string) => {
@@ -131,10 +144,10 @@ const initCharts = () => {
   disposeCharts()
 
   const data = props.chartData
-  const trendChart = trendChartEl.value ? echarts.init(trendChartEl.value) : null
-  const categoryChart = categoryChartEl.value ? echarts.init(categoryChartEl.value) : null
-  const spotChart = spotChartEl.value ? echarts.init(spotChartEl.value) : null
-  const growthChart = growthChartEl.value ? echarts.init(growthChartEl.value) : null
+  const trendChart = trendChartEl.value ? init(trendChartEl.value) : null
+  const categoryChart = categoryChartEl.value ? init(categoryChartEl.value) : null
+  const spotChart = spotChartEl.value ? init(spotChartEl.value) : null
+  const growthChart = growthChartEl.value ? init(growthChartEl.value) : null
 
   if (trendChart) {
     trendChart.setOption({
@@ -214,7 +227,7 @@ const initCharts = () => {
           barWidth: 16,
           itemStyle: {
             borderRadius: [0, 8, 8, 0],
-            color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+            color: new graphic.LinearGradient(0, 0, 1, 0, [
               { offset: 0, color: '#60a5fa' },
               { offset: 1, color: '#2563eb' }
             ])

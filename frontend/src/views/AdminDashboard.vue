@@ -1106,12 +1106,9 @@ const displayedSpots = computed(() => {
 
 const fetchUsers = async () => {
   try {
-    console.log('正在获取用户数据...')
     const response = await api.get(endpoints.admin.users)
-    console.log('用户数据响应:', response)
     if (Array.isArray(response.data)) {
       users.value = response.data
-      console.log(`成功加载 ${users.value.length} 个用户`)
     } else {
       console.error('响应数据格式错误:', response.data)
       users.value = []
@@ -1132,32 +1129,11 @@ const fetchSpots = async () => {
   loadingSpots.value = true
   spotsError.value = ''
   try {
-    console.log('=== 开始获取景点数据 ===')
-    console.log('请求 URL:', endpoints.admin.spots)
-    console.log('完整路径:', '/api' + endpoints.admin.spots)
-    
-    // 检查认证 token
-    const userStr = localStorage.getItem('user')
-    if (userStr) {
-      const user = JSON.parse(userStr)
-      console.log('用户 token 存在:', user.token ? '是' : '否')
-    } else {
-      console.warn('未找到用户信息，可能未登录')
-    }
-    
     const response = await api.get(endpoints.admin.spots)
-    console.log('景点数据响应状态:', response.status)
-    console.log('景点数据响应头:', response.headers)
-    console.log('景点数据响应数据:', response.data)
-    console.log('数据类型:', Array.isArray(response.data) ? '数组' : typeof response.data)
     
     const spotsData = response.data?.content || response.data
     if (Array.isArray(spotsData)) {
       spots.value = spotsData
-      console.log(`✅ 成功加载 ${spots.value.length} 个景点`)
-      if (spots.value.length > 0) {
-        console.log('第一个景点示例:', spots.value[0])
-      }
     } else {
       console.error('❌ 响应数据格式错误:', response.data)
       spotsError.value = t('admin.malformedResponse', { type: typeof response.data })
@@ -1191,7 +1167,6 @@ const fetchSpots = async () => {
     spots.value = []
   } finally {
     loadingSpots.value = false
-    console.log('=== 获取景点数据完成 ===')
   }
 }
 
@@ -1339,9 +1314,6 @@ const deleteHotelOrder = async (orderId: number) => {
 const fetchNews = async () => {
   loadingNews.value = true
   try {
-    console.log('=== 开始获取资讯数据 ===')
-    console.log('请求 URL:', endpoints.admin.news)
-    
     // 检查认证 token
     const userStr = localStorage.getItem('user')
     if (!userStr) {
@@ -1351,9 +1323,6 @@ const fetchNews = async () => {
     }
     
     const user = JSON.parse(userStr)
-    console.log('用户信息:', user)
-    console.log('用户 token 存在:', user.token ? '是' : '否')
-    console.log('用户角色:', user.role)
     
     if (!user.token) {
       alert(t('admin.loginExpired'))
@@ -1368,14 +1337,10 @@ const fetchNews = async () => {
     }
     
     const response = await api.get(endpoints.admin.news)
-    console.log('资讯数据响应状态:', response.status)
-    console.log('资讯数据响应数据:', response.data)
-    console.log('数据类型:', Array.isArray(response.data) ? '数组' : typeof response.data)
     
     const newsData = response.data?.content || response.data
     if (Array.isArray(newsData)) {
       newsList.value = newsData
-      console.log(`✅ 成功加载 ${newsList.value.length} 条资讯`)
     } else {
       console.error('❌ 响应数据格式错误:', response.data)
       newsList.value = []
@@ -1407,7 +1372,6 @@ const fetchNews = async () => {
     newsList.value = []
   } finally {
     loadingNews.value = false
-    console.log('=== 获取资讯数据完成 ===')
   }
 }
 
@@ -1562,7 +1526,6 @@ const loadCurrentUser = () => {
     const userStr = localStorage.getItem('user')
     if (userStr) {
       currentUser.value = JSON.parse(userStr)
-      console.log('当前登录用户:', currentUser.value?.username, '是否超级管理员:', isSuperAdmin.value)
     }
   } catch (error) {
     console.error('加载用户信息失败:', error)
