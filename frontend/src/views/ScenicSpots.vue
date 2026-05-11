@@ -2,20 +2,35 @@
   <div class="min-h-screen tibet-page-shell py-24">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <!-- Header -->
-      <div class="text-center mb-16 animate-fade-in">
+      <motion.div
+        class="text-center mb-16"
+        :initial="revealInitial"
+        :whileInView="revealInView"
+        :inViewOptions="inViewOnce"
+        :transition="revealTransition"
+      >
         <h1 class="tibet-heading inline-flex justify-center text-4xl font-bold text-tibet-dark mb-4 tibetan-font">{{ t('spots.title') }}</h1>
         <p class="text-lg text-tibet-brown/70 max-w-2xl mx-auto tibetan-font">
           {{ t('spots.subtitle') }}
         </p>
-      </div>
+      </motion.div>
 
       <!-- Filters -->
-      <div class="flex justify-center mb-12 animate-slide-up will-change-transform" style="animation-delay: 0.1s">
+      <motion.div
+        class="flex justify-center mb-12 will-change-transform"
+        :initial="revealInitial"
+        :whileInView="revealInView"
+        :inViewOptions="inViewOnce"
+        :transition="revealTransition"
+      >
         <div class="tibet-panel p-1.5 rounded-full flex space-x-2">
-          <button 
+          <motion.button 
             v-for="cat in categories" 
             :key="cat.value"
             @click="selectedCategory = cat.value"
+            layout
+            :whileHover="{ y: -2, scale: 1.04 }"
+            :whilePress="{ scale: 0.94 }"
             :class="[
               'px-6 py-2.5 rounded-full text-sm font-medium transition-all duration-300 ease-out-expo relative overflow-hidden will-change-transform tibetan-font',
               selectedCategory === cat.value 
@@ -24,11 +39,15 @@
             ]"
           >
             <span class="relative z-10">{{ cat.label }}</span>
-            <span v-if="selectedCategory === cat.value" 
-                  class="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-purple-500/20 transition-opacity duration-300 ease-out-expo"></span>
-          </button>
+            <motion.span
+              v-if="selectedCategory === cat.value"
+              layoutId="spots-category-pill"
+              class="absolute inset-0 bg-gradient-to-r from-tibet-blue/20 to-tibet-red/20"
+              :transition="softSpring"
+            ></motion.span>
+          </motion.button>
         </div>
-      </div>
+      </motion.div>
 
       <!-- Loading State with Skeleton -->
       <div v-if="loading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -84,9 +103,19 @@
 
       <!-- Spots Grid -->
       <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        <div v-for="(spot, index) in filteredSpots" :key="spot.id" 
-             class="group tibet-card-elevated rounded-3xl overflow-hidden border border-tibet-gold/20 animate-on-scroll scroll-pop-card gpu-accelerated"
-             :style="{ animationDelay: `${index * 80}ms` }">
+        <AnimatePresence mode="popLayout">
+        <motion.div
+             v-for="(spot, index) in filteredSpots"
+             :key="spot.id"
+             layout
+             class="group tibet-card-elevated rounded-3xl overflow-hidden border border-tibet-gold/20 gpu-accelerated"
+             :initial="cardInitial"
+             :whileInView="cardInView"
+             :exit="cardExit"
+             :inViewOptions="inViewOnce"
+             :transition="cardTransition(index)"
+             :whileHover="{ y: -5, scale: 1.012 }"
+             :whilePress="{ scale: 0.996 }">
           
           <!-- Image Container -->
           <div class="relative h-72 overflow-hidden cursor-pointer bg-gray-200" @click="router.push(`/spots/${spot.id}`)">
@@ -142,17 +171,30 @@
               </button>
             </div>
           </div>
-        </div>
+        </motion.div>
+        </AnimatePresence>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import { AnimatePresence, motion } from 'motion-v'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import api, { endpoints } from '../api'
+import {
+  cardExit,
+  cardInitial,
+  cardInView,
+  cardTransition,
+  inViewOnce,
+  revealInitial,
+  revealInView,
+  revealTransition,
+  softSpring
+} from '../motion/presets'
 
 const router = useRouter()
 const { t, locale } = useI18n()
@@ -234,42 +276,12 @@ const getGradientClass = (spot: any) => {
   return gradients[index]
 }
 
-// 监听语言变化，重新获取数据并重新初始化滚动动画
+// 监听语言变化，重新获取数据
 watch(locale, () => {
   fetchSpots()
-  nextTick(() => initScrollAnimations())
-})
-
-// 监听分类切换，重新初始化滚动动画（因为切换分类时 v-if/v-else 会重建 DOM）
-watch(filteredSpots, () => {
-  nextTick(() => initScrollAnimations())
 })
 
 onMounted(() => {
   fetchSpots()
-  nextTick(() => initScrollAnimations())
 })
-
-onUnmounted(() => {
-  if (scrollObserver) scrollObserver.disconnect()
-})
-
-let scrollObserver: IntersectionObserver | null = null
-
-const initScrollAnimations = () => {
-  if (scrollObserver) scrollObserver.disconnect()
-
-  scrollObserver = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        entry.target.classList.add('revealed')
-        scrollObserver!.unobserve(entry.target)
-      }
-    })
-  }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' })
-
-  document.querySelectorAll('.animate-on-scroll:not(.revealed)').forEach(el => {
-    scrollObserver!.observe(el)
-  })
-}
 </script>

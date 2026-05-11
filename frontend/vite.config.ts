@@ -35,11 +35,26 @@ export default defineConfig({
     minify: 'esbuild',
     rollupOptions: {
       output: {
-        manualChunks: {
-          'echarts': ['echarts'],
-          'leaflet': ['leaflet'],
-          'vendor': ['vue', 'vue-router', 'pinia'],
-          'ui': ['lucide-vue-next'],
+        manualChunks(id) {
+          const normalizedId = id.replace(/\\/g, '/')
+          if (!normalizedId.includes('/node_modules/')) return
+          if (normalizedId.includes('/node_modules/zrender/')) return 'zrender'
+          if (normalizedId.includes('/node_modules/echarts/')) {
+            if (normalizedId.includes('/chart/')) return 'echarts-charts'
+            if (normalizedId.includes('/component/')) return 'echarts-components'
+            return 'echarts-core'
+          }
+          if (normalizedId.includes('/node_modules/leaflet/')) return 'leaflet'
+          if (normalizedId.includes('/node_modules/motion-')) return 'motion'
+          if (normalizedId.includes('/node_modules/lucide-vue-next/')) return 'ui'
+          if (normalizedId.includes('/node_modules/marked/') || normalizedId.includes('/node_modules/dompurify/')) return 'markdown'
+          if (
+            normalizedId.includes('/node_modules/@vue/') ||
+            normalizedId.includes('/node_modules/vue/') ||
+            normalizedId.includes('/node_modules/vue-router/') ||
+            normalizedId.includes('/node_modules/pinia/') ||
+            normalizedId.includes('/node_modules/vue-i18n/')
+          ) return 'vendor'
         },
       },
     },

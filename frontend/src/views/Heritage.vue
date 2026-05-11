@@ -993,8 +993,6 @@ const initMap = () => {
     }
     
     try {
-      console.log('开始初始化高德地图，容器:', mapContainer.value)
-      
       // 创建地图实例，中心点设为拉萨
       map = new AMap.Map(mapContainer.value, {
         zoom: 6,
@@ -1003,15 +1001,12 @@ const initMap = () => {
         mapStyle: 'amap://styles/normal'
       })
       
-      console.log('地图实例创建成功')
-      
       let mapComplete = false
       
       // 监听地图加载完成事件
       map.on('complete', () => {
         if (mapComplete) return // 防止重复触发
         mapComplete = true
-        console.log('地图加载完成事件触发')
         mapLoading.value = false
         
         // 添加体验点标记
@@ -1051,7 +1046,6 @@ const initMap = () => {
               console.error('添加标记失败:', markerError)
             }
           })
-          console.log('所有标记添加完成')
         } catch (addMarkerError) {
           console.error('添加标记过程出错:', addMarkerError)
         }
@@ -1069,7 +1063,6 @@ const initMap = () => {
         try {
           if (map && map.getStatus && map.getStatus() === 'complete') {
             if (!mapComplete) {
-              console.log('地图状态检查：已加载完成')
               mapComplete = true
               mapLoading.value = false
               // 触发添加标记

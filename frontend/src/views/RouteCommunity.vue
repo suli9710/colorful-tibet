@@ -2,40 +2,76 @@
   <div class="min-h-screen tibet-page-shell py-24">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <!-- Header -->
-      <div class="text-center mb-12 animate-fade-in">
+      <motion.div
+        class="text-center mb-12"
+        :initial="revealInitial"
+        :whileInView="revealInView"
+        :inViewOptions="inViewOnce"
+        :transition="revealTransition"
+      >
         <h1 class="tibet-heading inline-flex justify-center text-4xl font-bold text-tibet-dark mb-4">{{ t('community.title') }}</h1>
         <p class="text-lg text-tibet-brown/70">{{ t('community.subtitle') }}</p>
-      </div>
+      </motion.div>
 
       <!-- Tabs -->
       <div class="flex justify-center mb-8">
-        <div class="tibet-panel rounded-2xl p-1.5 inline-flex gap-1 animate-slide-up">
-          <button
+        <LayoutGroup>
+        <motion.div
+          class="tibet-panel rounded-2xl p-1.5 inline-flex gap-1"
+          :initial="revealInitial"
+          :whileInView="revealInView"
+          :inViewOptions="inViewOnce"
+          :transition="revealTransition"
+        >
+          <motion.button
             @click="activeTab = 'routes'"
-            class="px-6 py-2.5 rounded-xl font-semibold text-sm transition-all duration-300 flex items-center gap-2"
-            :class="activeTab === 'routes' ? 'bg-tibet-red text-tibet-yellow shadow-md' : 'text-tibet-brown/70 hover:text-tibet-dark/80'"
+            class="px-6 py-2.5 rounded-xl font-semibold text-sm transition-colors duration-300 flex items-center gap-2 relative overflow-hidden"
+            :class="activeTab === 'routes' ? 'text-tibet-yellow' : 'text-tibet-brown/70 hover:text-tibet-dark/80'"
+            :whileHover="{ y: -2, scale: 1.03 }"
+            :whilePress="{ scale: 0.95 }"
           >
+            <motion.span
+              v-if="activeTab === 'routes'"
+              layoutId="community-tab-pill"
+              class="absolute inset-0 rounded-xl bg-tibet-red shadow-md"
+              :transition="softSpring"
+            ></motion.span>
             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l5.447 2.724A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
             </svg>
-            {{ t('community.sharedRoutes') }}
-          </button>
-          <button
+            <span class="relative z-10">{{ t('community.sharedRoutes') }}</span>
+          </motion.button>
+          <motion.button
             @click="activeTab = 'qa'"
-            class="px-6 py-2.5 rounded-xl font-semibold text-sm transition-all duration-300 flex items-center gap-2"
-            :class="activeTab === 'qa' ? 'bg-tibet-red text-tibet-yellow shadow-md' : 'text-tibet-brown/70 hover:text-tibet-dark/80'"
+            class="px-6 py-2.5 rounded-xl font-semibold text-sm transition-colors duration-300 flex items-center gap-2 relative overflow-hidden"
+            :class="activeTab === 'qa' ? 'text-tibet-yellow' : 'text-tibet-brown/70 hover:text-tibet-dark/80'"
+            :whileHover="{ y: -2, scale: 1.03 }"
+            :whilePress="{ scale: 0.95 }"
           >
+            <motion.span
+              v-if="activeTab === 'qa'"
+              layoutId="community-tab-pill"
+              class="absolute inset-0 rounded-xl bg-tibet-red shadow-md"
+              :transition="softSpring"
+            ></motion.span>
             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
             </svg>
-            {{ t('community.travelQA') }}
-          </button>
-        </div>
+            <span class="relative z-10">{{ t('community.travelQA') }}</span>
+          </motion.button>
+        </motion.div>
+        </LayoutGroup>
       </div>
 
       <!-- ==================== ROUTE SHARING TAB ==================== -->
       <template v-if="activeTab === 'routes'">
-        <div class="tibet-panel rounded-2xl p-6 mb-8 flex flex-wrap gap-4 items-center justify-between animate-slide-up">
+        <motion.div
+          class="tibet-panel rounded-2xl p-6 mb-8 flex flex-wrap gap-4 items-center justify-between"
+          :initial="revealInitial"
+          :whileInView="revealInView"
+          :inViewOptions="inViewOnce"
+          :transition="revealTransition"
+        >
           <div class="flex flex-wrap gap-4">
             <select v-model="routeFilters.days" @change="loadRoutes" class="px-4 py-2 rounded-xl bg-white/50 border border-tibet-gold/25 focus:border-tibet-gold outline-none text-sm">
               <option value="">{{ t('community.allDays') }}</option>
@@ -56,7 +92,7 @@
           <button @click="router.push('/create-route')" class="px-4 py-2.5 bg-tibet-red text-tibet-yellow rounded-xl hover:bg-tibet-red/90 transition-all duration-300 transform hover:scale-105 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-tibet-red/20 active:scale-95 font-medium text-sm">
             {{ t('community.createMyRoute') }}
           </button>
-        </div>
+        </motion.div>
 
         <div v-if="routeLoading" class="text-center py-12">
           <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-tibet-gold mx-auto"></div>
@@ -67,9 +103,19 @@
         </div>
 
         <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <div v-for="(route, index) in routes" :key="route.id"
-               class="tibet-card-elevated rounded-2xl p-6 cursor-pointer group hover:border-tibet-gold/30 animate-on-scroll scroll-pop-card"
-               :style="{ animationDelay: `${index * 80}ms` }"
+          <AnimatePresence mode="popLayout">
+          <motion.div
+               v-for="(route, index) in routes"
+               :key="route.id"
+               layout
+               class="tibet-card-elevated rounded-2xl p-6 cursor-pointer group hover:border-tibet-gold/30"
+               :initial="cardInitial"
+               :whileInView="cardInView"
+               :exit="cardExit"
+               :inViewOptions="inViewOnce"
+               :transition="cardTransition(index)"
+               :whileHover="{ y: -5, scale: 1.012 }"
+               :whilePress="{ scale: 0.996 }"
                @click="viewRoute(route.id)">
             <div class="flex justify-between items-start mb-4">
               <h3 class="text-xl font-bold text-gray-900 group-hover:text-tibet-gold transition-colors duration-300 line-clamp-2 flex-1">
@@ -100,7 +146,8 @@
               </div>
               <span class="text-xs">{{ formatDate(route.createdAt) }}</span>
             </div>
-          </div>
+          </motion.div>
+          </AnimatePresence>
         </div>
 
         <div v-if="routeTotalPages > 1" class="flex justify-center mt-8 gap-2">
@@ -118,7 +165,13 @@
 
       <!-- ==================== Q&A TAB ==================== -->
       <template v-if="activeTab === 'qa'">
-        <div class="tibet-panel rounded-2xl p-6 mb-8 flex flex-wrap gap-4 items-center justify-between animate-slide-up">
+        <motion.div
+          class="tibet-panel rounded-2xl p-6 mb-8 flex flex-wrap gap-4 items-center justify-between"
+          :initial="revealInitial"
+          :whileInView="revealInView"
+          :inViewOptions="inViewOnce"
+          :transition="revealTransition"
+        >
           <div class="flex flex-wrap gap-3 items-center">
             <!-- Tag filter -->
             <div class="flex flex-wrap gap-1.5">
@@ -145,7 +198,7 @@
           <button @click="showAskModal = true" class="px-4 py-2.5 bg-tibet-red text-tibet-yellow rounded-xl hover:bg-tibet-red/90 transition-all duration-300 transform hover:scale-105 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-red-500/30 active:scale-95 font-medium text-sm">
             {{ t('community.askQuestion') }}
           </button>
-        </div>
+        </motion.div>
 
         <div v-if="qaLoading" class="text-center py-12">
           <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-tibet-red mx-auto"></div>
@@ -156,9 +209,19 @@
         </div>
 
         <div v-else class="space-y-4">
-          <div v-for="(q, index) in questions" :key="q.id"
-               class="tibet-card-elevated rounded-2xl p-6 cursor-pointer group animate-on-scroll scroll-pop-card"
-               :style="{ animationDelay: `${index * 60}ms` }"
+          <AnimatePresence mode="popLayout">
+          <motion.div
+               v-for="(q, index) in questions"
+               :key="q.id"
+               layout
+               class="tibet-card-elevated rounded-2xl p-6 cursor-pointer group"
+               :initial="cardInitial"
+               :whileInView="cardInView"
+               :exit="cardExit"
+               :inViewOptions="inViewOnce"
+               :transition="cardTransition(index)"
+               :whileHover="{ y: -3, scale: 1.006 }"
+               :whilePress="{ scale: 0.996 }"
                @click="viewQuestion(q.id)">
             <div class="flex items-start justify-between gap-4">
               <div class="flex-1 min-w-0">
@@ -195,7 +258,8 @@
               </span>
               <span class="ml-auto">{{ formatDate(q.createdAt) }}</span>
             </div>
-          </div>
+          </motion.div>
+          </AnimatePresence>
         </div>
 
         <div v-if="qaTotalPages > 1" class="flex justify-center mt-8 gap-2">
@@ -264,9 +328,21 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, onActivated, computed } from 'vue'
+import { AnimatePresence, LayoutGroup, motion } from 'motion-v'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import api from '../api'
+import {
+  cardExit,
+  cardInitial,
+  cardInView,
+  cardTransition,
+  inViewOnce,
+  revealInitial,
+  revealInView,
+  revealTransition,
+  softSpring
+} from '../motion/presets'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -329,7 +405,6 @@ const loadRoutes = async () => {
     routes.value = []; routeTotalPages.value = 0
   } finally {
     routeLoading.value = false
-    setTimeout(initScrollAnimations, 100)
   }
 }
 
@@ -382,7 +457,6 @@ const loadQuestions = async () => {
     questions.value = []; qaTotalPages.value = 0
   } finally {
     qaLoading.value = false
-    setTimeout(initScrollAnimations, 100)
   }
 }
 
@@ -416,16 +490,6 @@ const viewQuestion = (id: number) => router.push(`/community/question/${id}`)
 const formatDate = (dateStr: string) => {
   const locale = localStorage.getItem('locale') || 'zh'
   return new Date(dateStr).toLocaleDateString(locale === 'bo' ? 'bo-CN' : 'zh-CN')
-}
-
-// ========== Scroll animations ==========
-const initScrollAnimations = () => {
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) { entry.target.classList.add('revealed'); observer.unobserve(entry.target) }
-    })
-  }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' })
-  document.querySelectorAll('.animate-on-scroll:not(.revealed)').forEach(el => observer.observe(el))
 }
 
 onMounted(() => { loadRoutes(); loadQuestions() })
