@@ -30,14 +30,16 @@ export interface StreamCallbacks {
 }
 
 export async function generateRouteStream(
-  requestBody: { days: number; budget: string; preference: string },
+  requestBody: { days: number; budget: string; preference: string; locale?: string },
   callbacks: StreamCallbacks,
   abortSignal?: AbortSignal
 ): Promise<void> {
   const token = getStoredToken()
+  const locale = requestBody.locale || localStorage.getItem('locale') || 'zh'
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'Accept': 'text/event-stream',
+    'Accept-Language': locale,
   }
   if (token) {
     headers['Authorization'] = `Bearer ${token}`
@@ -46,7 +48,7 @@ export async function generateRouteStream(
   const response = await fetch(`${apiBaseURL}/routes/generate/stream`, {
     method: 'POST',
     headers,
-    body: JSON.stringify(requestBody),
+    body: JSON.stringify({ ...requestBody, locale }),
     signal: abortSignal,
   })
 

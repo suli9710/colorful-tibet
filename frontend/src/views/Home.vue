@@ -55,7 +55,7 @@
           <button v-for="(slide, index) in heroSlides" :key="slide.title" @click="goToSlide(index)"
                   class="tibet-carousel-dot"
                   :class="{ active: currentSlide === index }"
-                  :aria-label="`切换到第 ${index + 1} 张轮播图`"></button>
+                  :aria-label="t('home.carouselDot', { index: index + 1 })"></button>
         </div>
       </div>
     </div>
@@ -336,11 +336,11 @@ const fetchRecommendations = async () => {
         const reasonsMap = new Map<number, string>()
         recommendedSpots.value.forEach((spot: any) => {
           if (spot.rating && spot.rating >= 4.0) {
-            reasonsMap.set(spot.id, '高评分景点')
+            reasonsMap.set(spot.id, t('home.highRatingSpot'))
           } else if (spot.visitCount && spot.visitCount > 15000) {
-            reasonsMap.set(spot.id, '热门景点')
+            reasonsMap.set(spot.id, t('home.popularSpot'))
           } else {
-            reasonsMap.set(spot.id, '为您精选')
+            reasonsMap.set(spot.id, t('home.selectedForYou'))
           }
         })
         recommendationReasons.value = reasonsMap
@@ -351,7 +351,7 @@ const fetchRecommendations = async () => {
       recommendedSpots.value = spots.slice(0, 3)
       const defaultReasons = new Map<number, string>()
       recommendedSpots.value.forEach((spot: any) => {
-        defaultReasons.set(spot.id, '热门景点')
+        defaultReasons.set(spot.id, t('home.popularSpot'))
       })
       recommendationReasons.value = defaultReasons
     }

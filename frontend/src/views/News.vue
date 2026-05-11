@@ -27,10 +27,10 @@
       </div>
 
       <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div v-for="(item, index) in filteredNews" :key="item.id" class="tibet-card-elevated rounded-2xl overflow-hidden hover:shadow-lg transition-shadow duration-300 flex flex-col h-full animate-on-scroll scroll-pop-card"
+        <div v-for="(item, index) in filteredNews" :key="item.id" class="group tibet-card-elevated rounded-2xl overflow-hidden flex flex-col h-full animate-on-scroll scroll-pop-card"
              :style="{ animationDelay: `${index * 80}ms` }">
           <div class="w-full h-48 relative flex-shrink-0">
-            <img :src="item.imageUrl || '/images/news/default-news.jpg'" :alt="item.title" class="w-full h-full object-cover" onerror="this.src='/images/spots/布达拉宫.jpg'">
+            <img :src="item.imageUrl || '/images/news/default-news.jpg'" :alt="item.title" class="w-full h-full object-cover tibet-image-hover will-change-transform" onerror="this.src='/images/spots/布达拉宫.jpg'">
             <div class="absolute top-0 left-0 bg-tibet-red text-tibet-yellow px-3 py-1 m-4 rounded-full text-xs font-medium shadow-lg">
               {{ getCategoryLabel(item.category) }}
             </div>
@@ -41,7 +41,7 @@
             <p class="text-tibet-brown/70 line-clamp-3 mb-4 flex-grow">{{ item.content }}</p>
             <div class="mt-auto">
               <button @click="openDetail(item)" class="tibet-link font-medium flex items-center">
-                {{ t('common.readMore') || '阅读全文' }}
+                {{ t('common.readMore') }}
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
                 </svg>
@@ -105,17 +105,17 @@ const selectedCategory = ref<string>('ALL')
 const selectedItem = ref<NewsItem | null>(null)
 
 const categories = computed(() => [
-  { label: t('common.all') || '全部', value: 'ALL' },
-  { label: t('news.category.policy') || '政策', value: 'POLICY' },
-  { label: t('news.category.event') || '活动', value: 'EVENT' },
-  { label: t('news.category.notice') || '公告', value: 'NOTICE' }
+  { label: t('common.all'), value: 'ALL' },
+  { label: t('news.category.policy'), value: 'POLICY' },
+  { label: t('news.category.event'), value: 'EVENT' },
+  { label: t('news.category.notice'), value: 'NOTICE' }
 ])
 
 const getCategoryLabel = (category: string) => {
   const map: Record<string, string> = {
-    'POLICY': t('news.category.policy') || '政策',
-    'EVENT': t('news.category.event') || '活动',
-    'NOTICE': t('news.category.notice') || '公告'
+    'POLICY': t('news.category.policy'),
+    'EVENT': t('news.category.event'),
+    'NOTICE': t('news.category.notice')
   }
   return map[category] || category
 }

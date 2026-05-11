@@ -28,31 +28,29 @@ public class FileStorageService {
     }
 
     public String storeCommentImage(MultipartFile file) throws IOException {
-        validateImage(file);
-        String extension = getFileExtension(file.getOriginalFilename());
-        String filename = UUID.randomUUID() + extension;
-
-        Path commentDir = uploadRoot.resolve("comments");
-        Files.createDirectories(commentDir);
-
-        Path targetLocation = commentDir.resolve(filename);
-        Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);
-
-        return "/uploads/comments/" + filename;
+        return storeImage(file, "comments");
     }
 
     public String storeAvatar(MultipartFile file) throws IOException {
+        return storeImage(file, "avatars");
+    }
+
+    public String storeAdminImage(MultipartFile file) throws IOException {
+        return storeImage(file, "admin");
+    }
+
+    private String storeImage(MultipartFile file, String folder) throws IOException {
         validateImage(file);
         String extension = getFileExtension(file.getOriginalFilename());
         String filename = UUID.randomUUID() + extension;
 
-        Path avatarDir = uploadRoot.resolve("avatars");
-        Files.createDirectories(avatarDir);
+        Path targetDir = uploadRoot.resolve(folder);
+        Files.createDirectories(targetDir);
 
-        Path targetLocation = avatarDir.resolve(filename);
+        Path targetLocation = targetDir.resolve(filename);
         Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);
 
-        return "/uploads/avatars/" + filename;
+        return "/uploads/" + folder + "/" + filename;
     }
 
     private void validateImage(MultipartFile file) {
@@ -86,7 +84,6 @@ public class FileStorageService {
         return originalFilename.substring(dotIndex).toLowerCase(Locale.ROOT);
     }
 }
-
 
 
 

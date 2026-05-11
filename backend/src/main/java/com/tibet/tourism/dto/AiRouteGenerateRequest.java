@@ -5,6 +5,7 @@ public class AiRouteGenerateRequest {
     private Integer days;
     private String budget;
     private String preference;
+    private String locale;
 
     public Integer getDays() {
         return days;
@@ -28,5 +29,13 @@ public class AiRouteGenerateRequest {
 
     public void setPreference(String preference) {
         this.preference = preference;
+    }
+
+    public String getLocale() {
+        return locale;
+    }
+
+    public void setLocale(String locale) {
+        this.locale = locale;
     }
 }

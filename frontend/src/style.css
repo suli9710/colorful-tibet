@@ -216,14 +216,14 @@
     animation-fill-mode: backwards;
   }
   .scroll-pop-card.animate-on-scroll {
-    transform: translate3d(0, 36px, 0) scale(0.94);
-    filter: blur(6px);
+    transform: translate3d(0, 30px, 0) scale(0.96);
+    filter: blur(5px);
   }
   .scroll-pop-card.animate-on-scroll.revealed {
     opacity: 1;
     transform: translate3d(0, 0, 0) scale(1);
     filter: blur(0);
-    animation: revealCardPop 0.78s cubic-bezier(0.2, 1.3, 0.32, 1);
+    animation: revealCardPop 0.68s cubic-bezier(0.16, 1, 0.3, 1);
     animation-fill-mode: backwards;
   }
 
@@ -244,8 +244,8 @@
     100% { opacity: 1; transform: scale(1); filter: blur(0); }
   }
   @keyframes revealCardPop {
-    0% { opacity: 0; transform: translate3d(0, 40px, 0) scale(0.92); filter: blur(8px); }
-    62% { opacity: 1; transform: translate3d(0, -6px, 0) scale(1.025); filter: blur(0); }
+    0% { opacity: 0; transform: translate3d(0, 34px, 0) scale(0.95); filter: blur(7px); }
+    72% { opacity: 1; transform: translate3d(0, -2px, 0) scale(1.008); filter: blur(0); }
     100% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); filter: blur(0); }
   }
 
@@ -388,13 +388,19 @@
 
   /* 卡片悬停效果 */
   .card-hover {
-    @apply transition-all duration-500;
+    translate: 0 0;
+    scale: 1;
+    transition-property: translate, scale, box-shadow, border-color, background-color, filter;
+    transition-duration: 420ms;
     transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
-    will-change: transform, box-shadow;
+    backface-visibility: hidden;
   }
 
-  .card-hover:hover {
-    transform: translateY(-8px) scale(1.01);
+  @media (hover: hover) and (pointer: fine) {
+    .card-hover:hover {
+      translate: 0 -6px;
+      scale: 1.01;
+    }
   }
 
   /* 平滑过渡 */
@@ -405,10 +411,8 @@
 
   /* 性能优化：使用 GPU 加速 */
   .gpu-accelerated {
-    transform: translateZ(0);
     will-change: transform;
     backface-visibility: hidden;
-    perspective: 1000px;
   }
 }
 
@@ -520,6 +524,12 @@
     border: 1px solid rgba(197, 150, 75, 0.3);
     box-shadow: 0 4px 24px rgba(139, 46, 58, 0.06);
     position: relative;
+    translate: 0 0;
+    scale: 1;
+    transition-property: translate, scale, box-shadow, border-color, background-color;
+    transition-duration: 420ms;
+    transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+    backface-visibility: hidden;
   }
   .tibet-card::before {
     content: '';
@@ -546,6 +556,7 @@
       linear-gradient(45deg, rgba(139, 46, 58, 0.20) 0 9px, transparent 9px) bottom left/26px 26px no-repeat,
       linear-gradient(315deg, rgba(139, 46, 58, 0.20) 0 9px, transparent 9px) bottom right/26px 26px no-repeat;
     opacity: 0.72;
+    border-radius: inherit;
   }
 
   /* 经幡飘扬动画 */
@@ -653,7 +664,12 @@
                 0 4px 16px rgba(139, 46, 58, 0.04),
                 0 8px 32px rgba(139, 46, 58, 0.02);
     position: relative;
-    transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    translate: 0 0;
+    scale: 1;
+    transition-property: translate, scale, box-shadow, border-color, background-color;
+    transition-duration: 420ms;
+    transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+    backface-visibility: hidden;
   }
   .tibet-card-elevated::before {
     content: '';
@@ -667,14 +683,26 @@
     opacity: 0;
     transition: opacity 0.5s ease;
   }
-  .tibet-card-elevated:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 4px 12px rgba(139, 46, 58, 0.06),
-                0 12px 40px rgba(139, 46, 58, 0.08);
-    border-color: rgba(197, 150, 75, 0.35);
+  @media (hover: hover) and (pointer: fine) {
+    .tibet-card:hover,
+    .tibet-card-elevated:hover,
+    .tibet-card-elevated:focus-within {
+      translate: 0 -6px;
+      scale: 1.012;
+      box-shadow: 0 8px 18px rgba(139, 46, 58, 0.07),
+                  0 18px 48px rgba(139, 46, 58, 0.10);
+      border-color: rgba(197, 150, 75, 0.38);
+    }
+    .tibet-card:hover::before,
+    .tibet-card-elevated:hover::before,
+    .tibet-card-elevated:focus-within::before {
+      opacity: 1;
+    }
   }
-  .tibet-card-elevated:hover::before {
-    opacity: 1;
+  .tibet-card:active,
+  .tibet-card-elevated:active {
+    translate: 0 -2px;
+    scale: 0.998;
   }
 
   /* ===== 藏式标签药丸 ===== */
@@ -717,9 +745,10 @@
   /* ===== 图片悬浮效果 ===== */
   .tibet-image-hover {
     transition: transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+    backface-visibility: hidden;
   }
   .group:hover .tibet-image-hover {
-    transform: scale(1.05);
+    transform: scale(1.06);
   }
 
   /* ===== 骨架屏（暖色金闪）===== */

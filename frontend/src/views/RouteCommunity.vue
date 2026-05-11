@@ -68,7 +68,7 @@
 
         <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <div v-for="(route, index) in routes" :key="route.id"
-               class="tibet-card-elevated rounded-2xl p-6 hover:shadow-2xl transition-all duration-500 ease-out cursor-pointer group transform hover:-translate-y-2 hover:border-tibet-gold/30 animate-on-scroll scroll-pop-card"
+               class="tibet-card-elevated rounded-2xl p-6 cursor-pointer group hover:border-tibet-gold/30 animate-on-scroll scroll-pop-card"
                :style="{ animationDelay: `${index * 80}ms` }"
                @click="viewRoute(route.id)">
             <div class="flex justify-between items-start mb-4">
@@ -126,7 +126,7 @@
                 @click="qaFilters.tag = ''; loadQuestions()"
                 class="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
                 :class="!qaFilters.tag ? 'bg-tibet-gold text-white shadow-sm' : 'bg-white/60 text-gray-500 hover:bg-white hover:text-gray-700 border border-tibet-gold/20'"
-              >全部</button>
+              >{{ t('common.all') }}</button>
               <button
                 v-for="tag in tagOptions" :key="tag.value"
                 @click="qaFilters.tag = qaFilters.tag === tag.value ? '' : tag.value; loadQuestions()"
@@ -157,7 +157,7 @@
 
         <div v-else class="space-y-4">
           <div v-for="(q, index) in questions" :key="q.id"
-               class="tibet-card-elevated rounded-2xl p-6 hover:shadow-xl transition-all duration-300 cursor-pointer group animate-on-scroll scroll-pop-card"
+               class="tibet-card-elevated rounded-2xl p-6 cursor-pointer group animate-on-scroll scroll-pop-card"
                :style="{ animationDelay: `${index * 60}ms` }"
                @click="viewQuestion(q.id)">
             <div class="flex items-start justify-between gap-4">
@@ -403,7 +403,7 @@ const submitQuestion = async () => {
     if (error.response?.status === 401 && confirm(t('routePlanner.loginRequired'))) {
       router.push('/login')
     } else {
-      alert('发布失败，请稍后重试')
+      alert(t('community.publishFailedRetry'))
     }
   } finally {
     qaSubmitting.value = false

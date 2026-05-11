@@ -14,12 +14,14 @@ import com.tibet.tourism.repository.UserVisitHistoryRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Service
@@ -73,10 +75,24 @@ public class RecommendationService {
     @Autowired
     private ColdStartOptimizationService coldStartOptimizationService;
     
-    // 缓存：用户相似度映射（可扩展为Redis缓存）
-    private final Map<Long, Map<Long, Double>> similarityCache = new ConcurrentHashMap<>();
-    private final Map<Long, Map<String, Double>> tagProfileCache = new ConcurrentHashMap<>();
-    private static final int CACHE_SIZE_LIMIT = 1000; // 缓存大小限制
+    @Autowired(required = false)
+    private RedisTemplate<String, Object> redisTemplate;
+
+    private static final long SIMILARITY_CACHE_TTL_MINUTES = 30;
+    private static final long TAG_PROFILE_CACHE_TTL_MINUTES = 60;
+    private static final int LOCAL_CACHE_SIZE_LIMIT = 1000;
+
+    private final Map<Long, Map<Long, Double>> localSimilarityCache = new ConcurrentHashMap<>();
+    private final Map<Long, Map<String, Double>> localTagProfileCache = new ConcurrentHashMap<>();
+    private volatile boolean redisCacheWarningLogged = false;
+
+    private static String similarityKey(Long userId) {
+        return "recommend:similarity:" + userId;
+    }
+
+    private static String tagProfileKey(Long userId) {
+        return "recommend:tagprofile:" + userId;
+    }
     
     // 混合推荐权重配置
     private static final double USER_BASED_WEIGHT = 0.3d; // User-Based CF权重
@@ -655,13 +671,10 @@ public class RecommendationService {
         logger.info("📍 已访问景点数: {}", visitedSpotIds.size());
 
         // 尝试从缓存获取标签画像
-        Map<String, Double> tagPreferenceProfile = tagProfileCache.get(userId);
+        Map<String, Double> tagPreferenceProfile = getTagProfileFromCache(userId);
         if (tagPreferenceProfile == null) {
             tagPreferenceProfile = buildUserTagProfile(currentUserHistory, visitedSpotIds);
-            // 更新缓存
-            if (tagProfileCache.size() < CACHE_SIZE_LIMIT) {
-                tagProfileCache.put(userId, tagPreferenceProfile);
-            }
+            cacheTagProfile(userId, tagPreferenceProfile);
             logger.info("🏷️  构建用户标签画像: {} 个标签", tagPreferenceProfile.size());
         } else {
             logger.info("🏷️  从缓存获取标签画像: {} 个标签", tagPreferenceProfile.size());
@@ -674,6 +687,8 @@ public class RecommendationService {
                 .filter(history -> !history.getUser().getId().equals(userId))
                 .collect(Collectors.groupingBy(history -> history.getUser().getId()));
 
+        Map<Long, Double> cachedSimilarities = getSimilarityCache(userId);
+
         // 使用并行流计算相似度以提高性能，同时收集详细信息
         Map<Long, SimilarityDetails> similarityDetailsMap = new ConcurrentHashMap<>();
         Map<Long, Double> userSimilarityMap = overlapHistoryByUser.entrySet().parallelStream()
@@ -682,10 +697,8 @@ public class RecommendationService {
                     entry -> {
                         // 尝试从缓存获取
                         Long otherUserId = entry.getKey();
-                        Map<Long, Double> cached = similarityCache.get(userId);
-                        if (cached != null && cached.containsKey(otherUserId)) {
-                            // 缓存命中时，详细信息可能不完整，但为了性能可以接受
-                            return cached.get(otherUserId);
+                        if (cachedSimilarities != null && cachedSimilarities.containsKey(otherUserId)) {
+                            return cachedSimilarities.get(otherUserId);
                         }
                         
                         // 计算相似度及详细信息
@@ -1504,25 +1517,148 @@ public class RecommendationService {
         return union.isEmpty() ? 0.0 : (double) intersection.size() / union.size();
     }
 
+    private Map<String, Double> getTagProfileFromCache(Long userId) {
+        Map<String, Double> redisValue = toStringDoubleMap(getRedisValue(tagProfileKey(userId), "get tag profile"));
+        return redisValue != null ? redisValue : localTagProfileCache.get(userId);
+    }
+
+    private Map<Long, Double> getSimilarityCache(Long userId) {
+        Map<Long, Double> redisValue = toLongDoubleMap(getRedisValue(similarityKey(userId), "get similarity"));
+        return redisValue != null ? redisValue : localSimilarityCache.get(userId);
+    }
+
+    private void cacheTagProfile(Long userId, Map<String, Double> tagPreferenceProfile) {
+        if (localTagProfileCache.size() >= LOCAL_CACHE_SIZE_LIMIT && !localTagProfileCache.containsKey(userId)) {
+            localTagProfileCache.clear();
+        }
+        localTagProfileCache.put(userId, new HashMap<>(tagPreferenceProfile));
+        setRedisValue(tagProfileKey(userId), tagPreferenceProfile, TAG_PROFILE_CACHE_TTL_MINUTES, "set tag profile");
+    }
+
+    private void cacheSimilarity(Long userId, Map<Long, Double> similarities) {
+        if (localSimilarityCache.size() >= LOCAL_CACHE_SIZE_LIMIT && !localSimilarityCache.containsKey(userId)) {
+            localSimilarityCache.clear();
+        }
+        localSimilarityCache.put(userId, new HashMap<>(similarities));
+        setRedisValue(similarityKey(userId), new HashMap<>(similarities), SIMILARITY_CACHE_TTL_MINUTES, "set similarity");
+    }
+
+    private Object getRedisValue(String key, String operation) {
+        if (redisTemplate == null) {
+            return null;
+        }
+        try {
+            return redisTemplate.opsForValue().get(key);
+        } catch (RuntimeException ex) {
+            logRedisCacheFailure(operation, ex);
+            return null;
+        }
+    }
+
+    private void setRedisValue(String key, Object value, long ttlMinutes, String operation) {
+        if (redisTemplate == null) {
+            return;
+        }
+        try {
+            redisTemplate.opsForValue().set(key, value, ttlMinutes, TimeUnit.MINUTES);
+        } catch (RuntimeException ex) {
+            logRedisCacheFailure(operation, ex);
+        }
+    }
+
+    private void deleteRedisValue(String key) {
+        if (redisTemplate == null) {
+            return;
+        }
+        try {
+            redisTemplate.delete(key);
+        } catch (RuntimeException ex) {
+            logRedisCacheFailure("delete cache", ex);
+        }
+    }
+
+    private void logRedisCacheFailure(String operation, RuntimeException ex) {
+        if (!redisCacheWarningLogged) {
+            redisCacheWarningLogged = true;
+            logger.warn("Redis cache unavailable; using local in-memory cache. operation={}, cause={}",
+                    operation, ex.getMessage());
+        } else {
+            logger.debug("Redis cache operation failed: {}", operation, ex);
+        }
+    }
+
+    private Map<String, Double> toStringDoubleMap(Object value) {
+        if (!(value instanceof Map<?, ?> source)) {
+            return null;
+        }
+        Map<String, Double> result = new HashMap<>();
+        for (Map.Entry<?, ?> entry : source.entrySet()) {
+            Double score = toDouble(entry.getValue());
+            if (entry.getKey() != null && score != null) {
+                result.put(entry.getKey().toString(), score);
+            }
+        }
+        return result;
+    }
+
+    private Map<Long, Double> toLongDoubleMap(Object value) {
+        if (!(value instanceof Map<?, ?> source)) {
+            return null;
+        }
+        Map<Long, Double> result = new HashMap<>();
+        for (Map.Entry<?, ?> entry : source.entrySet()) {
+            Long userId = toLong(entry.getKey());
+            Double score = toDouble(entry.getValue());
+            if (userId != null && score != null) {
+                result.put(userId, score);
+            }
+        }
+        return result;
+    }
+
+    private Long toLong(Object value) {
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        if (value instanceof String text) {
+            try {
+                return Long.parseLong(text);
+            } catch (NumberFormatException ex) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    private Double toDouble(Object value) {
+        if (value instanceof Number number) {
+            return number.doubleValue();
+        }
+        if (value instanceof String text) {
+            try {
+                return Double.parseDouble(text);
+            } catch (NumberFormatException ex) {
+                return null;
+            }
+        }
+        return null;
+    }
+
     /**
      * 更新相似度缓存
      */
     private void updateSimilarityCache(Long userId, Map<Long, Double> similarities) {
-        if (similarityCache.size() >= CACHE_SIZE_LIMIT) {
-            // 简单的LRU策略：清除最旧的缓存（这里简化处理，实际可以使用LinkedHashMap实现真正的LRU）
-            if (similarityCache.size() >= CACHE_SIZE_LIMIT * 1.5) {
-                similarityCache.clear();
-            }
-        }
-        similarityCache.put(userId, new HashMap<>(similarities));
+        cacheSimilarity(userId, similarities);
     }
     
     /**
      * 清除用户缓存（当用户行为更新时调用）
      */
     public void invalidateUserCache(Long userId) {
-        similarityCache.remove(userId);
-        tagProfileCache.remove(userId);
+        localSimilarityCache.remove(userId);
+        localTagProfileCache.remove(userId);
+        deleteRedisValue(similarityKey(userId));
+        deleteRedisValue(tagProfileKey(userId));
     }
 
     private Double accumulateScores(Double existing, Double addition) {

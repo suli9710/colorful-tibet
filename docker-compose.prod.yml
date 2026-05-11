@@ -24,9 +24,15 @@ services:
       - DB_HOST=${DB_HOST:-mysql}
       - DB_PORT=${DB_PORT:-3306}
       - DB_NAME=${DB_NAME:-tibet_tourism}
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      - REDIS_DATABASE=${REDIS_DATABASE:-0}
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
+    depends_on:
+      - redis
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/api/spots"]
@@ -36,6 +42,30 @@ services:
       start_period: 40s
     networks:
       - tibet-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: colorful-tibet-redis
+    command: >
+      sh -c 'if [ -n "$$REDIS_PASSWORD" ]; then
+        redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD";
+      else
+        redis-server --appendonly yes;
+      fi'
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+    ports:
+      - "${REDIS_HOST_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - tibet-network
+    healthcheck:
+      test: ["CMD-SHELL", "if [ -n \"$$REDIS_PASSWORD\" ]; then redis-cli -a \"$$REDIS_PASSWORD\" ping; else redis-cli ping; fi"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
 
   frontend:
     build:
@@ -77,6 +107,9 @@ services:
 networks:
   tibet-network:
     driver: bridge
+
+volumes:
+  redis_data:
 
 # volumes:
 #   mysql_data:

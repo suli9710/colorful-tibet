@@ -99,7 +99,7 @@ const loadChartData = async () => {
       },
       series: [
         {
-          name: '景点',
+          name: t('heatmap.heatLevel.spot'),
           type: 'scatter',
           coordinateSystem: mapLoaded ? 'geo' : undefined,
           data: data,
@@ -130,7 +130,7 @@ const loadChartData = async () => {
           }
         },
         {
-          name: '热门景点',
+          name: t('home.hotSpotsDistribution'),
           type: 'effectScatter',
           coordinateSystem: mapLoaded ? 'geo' : undefined,
           data: data

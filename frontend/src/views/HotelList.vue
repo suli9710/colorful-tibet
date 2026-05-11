@@ -53,7 +53,7 @@
             <div class="flex-1 h-px bg-gradient-to-r from-transparent via-tibet-gold/50 to-transparent"></div>
             <div class="text-center shrink-0">
               <h2 class="tibet-heading text-2xl md:text-3xl font-bold text-tibet-dark tibetan-font">
-                {{ t('hotel.regionalHotels', { region: group.region }) }}
+                {{ t('hotel.regionalHotels', { region: group.regionLabel }) }}
               </h2>
               <p class="text-sm text-tibet-brown/50 mt-1">{{ t('hotel.hotelsCount', { count: group.hotels.length }) }}</p>
             </div>
@@ -63,11 +63,17 @@
           <!-- Hotel Cards -->
           <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
             <article v-for="(hotel, index) in group.hotels" :key="hotel.id"
-                     class="tibet-card group rounded-2xl overflow-hidden hover:shadow-2xl hover:shadow-tibet-red/8 hover:-translate-y-1.5 transition-all duration-500 ease-out-expo animate-on-scroll scroll-pop-card"
+                     class="tibet-card group rounded-2xl overflow-hidden animate-on-scroll scroll-pop-card"
                      :style="{ animationDelay: `${index * 80}ms` }">
               <!-- Image -->
               <div class="relative h-52 overflow-hidden bg-tibet-brown/10">
-                <img :src="hotel.coverImage" :alt="hotel.name" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out-expo" loading="lazy" />
+                <img
+                  :src="hotel.coverImage || defaultHotelImage"
+                  :alt="hotel.name"
+                  class="w-full h-full object-cover tibet-image-hover will-change-transform"
+                  loading="lazy"
+                  @error="($event.target as HTMLImageElement).src = defaultHotelImage"
+                />
                 <div class="absolute inset-0 bg-gradient-to-t from-tibet-dark/50 via-transparent to-transparent"></div>
                 <!-- Star Badge — 藏金星星 -->
                 <div class="absolute top-3 left-3 flex items-center gap-0.5 px-2.5 py-1 rounded-full bg-tibet-white/90 backdrop-blur text-tibet-gold text-xs font-bold shadow">
@@ -119,7 +125,7 @@
                        :title="t('hotel.navigate')">
                       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                     </a>
-                    <router-link :to="`/hotels/${hotel.id}`" class="tibet-btn text-sm">查看详情</router-link>
+                    <router-link :to="`/hotels/${hotel.id}`" class="tibet-btn text-sm">{{ t('hotel.viewDetails') }}</router-link>
                   </div>
                 </div>
               </div>
@@ -145,53 +151,58 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { hotelsByRegion, hotelRegions, type HotelItem } from '../data/hotels'
+import { hotels, hotelsByRegion, hotelRegions, type HotelItem } from '../data/hotels'
+import { getCanonicalRegion, localizeHotel, localizeRegion } from '../data/hotelTranslations'
 import api, { endpoints } from '../api'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const keyword = ref('')
 const city = ref('')
 const star = ref('')
 
 // --- Merge API hotels into static data ---
 
+const defaultHotelImage = '/images/hotels/hotel-luxury-1.jpg'
+
 const resolveRegion = (location: string): string => {
-  for (const region of hotelRegions) {
-    if (location.includes(region)) return region
-  }
-  if (location.includes('那曲')) return '那曲'
-  return '拉萨'
+  return getCanonicalRegion(location)
 }
 
-const mapApiHotel = (apiHotel: any, idOffset: number): HotelItem => {
-  const region = resolveRegion(apiHotel.location || '')
-  const amenities = apiHotel.facilities
-    ? apiHotel.facilities.split(',').map((f: string) => f.trim()).filter(Boolean)
+const splitFacilities = (facilities?: string): string[] =>
+  facilities
+    ? facilities.split(',').map((f: string) => f.trim()).filter(Boolean)
     : []
-  let priceMin = 300
-  if (apiHotel.priceRange) {
-    const m = (apiHotel.priceRange as string).match(/(\d+)/)
-    if (m) priceMin = parseInt(m[1]) || 300
-  }
+
+const parsePriceMin = (priceRange?: string): number => {
+  const match = (priceRange || '').match(/(\d+)/)
+  return match ? parseInt(match[1], 10) || 300 : 300
+}
+
+const mapApiHotel = (apiHotel: any, staticHotel?: HotelItem): HotelItem & { isApiHotel: boolean; phone: string } => {
+  const region = resolveRegion(apiHotel.location || '')
+  const amenities = splitFacilities(apiHotel.facilities)
 
   return {
-    id: apiHotel.id + idOffset,
+    ...(staticHotel || {}),
+    id: apiHotel.id,
     region,
     name: apiHotel.name,
     city: region,
-    address: apiHotel.location || '西藏',
-    lng: 91.0,
-    lat: 29.6,
+    address: apiHotel.location || staticHotel?.address || '西藏',
+    lng: staticHotel?.lng || 91.0,
+    lat: staticHotel?.lat || 29.6,
     stars: Math.min(5, Math.max(3, Math.round(Number(apiHotel.rating) || 4))),
     rating: Number(apiHotel.rating) || 4.0,
-    reviewCount: 0,
-    priceMin,
+    reviewCount: staticHotel?.reviewCount || 0,
+    priceMin: apiHotel.priceRange ? parsePriceMin(apiHotel.priceRange) : (staticHotel?.priceMin || 300),
     available: true,
-    tags: ['可预订'],
-    coverImage: apiHotel.imageUrl || '',
-    description: `${apiHotel.name}位于${apiHotel.location || '西藏'}，电话：${apiHotel.phone || '暂无'}`,
-    amenities,
-    rooms: [],
+    tags: amenities.length ? amenities.slice(0, 4) : (staticHotel?.tags || ['可预订']),
+    coverImage: apiHotel.imageUrl || staticHotel?.coverImage || defaultHotelImage,
+    description: staticHotel?.description || '',
+    amenities: amenities.length ? amenities : (staticHotel?.amenities || []),
+    rooms: staticHotel?.rooms || [],
+    isApiHotel: true,
+    phone: apiHotel.phone || '',
   }
 }
 
@@ -200,24 +211,38 @@ const mergedByRegion = ref<Record<string, HotelItem[]>>(
   JSON.parse(JSON.stringify(hotelsByRegion))
 )
 
-const staticNames = new Set(
-  Object.values(hotelsByRegion).flat().map(h => h.name)
-)
+const staticHotelsByName = new Map(hotels.map(hotel => [hotel.name, hotel]))
 
 onMounted(async () => {
   try {
     const res = await api.get(endpoints.hotels.list)
     if (res.data && res.data.length > 0) {
-      const offset = 10000 // push API ids far above static range
+      const nextByRegion = JSON.parse(JSON.stringify(hotelsByRegion)) as Record<string, HotelItem[]>
+
       for (const apiHotel of res.data) {
-        if (staticNames.has(apiHotel.name)) continue
-        const mapped = mapApiHotel(apiHotel, offset)
+        const staticHotel = staticHotelsByName.get(apiHotel.name)
+        const mapped = mapApiHotel(apiHotel, staticHotel)
         const region = mapped.region
-        if (!mergedByRegion.value[region]) {
-          mergedByRegion.value[region] = []
+
+        if (staticHotel) {
+          Object.keys(nextByRegion).forEach(key => {
+            nextByRegion[key] = nextByRegion[key].filter(hotel => hotel.name !== apiHotel.name)
+          })
         }
-        mergedByRegion.value[region].push(mapped)
+
+        if (!nextByRegion[region]) {
+          nextByRegion[region] = []
+        }
+
+        const existingIndex = nextByRegion[region].findIndex(hotel => hotel.name === mapped.name)
+        if (existingIndex >= 0) {
+          nextByRegion[region][existingIndex] = mapped
+        } else {
+          nextByRegion[region].push(mapped)
+        }
       }
+
+      mergedByRegion.value = nextByRegion
     }
   } catch (_) { /* fallback to static data */ }
   setTimeout(initScrollAnimations, 100)
@@ -225,16 +250,49 @@ onMounted(async () => {
 
 // --- Filtering ---
 
+const toDisplayHotel = (hotel: HotelItem) => {
+  const localized = localizeHotel(hotel, locale.value)
+  if ((hotel as any).isApiHotel) {
+    return {
+      ...localized,
+      region: localizeRegion(hotel.region, locale.value),
+      city: localizeRegion(hotel.city, locale.value),
+      tags: [t('hotel.bookable')],
+      description: t('hotel.apiHotelDescription', {
+        name: hotel.name,
+        location: hotel.address || t('common.unknownLocation'),
+        phone: (hotel as any).phone || t('hotel.noPhone')
+      })
+    }
+  }
+  return localized
+}
+
 const hotelsByRegionVisible = computed(() =>
   hotelRegions
-    .map(region => ({
-      region,
-      hotels: (mergedByRegion.value[region] || []).filter((h: HotelItem) =>
-        (!keyword.value || h.name.includes(keyword.value) || h.city.includes(keyword.value) || h.tags.some(tag => tag.includes(keyword.value))) &&
-        (!city.value || h.city === city.value) &&
-        (!star.value || h.stars === Number(star.value))
-      )
-    }))
+    .map(region => {
+      const hotels = (mergedByRegion.value[region] || [])
+        .filter((h: HotelItem) => {
+          const displayHotel = toDisplayHotel(h)
+          const searchable = [
+            displayHotel.name,
+            displayHotel.city,
+            displayHotel.address,
+            displayHotel.description,
+            ...(displayHotel.tags || [])
+          ].join(' ')
+          return (!keyword.value || searchable.includes(keyword.value)) &&
+            (!city.value || h.city === city.value) &&
+            (!star.value || h.stars === Number(star.value))
+        })
+        .map(toDisplayHotel)
+
+      return {
+        region,
+        regionLabel: localizeRegion(region, locale.value),
+        hotels
+      }
+    })
     .filter(group => group.hotels.length > 0)
 )
 

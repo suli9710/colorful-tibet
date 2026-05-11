@@ -27,6 +27,7 @@ import com.tibet.tourism.repository.UserVisitHistoryRepository;
 import org.springframework.data.domain.Sort;
 import com.tibet.tourism.repository.ScenicSpotRepository;
 import com.tibet.tourism.repository.UserRepository;
+import com.tibet.tourism.service.FileStorageService;
 import com.tibet.tourism.service.TibetanTranslationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -34,6 +35,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.util.HashMap;
@@ -100,6 +102,9 @@ public class AdminController {
     @Autowired
     private TibetanTranslationService translationService;
 
+    @Autowired
+    private FileStorageService fileStorageService;
+
     @Value("${app.super-admin-username:lzh}")
     private String superAdminUsername;
 
@@ -162,6 +167,19 @@ public class AdminController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<AuditLog>> getAuditLogs() {
         return ResponseEntity.ok(auditLogRepository.findAll(Sort.by(Sort.Direction.DESC, "createdAt")));
+    }
+
+    @PostMapping("/upload-image")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> uploadImage(@RequestParam("file") MultipartFile file) {
+        try {
+            String imageUrl = fileStorageService.storeAdminImage(file);
+            return ResponseEntity.ok(Map.of("imageUrl", imageUrl));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", "上传失败，请稍后重试"));
+        }
     }
 
     /**
