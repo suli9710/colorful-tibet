@@ -48,6 +48,9 @@ out/
 *.bak
 *.cache
 
+# Uploaded files
+backend/uploads/
+
 # Database files (H2)
 backend/data/*.mv.db
 backend/data/*.trace.db
