@@ -2,15 +2,17 @@
   <div class="bg-white rounded-2xl shadow overflow-hidden border border-stone-100">
     <div class="px-6 py-5 border-b border-stone-200 flex items-center justify-between">
       <div>
-        <h3 class="text-xl font-bold text-stone-800">运营分析面板</h3>
-        <p class="text-sm text-stone-500 mt-1">景点、订单、用户与资讯的关键运营指标</p>
+        <h3 class="text-xl font-bold text-stone-800">{{ t('admin.analytics.title') }}</h3>
+        <p class="text-sm text-stone-500 mt-1">{{ t('admin.analytics.subtitle') }}</p>
       </div>
-      <div class="text-xs text-stone-400">{{ chartData?.updatedAt ? `数据更新时间：${formatDateTime(chartData.updatedAt)}` : '实时统计' }}</div>
+      <div class="text-xs text-stone-400">
+        {{ chartData?.updatedAt ? t('admin.analytics.updatedAt', { time: formatDateTime(chartData.updatedAt) }) : t('admin.analytics.realtime') }}
+      </div>
     </div>
 
     <div v-if="loading" class="p-10 text-center text-stone-500">
       <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-      <p>正在加载运营分析数据...</p>
+      <p>{{ t('admin.analytics.loading') }}</p>
     </div>
 
     <div v-else-if="error" class="p-8 text-center text-red-600">
@@ -29,32 +31,32 @@
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div class="rounded-2xl border border-stone-100 p-4">
           <div class="flex items-center justify-between mb-3">
-            <h4 class="font-semibold text-stone-800">订单与营收趋势</h4>
-            <span class="text-xs text-stone-400">近六个月</span>
+            <h4 class="font-semibold text-stone-800">{{ t('admin.analytics.charts.orderRevenueTrend') }}</h4>
+            <span class="text-xs text-stone-400">{{ t('admin.analytics.charts.lastSixMonths') }}</span>
           </div>
           <div ref="trendChartEl" class="w-full h-80"></div>
         </div>
 
         <div class="rounded-2xl border border-stone-100 p-4">
           <div class="flex items-center justify-between mb-3">
-            <h4 class="font-semibold text-stone-800">景点分类占比</h4>
-            <span class="text-xs text-stone-400">按当前景点数据统计</span>
+            <h4 class="font-semibold text-stone-800">{{ t('admin.analytics.charts.categoryShare') }}</h4>
+            <span class="text-xs text-stone-400">{{ t('admin.analytics.charts.currentSpotData') }}</span>
           </div>
           <div ref="categoryChartEl" class="w-full h-80"></div>
         </div>
 
         <div class="rounded-2xl border border-stone-100 p-4">
           <div class="flex items-center justify-between mb-3">
-            <h4 class="font-semibold text-stone-800">热门景点访问量</h4>
-            <span class="text-xs text-stone-400">前八名</span>
+            <h4 class="font-semibold text-stone-800">{{ t('admin.analytics.charts.popularSpotVisits') }}</h4>
+            <span class="text-xs text-stone-400">{{ t('admin.analytics.charts.topEight') }}</span>
           </div>
           <div ref="spotChartEl" class="w-full h-80"></div>
         </div>
 
         <div class="rounded-2xl border border-stone-100 p-4">
           <div class="flex items-center justify-between mb-3">
-            <h4 class="font-semibold text-stone-800">资讯与用户增长</h4>
-            <span class="text-xs text-stone-400">近六个月</span>
+            <h4 class="font-semibold text-stone-800">{{ t('admin.analytics.charts.newsAndUserGrowth') }}</h4>
+            <span class="text-xs text-stone-400">{{ t('admin.analytics.charts.lastSixMonths') }}</span>
           </div>
           <div ref="growthChartEl" class="w-full h-80"></div>
         </div>
@@ -65,6 +67,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import * as echarts from 'echarts'
 
 interface AnalyticsStats {
@@ -94,27 +97,27 @@ const categoryChartEl = ref<HTMLElement | null>(null)
 const spotChartEl = ref<HTMLElement | null>(null)
 const growthChartEl = ref<HTMLElement | null>(null)
 const charts: echarts.ECharts[] = []
+const { t, locale } = useI18n()
 
-const categoryLabelMap: Record<string, string> = {
-  NATURAL: '自然景观',
-  HISTORICAL: '历史人文',
-  CULTURAL: '文化体验',
-  UNCLASSIFIED: '未分类'
+const getCategoryLabel = (category: string) => {
+  const key = `admin.analytics.spotCategories.${category}`
+  const label = t(key)
+  return label === key ? category : label
 }
 
 const summaryCards = computed(() => {
   const data = props.chartData
   return [
-    { label: '总用户数', value: data?.userCount ?? 0, hint: '平台注册用户规模' },
-    { label: '总订单数', value: data?.orderCount ?? 0, hint: '景点 + 酒店已确认订单' },
-    { label: '总营收', value: `¥${Number(data?.totalRevenue ?? 0).toLocaleString()}`, hint: '已确认订单营收' },
-    { label: '景点总数', value: data?.spotCount ?? 0, hint: '当前景点资源数量' },
+    { label: t('admin.analytics.summary.userCount'), value: data?.userCount ?? 0, hint: t('admin.analytics.summary.userHint') },
+    { label: t('admin.analytics.summary.orderCount'), value: data?.orderCount ?? 0, hint: t('admin.analytics.summary.orderHint') },
+    { label: t('admin.analytics.summary.revenue'), value: `¥${Number(data?.totalRevenue ?? 0).toLocaleString()}`, hint: t('admin.analytics.summary.revenueHint') },
+    { label: t('admin.analytics.summary.spotCount'), value: data?.spotCount ?? 0, hint: t('admin.analytics.summary.spotHint') },
   ]
 })
 
 const formatDateTime = (value?: string) => {
   if (!value) return '-'
-  return new Date(value).toLocaleString('zh-CN')
+  return new Date(value).toLocaleString(locale.value === 'bo' ? 'bo-CN' : 'zh-CN')
 }
 
 const disposeCharts = () => {
@@ -136,26 +139,26 @@ const initCharts = () => {
   if (trendChart) {
     trendChart.setOption({
       tooltip: { trigger: 'axis' },
-      legend: { data: ['订单数', '营收'], top: 6 },
+      legend: { data: [t('admin.analytics.charts.orders'), t('admin.analytics.charts.revenue')], top: 6 },
       grid: { left: 40, right: 30, top: 50, bottom: 30 },
       xAxis: {
         type: 'category',
-        name: '月份',
+        name: t('admin.analytics.charts.month'),
         data: (data.monthlyBookingTrend || []).map(item => item.month)
       },
       yAxis: [
-        { type: 'value', name: '订单数' },
-        { type: 'value', name: '营收', position: 'right' }
+        { type: 'value', name: t('admin.analytics.charts.orders') },
+        { type: 'value', name: t('admin.analytics.charts.revenue'), position: 'right' }
       ],
       series: [
         {
-          name: '订单数',
+          name: t('admin.analytics.charts.orders'),
           type: 'bar',
           data: (data.monthlyBookingTrend || []).map(item => item.orderCount),
           itemStyle: { color: '#3b82f6' }
         },
         {
-          name: '营收',
+          name: t('admin.analytics.charts.revenue'),
           type: 'line',
           yAxisIndex: 1,
           smooth: true,
@@ -169,7 +172,7 @@ const initCharts = () => {
 
   if (categoryChart) {
     const categoryData = (data.spotCategories || []).map(item => ({
-      name: categoryLabelMap[item.name] || item.name,
+      name: getCategoryLabel(item.name),
       value: item.value
     }))
     categoryChart.setOption({
@@ -197,10 +200,10 @@ const initCharts = () => {
     spotChart.setOption({
       tooltip: { trigger: 'axis' },
       grid: { left: 120, right: 30, top: 20, bottom: 20 },
-      xAxis: { type: 'value', name: '访问量' },
+      xAxis: { type: 'value', name: t('admin.analytics.charts.visits') },
       yAxis: {
         type: 'category',
-        name: '景点',
+        name: t('admin.analytics.charts.spot'),
         data: sortedSpots.map(item => item.name),
         axisLabel: { interval: 0, width: 100, overflow: 'truncate' }
       },
@@ -225,17 +228,17 @@ const initCharts = () => {
   if (growthChart) {
     growthChart.setOption({
       tooltip: { trigger: 'axis' },
-      legend: { data: ['用户增长', '资讯发布'], top: 6 },
+      legend: { data: [t('admin.analytics.charts.userGrowth'), t('admin.analytics.charts.newsPublished')], top: 6 },
       grid: { left: 40, right: 30, top: 50, bottom: 30 },
       xAxis: {
         type: 'category',
-        name: '月份',
+        name: t('admin.analytics.charts.month'),
         data: (data.userGrowthTrend || []).map(item => item.month)
       },
-      yAxis: { type: 'value', name: '数量' },
+      yAxis: { type: 'value', name: t('admin.analytics.charts.quantity') },
       series: [
         {
-          name: '用户增长',
+          name: t('admin.analytics.charts.userGrowth'),
           type: 'line',
           smooth: true,
           areaStyle: {},
@@ -243,7 +246,7 @@ const initCharts = () => {
           itemStyle: { color: '#10b981' }
         },
         {
-          name: '资讯发布',
+          name: t('admin.analytics.charts.newsPublished'),
           type: 'bar',
           data: (data.newsPublishTrend || []).map(item => item.count),
           itemStyle: { color: '#8b5cf6' }
@@ -262,6 +265,11 @@ watch(() => props.chartData, async () => {
   await nextTick()
   initCharts()
 }, { deep: true })
+
+watch(locale, async () => {
+  await nextTick()
+  initCharts()
+})
 
 onMounted(() => {
   window.addEventListener('resize', handleResize)

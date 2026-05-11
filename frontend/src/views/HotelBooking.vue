@@ -46,13 +46,13 @@
                 <input v-model="form.guestName" type="text" :placeholder="t('contact.namePlaceholder')" class="w-full px-4 py-3 rounded-2xl border border-tibet-gold/25 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all" />
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">{{ t('hotel.phone') || '电话' }}</label>
-                <input v-model="form.phone" type="tel" :placeholder="t('hotel.phonePlaceholder') || '请输入联系电话'" class="w-full px-4 py-3 rounded-2xl border border-tibet-gold/25 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all" />
+                <label class="block text-sm font-medium text-gray-700 mb-2">{{ t('hotel.phone') }}</label>
+                <input v-model="form.phone" type="tel" :placeholder="t('hotel.phonePlaceholder')" class="w-full px-4 py-3 rounded-2xl border border-tibet-gold/25 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all" />
               </div>
             </div>
             <div class="mt-4">
-              <label class="block text-sm font-medium text-gray-700 mb-2">{{ t('hotel.noteLabel') || '备注（选填）' }}</label>
-              <textarea v-model="form.note" rows="3" :placeholder="t('hotel.notePlaceholder') || '如有特殊需求请在此说明...'" class="w-full px-4 py-3 rounded-2xl border border-tibet-gold/25 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all resize-none"></textarea>
+              <label class="block text-sm font-medium text-gray-700 mb-2">{{ t('hotel.noteLabel') }}</label>
+              <textarea v-model="form.note" rows="3" :placeholder="t('hotel.notePlaceholder')" class="w-full px-4 py-3 rounded-2xl border border-tibet-gold/25 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all resize-none"></textarea>
             </div>
           </div>
 
@@ -66,18 +66,23 @@
         <div>
           <div class="sticky top-24 bg-white rounded-3xl p-7 border border-tibet-gold/20 shadow-lg">
             <div class="h-40 rounded-2xl overflow-hidden mb-4 bg-gray-100">
-              <img :src="hotel.coverImage" :alt="hotel.name" class="w-full h-full object-cover" />
+              <img
+                :src="hotel.coverImage || defaultHotelImage"
+                :alt="hotel.name"
+                class="w-full h-full object-cover"
+                @error="($event.target as HTMLImageElement).src = defaultHotelImage"
+              />
             </div>
             <h3 class="text-xl font-bold text-gray-900">{{ hotel.name }}</h3>
             <p class="text-sm text-gray-500 mt-1">{{ hotel.city }} · {{ hotel.address }}</p>
 
             <div v-if="selectedRoom" class="mt-4 pt-4 border-t border-tibet-gold/20 space-y-2 text-sm">
-              <div class="flex justify-between"><span class="text-gray-500">房型</span><span class="font-medium">{{ selectedRoom.name }}</span></div>
+              <div class="flex justify-between"><span class="text-gray-500">{{ t('hotel.roomType') }}</span><span class="font-medium">{{ selectedRoom.name }}</span></div>
               <div class="flex justify-between"><span class="text-gray-500">{{ t('hotel.perNight') }}</span><span class="font-medium">¥{{ selectedRoom.price }}</span></div>
-              <div class="flex justify-between"><span class="text-gray-500">晚数</span><span class="font-medium">{{ nights }} 晚</span></div>
-              <div class="flex justify-between"><span class="text-gray-500">入住</span><span class="font-medium">{{ form.checkInDate || '-' }}</span></div>
-              <div class="flex justify-between"><span class="text-gray-500">离店</span><span class="font-medium">{{ form.checkOutDate || '-' }}</span></div>
-              <div class="flex justify-between border-t border-tibet-gold/20 pt-2 mt-2"><span class="font-semibold">合计</span><span class="text-xl font-bold text-blue-600">¥{{ totalPrice }}</span></div>
+              <div class="flex justify-between"><span class="text-gray-500">{{ t('hotel.nights') }}</span><span class="font-medium">{{ nights }}{{ t('common.nightsUnit') }}</span></div>
+              <div class="flex justify-between"><span class="text-gray-500">{{ t('hotel.checkIn') }}</span><span class="font-medium">{{ form.checkInDate || '-' }}</span></div>
+              <div class="flex justify-between"><span class="text-gray-500">{{ t('hotel.checkOut') }}</span><span class="font-medium">{{ form.checkOutDate || '-' }}</span></div>
+              <div class="flex justify-between border-t border-tibet-gold/20 pt-2 mt-2"><span class="font-semibold">{{ t('hotel.total') }}</span><span class="text-xl font-bold text-blue-600">¥{{ totalPrice }}</span></div>
             </div>
           </div>
         </div>
@@ -90,10 +95,11 @@
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { getHotelById, getRoomById } from '../data/hotels'
+import { getHotelById, getRoomById, hotels } from '../data/hotels'
+import { getCanonicalRegion, localizeApiRoom, localizeHotel } from '../data/hotelTranslations'
 import api, { endpoints } from '../api'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const route = useRoute()
 const router = useRouter()
 
@@ -101,6 +107,7 @@ const hotelId = Number(route.params.id || 1)
 const roomId = Number(route.query.roomId || 1)
 const apiHotel = ref<any>(null)
 const apiRoomTypes = ref<any[]>([])
+const defaultHotelImage = '/images/hotels/hotel-luxury-1.jpg'
 
 ;(async () => {
   try {
@@ -113,11 +120,43 @@ const apiRoomTypes = ref<any[]>([])
   } catch (e) { /* fallback */ }
 })()
 
-const hotel = computed(() => apiHotel.value || getHotelById(hotelId))
+const matchingStaticHotel = computed(() => {
+  if (!apiHotel.value) return getHotelById(hotelId)
+  return hotels.find(item => item.name === apiHotel.value.name) || getHotelById(hotelId)
+})
+
+const mappedApiHotel = computed(() => {
+  if (!apiHotel.value) return null
+  const staticHotel = matchingStaticHotel.value
+  const region = getCanonicalRegion(apiHotel.value.location || '')
+  const amenities = apiHotel.value.facilities
+    ? apiHotel.value.facilities.split(',').map((f: string) => f.trim()).filter(Boolean)
+    : []
+  return {
+    ...(staticHotel || {}),
+    ...apiHotel.value,
+    id: apiHotel.value.id,
+    coverImage: apiHotel.value.imageUrl || staticHotel?.coverImage || defaultHotelImage,
+    city: region,
+    address: apiHotel.value.location || staticHotel?.address || '',
+    tags: amenities.length ? amenities.slice(0, 4) : (staticHotel?.tags || []),
+    amenities: amenities.length ? amenities : (staticHotel?.amenities || []),
+    reviewCount: staticHotel?.reviewCount || 0,
+    stars: Math.min(5, Math.max(3, Math.round(Number(apiHotel.value.rating) || staticHotel?.rating || 4))),
+    lng: staticHotel?.lng || 91.0,
+    lat: staticHotel?.lat || 29.6
+  }
+})
+
+const hotel = computed(() => {
+  const rawHotel = mappedApiHotel.value || getHotelById(hotelId)
+  return rawHotel ? localizeHotel(rawHotel, locale.value) : null
+})
 const selectedRoom = computed(() => {
   const apiRoom = apiRoomTypes.value.find((r: any) => r.id === roomId)
-  if (apiRoom) return { ...apiRoom, price: apiRoom.price, desc: apiRoom.amenities }
-  return getRoomById(hotelId, roomId)
+  if (apiRoom) return localizeApiRoom({ ...apiRoom, price: apiRoom.price, desc: apiRoom.amenities }, locale.value)
+  const staticRoom = matchingStaticHotel.value?.rooms?.find(room => room.id === roomId) || getRoomById(hotelId, roomId)
+  return staticRoom ? localizeApiRoom(staticRoom, locale.value) : null
 })
 
 const form = ref({
@@ -158,15 +197,15 @@ const submitError = ref('')
 const submitBooking = async () => {
   submitError.value = ''
   if (!form.value.checkInDate || !form.value.checkOutDate) {
-    submitError.value = '请选择入住和离店日期'
+    submitError.value = t('hotel.checkInRequired')
     return
   }
   if (!form.value.guestName.trim()) {
-    submitError.value = '请填写预订人姓名'
+    submitError.value = t('hotel.guestNameRequired')
     return
   }
   if (!form.value.phone.trim()) {
-    submitError.value = '请填写联系电话'
+    submitError.value = t('hotel.phoneRequired')
     return
   }
 

@@ -2,8 +2,8 @@
   <div class="min-h-screen bg-stone-50 py-12 pt-24">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="text-center mb-12">
-        <h1 class="text-4xl font-bold text-stone-800 mb-4">后台管理看板</h1>
-        <p class="text-lg text-stone-600">数据概览与运营统计</p>
+        <h1 class="text-4xl font-bold text-stone-800 mb-4">{{ t('admin.title') }}</h1>
+        <p class="text-lg text-stone-600">{{ t('admin.subtitle') }}</p>
       </div>
 
       <div v-if="loading" class="flex justify-center items-center h-64">
@@ -18,7 +18,7 @@
           <div class="bg-white rounded-lg shadow p-6 border-l-4 border-blue-500">
             <div class="flex items-center justify-between">
               <div>
-                <p class="text-sm text-stone-500 uppercase font-semibold">总用户数</p>
+                <p class="text-sm text-stone-500 uppercase font-semibold">{{ t('admin.totalUsers') }}</p>
                 <p class="text-3xl font-bold text-stone-800">{{ stats.userCount }}</p>
               </div>
               <div class="bg-blue-100 p-3 rounded-full">
@@ -32,7 +32,7 @@
           <div class="bg-white rounded-lg shadow p-6 border-l-4 border-green-500">
             <div class="flex items-center justify-between">
               <div>
-                <p class="text-sm text-stone-500 uppercase font-semibold">总订单数</p>
+                <p class="text-sm text-stone-500 uppercase font-semibold">{{ t('admin.totalOrders') }}</p>
                 <p class="text-3xl font-bold text-stone-800">{{ stats.orderCount }}</p>
               </div>
               <div class="bg-green-100 p-3 rounded-full">
@@ -46,7 +46,7 @@
           <div class="bg-white rounded-lg shadow p-6 border-l-4 border-yellow-500">
             <div class="flex items-center justify-between">
               <div>
-                <p class="text-sm text-stone-500 uppercase font-semibold">总营收</p>
+                <p class="text-sm text-stone-500 uppercase font-semibold">{{ t('admin.totalRevenue') }}</p>
                 <p class="text-3xl font-bold text-stone-800">¥{{ stats.totalRevenue?.toLocaleString() || 0 }}</p>
               </div>
               <div class="bg-yellow-100 p-3 rounded-full">
@@ -65,11 +65,11 @@
               <div class="w-9 h-9 rounded-lg bg-amber-100 flex items-center justify-center">
                 <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
               </div>
-              <h3 class="text-lg font-bold text-stone-800">酒店订单 <span class="text-sm font-normal text-stone-400">({{ hotelOrders.length }}条)</span></h3>
+                <h3 class="text-lg font-bold text-stone-800">{{ t('admin.hotelOrders') }} <span class="text-sm font-normal text-stone-400">({{ hotelOrders.length }}{{ t('common.items') }})</span></h3>
             </div>
             <div class="flex items-center gap-2">
               <button @click.stop="fetchHotelOrders" :disabled="loadingHotelOrders" class="text-xs px-3 py-1.5 rounded-lg bg-stone-100 text-stone-600 hover:bg-stone-200 transition-colors">
-                {{ loadingHotelOrders ? '加载中...' : '刷新' }}
+                {{ loadingHotelOrders ? t('common.loading') : t('common.refresh') }}
               </button>
               <svg class="w-5 h-5 text-stone-400 transition-transform duration-200" :class="{ 'rotate-180': showAllHotelOrders }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
@@ -79,22 +79,22 @@
 
           <div v-if="loadingHotelOrders" class="p-8 text-center text-stone-500">
             <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-            <p>正在加载酒店订单...</p>
+            <p>{{ t('admin.loadingHotelOrders') }}</p>
           </div>
 
           <div v-else-if="showAllHotelOrders" class="overflow-x-auto">
             <table class="min-w-full divide-y divide-stone-200">
               <thead class="bg-stone-50">
                 <tr>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">订单ID</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">用户</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">酒店 / 房型</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">入住 - 离店</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">预订人</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">金额</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">状态</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">下单时间</th>
-                  <th class="px-6 py-3 text-right text-xs font-medium text-stone-500 uppercase tracking-wider">操作</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">{{ t('admin.orderId') }}</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">{{ t('admin.user') }}</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">{{ t('admin.hotelAndRoom') }}</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">{{ t('admin.checkInOut') }}</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">{{ t('admin.booker') }}</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">{{ t('admin.amount') }}</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">{{ t('admin.role') }}</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">{{ t('admin.orderedAt') }}</th>
+                  <th class="px-6 py-3 text-right text-xs font-medium text-stone-500 uppercase tracking-wider">{{ t('admin.action') }}</th>
                 </tr>
               </thead>
               <tbody class="bg-white divide-y divide-stone-200">
@@ -102,12 +102,12 @@
                   <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-500">{{ order.id }}</td>
                   <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-stone-800">{{ order.user?.username || '-' }}</td>
                   <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-600">
-                    <div>{{ order.hotel?.name || '未知酒店' }}</div>
+                    <div>{{ order.hotel?.name || t('admin.unknownHotel') }}</div>
                     <div class="text-xs text-stone-400">{{ order.roomName }}</div>
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-500">
                     <div>{{ order.checkInDate }}</div>
-                    <div class="text-xs text-stone-400">至 {{ order.checkOutDate }}</div>
+                    <div class="text-xs text-stone-400">{{ t('admin.toDate', { date: order.checkOutDate }) }}</div>
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-600">
                     <div>{{ order.guestName }}</div>
@@ -125,24 +125,24 @@
                         'bg-red-100 text-red-800': order.status === 'CANCELLED'
                       }"
                     >
-                      <option value="PENDING">待确认</option>
-                      <option value="CONFIRMED">已确认</option>
-                      <option value="CANCELLED">已取消</option>
+                      <option value="PENDING">{{ t('admin.statusLabel.PENDING') }}</option>
+                      <option value="CONFIRMED">{{ t('admin.statusLabel.CONFIRMED') }}</option>
+                      <option value="CANCELLED">{{ t('admin.statusLabel.CANCELLED') }}</option>
                     </select>
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-500">{{ formatDateTime(order.createdAt) }}</td>
                   <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button @click="deleteHotelOrder(order.id)" class="text-red-600 hover:text-red-900">删除</button>
+                    <button @click="deleteHotelOrder(order.id)" class="text-red-600 hover:text-red-900">{{ t('common.delete') }}</button>
                   </td>
                 </tr>
                 <tr v-if="hotelOrders.length === 0">
-                  <td colspan="9" class="px-6 py-8 text-center text-stone-500">暂无酒店订单</td>
+                  <td colspan="9" class="px-6 py-8 text-center text-stone-500">{{ t('admin.noHotelOrders') }}</td>
                 </tr>
               </tbody>
             </table>
           </div>
           <div v-else-if="!loadingHotelOrders && hotelOrders.length > 0" class="px-6 py-4 text-center text-stone-500 text-sm">
-            点击上方标题栏展开查看全部订单（共{{ hotelOrders.length }}条）
+            {{ t('admin.expandHotelOrders', { count: hotelOrders.length }) }}
           </div>
         </div>
 
@@ -154,7 +154,7 @@
                 <div class="w-9 h-9 rounded-lg bg-blue-100 flex items-center justify-center">
                   <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
                 </div>
-                <h3 class="text-lg font-bold text-stone-800">最新订单 <span class="text-sm font-normal text-stone-400">({{ recentOrders.length }}条)</span></h3>
+                <h3 class="text-lg font-bold text-stone-800">{{ t('admin.latestOrders') }} <span class="text-sm font-normal text-stone-400">({{ recentOrders.length }}{{ t('common.items') }})</span></h3>
               </div>
               <svg class="w-5 h-5 text-stone-400 transition-transform duration-200" :class="{ 'rotate-180': showRecentOrders }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
@@ -165,19 +165,19 @@
                 <div v-for="order in recentOrders" :key="order.id" class="px-6 py-4 flex items-center justify-between hover:bg-stone-50 transition-colors">
                   <div>
                     <div class="flex items-center gap-2">
-                      <span v-if="order.hotel" class="text-xs px-2 py-0.5 rounded bg-blue-100 text-blue-700">酒店</span>
-                      <span v-else class="text-xs px-2 py-0.5 rounded bg-orange-100 text-orange-700">景点</span>
-                      <p class="text-sm font-medium text-stone-800">{{ order.hotel?.name || order.spot?.name || '未知' }}</p>
+                      <span v-if="order.hotel" class="text-xs px-2 py-0.5 rounded bg-blue-100 text-blue-700">{{ t('admin.hotel') }}</span>
+                      <span v-else class="text-xs px-2 py-0.5 rounded bg-orange-100 text-orange-700">{{ t('admin.spot') }}</span>
+                      <p class="text-sm font-medium text-stone-800">{{ order.hotel?.name || order.spot?.name || t('common.unknown') }}</p>
                     </div>
                     <p class="text-xs text-stone-500 mt-1">{{ formatDate(order.createdAt) }}</p>
                   </div>
                   <div class="text-right">
                     <p class="text-sm font-bold text-stone-800">¥{{ order.totalPrice }}</p>
-                    <span :class="getStatusClass(order.status)" class="text-xs px-2 py-1 rounded-full">{{ order.status }}</span>
+                    <span :class="getStatusClass(order.status)" class="text-xs px-2 py-1 rounded-full">{{ getStatusLabel(order.status) }}</span>
                   </div>
                 </div>
               </template>
-              <div v-else class="px-6 py-4 text-center text-stone-400 text-sm">暂无订单</div>
+              <div v-else class="px-6 py-4 text-center text-stone-400 text-sm">{{ t('admin.noOrders') }}</div>
             </div>
           </div>
 
@@ -188,7 +188,7 @@
                 <div class="w-9 h-9 rounded-lg bg-rose-100 flex items-center justify-center">
                   <svg class="w-5 h-5 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>
                 </div>
-                <h3 class="text-lg font-bold text-stone-800">热门景点 <span class="text-sm font-normal text-stone-400">({{ sortedPopularSpots.length }}个)</span></h3>
+                <h3 class="text-lg font-bold text-stone-800">{{ t('admin.popularSpots') }} <span class="text-sm font-normal text-stone-400">({{ sortedPopularSpots.length }}{{ t('common.countUnit') }})</span></h3>
               </div>
               <svg class="w-5 h-5 text-stone-400 transition-transform duration-200" :class="{ 'rotate-180': showPopularSpots }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
@@ -208,100 +208,106 @@
                         :style="{ width: getClickCountPercentage(spot) + '%' }"
                       ></div>
                     </div>
-                    <span class="text-xs text-stone-500 font-medium whitespace-nowrap">{{ spot.visitCount || 0 }}次</span>
+                    <span class="text-xs text-stone-500 font-medium whitespace-nowrap">{{ t('admin.visits', { count: spot.visitCount || 0 }) }}</span>
                   </div>
                 </div>
                 <div class="text-right ml-4">
                   <p class="text-sm font-bold text-red-600">¥{{ spot.ticketPrice }}</p>
                 </div>
               </div>
-              <div v-if="!sortedPopularSpots?.length" class="px-6 py-4 text-center text-stone-400 text-sm">暂无数据</div>
+              <div v-if="!sortedPopularSpots?.length" class="px-6 py-4 text-center text-stone-400 text-sm">{{ t('common.noData') }}</div>
             </div>
           </div>
         </div>
         
         <!-- Spots Management Section -->
         <div class="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden mt-8">
-          <div class="px-6 py-4 border-b border-stone-100 flex justify-between items-center bg-gradient-to-r from-stone-50 to-white">
+          <div class="px-6 py-4 border-b border-stone-100 flex justify-between items-center bg-gradient-to-r from-stone-50 to-white cursor-pointer hover:bg-stone-100/50 transition-colors" @click="showSpots = !showSpots">
             <div class="flex items-center gap-3">
               <div class="w-9 h-9 rounded-lg bg-emerald-100 flex items-center justify-center">
                 <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
               </div>
-              <h3 class="text-lg font-bold text-stone-800">景点管理 <span class="text-sm font-normal text-stone-400">({{ spots.length }}个)</span></h3>
+              <h3 class="text-lg font-bold text-stone-800">{{ t('admin.spotManagement') }} <span class="text-sm font-normal text-stone-400">({{ spots.length }}{{ t('common.countUnit') }})</span></h3>
             </div>
             <div class="flex items-center gap-2">
-              <button @click="fetchSpots" :disabled="loadingSpots" class="text-xs px-3 py-1.5 rounded-lg bg-stone-100 text-stone-600 hover:bg-stone-200 transition-colors">
-                {{ loadingSpots ? '加载中...' : '刷新' }}
+              <button @click.stop="fetchSpots" :disabled="loadingSpots" class="text-xs px-3 py-1.5 rounded-lg bg-stone-100 text-stone-600 hover:bg-stone-200 transition-colors">
+                {{ loadingSpots ? t('common.loading') : t('common.refresh') }}
               </button>
-              <button v-if="spots.length > 6" @click="showAllSpots = !showAllSpots" class="text-xs px-3 py-1.5 rounded-lg bg-stone-100 text-stone-600 hover:bg-stone-200 transition-colors">
-                {{ showAllSpots ? '收起' : '查看全部(' + spots.length + ')' }}
+              <button v-if="spots.length > 6 && showSpots" @click.stop="showAllSpots = !showAllSpots" class="text-xs px-3 py-1.5 rounded-lg bg-stone-100 text-stone-600 hover:bg-stone-200 transition-colors">
+                {{ showAllSpots ? t('common.collapse') : t('common.expandAll') + '(' + spots.length + ')' }}
               </button>
+              <svg class="w-5 h-5 text-stone-400 transition-transform duration-200" :class="{ 'rotate-180': showSpots }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
             </div>
           </div>
 
-          <!-- Loading State -->
-          <div v-if="loadingSpots" class="p-12 text-center">
-            <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-500 mx-auto mb-4"></div>
-            <p class="text-stone-400 text-sm">正在加载景点数据...</p>
-          </div>
-
-          <!-- Error State -->
-          <div v-else-if="spotsError" class="p-12 text-center">
-            <div class="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
-              <svg class="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+          <template v-if="showSpots">
+            <!-- Loading State -->
+            <div v-if="loadingSpots" class="p-12 text-center">
+              <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-500 mx-auto mb-4"></div>
+              <p class="text-stone-400 text-sm">{{ t('admin.loadingSpots') }}</p>
             </div>
-            <p class="text-red-500 text-sm mb-1">加载失败</p>
-            <p class="text-stone-400 text-xs mb-4">{{ spotsError }}</p>
-            <button @click="fetchSpots" class="text-sm px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors">重试</button>
-          </div>
 
-          <!-- Empty State -->
-          <div v-else-if="spots.length === 0" class="p-16 text-center">
-            <svg class="w-16 h-16 text-stone-200 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>
-            <p class="text-stone-400">暂无景点数据</p>
-          </div>
+            <!-- Error State -->
+            <div v-else-if="spotsError" class="p-12 text-center">
+              <div class="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
+                <svg class="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+              </div>
+              <p class="text-red-500 text-sm mb-1">{{ t('admin.loadFailed') }}</p>
+              <p class="text-stone-400 text-xs mb-4">{{ spotsError }}</p>
+              <button @click="fetchSpots" class="text-sm px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors">{{ t('common.retry') }}</button>
+            </div>
 
-          <!-- Spots Card Grid -->
-          <div v-else class="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div v-for="spot in displayedSpots" :key="spot.id"
-                 class="group bg-white rounded-xl border border-stone-200 overflow-hidden hover:shadow-lg hover:border-emerald-300 transition-all duration-200 cursor-pointer"
-                 @click="openEditModal(spot)">
-              <!-- Thumbnail -->
-              <div class="relative h-40 overflow-hidden bg-stone-100">
-                <img v-if="spot.imageUrl" :src="spot.imageUrl" :alt="spot.name"
-                     class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                     @error="($event.target as HTMLImageElement).style.display='none'" />
-                <div v-if="!spot.imageUrl" class="w-full h-full flex items-center justify-center bg-gradient-to-br from-emerald-400 to-teal-600">
-                  <span class="text-4xl font-bold text-white/80">{{ spot.name?.charAt(0) }}</span>
+            <!-- Empty State -->
+            <div v-else-if="spots.length === 0" class="p-16 text-center">
+              <svg class="w-16 h-16 text-stone-200 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>
+              <p class="text-stone-400">{{ t('admin.noSpotData') }}</p>
+            </div>
+
+            <!-- Spots Card Grid -->
+            <div v-else class="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div v-for="spot in displayedSpots" :key="spot.id"
+                   class="group bg-white rounded-xl border border-stone-200 overflow-hidden hover:shadow-lg hover:border-emerald-300 transition-all duration-200 cursor-pointer"
+                   @click="openEditModal(spot)">
+                <!-- Thumbnail -->
+                <div class="relative h-40 overflow-hidden bg-stone-100">
+                  <img v-if="spot.imageUrl" :src="spot.imageUrl" :alt="spot.name"
+                       class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                       @error="($event.target as HTMLImageElement).style.display='none'" />
+                  <div v-if="!spot.imageUrl" class="w-full h-full flex items-center justify-center bg-gradient-to-br from-emerald-400 to-teal-600">
+                    <span class="text-4xl font-bold text-white/80">{{ spot.name?.charAt(0) }}</span>
+                  </div>
+                  <!-- Price badge -->
+                  <div class="absolute top-3 right-3 px-2.5 py-1 rounded-full bg-white/90 backdrop-blur text-emerald-700 text-xs font-bold shadow-sm">
+                    ¥{{ spot.ticketPrice || '-' }}
+                  </div>
+                  <!-- Edit overlay on hover -->
+                  <div class="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all flex items-center justify-center">
+                    <span class="px-4 py-2 rounded-lg bg-white/90 text-stone-700 text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity shadow-lg backdrop-blur">
+                    {{ t('admin.clickEdit') }}
+                    </span>
+                  </div>
                 </div>
-                <!-- Price badge -->
-                <div class="absolute top-3 right-3 px-2.5 py-1 rounded-full bg-white/90 backdrop-blur text-emerald-700 text-xs font-bold shadow-sm">
-                  ¥{{ spot.ticketPrice || '-' }}
-                </div>
-                <!-- Edit overlay on hover -->
-                <div class="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all flex items-center justify-center">
-                  <span class="px-4 py-2 rounded-lg bg-white/90 text-stone-700 text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity shadow-lg backdrop-blur">
-                    点击编辑
-                  </span>
+                <!-- Info -->
+                <div class="p-4">
+                  <h4 class="font-semibold text-stone-800 truncate mb-1">{{ spot.name }}</h4>
+                  <div class="flex items-center gap-2 text-xs text-stone-400 mb-2">
+                    <span v-if="spot.city" class="flex items-center gap-0.5">
+                      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>
+                      {{ spot.city }}
+                    </span>
+                    <span v-if="spot.visitCount > 0">· 👁 {{ spot.visitCount }}</span>
+                  </div>
+                  <p v-if="spot.description" class="text-xs text-stone-500 line-clamp-2 leading-relaxed">{{ spot.description }}</p>
+                  <div class="mt-3 pt-3 border-t border-stone-100 flex items-center justify-between">
+                    <span class="text-xs text-stone-400">ID: {{ spot.id }}</span>
+                    <span class="text-xs font-medium text-emerald-600 group-hover:text-emerald-700 transition-colors">{{ t('admin.editArrow') }}</span>
+                  </div>
                 </div>
               </div>
-              <!-- Info -->
-              <div class="p-4">
-                <h4 class="font-semibold text-stone-800 truncate mb-1">{{ spot.name }}</h4>
-                <div class="flex items-center gap-2 text-xs text-stone-400 mb-2">
-                  <span v-if="spot.city" class="flex items-center gap-0.5">
-                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>
-                    {{ spot.city }}
-                  </span>
-                  <span v-if="spot.visitCount > 0">· 👁 {{ spot.visitCount }}</span>
-                </div>
-                <p v-if="spot.description" class="text-xs text-stone-500 line-clamp-2 leading-relaxed">{{ spot.description }}</p>
-                <div class="mt-3 pt-3 border-t border-stone-100 flex items-center justify-between">
-                  <span class="text-xs text-stone-400">ID: {{ spot.id }}</span>
-                  <span class="text-xs font-medium text-emerald-600 group-hover:text-emerald-700 transition-colors">编辑 →</span>
-                </div>
-              </div>
             </div>
+          </template>
+          <div v-else class="px-6 py-4 text-center text-stone-500 text-sm">
+            {{ t('admin.expandSpots', { count: spots.length }) }}
           </div>
         </div>
 
@@ -312,10 +318,10 @@
               <div class="w-9 h-9 rounded-lg bg-violet-100 flex items-center justify-center">
                 <svg class="w-5 h-5 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"/></svg>
               </div>
-              <h3 class="text-lg font-bold text-stone-800">用户管理 <span class="text-sm font-normal text-stone-400">({{ users.length }}人)</span></h3>
+              <h3 class="text-lg font-bold text-stone-800">{{ t('admin.userManagement') }} <span class="text-sm font-normal text-stone-400">({{ users.length }}{{ t('common.peopleUnit') }})</span></h3>
             </div>
             <div class="flex items-center gap-2">
-              <button @click.stop="fetchUsers" class="text-xs px-3 py-1.5 rounded-lg bg-stone-100 text-stone-600 hover:bg-stone-200 transition-colors">刷新</button>
+            <button @click.stop="fetchUsers" class="text-xs px-3 py-1.5 rounded-lg bg-stone-100 text-stone-600 hover:bg-stone-200 transition-colors">{{ t('common.refresh') }}</button>
               <svg class="w-5 h-5 text-stone-400 transition-transform duration-200" :class="{ 'rotate-180': showUsers }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
             </div>
           </div>
@@ -326,15 +332,15 @@
                 <thead class="bg-stone-50">
                   <tr>
                     <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">ID</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">用户名</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">密码</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">昵称</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">城市</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">IP地址</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">最后登录</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">注册时间</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">角色</th>
-                    <th class="px-6 py-3 text-right text-xs font-medium text-stone-500 uppercase tracking-wider">操作</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">{{ t('admin.username') }}</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">{{ t('admin.password') }}</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">{{ t('admin.nickname') }}</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">{{ t('admin.city') }}</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">{{ t('admin.ipAddress') }}</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">{{ t('admin.lastLogin') }}</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">{{ t('admin.registeredAt') }}</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">{{ t('admin.status') }}</th>
+                  <th class="px-6 py-3 text-right text-xs font-medium text-stone-500 uppercase tracking-wider">{{ t('admin.action') }}</th>
                   </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-stone-200">
@@ -343,8 +349,8 @@
                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-stone-900">{{ u.username }}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-500 font-mono">
                       <div class="flex items-center gap-2">
-                        <span class="text-xs bg-gray-100 px-2 py-1 rounded" title="密码仅保存 BCrypt 哈希，无法查看明文">
-                          BCrypt 哈希
+                    <span class="text-xs bg-gray-100 px-2 py-1 rounded" :title="t('admin.passwordHashTitle')">
+                      {{ t('admin.bcryptHash') }}
                         </span>
                       </div>
                     </td>
@@ -357,9 +363,9 @@
                       <span v-if="u.ipAddress" class="text-xs">{{ u.ipAddress }}</span>
                       <span v-else class="text-stone-400">-</span>
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-500">
-                      <span v-if="u.lastLoginAt">{{ formatDateTime(u.lastLoginAt) }}</span>
-                      <span v-else class="text-stone-400">从未登录</span>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-500">
+                    <span v-if="u.lastLoginAt">{{ formatDateTime(u.lastLoginAt) }}</span>
+                    <span v-else class="text-stone-400">{{ t('admin.neverLoggedIn') }}</span>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-500">
                       <span v-if="u.createdAt">{{ formatDateTime(u.createdAt) }}</span>
@@ -368,14 +374,14 @@
                     <td class="px-6 py-4 whitespace-nowrap">
                       <span :class="u.role === 'ADMIN' ? 'bg-purple-100 text-purple-800' : 'bg-gray-100 text-gray-800'" 
                             class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full">
-                        {{ u.role === 'ADMIN' ? '管理员' : '普通用户' }}
+                    {{ u.role === 'ADMIN' ? t('admin.adminRole') : t('admin.userRole') }}
                       </span>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <button v-if="u.role !== 'ADMIN'" @click="updateRole(u.id, 'ADMIN')" class="text-blue-600 hover:text-blue-900 mr-4">设为管理员</button>
-                      <button v-else-if="u.username !== 'lzh'" @click="updateRole(u.id, 'USER')" class="text-orange-600 hover:text-orange-900 mr-4">取消管理员</button>
-                      <button v-if="isSuperAdmin && u.username !== 'lzh'" @click="deleteUser(u)" class="text-red-600 hover:text-red-900">删除</button>
-                      <span v-if="u.username === 'lzh'" class="text-gray-400 cursor-not-allowed">不可操作</span>
+                    <button v-if="u.role !== 'ADMIN'" @click="updateRole(u.id, 'ADMIN')" class="text-blue-600 hover:text-blue-900 mr-4">{{ t('admin.setAdmin') }}</button>
+                    <button v-else-if="u.username !== 'lzh'" @click="updateRole(u.id, 'USER')" class="text-orange-600 hover:text-orange-900 mr-4">{{ t('admin.unsetAdmin') }}</button>
+                    <button v-if="isSuperAdmin && u.username !== 'lzh'" @click="deleteUser(u)" class="text-red-600 hover:text-red-900">{{ t('common.delete') }}</button>
+                    <span v-if="u.username === 'lzh'" class="text-gray-400 cursor-not-allowed">{{ t('admin.notOperable') }}</span>
                     </td>
                   </tr>
                 </tbody>
@@ -387,20 +393,20 @@
         <!-- 审计日志（仅超级管理员） -->
         <div v-if="isSuperAdmin" class="bg-white rounded-lg shadow overflow-hidden mt-8">
           <div class="px-6 py-4 border-b border-stone-200 flex justify-between items-center">
-            <h3 class="text-lg font-bold text-stone-800">用户操作审计日志</h3>
+            <h3 class="text-lg font-bold text-stone-800">{{ t('admin.auditLogs') }}</h3>
             <button @click="fetchAuditLogs" class="text-sm text-blue-600 hover:text-blue-800" :disabled="loadingAuditLogs">
-              {{ loadingAuditLogs ? '加载中...' : '刷新日志' }}
+              {{ loadingAuditLogs ? t('common.loading') : t('admin.refreshLogs') }}
             </button>
           </div>
           <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-stone-200">
               <thead class="bg-stone-50">
                 <tr>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">时间</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">操作人</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">目标用户</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">结果</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">原因</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">{{ t('admin.orderedAt') }}</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">{{ t('admin.operator') }}</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">{{ t('admin.targetUser') }}</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">{{ t('admin.result') }}</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">{{ t('admin.reason') }}</th>
                 </tr>
               </thead>
               <tbody class="bg-white divide-y divide-stone-200">
@@ -416,7 +422,7 @@
                   <td class="px-6 py-4 text-sm text-stone-600">{{ log.detail || '-' }}</td>
                 </tr>
                 <tr v-if="!loadingAuditLogs && auditLogs.length === 0">
-                  <td colspan="5" class="px-6 py-6 text-center text-stone-500">暂无审计记录</td>
+                  <td colspan="5" class="px-6 py-6 text-center text-stone-500">{{ t('admin.noAuditLogs') }}</td>
                 </tr>
               </tbody>
             </table>
@@ -429,13 +435,13 @@
               <div class="w-9 h-9 rounded-lg bg-cyan-100 flex items-center justify-center">
                 <svg class="w-5 h-5 text-cyan-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"/></svg>
               </div>
-              <h3 class="text-lg font-bold text-stone-800">旅游资讯管理 <span class="text-sm font-normal text-stone-400">({{ newsList.length }}条)</span></h3>
+              <h3 class="text-lg font-bold text-stone-800">{{ t('admin.newsManagement') }} <span class="text-sm font-normal text-stone-400">({{ newsList.length }}{{ t('common.items') }})</span></h3>
             </div>
             <div class="flex items-center gap-2">
               <button @click.stop="fetchNews" :disabled="loadingNews" class="text-xs px-3 py-1.5 rounded-lg bg-stone-100 text-stone-600 hover:bg-stone-200 transition-colors">
-                {{ loadingNews ? '加载中...' : '刷新' }}
+                {{ loadingNews ? t('common.loading') : t('common.refresh') }}
               </button>
-              <button @click.stop="openCreateNewsModal" class="text-xs px-3 py-1.5 rounded-lg bg-cyan-500 text-white hover:bg-cyan-600 transition-colors">+ 创建</button>
+              <button @click.stop="openCreateNewsModal" class="text-xs px-3 py-1.5 rounded-lg bg-cyan-500 text-white hover:bg-cyan-600 transition-colors">{{ t('admin.createNews') }}</button>
               <svg class="w-5 h-5 text-stone-400 transition-transform duration-200" :class="{ 'rotate-180': showAllNews }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
               </svg>
@@ -445,7 +451,7 @@
           <!-- Loading State -->
           <div v-if="loadingNews" class="p-8 text-center text-stone-500">
             <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-            <p>正在加载资讯数据...</p>
+            <p>{{ t('admin.loadingNews') }}</p>
           </div>
           
           <!-- News List (Collapsible) -->
@@ -467,16 +473,16 @@
                         <span :class="getCategoryClass(news.category)" class="px-2 py-1 rounded-full font-medium whitespace-nowrap">
                           {{ getCategoryLabel(news.category) }}
                         </span>
-                        <span class="whitespace-nowrap">浏览量: {{ news.viewCount || 0 }}</span>
+                        <span class="whitespace-nowrap">{{ t('admin.viewCount', { count: news.viewCount || 0 }) }}</span>
                         <span class="whitespace-nowrap">{{ formatDate(news.createdAt) }}</span>
                       </div>
                     </div>
                     <div class="flex space-x-2 flex-shrink-0">
                       <button @click="openEditNewsModal(news)" class="text-blue-600 hover:text-blue-800 text-sm font-medium whitespace-nowrap">
-                        编辑
+                        {{ t('common.edit') }}
                       </button>
                       <button @click="deleteNewsItem(news.id)" class="text-red-600 hover:text-red-800 text-sm font-medium whitespace-nowrap">
-                        删除
+                        {{ t('common.delete') }}
                       </button>
                     </div>
                   </div>
@@ -484,11 +490,11 @@
               </div>
             </div>
             <div v-if="newsList.length === 0" class="px-6 py-8 text-center text-stone-500">
-              暂无资讯数据
+              {{ t('admin.noNews') }}
             </div>
           </div>
           <div v-else-if="!loadingNews && newsList.length > 0" class="px-6 py-4 text-center text-stone-500 text-sm">
-            点击上方标题栏展开查看全部资讯（共{{ newsList.length }}条）
+            {{ t('admin.expandNews', { count: newsList.length }) }}
           </div>
         </div>
 
@@ -499,10 +505,10 @@
               <div class="w-9 h-9 rounded-lg bg-pink-100 flex items-center justify-center">
                 <svg class="w-5 h-5 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
               </div>
-              <h3 class="text-lg font-bold text-stone-800">轮播图管理 <span class="text-sm font-normal text-stone-400">({{ carousels.length }}张)</span></h3>
+              <h3 class="text-lg font-bold text-stone-800">{{ t('admin.carouselManagement') }} <span class="text-sm font-normal text-stone-400">({{ carousels.length }}{{ t('common.imagesUnit') }})</span></h3>
             </div>
             <div class="flex items-center gap-2">
-              <button @click.stop="openCreateCarouselModal" class="text-xs px-3 py-1.5 rounded-lg bg-pink-500 text-white hover:bg-pink-600 transition-colors">+ 添加</button>
+              <button @click.stop="openCreateCarouselModal" class="text-xs px-3 py-1.5 rounded-lg bg-pink-500 text-white hover:bg-pink-600 transition-colors">{{ t('admin.addCarousel') }}</button>
               <svg class="w-5 h-5 text-stone-400 transition-transform duration-200" :class="{ 'rotate-180': showCarousels }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
             </div>
           </div>
@@ -514,10 +520,10 @@
                   <h4 class="font-bold text-sm">{{ c.title }}</h4>
                   <p class="text-xs text-stone-500">{{ c.subtitle }}</p>
                   <div class="flex justify-between items-center mt-2">
-                    <span :class="c.active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'" class="text-xs px-2 py-0.5 rounded">{{ c.active ? '启用' : '禁用' }}</span>
+                    <span :class="c.active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'" class="text-xs px-2 py-0.5 rounded">{{ c.active ? t('common.enabled') : t('common.disabled') }}</span>
                     <div class="space-x-2">
-                      <button @click="openEditCarouselModal(c)" class="text-blue-600 text-xs">编辑</button>
-                      <button @click="deleteCarousel(c.id)" class="text-red-600 text-xs">删除</button>
+                      <button @click="openEditCarouselModal(c)" class="text-blue-600 text-xs">{{ t('common.edit') }}</button>
+                      <button @click="deleteCarousel(c.id)" class="text-red-600 text-xs">{{ t('common.delete') }}</button>
                     </div>
                   </div>
                 </div>
@@ -533,11 +539,11 @@
               <div class="w-9 h-9 rounded-lg bg-teal-100 flex items-center justify-center">
                 <svg class="w-5 h-5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
               </div>
-              <h3 class="text-lg font-bold text-stone-800">线路管理 <span class="text-sm font-normal text-stone-400">({{ adminRoutes.length }}条)</span></h3>
+              <h3 class="text-lg font-bold text-stone-800">{{ t('admin.routeManagement') }} <span class="text-sm font-normal text-stone-400">({{ adminRoutes.length }}{{ t('common.items') }})</span></h3>
             </div>
             <div class="flex items-center gap-2">
-              <button @click.stop="fetchAdminRoutes" class="text-xs px-3 py-1.5 rounded-lg bg-stone-100 text-stone-600 hover:bg-stone-200 transition-colors">刷新</button>
-              <button @click.stop="openCreateRouteModal" class="text-xs px-3 py-1.5 rounded-lg bg-teal-500 text-white hover:bg-teal-600 transition-colors">+ 新增</button>
+              <button @click.stop="fetchAdminRoutes" class="text-xs px-3 py-1.5 rounded-lg bg-stone-100 text-stone-600 hover:bg-stone-200 transition-colors">{{ t('common.refresh') }}</button>
+              <button @click.stop="openCreateRouteModal" class="text-xs px-3 py-1.5 rounded-lg bg-teal-500 text-white hover:bg-teal-600 transition-colors">{{ t('admin.addNew') }}</button>
               <svg class="w-5 h-5 text-stone-400 transition-transform duration-200" :class="{ 'rotate-180': showRoutes }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
             </div>
           </div>
@@ -545,26 +551,26 @@
             <table class="min-w-full divide-y divide-stone-200">
               <thead class="bg-stone-50">
                 <tr>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-stone-500 uppercase">名称</th>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-stone-500 uppercase">天数</th>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-stone-500 uppercase">价格</th>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-stone-500 uppercase">难度</th>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-stone-500 uppercase">温度</th>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-stone-500 uppercase">地理</th>
-                  <th class="px-4 py-3 text-right text-xs font-medium text-stone-500 uppercase">操作</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-stone-500 uppercase">{{ t('admin.name') }}</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-stone-500 uppercase">{{ t('admin.days') }}</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-stone-500 uppercase">{{ t('admin.price') }}</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-stone-500 uppercase">{{ t('admin.difficulty') }}</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-stone-500 uppercase">{{ t('admin.temperature') }}</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-stone-500 uppercase">{{ t('admin.geography') }}</th>
+                  <th class="px-4 py-3 text-right text-xs font-medium text-stone-500 uppercase">{{ t('admin.action') }}</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-stone-200">
                 <tr v-for="r in adminRoutes" :key="r.id" class="hover:bg-stone-50">
                   <td class="px-4 py-3 text-sm font-medium">{{ r.name }}</td>
-                  <td class="px-4 py-3 text-sm">{{ r.days }}天</td>
+                  <td class="px-4 py-3 text-sm">{{ t('admin.daysValue', { count: r.days }) }}</td>
                   <td class="px-4 py-3 text-sm text-red-600">¥{{ r.price }}</td>
                   <td class="px-4 py-3 text-sm">{{ r.difficulty }}</td>
                   <td class="px-4 py-3 text-sm">{{ r.temperature || '-' }}</td>
                   <td class="px-4 py-3 text-sm">{{ r.geography || '-' }}</td>
                   <td class="px-4 py-3 text-right text-sm space-x-2">
-                    <button @click="openEditRouteModal(r)" class="text-blue-600">编辑</button>
-                    <button @click="deleteRoute(r.id)" class="text-red-600">删除</button>
+                    <button @click="openEditRouteModal(r)" class="text-blue-600">{{ t('common.edit') }}</button>
+                    <button @click="deleteRoute(r.id)" class="text-red-600">{{ t('common.delete') }}</button>
                   </td>
                 </tr>
               </tbody>
@@ -574,21 +580,22 @@
 
         <!-- Hotel Management Section -->
         <div class="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden mt-8">
-          <div class="px-6 py-4 border-b border-stone-100 flex justify-between items-center bg-gradient-to-r from-stone-50 to-white">
+          <div class="px-6 py-4 border-b border-stone-100 flex justify-between items-center bg-gradient-to-r from-stone-50 to-white cursor-pointer hover:bg-stone-100/50 transition-colors" @click="showHotels = !showHotels">
             <div class="flex items-center gap-3">
               <div class="w-9 h-9 rounded-lg bg-indigo-100 flex items-center justify-center">
                 <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
               </div>
-              <h3 class="text-lg font-bold text-stone-800">酒店管理 <span class="text-sm font-normal text-stone-400">({{ adminHotels.length }}家)</span></h3>
+              <h3 class="text-lg font-bold text-stone-800">{{ t('admin.hotelManagement') }} <span class="text-sm font-normal text-stone-400">({{ adminHotels.length }}{{ t('common.hotelsUnit') }})</span></h3>
             </div>
             <div class="flex items-center gap-2">
-              <button @click.stop="fetchAdminHotels" class="text-xs px-3 py-1.5 rounded-lg bg-stone-100 text-stone-600 hover:bg-stone-200 transition-colors">刷新</button>
-              <button @click.stop="openCreateHotelModal" class="text-xs px-4 py-2 rounded-lg bg-indigo-500 text-white hover:bg-indigo-600 transition-colors shadow-sm">+ 新增酒店</button>
+              <button @click.stop="fetchAdminHotels" class="text-xs px-3 py-1.5 rounded-lg bg-stone-100 text-stone-600 hover:bg-stone-200 transition-colors">{{ t('common.refresh') }}</button>
+              <button @click.stop="openCreateHotelModal" class="text-xs px-4 py-2 rounded-lg bg-indigo-500 text-white hover:bg-indigo-600 transition-colors shadow-sm">{{ t('admin.addHotel') }}</button>
+              <svg class="w-5 h-5 text-stone-400 transition-transform duration-200" :class="{ 'rotate-180': showHotels }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
             </div>
           </div>
 
           <!-- Card Grid -->
-          <div class="p-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div v-if="showHotels" class="p-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div v-for="h in adminHotels" :key="h.id"
                  class="bg-white rounded-xl border border-stone-200 overflow-hidden hover:shadow-md transition-all duration-200"
                  :class="{ 'ring-2 ring-indigo-200 shadow-md': expandedHotelId === h.id }">
@@ -596,10 +603,10 @@
               <div class="flex gap-4 p-4 cursor-pointer" @click="toggleHotelExpand(h)">
                 <!-- Thumbnail -->
                 <div class="w-24 h-24 shrink-0 rounded-lg overflow-hidden bg-stone-100">
-                  <img v-if="h.imageUrl" :src="h.imageUrl" :alt="h.name"
+                  <img v-if="h.imageUrl && !failedHotelImages[h.id]" :src="h.imageUrl" :alt="h.name"
                        class="w-full h-full object-cover"
-                       @error="($event.target as HTMLImageElement).style.display='none'" />
-                  <div v-if="!h.imageUrl" class="w-full h-full flex items-center justify-center text-stone-300">
+                       @error="failedHotelImages[h.id] = true" />
+                  <div v-if="!h.imageUrl || failedHotelImages[h.id]" class="w-full h-full flex items-center justify-center text-stone-300">
                     <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
                   </div>
                 </div>
@@ -614,7 +621,7 @@
                   <div class="mt-1.5 space-y-1 text-xs text-stone-500">
                     <div class="flex items-center gap-1">
                       <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>
-                      <span class="truncate">{{ h.location || '未知位置' }}</span>
+                      <span class="truncate">{{ h.location || t('common.unknownLocation') }}</span>
                     </div>
                     <div v-if="h.phone" class="flex items-center gap-1">
                       <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
@@ -622,7 +629,7 @@
                     </div>
                   </div>
                   <div class="mt-2 flex items-center gap-2">
-                    <span class="text-xs font-semibold text-red-600 bg-red-50 px-2 py-0.5 rounded">{{ h.priceRange || '咨询' }}</span>
+                    <span class="text-xs font-semibold text-red-600 bg-red-50 px-2 py-0.5 rounded">{{ h.priceRange || t('common.consult') }}</span>
                     <span v-if="h.facilities" class="text-xs text-stone-400 truncate">{{ h.facilities.split(',')[0] }}{{ h.facilities.split(',').length > 1 ? '...' : '' }}</span>
                   </div>
                 </div>
@@ -635,30 +642,30 @@
               <!-- Expanded Room Type Management -->
               <div v-if="expandedHotelId === h.id" class="border-t border-stone-100 bg-stone-50/50 px-4 py-3 animate-slide-up">
                 <div class="flex items-center justify-between mb-3">
-                  <span class="text-xs font-semibold text-stone-500 uppercase tracking-wide">房型管理</span>
-                  <span class="text-xs text-stone-400">{{ expandedRoomTypes.length }}个房型</span>
+                  <span class="text-xs font-semibold text-stone-500 uppercase tracking-wide">{{ t('admin.roomManagement') }}</span>
+                  <span class="text-xs text-stone-400">{{ t('admin.roomTypesCount', { count: expandedRoomTypes.length }) }}</span>
                 </div>
 
                 <!-- Room type list -->
                 <div class="space-y-2 mb-3">
-                  <div v-if="loadingRoomTypes" class="text-center py-2 text-xs text-stone-400">加载中...</div>
-                  <div v-else-if="expandedRoomTypes.length === 0" class="text-center py-2 text-xs text-stone-400">暂无房型，请在下方添加</div>
+                  <div v-if="loadingRoomTypes" class="text-center py-2 text-xs text-stone-400">{{ t('common.loading') }}</div>
+                  <div v-else-if="expandedRoomTypes.length === 0" class="text-center py-2 text-xs text-stone-400">{{ t('admin.noRoomTypes') }}</div>
                   <div v-else v-for="rt in expandedRoomTypes" :key="rt.id"
                        class="flex items-center justify-between bg-white rounded-lg border border-stone-200 px-3 py-2.5 text-sm">
                     <div class="flex-1 min-w-0">
                       <span class="font-medium text-stone-700">{{ rt.name }}</span>
-                      <span class="ml-2 text-xs text-stone-400">¥{{ rt.price }} / 晚 · {{ rt.capacity }}人</span>
+                      <span class="ml-2 text-xs text-stone-400">{{ t('admin.pricePerNightWithCapacity', { price: rt.price, capacity: rt.capacity }) }}</span>
                       <span v-if="rt.amenities" class="ml-2 text-xs text-stone-300">· {{ rt.amenities }}</span>
                     </div>
-                    <button @click="deleteRoomTypeInline(rt.id, h.id)" class="shrink-0 ml-2 text-xs text-red-400 hover:text-red-600 transition-colors">删除</button>
+                    <button @click="deleteRoomTypeInline(rt.id, h.id)" class="shrink-0 ml-2 text-xs text-red-400 hover:text-red-600 transition-colors">{{ t('common.delete') }}</button>
                   </div>
                 </div>
 
                 <!-- Add room type form -->
                 <div class="flex items-center gap-1.5 bg-white rounded-lg border border-stone-200 px-2.5 py-2">
-                  <input v-model="roomTypeForm.name" placeholder="名称" class="flex-1 min-w-0 text-xs border-0 outline-none px-1" @keyup.enter="addRoomTypeInline(h.id)">
+                  <input v-model="roomTypeForm.name" :placeholder="t('admin.roomNamePlaceholder')" class="flex-1 min-w-0 text-xs border-0 outline-none px-1" @keyup.enter="addRoomTypeInline(h.id)">
                   <input v-model.number="roomTypeForm.price" type="number" placeholder="¥" class="w-14 text-xs border-0 outline-none text-right px-1" @keyup.enter="addRoomTypeInline(h.id)">
-                  <input v-model.number="roomTypeForm.capacity" type="number" placeholder="人" class="w-8 text-xs border-0 outline-none text-right px-1" @keyup.enter="addRoomTypeInline(h.id)">
+                  <input v-model.number="roomTypeForm.capacity" type="number" :placeholder="t('admin.capacityPlaceholder')" class="w-8 text-xs border-0 outline-none text-right px-1" @keyup.enter="addRoomTypeInline(h.id)">
                   <button @click="addRoomTypeInline(h.id)" class="shrink-0 text-xs px-2.5 py-1.5 rounded-md bg-green-500 text-white hover:bg-green-600 transition-colors">+</button>
                 </div>
               </div>
@@ -668,17 +675,17 @@
                 <button @click="openEditHotelModal(h)"
                         class="flex-1 py-2.5 text-xs text-stone-500 hover:text-blue-600 hover:bg-blue-50 transition-colors flex items-center justify-center gap-1">
                   <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                  编辑
+                  {{ t('common.edit') }}
                 </button>
                 <button @click="toggleHotelExpand(h)"
                         class="flex-1 py-2.5 text-xs text-stone-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors flex items-center justify-center gap-1">
                   <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
-                  {{ expandedHotelId === h.id ? '收起' : '房型' }}
+                  {{ expandedHotelId === h.id ? t('common.collapse') : t('admin.roomTypes') }}
                 </button>
                 <button @click="deleteHotel(h.id)"
                         class="flex-1 py-2.5 text-xs text-stone-500 hover:text-red-600 hover:bg-red-50 transition-colors flex items-center justify-center gap-1">
                   <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                  删除
+                  {{ t('common.delete') }}
                 </button>
               </div>
             </div>
@@ -686,28 +693,34 @@
             <!-- Empty state -->
             <div v-if="adminHotels.length === 0" class="col-span-full text-center py-16">
               <svg class="w-16 h-16 text-stone-200 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
-              <p class="text-stone-400">暂无酒店数据</p>
-              <button @click="openCreateHotelModal" class="mt-3 text-sm text-indigo-500 hover:text-indigo-700">+ 添加第一家酒店</button>
+              <p class="text-stone-400">{{ t('admin.noHotels') }}</p>
+              <button @click="openCreateHotelModal" class="mt-3 text-sm text-indigo-500 hover:text-indigo-700">{{ t('admin.addFirstHotel') }}</button>
             </div>
+          </div>
+          <div v-else class="px-6 py-4 text-center text-stone-500 text-sm">
+            {{ t('admin.expandHotels', { count: adminHotels.length }) }}
           </div>
         </div>
 
         <!-- Carousel Edit/Create Modal -->
         <div v-if="showCarouselModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" @click.self="closeCarouselModal">
           <div class="bg-white rounded-2xl max-w-lg w-full p-6 animate-scale-in">
-            <h2 class="text-xl font-bold mb-4">{{ editingCarousel.id ? '编辑' : '创建' }}轮播图</h2>
+            <h2 class="text-xl font-bold mb-4">{{ t('admin.editOrCreateCarousel', { mode: editingCarousel.id ? t('common.edit') : t('common.create') }) }}</h2>
             <div class="space-y-3">
-              <div><label class="block text-sm font-medium mb-1">标题 *</label><input v-model="carouselForm.title" class="w-full border rounded px-3 py-2" placeholder="轮播标题"></div>
-              <div><label class="block text-sm font-medium mb-1">副标题</label><input v-model="carouselForm.subtitle" class="w-full border rounded px-3 py-2" placeholder="副标题"></div>
-              <div><label class="block text-sm font-medium mb-1">标签</label><input v-model="carouselForm.tag" class="w-full border rounded px-3 py-2" placeholder="如：热门推荐"></div>
-              <div><label class="block text-sm font-medium mb-1">图片URL</label><input v-model="carouselForm.imageUrl" class="w-full border rounded px-3 py-2" placeholder="/images/banner.jpg"></div>
-              <div><label class="block text-sm font-medium mb-1">链接URL</label><input v-model="carouselForm.linkUrl" class="w-full border rounded px-3 py-2" placeholder="/spots"></div>
-              <div class="flex items-center gap-2"><label class="text-sm font-medium">排序</label><input v-model.number="carouselForm.sortOrder" type="number" class="border rounded px-2 py-1 w-20"></div>
-              <div class="flex items-center gap-2"><input v-model="carouselForm.active" type="checkbox" id="carousel-active"><label for="carousel-active" class="text-sm">启用</label></div>
+              <div><label class="block text-sm font-medium mb-1">{{ t('admin.titleLabel') }} *</label><input v-model="carouselForm.title" class="w-full border rounded px-3 py-2" :placeholder="t('admin.titleLabel')"></div>
+              <div><label class="block text-sm font-medium mb-1">{{ t('admin.subtitleLabel') }}</label><input v-model="carouselForm.subtitle" class="w-full border rounded px-3 py-2" :placeholder="t('admin.subtitleLabel')"></div>
+              <div><label class="block text-sm font-medium mb-1">{{ t('admin.tagLabel') }}</label><input v-model="carouselForm.tag" class="w-full border rounded px-3 py-2"></div>
+              <div>
+                <label class="block text-sm font-medium mb-1">{{ t('admin.image') }}</label>
+                <ImageUploadField v-model="carouselForm.imageUrl" :upload-endpoint="endpoints.admin.uploadImage" placeholder="/images/banner.jpg" />
+              </div>
+              <div><label class="block text-sm font-medium mb-1">{{ t('admin.linkUrl') }}</label><input v-model="carouselForm.linkUrl" class="w-full border rounded px-3 py-2" placeholder="/spots"></div>
+              <div class="flex items-center gap-2"><label class="text-sm font-medium">{{ t('admin.sortOrder') }}</label><input v-model.number="carouselForm.sortOrder" type="number" class="border rounded px-2 py-1 w-20"></div>
+              <div class="flex items-center gap-2"><input v-model="carouselForm.active" type="checkbox" id="carousel-active"><label for="carousel-active" class="text-sm">{{ t('common.enabled') }}</label></div>
             </div>
             <div class="flex space-x-3 mt-6">
-              <button @click="saveCarousel" class="flex-1 bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600">保存</button>
-              <button @click="closeCarouselModal" class="flex-1 bg-stone-200 py-2 rounded-lg">取消</button>
+              <button @click="saveCarousel" class="flex-1 bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600">{{ t('common.save') }}</button>
+              <button @click="closeCarouselModal" class="flex-1 bg-stone-200 py-2 rounded-lg">{{ t('common.cancel') }}</button>
             </div>
           </div>
         </div>
@@ -715,23 +728,23 @@
         <!-- Route Edit/Create Modal -->
         <div v-if="showRouteModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" @click.self="closeRouteModal">
           <div class="bg-white rounded-2xl max-w-2xl w-full p-6 max-h-[85vh] overflow-y-auto animate-scale-in">
-            <h2 class="text-xl font-bold mb-4">{{ editingRoute.id ? '编辑' : '创建' }}线路</h2>
+            <h2 class="text-xl font-bold mb-4">{{ t('admin.editOrCreateRoute', { mode: editingRoute.id ? t('common.edit') : t('common.create') }) }}</h2>
             <div class="grid grid-cols-2 gap-3">
-              <div><label class="block text-sm font-medium mb-1">名称 *</label><input v-model="routeForm.name" class="w-full border rounded px-3 py-2"></div>
-              <div><label class="block text-sm font-medium mb-1">天数</label><input v-model.number="routeForm.days" type="number" class="w-full border rounded px-3 py-2"></div>
-              <div><label class="block text-sm font-medium mb-1">价格</label><input v-model.number="routeForm.price" type="number" class="w-full border rounded px-3 py-2"></div>
-              <div><label class="block text-sm font-medium mb-1">难度</label>
+              <div><label class="block text-sm font-medium mb-1">{{ t('admin.name') }} *</label><input v-model="routeForm.name" class="w-full border rounded px-3 py-2"></div>
+              <div><label class="block text-sm font-medium mb-1">{{ t('admin.days') }}</label><input v-model.number="routeForm.days" type="number" class="w-full border rounded px-3 py-2"></div>
+              <div><label class="block text-sm font-medium mb-1">{{ t('admin.price') }}</label><input v-model.number="routeForm.price" type="number" class="w-full border rounded px-3 py-2"></div>
+              <div><label class="block text-sm font-medium mb-1">{{ t('admin.difficulty') }}</label>
                 <select v-model="routeForm.difficulty" class="w-full border rounded px-3 py-2">
-                  <option value="EASY">简单</option><option value="MEDIUM">中等</option><option value="HARD">困难</option>
+                  <option value="EASY">{{ t('admin.easy') }}</option><option value="MEDIUM">{{ t('admin.medium') }}</option><option value="HARD">{{ t('admin.hard') }}</option>
                 </select>
               </div>
-              <div><label class="block text-sm font-medium mb-1">温度</label><input v-model="routeForm.temperature" class="w-full border rounded px-3 py-2" placeholder="如: 15°C - 25°C"></div>
-              <div><label class="block text-sm font-medium mb-1">地理特征</label><input v-model="routeForm.geography" class="w-full border rounded px-3 py-2" placeholder="如: 高原河谷地带"></div>
-              <div class="col-span-2"><label class="block text-sm font-medium mb-1">描述</label><textarea v-model="routeForm.description" rows="3" class="w-full border rounded px-3 py-2"></textarea></div>
+              <div><label class="block text-sm font-medium mb-1">{{ t('admin.temperature') }}</label><input v-model="routeForm.temperature" class="w-full border rounded px-3 py-2" :placeholder="t('admin.temperaturePlaceholder')"></div>
+              <div><label class="block text-sm font-medium mb-1">{{ t('admin.geography') }}</label><input v-model="routeForm.geography" class="w-full border rounded px-3 py-2" :placeholder="t('admin.geographyPlaceholder')"></div>
+              <div class="col-span-2"><label class="block text-sm font-medium mb-1">{{ t('admin.description') }}</label><textarea v-model="routeForm.description" rows="3" class="w-full border rounded px-3 py-2"></textarea></div>
             </div>
             <div class="flex space-x-3 mt-6">
-              <button @click="saveRoute" class="flex-1 bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600">保存</button>
-              <button @click="closeRouteModal" class="flex-1 bg-stone-200 py-2 rounded-lg">取消</button>
+              <button @click="saveRoute" class="flex-1 bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600">{{ t('common.save') }}</button>
+              <button @click="closeRouteModal" class="flex-1 bg-stone-200 py-2 rounded-lg">{{ t('common.cancel') }}</button>
             </div>
           </div>
         </div>
@@ -739,19 +752,22 @@
         <!-- Hotel Edit/Create Modal -->
         <div v-if="showHotelModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" @click.self="closeHotelModal">
           <div class="bg-white rounded-2xl max-w-2xl w-full p-6 max-h-[85vh] overflow-y-auto animate-scale-in">
-            <h2 class="text-xl font-bold mb-4">{{ editingHotel.id ? '编辑' : '创建' }}酒店</h2>
+            <h2 class="text-xl font-bold mb-4">{{ t('admin.editOrCreateHotel', { mode: editingHotel.id ? t('common.edit') : t('common.create') }) }}</h2>
             <div class="grid grid-cols-2 gap-3">
-              <div><label class="block text-sm font-medium mb-1">名称 *</label><input v-model="hotelForm.name" class="w-full border rounded px-3 py-2"></div>
-              <div><label class="block text-sm font-medium mb-1">位置</label><input v-model="hotelForm.location" class="w-full border rounded px-3 py-2"></div>
-              <div><label class="block text-sm font-medium mb-1">电话</label><input v-model="hotelForm.phone" class="w-full border rounded px-3 py-2"></div>
-              <div><label class="block text-sm font-medium mb-1">价格区间</label><input v-model="hotelForm.priceRange" class="w-full border rounded px-3 py-2" placeholder="¥500 - ¥1500"></div>
-              <div><label class="block text-sm font-medium mb-1">评分</label><input v-model.number="hotelForm.rating" type="number" step="0.1" class="w-full border rounded px-3 py-2"></div>
-              <div><label class="block text-sm font-medium mb-1">图片URL</label><input v-model="hotelForm.imageUrl" class="w-full border rounded px-3 py-2"></div>
-              <div class="col-span-2"><label class="block text-sm font-medium mb-1">设施</label><input v-model="hotelForm.facilities" class="w-full border rounded px-3 py-2" placeholder="WiFi, 停车场, 餐厅..."></div>
+              <div><label class="block text-sm font-medium mb-1">{{ t('admin.name') }} *</label><input v-model="hotelForm.name" class="w-full border rounded px-3 py-2"></div>
+              <div><label class="block text-sm font-medium mb-1">{{ t('admin.location') }}</label><input v-model="hotelForm.location" class="w-full border rounded px-3 py-2"></div>
+              <div><label class="block text-sm font-medium mb-1">{{ t('admin.phone') }}</label><input v-model="hotelForm.phone" class="w-full border rounded px-3 py-2"></div>
+              <div><label class="block text-sm font-medium mb-1">{{ t('admin.priceRange') }}</label><input v-model="hotelForm.priceRange" class="w-full border rounded px-3 py-2" placeholder="¥500 - ¥1500"></div>
+              <div><label class="block text-sm font-medium mb-1">{{ t('admin.rating') }}</label><input v-model.number="hotelForm.rating" type="number" step="0.1" class="w-full border rounded px-3 py-2"></div>
+              <div class="col-span-2">
+                <label class="block text-sm font-medium mb-1">{{ t('admin.image') }}</label>
+                <ImageUploadField v-model="hotelForm.imageUrl" :upload-endpoint="endpoints.admin.uploadImage" />
+              </div>
+              <div class="col-span-2"><label class="block text-sm font-medium mb-1">{{ t('admin.facilities') }}</label><input v-model="hotelForm.facilities" class="w-full border rounded px-3 py-2" :placeholder="t('admin.facilitiesPlaceholder')"></div>
             </div>
             <div class="flex space-x-3 mt-6">
-              <button @click="saveHotel" class="flex-1 bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600">保存</button>
-              <button @click="closeHotelModal" class="flex-1 bg-stone-200 py-2 rounded-lg">取消</button>
+              <button @click="saveHotel" class="flex-1 bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600">{{ t('common.save') }}</button>
+              <button @click="closeHotelModal" class="flex-1 bg-stone-200 py-2 rounded-lg">{{ t('common.cancel') }}</button>
             </div>
           </div>
         </div>
@@ -765,67 +781,54 @@
       @click.self="closeNewsModal"
     >
       <div class="bg-white rounded-2xl max-w-3xl w-full p-8 animate-scale-in max-h-[90vh] overflow-y-auto">
-        <h2 class="text-2xl font-bold mb-6 text-stone-800">{{ editingNews.id ? '编辑资讯' : '创建资讯' }}</h2>
+        <h2 class="text-2xl font-bold mb-6 text-stone-800">{{ editingNews.id ? t('admin.editNewsTitle') : t('admin.createNewsTitle') }}</h2>
         
         <div class="mb-6">
-          <label class="block text-sm font-medium text-stone-700 mb-2">标题 <span class="text-red-500">*</span></label>
+          <label class="block text-sm font-medium text-stone-700 mb-2">{{ t('admin.titleLabel') }} <span class="text-red-500">*</span></label>
           <input v-model="newsForm.title" type="text" required
                  class="w-full px-4 py-3 border border-stone-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                 placeholder="输入资讯标题">
+                 :placeholder="t('admin.titlePlaceholder')">
         </div>
 
         <div class="mb-6">
-          <label class="block text-sm font-medium text-stone-700 mb-2">内容 <span class="text-red-500">*</span></label>
+          <label class="block text-sm font-medium text-stone-700 mb-2">{{ t('admin.content') }} <span class="text-red-500">*</span></label>
           <textarea v-model="newsForm.content" rows="8" required
                     class="w-full px-4 py-3 border border-stone-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none"
-                    placeholder="输入资讯内容..."></textarea>
-          <p class="text-xs text-stone-500 mt-2">当前字数：{{ newsForm.content.length }}</p>
+                    :placeholder="t('admin.contentPlaceholder')"></textarea>
+          <p class="text-xs text-stone-500 mt-2">{{ t('admin.currentWordCount', { count: newsForm.content.length }) }}</p>
         </div>
 
         <div class="mb-6">
-          <label class="block text-sm font-medium text-stone-700 mb-2">分类 <span class="text-red-500">*</span></label>
+          <label class="block text-sm font-medium text-stone-700 mb-2">{{ t('admin.category') }} <span class="text-red-500">*</span></label>
           <select v-model="newsForm.category" required
                   class="w-full px-4 py-3 border border-stone-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
-            <option value="">请选择分类</option>
-            <option value="POLICY">政策</option>
-            <option value="EVENT">活动</option>
-            <option value="NOTICE">通知</option>
+            <option value="">{{ t('admin.selectCategory') }}</option>
+            <option value="POLICY">{{ t('admin.categoryPolicy') }}</option>
+            <option value="EVENT">{{ t('admin.categoryEvent') }}</option>
+            <option value="NOTICE">{{ t('admin.categoryNotice') }}</option>
           </select>
         </div>
 
         <div class="mb-6">
-          <label class="block text-sm font-medium text-stone-700 mb-2">图片URL</label>
-          <input v-model="newsForm.imageUrl" type="url"
-                 class="w-full px-4 py-3 border border-stone-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                 placeholder="https://example.com/image.jpg">
-          <p class="text-xs text-stone-500 mt-2">提示：输入有效的图片URL地址，建议使用600px宽度的图片</p>
+          <label class="block text-sm font-medium text-stone-700 mb-2">{{ t('admin.image') }}</label>
+          <ImageUploadField v-model="newsForm.imageUrl" :upload-endpoint="endpoints.admin.uploadImage" />
         </div>
 
         <div class="mb-6">
-          <label class="block text-sm font-medium text-stone-700 mb-2">浏览量</label>
+          <label class="block text-sm font-medium text-stone-700 mb-2">{{ t('admin.views') }}</label>
           <input v-model.number="newsForm.viewCount" type="number" min="0"
                  class="w-full px-4 py-3 border border-stone-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                  placeholder="0">
         </div>
 
-        <div v-if="newsForm.imageUrl" class="mb-6">
-          <label class="block text-sm font-medium text-stone-700 mb-2">图片预览</label>
-          <div class="relative h-64 bg-gray-200 rounded-lg overflow-hidden">
-            <img :src="newsForm.imageUrl" alt="预览" class="w-full h-full object-cover" @error="newsImageError = true">
-            <div v-if="newsImageError" class="absolute inset-0 flex items-center justify-center bg-red-100 text-red-600">
-              <p>图片加载失败，请检查URL是否正确</p>
-            </div>
-          </div>
-        </div>
-
         <div class="flex space-x-4">
           <button @click="saveNews" :disabled="updatingNews || !newsForm.title || !newsForm.content || !newsForm.category"
                   class="flex-1 bg-blue-500 text-white py-3 rounded-lg hover:bg-blue-600 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed">
-            {{ updatingNews ? '保存中...' : (editingNews.id ? '保存修改' : '创建资讯') }}
+            {{ updatingNews ? t('admin.saving') : (editingNews.id ? t('admin.saveEditing') : t('admin.createNewsTitle')) }}
           </button>
           <button @click="closeNewsModal" :disabled="updatingNews"
                   class="flex-1 bg-stone-200 text-stone-700 py-3 rounded-lg hover:bg-stone-300 transition-colors disabled:cursor-not-allowed">
-            取消
+            {{ t('common.cancel') }}
           </button>
         </div>
       </div>
@@ -838,15 +841,15 @@
       @click.self="closeEditModal"
     >
       <div class="bg-white rounded-2xl max-w-2xl w-full p-8 animate-scale-in max-h-[85vh] overflow-y-auto">
-        <h2 class="text-2xl font-bold mb-6 text-stone-800">编辑景点信息</h2>
+        <h2 class="text-2xl font-bold mb-6 text-stone-800">{{ t('admin.editSpotInfo') }}</h2>
         
         <div class="mb-6">
-          <label class="block text-sm font-medium text-stone-700 mb-2">景点名称</label>
+          <label class="block text-sm font-medium text-stone-700 mb-2">{{ t('admin.spotName') }}</label>
           <p class="text-lg font-bold text-stone-900">{{ editingSpot.name }}</p>
         </div>
 
         <div class="mb-6">
-          <label class="block text-sm font-medium text-stone-700 mb-2">当前封面</label>
+          <label class="block text-sm font-medium text-stone-700 mb-2">{{ t('admin.currentCover') }}</label>
           <div class="relative h-64 bg-gray-200 rounded-lg overflow-hidden mb-4">
             <img v-if="editingSpot.imageUrl" :src="editingSpot.imageUrl" :alt="editingSpot.name" class="w-full h-full object-cover">
             <div v-else class="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-500 to-purple-600 text-white text-6xl font-bold">
@@ -856,17 +859,14 @@
         </div>
 
         <div class="mb-6">
-          <label class="block text-sm font-medium text-stone-700 mb-2">新图片URL</label>
-          <input v-model="newImageUrl" type="url" 
-                 class="w-full px-4 py-3 border border-stone-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                 placeholder="https://example.com/image.jpg">
-          <p class="text-xs text-stone-500 mt-2">提示：输入有效的图片URL地址，建议使用600px宽度的图片</p>
+          <label class="block text-sm font-medium text-stone-700 mb-2">{{ t('admin.newImage') }}</label>
+          <ImageUploadField v-model="newImageUrl" :upload-endpoint="endpoints.admin.uploadImage" />
         </div>
 
         <div class="mb-6">
-          <label class="block text-sm font-medium text-stone-700 mb-2">门票价格（元）</label>
+          <label class="block text-sm font-medium text-stone-700 mb-2">{{ t('admin.ticketPriceYuan') }}</label>
           <div class="flex items-center space-x-2">
-            <span class="text-stone-500 text-sm">当前：</span>
+            <span class="text-stone-500 text-sm">{{ t('admin.current') }}</span>
             <span class="font-semibold text-red-600 mr-4">¥{{ editingSpot.ticketPrice }}</span>
           </div>
           <input
@@ -875,37 +875,27 @@
             min="0"
             step="0.01"
             class="mt-2 w-full px-4 py-3 border border-stone-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-            placeholder="不修改则留空，例：199.00"
+            :placeholder="t('admin.ticketPlaceholder')"
           >
-          <p class="text-xs text-stone-500 mt-2">提示：输入新的门票价格（保留两位小数），不修改价格时可留空。</p>
+          <p class="text-xs text-stone-500 mt-2">{{ t('admin.ticketHint') }}</p>
         </div>
 
         <div class="mb-6">
-          <label class="block text-sm font-medium text-stone-700 mb-2">景点介绍</label>
+          <label class="block text-sm font-medium text-stone-700 mb-2">{{ t('admin.spotIntro') }}</label>
           <textarea v-model="newDescription" rows="6"
                     class="w-full px-4 py-3 border border-stone-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none"
-                    placeholder="输入景点介绍..."></textarea>
-          <p class="text-xs text-stone-500 mt-2">当前字数：{{ newDescription.length }}</p>
-        </div>
-
-        <div v-if="newImageUrl" class="mb-6">
-          <label class="block text-sm font-medium text-stone-700 mb-2">预览</label>
-          <div class="relative h-64 bg-gray-200 rounded-lg overflow-hidden">
-            <img :src="newImageUrl" alt="预览" class="w-full h-full object-cover" @error="imageError = true">
-            <div v-if="imageError" class="absolute inset-0 flex items-center justify-center bg-red-100 text-red-600">
-              <p>图片加载失败，请检查URL是否正确</p>
-            </div>
-          </div>
+                    :placeholder="t('admin.spotIntroPlaceholder')"></textarea>
+          <p class="text-xs text-stone-500 mt-2">{{ t('admin.currentWordCount', { count: newDescription.length }) }}</p>
         </div>
 
         <div class="flex space-x-4">
-          <button @click="updateSpotImage" :disabled="imageError || updating"
+          <button @click="updateSpotImage" :disabled="updating"
                   class="flex-1 bg-blue-500 text-white py-3 rounded-lg hover:bg-blue-600 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed">
-            {{ updating ? '保存中...' : '保存修改' }}
+            {{ updating ? t('admin.saving') : t('admin.saveEditing') }}
           </button>
           <button @click="closeEditModal" :disabled="updating"
                   class="flex-1 bg-stone-200 text-stone-700 py-3 rounded-lg hover:bg-stone-300 transition-colors disabled:cursor-not-allowed">
-            取消
+            {{ t('common.cancel') }}
           </button>
         </div>
       </div>
@@ -915,7 +905,9 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import AdminAnalyticsPanel from '../components/AdminAnalyticsPanel.vue'
+import ImageUploadField from '../components/ImageUploadField.vue'
 import api, { endpoints, clearTokenCache } from '../api'
 
 interface Stats {
@@ -933,6 +925,8 @@ interface Stats {
   spotCategories?: Array<{ name: string; value: number }>
   updatedAt?: string
 }
+
+const { t, locale, te } = useI18n()
 
 const stats = ref<Stats>({
   userCount: 0,
@@ -974,7 +968,7 @@ const fetchStats = async () => {
     } catch (_) { /* 解析失败继续尝试请求 */ }
 
     if (user.role !== 'ADMIN') {
-      alert('您没有管理员权限，请使用管理员账户登录')
+      alert(t('admin.unauthorizedAdmin'))
       window.location.href = '/'
       return
     }
@@ -994,25 +988,27 @@ const fetchStats = async () => {
       return
     }
     if (status === 403) {
-      alert('禁止访问：您没有管理员权限，请使用管理员账户登录')
+      alert(t('admin.forbiddenAdmin'))
       window.location.href = '/'
     } else {
-      analyticsError.value = error.response?.data?.message || error.response?.data?.error || '统计面板加载失败，请稍后重试'
+      analyticsError.value = error.response?.data?.message || error.response?.data?.error || t('admin.analyticsLoadFailed')
     }
   } finally {
     loading.value = false
   }
 }
 
+const activeDateLocale = computed(() => locale.value === 'bo' ? 'bo-CN' : 'zh-CN')
+
 const formatDate = (dateStr: string) => {
   if (!dateStr) return '-'
-  return new Date(dateStr).toLocaleDateString('zh-CN')
+  return new Date(dateStr).toLocaleDateString(activeDateLocale.value)
 }
 
 const formatDateTime = (dateStr: string) => {
   if (!dateStr) return '-'
   const date = new Date(dateStr)
-  return date.toLocaleString('zh-CN', {
+  return date.toLocaleString(activeDateLocale.value, {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -1028,6 +1024,15 @@ const getStatusClass = (status: string) => {
     case 'CANCELLED': return 'bg-red-100 text-red-800'
     default: return 'bg-gray-100 text-gray-800'
   }
+}
+
+const getStatusLabel = (status: string) => {
+  const key = `admin.statusLabel.${status}`
+  return te(key) ? t(key) : status
+}
+
+const getRoleLabel = (role: string) => {
+  return role === 'ADMIN' ? t('admin.adminRole') : t('admin.userRole')
 }
 
 // 合并景点门票订单和酒店预订，按时间倒序
@@ -1069,13 +1074,13 @@ const loadingAuditLogs = ref(false)
 const spots = ref<any[]>([])
 const loadingSpots = ref(false)
 const spotsError = ref('')
+const showSpots = ref(false)
 const showAllSpots = ref(false)
 const showEditModal = ref(false)
 const editingSpot = ref<any>({})
 const newImageUrl = ref('')
 const newDescription = ref('')
 const newTicketPrice = ref<number | null>(null)
-const imageError = ref(false)
 const updating = ref(false)
 const originalBodyOverflow = ref<string | null>(null)
 
@@ -1092,7 +1097,6 @@ const newsForm = ref({
   imageUrl: '',
   viewCount: 0
 })
-const newsImageError = ref(false)
 const updatingNews = ref(false)
 
 // Computed property to control displayed spots
@@ -1156,7 +1160,7 @@ const fetchSpots = async () => {
       }
     } else {
       console.error('❌ 响应数据格式错误:', response.data)
-      spotsError.value = '响应数据格式错误: 期望数组，但收到 ' + typeof response.data
+      spotsError.value = t('admin.malformedResponse', { type: typeof response.data })
       spots.value = []
     }
   } catch (error: any) {
@@ -1170,19 +1174,19 @@ const fetchSpots = async () => {
       console.error('响应数据:', error.response.data)
       
       if (error.response.status === 401) {
-        spotsError.value = '未授权：请先登录管理员账户'
+        spotsError.value = t('admin.unauthorizedAdmin')
       } else if (error.response.status === 403) {
-        spotsError.value = '禁止访问：您没有管理员权限'
+        spotsError.value = t('admin.forbiddenAdmin')
       } else {
-        spotsError.value = error.response.data?.message || `服务器错误 (${error.response.status})`
+        spotsError.value = error.response.data?.message || t('admin.serverError', { status: error.response.status })
       }
     } else if (error.request) {
       console.error('请求已发送但无响应')
       console.error('请求配置:', error.config)
-      spotsError.value = '无法连接到后端服务，请检查：1) 后端是否运行在 http://localhost:8080 2) 网络连接是否正常'
+      spotsError.value = t('admin.connectionFailed')
     } else {
       console.error('请求配置错误:', error.config)
-      spotsError.value = error.message || '未知错误'
+      spotsError.value = error.message || t('admin.unknownError')
     }
     spots.value = []
   } finally {
@@ -1196,7 +1200,6 @@ const openEditModal = (spot: any) => {
   newImageUrl.value = spot.imageUrl || ''
   newDescription.value = spot.description || ''
   newTicketPrice.value = spot.ticketPrice ?? null
-  imageError.value = false
   showEditModal.value = true
 
   // 锁定主页面滚动
@@ -1214,7 +1217,6 @@ const closeEditModal = () => {
   newImageUrl.value = ''
   newDescription.value = ''
   newTicketPrice.value = null
-  imageError.value = false
 
   // 恢复主页面滚动
   if (typeof document !== 'undefined' && originalBodyOverflow.value !== null) {
@@ -1224,11 +1226,6 @@ const closeEditModal = () => {
 }
 
 const updateSpotImage = async () => {
-  if (imageError.value) {
-    alert('图片URL无效，请检查后重试')
-    return
-  }
-  
   updating.value = true
   try {
     const payload: any = {}
@@ -1239,46 +1236,46 @@ const updateSpotImage = async () => {
     }
 
     if (Object.keys(payload).length === 0) {
-      alert('请至少修改一项内容')
+      alert(t('admin.fillOneField'))
       updating.value = false
       return
     }
     
     await api.put(endpoints.admin.updateSpot(editingSpot.value.id), payload)
-    alert('景点信息更新成功！')
+    alert(t('admin.spotUpdateSuccess'))
     await fetchSpots()
     closeEditModal()
   } catch (error) {
     console.error('Failed to update spot:', error)
-    alert('更新失败，请重试')
+    alert(t('admin.updateFailed'))
   } finally {
     updating.value = false
   }
 }
 
 const updateRole = async (userId: number, newRole: string) => {
-  if (!confirm(`确定要将该用户设置为 ${newRole} 吗？`)) return
+  if (!confirm(t('admin.confirmRoleChange', { role: getRoleLabel(newRole) }))) return
 
   try {
     await api.post(endpoints.admin.updateRole(userId), { role: newRole })
     await fetchUsers() // 刷新列表
-    alert('操作成功')
+    alert(t('admin.operationSuccess'))
   } catch (error) {
     console.error('Failed to update role:', error)
-    alert('操作失败')
+    alert(t('admin.operationFailed'))
   }
 }
 
 const deleteUser = async (user: any) => {
-  if (!confirm(`确定要删除用户 "${user.username}" 吗？此操作不可恢复。`)) return
+  if (!confirm(t('admin.confirmDeleteUser', { name: user.username }))) return
 
   try {
     await api.delete(endpoints.admin.deleteUser(user.id))
-    alert(`用户 "${user.username}" 已删除`)
+    alert(t('admin.userDeleted', { name: user.username }))
     await fetchUsers()
   } catch (error: any) {
     console.error('Failed to delete user:', error)
-    alert(error.response?.data?.error || '删除失败')
+    alert(error.response?.data?.error || t('admin.deleteFailed'))
   }
 }
 
@@ -1300,8 +1297,8 @@ const fetchAuditLogs = async () => {
 const hotelOrders = ref<any[]>([])
 const loadingHotelOrders = ref(false)
 const showAllHotelOrders = ref(false)
-const showRecentOrders = ref(true)
-const showPopularSpots = ref(true)
+const showRecentOrders = ref(false)
+const showPopularSpots = ref(false)
 const showUsers = ref(false)
 
 const fetchHotelOrders = async () => {
@@ -1323,19 +1320,19 @@ const updateHotelOrderStatus = async (orderId: number, status: string) => {
     await fetchHotelOrders()
   } catch (error) {
     console.error('Failed to update hotel order status:', error)
-    alert('更新状态失败')
+    alert(t('admin.statusUpdateFailed'))
   }
 }
 
 const deleteHotelOrder = async (orderId: number) => {
-  if (!confirm('确定要删除此订单吗？')) return
+  if (!confirm(t('admin.confirmDeleteOrder'))) return
   try {
     await api.delete(endpoints.hotelBookings.cancel(orderId))
     await fetchHotelOrders()
-    alert('删除成功')
+    alert(t('admin.deleteSuccess'))
   } catch (error) {
     console.error('Failed to delete hotel order:', error)
-    alert('删除失败')
+    alert(t('admin.deleteFailed'))
   }
 }
 
@@ -1348,7 +1345,7 @@ const fetchNews = async () => {
     // 检查认证 token
     const userStr = localStorage.getItem('user')
     if (!userStr) {
-      alert('未登录，请先登录')
+      alert(t('admin.notLoggedIn'))
       window.location.href = '/login'
       return
     }
@@ -1359,14 +1356,14 @@ const fetchNews = async () => {
     console.log('用户角色:', user.role)
     
     if (!user.token) {
-      alert('登录已过期，请重新登录')
+      alert(t('admin.loginExpired'))
       localStorage.removeItem('user')
       window.location.href = '/login'
       return
     }
     
     if (user.role !== 'ADMIN') {
-      alert('您没有管理员权限')
+      alert(t('admin.noAdminPermission'))
       return
     }
     
@@ -1393,19 +1390,19 @@ const fetchNews = async () => {
       console.error('响应数据:', error.response.data)
       
       if (error.response.status === 401) {
-        alert('未授权：请先登录管理员账户')
+        alert(t('admin.unauthorizedAdmin'))
       } else if (error.response.status === 403) {
-        alert('禁止访问：您没有管理员权限')
+        alert(t('admin.forbiddenAdmin'))
       } else {
-        const errorMsg = error.response.data?.message || error.response.data || `服务器错误 (${error.response.status})`
-        alert('获取资讯列表失败: ' + errorMsg)
+        const errorMsg = error.response.data?.message || error.response.data || t('admin.serverError', { status: error.response.status })
+        alert(t('admin.fetchNewsFailed', { message: errorMsg }))
       }
     } else if (error.request) {
       console.error('请求已发送但无响应')
-      alert('无法连接到后端服务，请检查：1) 后端是否运行在 http://localhost:8080 2) 网络连接是否正常')
+      alert(t('admin.connectionFailed'))
     } else {
       console.error('请求配置错误:', error.config)
-      alert('获取资讯列表失败: ' + (error.message || '未知错误'))
+      alert(t('admin.fetchNewsFailed', { message: error.message || t('admin.unknownError') }))
     }
     newsList.value = []
   } finally {
@@ -1423,7 +1420,6 @@ const openCreateNewsModal = () => {
     imageUrl: '',
     viewCount: 0
   }
-  newsImageError.value = false
   showNewsModal.value = true
   if (typeof document !== 'undefined') {
     if (originalBodyOverflow.value === null) {
@@ -1442,7 +1438,6 @@ const openEditNewsModal = (news: any) => {
     imageUrl: news.imageUrl || '',
     viewCount: news.viewCount || 0
   }
-  newsImageError.value = false
   showNewsModal.value = true
   if (typeof document !== 'undefined') {
     if (originalBodyOverflow.value === null) {
@@ -1462,7 +1457,6 @@ const closeNewsModal = () => {
     imageUrl: '',
     viewCount: 0
   }
-  newsImageError.value = false
   if (typeof document !== 'undefined' && originalBodyOverflow.value !== null) {
     document.body.style.overflow = originalBodyOverflow.value
     originalBodyOverflow.value = null
@@ -1471,7 +1465,7 @@ const closeNewsModal = () => {
 
 const saveNews = async () => {
   if (!newsForm.value.title || !newsForm.value.content || !newsForm.value.category) {
-    alert('请填写标题、内容和分类')
+    alert(t('admin.fillNewsFields'))
     return
   }
 
@@ -1492,52 +1486,49 @@ const saveNews = async () => {
     if (editingNews.value.id) {
       // Update existing news
       await api.put(endpoints.admin.updateNews(editingNews.value.id), payload)
-      alert('资讯更新成功！')
+      alert(t('admin.newsUpdateSuccess'))
     } else {
       // Create new news
       await api.post(endpoints.admin.createNews, payload)
-      alert('资讯创建成功！')
+      alert(t('admin.newsCreateSuccess'))
     }
     await fetchNews()
     closeNewsModal()
   } catch (error) {
     console.error('Failed to save news:', error)
-    alert('保存失败，请重试')
+    alert(t('admin.saveFailed'))
   } finally {
     updatingNews.value = false
   }
 }
 
 const deleteNewsItem = async (id: number) => {
-  if (!confirm('确定要删除这条资讯吗？此操作不可恢复。')) {
+  if (!confirm(t('admin.confirmDeleteNews'))) {
     return
   }
 
   try {
     await api.delete(endpoints.admin.deleteNews(id))
-    alert('删除成功！')
+    alert(t('admin.deleteSuccess'))
     await fetchNews()
   } catch (error) {
     console.error('Failed to delete news:', error)
-    alert('删除失败，请重试')
+    alert(t('admin.deleteFailed'))
   }
 }
 
 const getCategoryLabel = (category: string) => {
   const labels: Record<string, string> = {
-    POLICY: '政策',
-    EVENT: '活动',
-    NOTICE: '通知'
+    POLICY: t('admin.categoryPolicy'),
+    EVENT: t('admin.categoryEvent'),
+    NOTICE: t('admin.categoryNotice')
   }
   return labels[category] || category
 }
 
 const getAuditActionLabel = (action: string) => {
-  switch (action) {
-    case 'DELETE_USER': return '删除用户成功'
-    case 'DELETE_USER_DENIED': return '删除用户拒绝'
-    default: return action
-  }
+  const key = `admin.auditAction.${action}`
+  return te(key) ? t(key) : action
 }
 
 const getAuditActionClass = (action: string) => {
@@ -1616,16 +1607,16 @@ const saveCarousel = async () => {
     }
     await fetchCarousels()
     closeCarouselModal()
-    alert('保存成功')
-  } catch (e) { alert('保存失败') }
+    alert(t('admin.saveSuccess'))
+  } catch (e) { alert(t('admin.saveFailed')) }
 }
 
 const deleteCarousel = async (id: number) => {
-  if (!confirm('确定删除？')) return
+  if (!confirm(t('admin.confirmDelete'))) return
   try {
     await api.delete(endpoints.carousels.adminDelete(id))
     await fetchCarousels()
-  } catch (e) { alert('删除失败') }
+  } catch (e) { alert(t('admin.deleteFailed')) }
 }
 
 // Route management
@@ -1666,28 +1657,31 @@ const saveRoute = async () => {
     }
     await fetchAdminRoutes()
     closeRouteModal()
-    alert('保存成功')
-  } catch (e) { alert('保存失败') }
+    alert(t('admin.saveSuccess'))
+  } catch (e) { alert(t('admin.saveFailed')) }
 }
 
 const deleteRoute = async (id: number) => {
-  if (!confirm('确定删除？')) return
+  if (!confirm(t('admin.confirmDelete'))) return
   try {
     await api.delete(endpoints.adminRoutes.delete(id))
     await fetchAdminRoutes()
-  } catch (e) { alert('删除失败') }
+  } catch (e) { alert(t('admin.deleteFailed')) }
 }
 
 // Hotel management
 const adminHotels = ref<any[]>([])
+const showHotels = ref(false)
 const showHotelModal = ref(false)
 const editingHotel = ref<any>({})
 const hotelForm = ref({ name: '', location: '', phone: '', priceRange: '', rating: 0, imageUrl: '', facilities: '' })
+const failedHotelImages = ref<Record<number, boolean>>({})
 
 const fetchAdminHotels = async () => {
   try {
     const res = await api.get(endpoints.adminHotels.list)
     adminHotels.value = Array.isArray(res.data) ? res.data : []
+    failedHotelImages.value = {}
   } catch (e) { adminHotels.value = [] }
 }
 
@@ -1715,16 +1709,16 @@ const saveHotel = async () => {
     }
     await fetchAdminHotels()
     closeHotelModal()
-    alert('保存成功')
-  } catch (e) { alert('保存失败') }
+    alert(t('admin.saveSuccess'))
+  } catch (e) { alert(t('admin.saveFailed')) }
 }
 
 const deleteHotel = async (id: number) => {
-  if (!confirm('确定删除？')) return
+  if (!confirm(t('admin.confirmDelete'))) return
   try {
     await api.delete(endpoints.adminHotels.delete(id))
     await fetchAdminHotels()
-  } catch (e) { alert('删除失败') }
+  } catch (e) { alert(t('admin.deleteFailed')) }
 }
 
 // Room type management (inline in expanded cards)
@@ -1755,16 +1749,16 @@ const addRoomTypeInline = async (hotelId: number) => {
     roomTypeForm.value = { name: '', price: 0, capacity: 2, amenities: '' }
     const res = await api.get(endpoints.adminHotels.roomTypes(hotelId))
     expandedRoomTypes.value = Array.isArray(res.data) ? res.data : []
-  } catch (e) { alert('添加失败') }
+  } catch (e) { alert(t('admin.addFailed')) }
 }
 
 const deleteRoomTypeInline = async (roomTypeId: number, hotelId: number) => {
-  if (!confirm('确定删除该房型？')) return
+  if (!confirm(t('admin.confirmDeleteRoomType'))) return
   try {
     await api.delete(endpoints.adminHotels.deleteRoomType(roomTypeId))
     const res = await api.get(endpoints.adminHotels.roomTypes(hotelId))
     expandedRoomTypes.value = Array.isArray(res.data) ? res.data : []
-  } catch (e) { alert('删除失败') }
+  } catch (e) { alert(t('admin.deleteFailed')) }
 }
 
 onMounted(() => {

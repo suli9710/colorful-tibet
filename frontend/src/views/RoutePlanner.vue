@@ -147,7 +147,7 @@
                     <button type="button" v-for="preset in presets" :key="preset.label" @click="applyPreset(preset)" :disabled="loading"
                             class="group flex flex-col items-start gap-0.5 rounded-xl border border-tibet-gold/20 bg-white/60 px-3.5 py-3 text-left transition-all hover:border-tibet-gold/40 hover:bg-amber-50/40 hover:shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">
                       <span class="text-xs font-semibold text-tibet-dark/80 group-hover:text-tibet-dark">{{ preset.label }}</span>
-                      <span class="text-[11px] text-tibet-brown/50">{{ preset.days }}天 · {{ getBudgetShort(preset.budget) }}</span>
+                      <span class="text-[11px] text-tibet-brown/50">{{ preset.days }}{{ t('routePlanner.daysUnit') }} · {{ getBudgetShort(preset.budget) }}</span>
                     </button>
                   </div>
                 </div>
@@ -208,8 +208,8 @@
                 </svg>
               </div>
             </div>
-            <h3 class="text-xl font-bold text-tibet-brown/50 mb-2">定制您的西藏之旅</h3>
-            <p class="text-sm text-tibet-brown/40 max-w-sm">在左侧选择天数、预算和偏好，然后点击生成按钮，AI 将为您规划专属行程。</p>
+            <h3 class="text-xl font-bold text-tibet-brown/50 mb-2">{{ t('routePlanner.emptyTitle') }}</h3>
+            <p class="text-sm text-tibet-brown/40 max-w-sm">{{ t('routePlanner.emptyDescription') }}</p>
           </div>
 
           <!-- Result card -->
@@ -306,22 +306,22 @@ const presets = computed(() => [
 ])
 
 const budgetOptions = computed(() => [
-  { value: 'economy', label: t('routePlanner.budget.economy'), desc: '经济实惠的住宿与交通', icon: '💰' },
-  { value: 'comfort', label: t('routePlanner.budget.comfort'), desc: '性价比高的舒适体验', icon: '⭐' },
-  { value: 'luxury', label: t('routePlanner.budget.luxury'), desc: '高端酒店与专车服务', icon: '💎' }
+  { value: 'economy', label: t('routePlanner.budget.economy'), desc: t('routePlanner.budgetDesc.economy'), icon: '💰' },
+  { value: 'comfort', label: t('routePlanner.budget.comfort'), desc: t('routePlanner.budgetDesc.comfort'), icon: '⭐' },
+  { value: 'luxury', label: t('routePlanner.budget.luxury'), desc: t('routePlanner.budgetDesc.luxury'), icon: '💎' }
 ])
 
 const preferenceOptions = computed(() => [
-  { value: 'natural', label: t('routePlanner.preferenceOptions.natural'), desc: '雪山圣湖 · 自然奇观', icon: '🏔️' },
-  { value: 'cultural', label: t('routePlanner.preferenceOptions.cultural'), desc: '寺庙古迹 · 文化深度', icon: '🏛️' },
-  { value: 'photography', label: t('routePlanner.preferenceOptions.photography'), desc: '日照金山 · 光影秘境', icon: '📷' },
-  { value: 'relaxation', label: t('routePlanner.preferenceOptions.relaxation'), desc: '林芝氧吧 · 身心放松', icon: '🌿' }
+  { value: 'natural', label: t('routePlanner.preferenceOptions.natural'), desc: t('routePlanner.preferenceDesc.natural'), icon: '🏔️' },
+  { value: 'cultural', label: t('routePlanner.preferenceOptions.cultural'), desc: t('routePlanner.preferenceDesc.cultural'), icon: '🏛️' },
+  { value: 'photography', label: t('routePlanner.preferenceOptions.photography'), desc: t('routePlanner.preferenceDesc.photography'), icon: '📷' },
+  { value: 'relaxation', label: t('routePlanner.preferenceOptions.relaxation'), desc: t('routePlanner.preferenceDesc.relaxation'), icon: '🌿' }
 ])
 
 const getBudgetShort = (key: string) => {
-  if (key === 'economy') return '经济型'
-  if (key === 'comfort') return '舒适型'
-  if (key === 'luxury') return '豪华型'
+  if (key === 'economy') return t('routePlanner.budgetShort.economy')
+  if (key === 'comfort') return t('routePlanner.budgetShort.comfort')
+  if (key === 'luxury') return t('routePlanner.budgetShort.luxury')
   return key
 }
 
@@ -416,7 +416,7 @@ const generateRoute = async () => {
         },
         onError: (message) => {
           errorMessage.value = message
-          statusMessage.value = '路线生成失败，请检查后重试。'
+          statusMessage.value = t('routePlanner.finalFailure')
           streaming.value = false
           loading.value = false
         },

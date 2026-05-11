@@ -37,7 +37,7 @@
               v-for="(category, index) in heritageCategories"
               :key="category.name"
               type="button"
-              class="group tibet-card-elevated rounded-2xl border border-tibet-gold/20 px-4 py-4 sm:px-5 sm:py-5 flex flex-col gap-3 hover:border-tibet-red/25 hover:shadow-md transition duration-200 text-left w-full cursor-pointer"
+              class="group tibet-card-elevated rounded-2xl border border-tibet-gold/20 px-4 py-4 sm:px-5 sm:py-5 flex flex-col gap-3 hover:border-tibet-red/25 text-left w-full cursor-pointer"
               :style="{ transitionDelay: (index * 60) + 'ms' }"
               @click="toggleCategory(category.name)"
             >
@@ -127,7 +127,7 @@
             v-for="item in representativeItems"
             :key="item.id"
             @click="openDetail(item)"
-            class="tibet-card-elevated rounded-2xl p-5 text-left hover:shadow-lg hover:border-tibet-red/25 transition duration-200 focus:outline-none focus:ring-2 focus:ring-tibet-gold focus:ring-offset-2"
+            class="tibet-card-elevated rounded-2xl p-5 text-left hover:border-tibet-red/25 focus:outline-none focus:ring-2 focus:ring-tibet-gold focus:ring-offset-2"
           >
             <div class="mb-3">
               <span class="inline-block px-3 py-1 rounded-full text-xs font-medium bg-tibet-red/10 text-tibet-red border border-tibet-red/15">
@@ -480,7 +480,7 @@ interface ExperienceSpot {
 }
 
 // 西藏本地线下体验点（示例数据，可在后台扩展为可配置）
-const experienceSpots: ExperienceSpot[] = [
+const experienceSpotsZh: ExperienceSpot[] = [
   {
     name: '拉萨非遗体验中心（八廓街）',
     city: '拉萨',
@@ -523,9 +523,54 @@ const experienceSpots: ExperienceSpot[] = [
   }
 ]
 
+const experienceSpotsBo: ExperienceSpot[] = [
+  {
+    name: 'ལྷ་ས་རིག་གནས་ཤུལ་བཞག་ཉམས་མྱོང་ལྟེ་གནས། བར་སྐོར།',
+    city: 'ལྷ་ས།',
+    address: 'ལྷ་ས་ཁྲེང་ཀོན་ཆུས། བར་སྐོར་རྐང་ཐང་ལམ་ཉེ་འགྲམ།',
+    lat: 29.653,
+    lng: 91.117,
+    tag: 'བོད།',
+    brief: 'བོད་ཟློས་གར། ཐང་ཀ བོད་སྤོས་སོགས་རིག་གནས་ཤུལ་བཞག་ཉམས་མྱོང་ས་ཚིགས།',
+    highlight: 'ས་ཚིགས་གཅིག་ཏུ་རིག་གནས་ཤུལ་བཞག་མང་པོ་ཉམས་མྱོང་།'
+  },
+  {
+    name: 'ནོར་བུ་གླིང་ཁ་ཐང་ཀའི་ལས་ཁང་།',
+    city: 'ལྷ་ས།',
+    address: 'ལྷ་ས་ཁྲེང་ཀོན་ཆུས། ནོར་བུ་གླིང་ཁ་ཉེ་འགྲམ་གྱི་ལག་ཤེས་སྲང་ལམ།',
+    lat: 29.642,
+    lng: 91.071,
+    tag: 'རིས།',
+    brief: 'ཐང་ཀ་འབྲི་བ་དང་བཤམས་སྟོན་ལ་ཆེད་དུ་གནས་པའི་ལས་ཁང་།',
+    highlight: 'རང་གིས་ཐང་ཀའི་རི་མོ་དམར་པོ་ཞིག་ཚོད་འབྲི།'
+  },
+  {
+    name: 'གཞིས་ཀ་རྩེ་བོད་ཟློས་གར་སྦྱོང་བརྡར་ལྟེ་གནས།',
+    city: 'གཞིས་ཀ་རྩེ།',
+    address: 'གཞིས་ཀ་རྩེ་བསམ་འགྲུབ་རྩེ་ཆུས། རིག་གནས་སྲང་ལམ་ནང་།',
+    lat: 29.268,
+    lng: 88.882,
+    tag: 'ཟློས།',
+    brief: 'བོད་ཟློས་གར་སྦྱོང་བརྡར་དང་འཁྲབ་སྟོན་བྱེད་པའི་ས་ཚིགས།',
+    highlight: 'ཉེ་ས་ནས་བོད་ཟློས་གར་ཆ་ཚང་ཞིག་ལྟ།'
+  },
+  {
+    name: 'ཉིང་ཁྲི་བོད་སྨན་རིག་གནས་ཉམས་མྱོང་ཁང་།',
+    city: 'ཉིང་ཁྲི།',
+    address: 'ཉིང་ཁྲི་བ་ཡི་ཆུས། བོད་སྨན་དང་བདེ་ཐང་རིག་གནས་ས་ཁུལ།',
+    lat: 29.654,
+    lng: 94.362,
+    tag: 'སྨན།',
+    brief: 'བོད་སྨན་བཤམས་སྟོན། འགྲེལ་བཤད། སྟབས་བདེའི་གསོ་རིག་ཉམས་མྱོང་ཟུང་འབྲེལ།',
+    highlight: 'བོད་སྨན་རྒྱུ་ཆ་དང་སྲོལ་རྒྱུན་བདེ་ཐང་ཐབས་ལམ་ཤེས་པ།'
+  }
+]
+
+const experienceSpots = computed(() => locale.value === 'bo' ? experienceSpotsBo : experienceSpotsZh)
+
 // 代表性项目中要固定展示的几个核心项目
 const representativeItems = computed<HeritageItem[]>(() => {
-  const extra: HeritageItem[] = [
+  const extraZh: HeritageItem[] = [
     {
       id: 10001,
       name: '藏药',
@@ -571,6 +616,54 @@ const representativeItems = computed<HeritageItem[]>(() => {
       baikeUrl: 'https://baike.baidu.com/item/%E5%94%90%E5%8D%A1'
     }
   ]
+  const extraBo: HeritageItem[] = [
+    {
+      id: 10001,
+      name: 'བོད་སྨན།',
+      description: 'གངས་ལྗོངས་ས་མཐོ་ནས་བྱུང་བའི་སྲོལ་རྒྱུན་སྨན་རིག་མ་ལག བོད་མིའི་ཉམས་མྱོང་དང་རྒྱ་གར། རྒྱ་ནག་སྨན་རིག་གི་སྙིང་པོ་བསྡུས་ཡོད།',
+      category: 'སྲོལ་རྒྱུན་སྨན་རིག',
+      imageUrl: '/heritage/藏药.jpg',
+      videoUrl: '',
+      originStory: '',
+      significance: 'བོད་མིས་ས་མཐོའི་རང་བྱུང་ཁོར་ཡུག་དང་མཉམ་འཚོའི་ནང་གྲུབ་པའི་བདེ་ཐང་ཤེས་རབ་མཚོན།',
+      baikeUrl: 'https://baike.baidu.com/item/%E8%97%8F%E5%8C%BB%E8%8D%AF%E6%B5%B4%E6%B3%95'
+    },
+    {
+      id: 10002,
+      name: 'གེ་སར་སྒྲུང་།',
+      description: '“འཛམ་གླིང་གི་སྒྲུང་རིང་ཤོས” ཞེས་གྲགས། སྒྲུང་མཁན་གྱི་ཁ་བརྒྱུད་དང་རང་བྱུང་གླུ་སྒྲུང་གིས་མི་རབས་ནས་མི་རབས་སུ་བརྒྱུད།',
+      category: t('heritage.category.folkLiterature'),
+      imageUrl: '/heritage/格萨尔史诗.jpg',
+      videoUrl: '',
+      originStory: '',
+      significance: 'བོད་མིའི་ལོ་རྒྱུས་དྲན་ཤེས། དཔའ་བོའི་ཕུགས་བསམ། རིན་ཐང་ལྟ་ཚུལ་བཅས་ཟིན་ཐོར་བཀོད་ཡོད།',
+      baikeUrl: 'https://baike.baidu.com/item/%E6%A0%BC%E8%90%A8%E5%B0%94%E7%8E%8B%E4%BC%A0'
+    },
+    {
+      id: 10003,
+      name: 'བོད་ཟློས་གར།',
+      description: '“བོད་རིག་གནས་ཀྱི་གསོན་པོའི་དངོས་རྫས” ཞེས་གྲགས། གླུ་གར། གཏམ་བཤད། འཁྲབ་སྟོན་བཅས་ཟུང་འབྲེལ་གྱི་སྲོལ་རྒྱུན་ཟློས་གར།',
+      category: t('heritage.category.traditionalDrama'),
+      imageUrl: '/heritage/藏戏.jpg',
+      videoUrl: '',
+      originStory: '',
+      significance: 'ཆོས་ལུགས་ཆོ་ག ལོ་རྒྱུས་སྒྲུང་། མི་དམངས་གཏམ་རྒྱུད་བཅས་མཉམ་སྡེབ་བྱས་པའི་རིག་གནས་སྒེའུ་ཁུང་།',
+      baikeUrl: 'https://baike.baidu.com/item/%E8%97%8F%E6%88%8F'
+    },
+    {
+      id: 10004,
+      name: 'བོད་རིགས་ཐང་ཀ',
+      description: 'རྡོ་སྨན་ཚོན་རྫས་ཀྱིས་རས། ཤོག་བུའམ་དར་རས་ཐོག་ཏུ་འབྲི་བའི་ཆོས་ལུགས་རི་མོ། ཚོན་མདོག་བཀྲ་ཤིས་ཤིང་གྲུབ་ཚུལ་ནན་ཏན་ཡིན།',
+      category: t('heritage.category.traditionalCraft'),
+      imageUrl: '/heritage/唐卡.jpg',
+      videoUrl: '',
+      originStory: '',
+      significance: 'ཐང་ཀས་བོད་བརྒྱུད་ནང་བསྟན་གྱི་ཆོས་དོན། ལོ་རྒྱུས་མི་སྣ། འཇིག་རྟེན་ལྟ་ཚུལ་བཅས་འཁུར་ཡོད།',
+      baikeUrl: 'https://baike.baidu.com/item/%E5%94%90%E5%8D%A1'
+    }
+  ]
+
+  const extra = locale.value === 'bo' ? extraBo : extraZh
 
   // 为了避免和后台数据重复，先把与手动固定项目同名的条目从后台列表中排除
   const extraNames = new Set(extra.map(item => item.name))
@@ -672,6 +765,81 @@ const nationalHeritageRaw = `西藏国家级非物质文化遗产名录 (仅国�
 墨脱石锅制作技艺（第四批，2014 年）：林芝市墨脱县传统厨具制作技艺，2015 年成为国家批准保护的地理标志产品
 藏族传统榨油技艺（江孜传统榨油技艺）：日喀则市江孜县传统榨油工艺，使用传统的木制榨油设备`
 
+const getTibetanNationalHeritageItems = (): NationalHeritageItem[] => [
+  {
+    id: 1,
+    category: t('heritage.category.folkLiterature'),
+    name: 'གེ་སར།',
+    description: 'འཛམ་གླིང་གི་སྒྲུང་རིང་ཤོས་སུ་གྲགས་པའི་བོད་ཀྱི་དཔའ་བོའི་སྒྲུང་། སྒྲུང་མཁན་གྱི་ཁ་བརྒྱུད་ཀྱིས་ད་བར་བརྒྱུད་ཡོད།'
+  },
+  {
+    id: 2,
+    category: t('heritage.category.traditionalMusic'),
+    name: 'ནག་ཆུའི་རི་གླུ།',
+    description: 'བྱང་ཐང་ས་མཐོའི་རྩྭ་ཐང་འཚོ་བ་ལས་བྱུང་བའི་སྲོལ་རྒྱུན་དམངས་གླུ།'
+  },
+  {
+    id: 3,
+    category: t('heritage.category.traditionalMusic'),
+    name: 'ལྷ་སའི་ནང་མ།',
+    description: 'བོད་ཀྱི་གསོལ་སྟོན་དང་གླུ་གར་སྲོལ་རྒྱུན་ནང་གི་གླུ་རོལ་རྣམ་པ་གཙོ་བོ།'
+  },
+  {
+    id: 4,
+    category: t('heritage.category.traditionalDance'),
+    name: 'རེ་པ་གར།',
+    description: 'གླུ་དང་གར། རྩལ་འཁྲབ་བཅས་མཉམ་སྡེབ་ཀྱི་བོད་ཀྱི་སྲོལ་རྒྱུན་འཁྲབ་རྩལ།'
+  },
+  {
+    id: 5,
+    category: t('heritage.category.traditionalDance'),
+    name: 'མང་ཁང་གི་ཞན་ཙི།',
+    description: 'སྒྲ་སྙན་གྱི་རོལ་མོ་དང་མཉམ་དུ་འཁྲབ་པའི་མང་ཁང་ས་ཁུལ་གྱི་མཉམ་གར།'
+  },
+  {
+    id: 6,
+    category: t('heritage.category.traditionalDance'),
+    name: 'སྐོར་གར།',
+    description: 'བོད་མིའི་རྩྭ་ཐང་དང་གྲོང་སྡེའི་འཚོ་བའི་ནང་ཁྱབ་པའི་སྡེ་ཚན་མཉམ་གར།'
+  },
+  {
+    id: 7,
+    category: t('heritage.category.traditionalDrama'),
+    name: 'བོད་ཟློས་གར།',
+    description: 'ཆོས་ལུགས་ཆོ་ག་དང་ལོ་རྒྱུས་སྒྲུང་མཉམ་འདྲེས་ཀྱི་སྲོལ་རྒྱུན་ཟློས་གར།'
+  },
+  {
+    id: 8,
+    category: t('heritage.category.traditionalDrama'),
+    name: 'ལྷ་ས་ཇོ་མོ་ལུང་།',
+    description: 'བོད་ཟློས་གར་གྱི་གྲགས་ཆེ་བའི་རྒྱུན་ལུགས་གཅིག'
+  },
+  {
+    id: 9,
+    category: t('heritage.category.traditionalSports'),
+    name: 'བོད་རིགས་ཀྱི་རྟ་རྩལ།',
+    description: 'བོད་ཀྱི་རྟ་ཞོན་རྩལ་དང་རྩྭ་ཐང་འཚོ་བ་མཚོན་པའི་སྲོལ་རྒྱུན་ལུས་རྩལ།'
+  },
+  {
+    id: 10,
+    category: t('heritage.category.traditionalCraft'),
+    name: 'བོད་རིགས་ཐང་ཀ',
+    description: 'ཆོས་ལུགས་རི་མོ་དང་རྡོ་སྨན་ཚོན་རྫས་ལག་རྩལ་ཟུང་འབྲེལ་གྱི་བོད་ཀྱི་རི་མོའི་མཚོན་རྟགས།'
+  },
+  {
+    id: 11,
+    category: t('heritage.category.traditionalCraft'),
+    name: 'བོད་རིགས་ལྕགས་རིགས་བཟོ་རྩལ།',
+    description: 'བོད་ཀྱི་གྲི། ཟངས་ཆས། གསེར་དངུལ་རྒྱན་ཆ་སོགས་བཟོ་བའི་ལག་ཤེས།'
+  },
+  {
+    id: 12,
+    category: t('heritage.category.traditionalCraft'),
+    name: 'བོད་སྤོས་བཟོ་རྩལ།',
+    description: 'མིན་གྲོལ་གླིང་སོགས་སྲོལ་རྒྱུན་ནས་བྱུང་བའི་སྤོས་རྫས་དང་བཟོ་རྩལ།'
+  }
+]
+
 // 简单归一化分类名称，便于和上方大类卡片对应
 const normalizeCategoryName = (name: string) => {
   return name
@@ -682,6 +850,10 @@ const normalizeCategoryName = (name: string) => {
 }
 
 const nationalHeritageItems = computed<NationalHeritageItem[]>(() => {
+  if (locale.value === 'bo') {
+    return getTibetanNationalHeritageItems()
+  }
+
   const lines = nationalHeritageRaw.split('\n').map(l => l.trim()).filter(Boolean)
   const items: NationalHeritageItem[] = []
   let currentCategory = ''
@@ -844,7 +1016,7 @@ const initMap = () => {
         
         // 添加体验点标记
         try {
-          experienceSpots.forEach((spot) => {
+          experienceSpots.value.forEach((spot) => {
             try {
               const marker = new AMap.Marker({
                 position: [spot.lng, spot.lat],
@@ -920,7 +1092,7 @@ const initMap = () => {
           // 即使超时，也尝试添加标记
           if (map) {
             try {
-              experienceSpots.forEach((spot) => {
+              experienceSpots.value.forEach((spot) => {
                 try {
                   const marker = new AMap.Marker({
                     position: [spot.lng, spot.lat],

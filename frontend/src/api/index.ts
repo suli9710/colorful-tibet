@@ -63,6 +63,8 @@ api.interceptors.request.use(config => {
     config.headers.Authorization = `Bearer ${token}`
   }
 
+  config.headers['Accept-Language'] = memoizedLocale
+
   if (config.method?.toLowerCase() === 'get') {
     config.params = { ...(config.params || {}), locale: memoizedLocale }
   }
@@ -112,6 +114,7 @@ export interface AiRouteGenerateRequest {
   days: number
   budget: string
   preference: string
+  locale?: string
 }
 
 export interface AiRouteGenerateResponse {
@@ -165,7 +168,8 @@ export const endpoints = {
     news: '/admin/news',
     createNews: '/admin/news',
     updateNews: (id: number) => `/admin/news/${id}`,
-    deleteNews: (id: number) => `/admin/news/${id}`
+    deleteNews: (id: number) => `/admin/news/${id}`,
+    uploadImage: '/admin/upload-image'
   },
   carousels: {
     list: '/carousels',

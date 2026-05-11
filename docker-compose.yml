@@ -13,9 +13,13 @@ services:
       - DOUBAO_MODEL=${DOUBAO_MODEL:-your-model-name}
       - JWT_SECRET=${JWT_SECRET:-tibetTourismSecretKey12345678901234567890}
       - ADMIN_ENCRYPTION_KEY=${ADMIN_ENCRYPTION_KEY:-tibetTourismSecretKey12345678901234567890}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
+    depends_on:
+      - redis
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/api/spots"]
@@ -23,6 +27,20 @@ services:
       timeout: 10s
       retries: 5
       start_period: 600s  # 启动宽限期，允许后端在 699 秒内启动
+
+  redis:
+    image: redis:7-alpine
+    container_name: colorful-tibet-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
 
   frontend:
     build:
@@ -37,5 +55,5 @@ services:
       - backend
     restart: unless-stopped
 
-
-
+volumes:
+  redis_data:

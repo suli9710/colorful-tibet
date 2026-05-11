@@ -112,7 +112,23 @@
       "Bash(grep -v \"^$\")",
       "Bash(grep *)",
       "Bash(python -X utf8 -c \"import pip; pip.main\\(['install', 'python-docx']\\)\")",
-      "Bash(python -X utf8 -c ' *)"
+      "Bash(python -X utf8 -c ' *)",
+      "Bash(git commit *)",
+      "Bash(where redis-server *)",
+      "Bash(redis-cli --version)",
+      "Read(//c/Program Files \\(x86\\)/Redis/**)",
+      "Read(//c/Users/Suli/Desktop/Redis/**)",
+      "Read(//c/Users/Suli/redis/**)",
+      "WebFetch(domain:api.github.com)",
+      "Bash(unzip -o Redis-x64.zip)",
+      "Bash(rm Redis-x64.zip)",
+      "Bash(start \"\" C:/Users/Suli/Redis/redis-server.exe)",
+      "Bash(C:/Users/Suli/Redis/redis-cli.exe ping *)",
+      "Bash(file -i frontend/dist/index.html frontend/dist/assets/*.js)",
+      "Bash(docker --version)",
+      "Bash(/c/Users/Suli/Redis/redis-cli.exe *)",
+      "Bash(echo \"HTTP Status: $\\(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/api/spots\\)\")",
+      "Bash(where redis-cli *)"
     ]
   }
 }

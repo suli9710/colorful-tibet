@@ -15,6 +15,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.redis.RedisConnectionFailureException;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -33,6 +36,8 @@ class RecommendationServiceTest {
     @Mock private CompanionInferenceService companionInferenceService;
     @Mock private ItemBasedRecommendationService itemBasedRecommendationService;
     @Mock private ColdStartOptimizationService coldStartOptimizationService;
+    @Mock private RedisTemplate<String, Object> redisTemplate;
+    @Mock private ValueOperations<String, Object> valueOperations;
 
     @InjectMocks
     private RecommendationService recommendationService;
@@ -72,6 +77,10 @@ class RecommendationServiceTest {
                 createTag(9L, spot5, "森林"), createTag(10L, spot5, "自然"),
                 createTag(11L, spot6, "神山"), createTag(12L, spot6, "朝圣")
         );
+
+        // Redis mock: 默认缓存未命中（lenient，冷启动测试不会用到）
+        lenient().when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        lenient().when(valueOperations.get(anyString())).thenReturn(null);
     }
 
     @Test
@@ -107,6 +116,32 @@ class RecommendationServiceTest {
         assertTrue(result.stream().noneMatch(s -> s.getId().equals(spot1.getId())));
         assertTrue(result.stream().noneMatch(s -> s.getId().equals(spot2.getId())));
         assertTrue(result.stream().noneMatch(s -> s.getId().equals(spot3.getId())));
+    }
+
+    @Test
+    void testRecommendContinuesWhenRedisUnavailable() {
+        when(redisTemplate.opsForValue()).thenThrow(new RedisConnectionFailureException("Redis down"));
+        when(historyRepository.findByUserId(1L)).thenReturn(userHistories);
+        when(companionInferenceService.getCompanionType(1L)).thenReturn("ALONE");
+        when(spotTagRepository.findBySpotIdIn(anySet())).thenReturn(allTags);
+
+        User otherUser = new User();
+        otherUser.setId(2L);
+        UserVisitHistory otherHist1 = createHistory(otherUser, spot1, 5, 5, 200, LocalDateTime.now().minusDays(5));
+        UserVisitHistory otherHist2 = createHistory(otherUser, spot2, 4, 3, 150, LocalDateTime.now().minusDays(10));
+        when(historyRepository.findBySpotIdIn(anyList())).thenReturn(Arrays.asList(otherHist1, otherHist2));
+
+        UserVisitHistory otherSpotHistory = createHistory(otherUser, spot4, 5, 3, 100, LocalDateTime.now().minusDays(7));
+        when(historyRepository.findByUserIdIn(anyList())).thenReturn(List.of(otherSpotHistory));
+        when(itemBasedRecommendationService.recommendByItemCF(eq(1L), anySet())).thenReturn(Collections.emptyMap());
+        when(spotRepository.findByTagsInAndIdNotIn(anyList(), anySet())).thenReturn(Arrays.asList(spot4, spot5, spot6));
+        when(spotRepository.findAllById(anyList())).thenReturn(List.of(spot4));
+
+        List<ScenicSpot> result = recommendationService.recommendSpotsForUser(1L);
+
+        assertNotNull(result);
+        assertFalse(result.isEmpty());
+        assertTrue(result.stream().noneMatch(s -> s.getId().equals(spot1.getId())));
     }
 
     @Test

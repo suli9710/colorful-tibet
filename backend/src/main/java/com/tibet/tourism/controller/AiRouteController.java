@@ -34,7 +34,8 @@ public class AiRouteController {
                             safeRequest.getDays() == null ? 5 : safeRequest.getDays(),
                             safeRequest.getBudget(),
                             safeRequest.getPreference(),
-                            currentUser
+                            currentUser,
+                            resolveLocale(safeRequest.getLocale(), httpServletRequest)
                     )
             );
         } catch (IllegalStateException e) {
@@ -59,11 +60,23 @@ public class AiRouteController {
                 safeRequest.getBudget(),
                 safeRequest.getPreference(),
                 currentUser,
+                resolveLocale(safeRequest.getLocale(), httpServletRequest),
                 emitter
         );
 
         return ResponseEntity.ok()
                 .contentType(MediaType.TEXT_EVENT_STREAM)
                 .body(emitter);
+    }
+
+    private String resolveLocale(String requestLocale, HttpServletRequest request) {
+        if (requestLocale != null && !requestLocale.isBlank()) {
+            return requestLocale;
+        }
+        String acceptLanguage = request.getHeader("Accept-Language");
+        if (acceptLanguage != null && acceptLanguage.toLowerCase().startsWith("bo")) {
+            return "bo";
+        }
+        return "zh";
     }
 }

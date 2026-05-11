@@ -31,11 +31,24 @@ public class AiRouteService {
             "luxury", "豪华型"
     );
 
+    private static final Map<String, String> BUDGET_LABELS_BO = Map.of(
+            "economy", "དཔལ་འབྱོར་རིགས།",
+            "comfort", "བདེ་སྡོད་རིགས།",
+            "luxury", "རྒྱས་སྤྲོས་རིགས།"
+    );
+
     private static final Map<String, String> PREFERENCE_LABELS = Map.of(
             "natural", "自然风光",
             "cultural", "人文历史",
             "photography", "深度摄影",
             "relaxation", "休闲度假"
+    );
+
+    private static final Map<String, String> PREFERENCE_LABELS_BO = Map.of(
+            "natural", "རང་བྱུང་ལྗོངས།",
+            "cultural", "མི་ཆོས་ལོ་རྒྱུས།",
+            "photography", "པར་ལེན་གཏིང་ཟབ།",
+            "relaxation", "ངལ་གསོ་གནས་སྐོར།"
     );
 
     private final WebClient webClient;
@@ -99,7 +112,7 @@ public class AiRouteService {
     }
 
     public void streamRoute(int days, String budgetKey, String preferenceKey,
-                            User currentUser, SseEmitter emitter) {
+                            User currentUser, String locale, SseEmitter emitter) {
         try {
             validateConfig();
         } catch (IllegalStateException e) {
@@ -109,9 +122,13 @@ public class AiRouteService {
         }
 
         int safeDays = Math.max(1, days);
-        String budgetLabel = BUDGET_LABELS.getOrDefault(normalizeKey(budgetKey), BUDGET_LABELS.get("comfort"));
-        String preferenceLabel = PREFERENCE_LABELS.getOrDefault(normalizeKey(preferenceKey), PREFERENCE_LABELS.get("natural"));
-        String prompt = buildPrompt(safeDays, budgetLabel, preferenceLabel, currentUser);
+        String normalizedBudgetKey = normalizeKey(budgetKey);
+        String normalizedPreferenceKey = normalizeKey(preferenceKey);
+        String budgetLabel = BUDGET_LABELS.getOrDefault(normalizedBudgetKey, BUDGET_LABELS.get("comfort"));
+        String preferenceLabel = PREFERENCE_LABELS.getOrDefault(normalizedPreferenceKey, PREFERENCE_LABELS.get("natural"));
+        String displayBudgetLabel = localizedBudgetLabel(normalizedBudgetKey, locale);
+        String displayPreferenceLabel = localizedPreferenceLabel(normalizedPreferenceKey, locale);
+        String prompt = buildPrompt(safeDays, budgetLabel, preferenceLabel, currentUser, locale);
         Map<String, Object> streamBody = buildStreamRequestBody(prompt);
 
         log.info("AI stream request: model={}, url={}, promptLength={}",
@@ -121,8 +138,8 @@ public class AiRouteService {
         sendEmitterEvent(emitter, "meta", Map.of(
                 "model", model,
                 "days", String.valueOf(safeDays),
-                "budget", budgetLabel,
-                "preference", preferenceLabel
+                "budget", displayBudgetLabel,
+                "preference", displayPreferenceLabel
         ));
 
         Flux<String> streamFlux = webClient.post()
@@ -313,13 +330,17 @@ public class AiRouteService {
         }
     }
 
-    public AiRouteGenerateResponse generateRoute(int days, String budgetKey, String preferenceKey, User currentUser) {
+    public AiRouteGenerateResponse generateRoute(int days, String budgetKey, String preferenceKey, User currentUser, String locale) {
         validateConfig();
 
         int safeDays = Math.max(1, days);
-        String budgetLabel = BUDGET_LABELS.getOrDefault(normalizeKey(budgetKey), BUDGET_LABELS.get("comfort"));
-        String preferenceLabel = PREFERENCE_LABELS.getOrDefault(normalizeKey(preferenceKey), PREFERENCE_LABELS.get("natural"));
-        String prompt = buildPrompt(safeDays, budgetLabel, preferenceLabel, currentUser);
+        String normalizedBudgetKey = normalizeKey(budgetKey);
+        String normalizedPreferenceKey = normalizeKey(preferenceKey);
+        String budgetLabel = BUDGET_LABELS.getOrDefault(normalizedBudgetKey, BUDGET_LABELS.get("comfort"));
+        String preferenceLabel = PREFERENCE_LABELS.getOrDefault(normalizedPreferenceKey, PREFERENCE_LABELS.get("natural"));
+        String displayBudgetLabel = localizedBudgetLabel(normalizedBudgetKey, locale);
+        String displayPreferenceLabel = localizedPreferenceLabel(normalizedPreferenceKey, locale);
+        String prompt = buildPrompt(safeDays, budgetLabel, preferenceLabel, currentUser, locale);
 
         Map<String, Object> requestBody = buildRequestBody(prompt);
         log.info("AI route request prepared: model={}, promptLength={}, promptPreview={}",
@@ -353,13 +374,13 @@ public class AiRouteService {
             log.info("AI route response received, top-level keys={}", response.keySet());
 
             String rawContent = extractResponseText(response);
-            String content = normalizeMarkdownRoute(rawContent, safeDays, budgetLabel, preferenceLabel);
+            String content = normalizeMarkdownRoute(rawContent, safeDays, budgetLabel, preferenceLabel, locale);
             if (content.isBlank()) {
                 throw new IllegalStateException("AI service response did not contain usable text");
             }
 
             log.info("AI route content received: originalLength={}, validatedLength={}", rawContent.length(), content.length());
-            return new AiRouteGenerateResponse(content, model, budgetLabel, preferenceLabel, safeDays, null);
+            return new AiRouteGenerateResponse(content, model, displayBudgetLabel, displayPreferenceLabel, safeDays, null);
         } catch (Exception e) {
             log.error("AI route generation failed", e);
             throw new IllegalStateException("AI route generation failed: " + extractErrorMessage(e), e);
@@ -405,8 +426,11 @@ public class AiRouteService {
         return requestBody;
     }
 
-    private String buildPrompt(int days, String budget, String preference, User currentUser) {
+    private String buildPrompt(int days, String budget, String preference, User currentUser, String locale) {
         String userContext = currentUser == null ? "" : String.format("\n- 用户昵称：%s", safeText(currentUser.getNickname()));
+        String languageInstruction = isTibetanLocale(locale)
+                ? "语言要求：请全程使用现代标准藏文输出，保留 Markdown 标题、列表、加粗等格式。景点名、住宿、提示、预算说明都要使用藏文表达；不要夹杂中文解释或中文标题。"
+                : "语言要求：请全程使用简体中文输出。";
 
         String budgetGuidance;
         switch (budget) {
@@ -458,6 +482,7 @@ public class AiRouteService {
         return String.format(""
                 + "【重要指令】你是西藏旅行规划师。直接输出下方 Markdown 格式的旅行计划，不要输出任何思考过程、开场白、解释、分析或客套话。你的回复从第一行 # 标题开始，到「进藏必读」结束，中间不得有任何额外内容。\n\n"
                 + "%s\n\n"
+                + "%s\n\n"
                 + "═══════════════════════════════════\n"
                 + "游客需求\n"
                 + "═══════════════════════════════════\n"
@@ -501,6 +526,7 @@ public class AiRouteService {
                 + "列出6-8条实用信息：边防证办理、高原反应应对、最佳旅行季节、穿衣指南、防晒保湿、通讯信号、现金准备、尊重当地风俗。\n\n"
                 + "【再次强调】直接从 # 标题开始回复，不要输出任何其他内容。"
                 + "",
+                languageInstruction,
                 userContext,
                 days, budget, budgetGuidance,
                 preference, preferenceGuidance,
@@ -600,7 +626,7 @@ public class AiRouteService {
         return "";
     }
 
-    private String normalizeMarkdownRoute(String rawContent, int days, String budgetLabel, String preferenceLabel) {
+    private String normalizeMarkdownRoute(String rawContent, int days, String budgetLabel, String preferenceLabel, String locale) {
         if (rawContent == null) {
             return "";
         }
@@ -608,6 +634,10 @@ public class AiRouteService {
         String sanitized = sanitizeResponseText(rawContent);
         if (sanitized.isBlank()) {
             return "";
+        }
+
+        if (isTibetanLocale(locale)) {
+            return sanitized;
         }
 
         String canonical = validateMarkdownRoute(sanitized, days, budgetLabel, preferenceLabel);
@@ -821,5 +851,23 @@ public class AiRouteService {
 
     private String normalizeKey(String value) {
         return value == null ? "" : value.trim().toLowerCase();
+    }
+
+    private boolean isTibetanLocale(String locale) {
+        return locale != null && locale.toLowerCase().startsWith("bo");
+    }
+
+    private String localizedBudgetLabel(String budgetKey, String locale) {
+        if (isTibetanLocale(locale)) {
+            return BUDGET_LABELS_BO.getOrDefault(budgetKey, BUDGET_LABELS_BO.get("comfort"));
+        }
+        return BUDGET_LABELS.getOrDefault(budgetKey, BUDGET_LABELS.get("comfort"));
+    }
+
+    private String localizedPreferenceLabel(String preferenceKey, String locale) {
+        if (isTibetanLocale(locale)) {
+            return PREFERENCE_LABELS_BO.getOrDefault(preferenceKey, PREFERENCE_LABELS_BO.get("natural"));
+        }
+        return PREFERENCE_LABELS.getOrDefault(preferenceKey, PREFERENCE_LABELS.get("natural"));
     }
 }

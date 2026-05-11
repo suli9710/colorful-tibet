@@ -85,7 +85,7 @@
       <!-- Spots Grid -->
       <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
         <div v-for="(spot, index) in filteredSpots" :key="spot.id" 
-             class="group tibet-card-elevated rounded-3xl shadow-sm hover:shadow-2xl card-hover overflow-hidden border border-tibet-gold/20 animate-on-scroll scroll-pop-card hover:border-tibet-gold/20 gpu-accelerated"
+             class="group tibet-card-elevated rounded-3xl overflow-hidden border border-tibet-gold/20 animate-on-scroll scroll-pop-card gpu-accelerated"
              :style="{ animationDelay: `${index * 80}ms` }">
           
           <!-- Image Container -->
@@ -94,7 +94,7 @@
                  :src="spot.imageUrl" 
                  :alt="spot.name"
                  loading="lazy"
-                 class="w-full h-full object-cover transition-transform duration-700 ease-out-expo group-hover:scale-110 img-fade-in will-change-transform"
+                 class="w-full h-full object-cover tibet-image-hover img-fade-in will-change-transform"
                  @error="handleImageError($event)">
             <div v-else 
                  class="w-full h-full flex items-center justify-center"
