@@ -4,7 +4,12 @@
 
     <div class="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-20">
       <!-- ===== HEADER ===== -->
-      <header class="text-center mb-12 animate-fade-in">
+      <motion.header
+        class="text-center mb-12"
+        :initial="revealInitial"
+        :animate="revealInView"
+        :transition="revealTransition"
+      >
         <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/70 border border-tibet-gold/30 backdrop-blur text-xs font-semibold text-tibet-red tracking-widest uppercase mb-6">
           <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
           {{ t('routePlanner.aiGeneratorLabel') }}
@@ -21,11 +26,19 @@
           <span class="h-2.5 w-2.5 rotate-45 border border-tibet-gold/70 bg-tibet-gold/20"></span>
           <span class="h-px w-12 bg-gradient-to-l from-transparent to-tibet-gold/50"></span>
         </div>
-      </header>
+      </motion.header>
 
       <!-- ===== STATUS / ERROR BANNER ===== -->
-      <transition name="fade-slide">
-        <div v-if="statusMessage || errorMessage" class="mb-8 animate-fade-in">
+      <AnimatePresence mode="popLayout">
+        <motion.div
+          v-if="statusMessage || errorMessage"
+          key="route-planner-status"
+          class="mb-8"
+          :initial="{ opacity: 0, y: -12, scale: 0.98 }"
+          :animate="{ opacity: 1, y: 0, scale: 1 }"
+          :exit="{ opacity: 0, y: -8, scale: 0.98 }"
+          :transition="{ duration: 0.36, ease: motionEase }"
+        >
           <div class="mx-auto max-w-3xl rounded-2xl border px-5 py-4 backdrop-blur-md"
                :class="errorMessage ? 'border-rose-200 bg-rose-50/90 text-rose-700' : 'border-emerald-200 bg-emerald-50/90 text-emerald-700'">
             <div class="flex items-center gap-3">
@@ -44,8 +57,8 @@
               </div>
             </div>
           </div>
-        </div>
-      </transition>
+        </motion.div>
+      </AnimatePresence>
 
       <!-- ===== MAIN CONTENT ===== -->
       <div class="grid gap-8 lg:grid-cols-5 items-start">
@@ -53,7 +66,12 @@
         <div class="lg:col-span-2">
           <div class="sticky top-20 space-y-6">
             <!-- Form Card -->
-            <div class="glass-card rounded-3xl border border-white/50 shadow-xl shadow-slate-900/3 overflow-hidden animate-fade-in-up">
+            <motion.div
+              class="glass-card rounded-3xl border border-white/50 shadow-xl shadow-slate-900/3 overflow-hidden"
+              :initial="cardInitial"
+              :animate="cardInView"
+              :transition="cardTransition(0, 0.06)"
+            >
               <!-- Card header -->
               <div class="px-6 py-5 border-b border-white/60 bg-white/40">
                 <div class="flex items-center gap-3">
@@ -71,32 +89,46 @@
 
               <form @submit.prevent="generateRoute" class="p-6 space-y-6">
                 <!-- Days Selector -->
-                <div>
+                <motion.div layout>
                   <label class="block text-sm font-semibold text-tibet-dark/80 mb-3">{{ t('routePlanner.plannedDays') }}</label>
                   <div class="flex items-stretch gap-0 rounded-2xl border border-tibet-gold/25 bg-white/70 overflow-hidden">
-                    <button type="button" @click="adjustDays(-1)" :disabled="loading || form.days <= 1"
+                    <motion.button type="button" @click="adjustDays(-1)" :disabled="loading || form.days <= 1"
+                            :whileHover="{ backgroundColor: 'rgba(255, 255, 255, 0.82)' }"
+                            :whileTap="{ scale: 0.94 }"
                             class="flex items-center justify-center w-12 shrink-0 text-xl text-tibet-brown/70 hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
                       <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/></svg>
-                    </button>
+                    </motion.button>
                     <div class="flex-1 flex flex-col items-center justify-center py-3 border-x border-tibet-gold/20">
-                      <span class="text-4xl font-bold text-tibet-dark leading-none tabular-nums">{{ form.days }}</span>
+                      <motion.span
+                        :key="form.days"
+                        class="text-4xl font-bold text-tibet-dark leading-none tabular-nums"
+                        :initial="{ opacity: 0, y: 8, scale: 0.94 }"
+                        :animate="{ opacity: 1, y: 0, scale: 1 }"
+                        :transition="{ duration: 0.22, ease: motionEase }"
+                      >{{ form.days }}</motion.span>
                       <span class="text-[10px] uppercase tracking-[0.2em] text-tibet-brown/50 mt-1">Days</span>
                     </div>
-                    <button type="button" @click="adjustDays(1)" :disabled="loading || form.days >= 30"
+                    <motion.button type="button" @click="adjustDays(1)" :disabled="loading || form.days >= 30"
+                            :whileHover="{ backgroundColor: 'rgba(255, 255, 255, 0.82)' }"
+                            :whileTap="{ scale: 0.94 }"
                             class="flex items-center justify-center w-12 shrink-0 text-xl text-tibet-brown/70 hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
                       <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                    </button>
+                    </motion.button>
                   </div>
                   <p class="mt-2 text-xs text-tibet-brown/50">{{ t('routePlanner.suggestedDays') }}</p>
-                </div>
+                </motion.div>
 
                 <!-- Budget: card-style radio -->
                 <div>
                   <label class="block text-sm font-semibold text-tibet-dark/80 mb-3">{{ t('routePlanner.budgetRange') }}</label>
                   <div class="grid gap-2">
-                    <label v-for="opt in budgetOptions" :key="opt.value"
+                    <motion.label v-for="opt in budgetOptions" :key="opt.value"
                            @click="form.budget = opt.value"
                            class="relative flex items-center gap-3 rounded-xl border-2 cursor-pointer transition-all duration-200 px-4 py-3"
+                           layout
+                           :whileHover="{ y: -2, scale: 1.01 }"
+                           :whileTap="{ scale: 0.99 }"
+                           :transition="softSpring"
                            :class="form.budget === opt.value
                              ? 'border-tibet-gold bg-amber-50/60 shadow-sm'
                              : 'border-tibet-gold/20 bg-white/60 hover:border-tibet-gold/25 hover:bg-white'">
@@ -108,10 +140,13 @@
                         <p class="text-sm font-semibold" :class="form.budget === opt.value ? 'text-tibet-dark' : 'text-tibet-brown/80'">{{ opt.label }}</p>
                         <p class="text-xs text-tibet-brown/50 mt-0.5">{{ opt.desc }}</p>
                       </div>
-                      <span v-if="form.budget === opt.value" class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-tibet-gold text-white">
+                      <motion.span v-if="form.budget === opt.value" class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-tibet-gold text-white"
+                            :initial="{ opacity: 0, scale: 0.6, rotate: -20 }"
+                            :animate="{ opacity: 1, scale: 1, rotate: 0 }"
+                            :transition="softSpring">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
-                      </span>
-                    </label>
+                      </motion.span>
+                    </motion.label>
                   </div>
                 </div>
 
@@ -119,9 +154,13 @@
                 <div>
                   <label class="block text-sm font-semibold text-tibet-dark/80 mb-3">{{ t('routePlanner.preference') }}</label>
                   <div class="grid gap-2">
-                    <label v-for="opt in preferenceOptions" :key="opt.value"
+                    <motion.label v-for="opt in preferenceOptions" :key="opt.value"
                            @click="form.preference = opt.value"
                            class="relative flex items-center gap-3 rounded-xl border-2 cursor-pointer transition-all duration-200 px-4 py-3"
+                           layout
+                           :whileHover="{ y: -2, scale: 1.01 }"
+                           :whileTap="{ scale: 0.99 }"
+                           :transition="softSpring"
                            :class="form.preference === opt.value
                              ? 'border-tibet-blue bg-blue-50/60 shadow-sm'
                              : 'border-tibet-gold/20 bg-white/60 hover:border-tibet-gold/25 hover:bg-white'">
@@ -133,10 +172,13 @@
                         <p class="text-sm font-semibold" :class="form.preference === opt.value ? 'text-tibet-dark' : 'text-tibet-brown/80'">{{ opt.label }}</p>
                         <p class="text-xs text-tibet-brown/50 mt-0.5">{{ opt.desc }}</p>
                       </div>
-                      <span v-if="form.preference === opt.value" class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-tibet-blue text-white">
+                      <motion.span v-if="form.preference === opt.value" class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-tibet-blue text-white"
+                            :initial="{ opacity: 0, scale: 0.6, rotate: -20 }"
+                            :animate="{ opacity: 1, scale: 1, rotate: 0 }"
+                            :transition="softSpring">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
-                      </span>
-                    </label>
+                      </motion.span>
+                    </motion.label>
                   </div>
                 </div>
 
@@ -144,16 +186,20 @@
                 <div>
                   <label class="block text-sm font-semibold text-tibet-dark/80 mb-3">{{ t('routePlanner.quickPresets') }}</label>
                   <div class="grid grid-cols-2 gap-2">
-                    <button type="button" v-for="preset in presets" :key="preset.label" @click="applyPreset(preset)" :disabled="loading"
+                    <motion.button type="button" v-for="preset in presets" :key="preset.label" @click="applyPreset(preset)" :disabled="loading"
+                            :whileHover="{ y: -2, scale: 1.01 }"
+                            :whileTap="{ scale: 0.98 }"
                             class="group flex flex-col items-start gap-0.5 rounded-xl border border-tibet-gold/20 bg-white/60 px-3.5 py-3 text-left transition-all hover:border-tibet-gold/40 hover:bg-amber-50/40 hover:shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">
                       <span class="text-xs font-semibold text-tibet-dark/80 group-hover:text-tibet-dark">{{ preset.label }}</span>
                       <span class="text-[11px] text-tibet-brown/50">{{ preset.days }}{{ t('routePlanner.daysUnit') }} · {{ getBudgetShort(preset.budget) }}</span>
-                    </button>
+                    </motion.button>
                   </div>
                 </div>
 
                 <!-- Generate Button -->
-                <button type="submit" :disabled="loading"
+                <motion.button type="submit" :disabled="loading"
+                        :whileHover="loading ? {} : { y: -2, scale: 1.01 }"
+                        :whileTap="loading ? {} : { scale: 0.98 }"
                         class="w-full rounded-2xl bg-gradient-to-r from-tibet-red via-rose-600 to-tibet-gold px-6 py-4 font-bold text-white shadow-lg shadow-tibet-red/20 transition-all duration-300 hover:shadow-xl hover:shadow-tibet-red/25 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-3">
                   <span v-if="loading" class="flex items-center gap-2">
                     <svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -168,13 +214,21 @@
                     </svg>
                     {{ t('routePlanner.generateRoute') }}
                   </span>
-                </button>
+                </motion.button>
               </form>
-            </div>
+            </motion.div>
 
             <!-- Streaming Indicator -->
-            <transition name="fade-slide">
-              <div v-if="loading" class="glass-card rounded-2xl p-5 border border-sky-200/60 bg-sky-50/70 animate-fade-in-up">
+            <AnimatePresence>
+              <motion.div
+                v-if="loading"
+                key="route-planner-streaming"
+                class="glass-card rounded-2xl p-5 border border-sky-200/60 bg-sky-50/70"
+                :initial="{ opacity: 0, y: 14, scale: 0.98 }"
+                :animate="{ opacity: 1, y: 0, scale: 1 }"
+                :exit="{ opacity: 0, y: 8, scale: 0.98 }"
+                :transition="{ duration: 0.34, ease: motionEase }"
+              >
                 <div class="flex items-center gap-3 mb-3">
                   <span class="relative flex h-3 w-3">
                     <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
@@ -187,15 +241,24 @@
                   <div class="h-full rounded-full bg-gradient-to-r from-tibet-blue via-tibet-turquoise to-tibet-gold animate-shimmer-stream" :class="{ 'w-full': !streaming, 'animate-pulse': streaming }"></div>
                 </div>
                 <p class="mt-2 text-xs text-tibet-brown/60">{{ t('routePlanner.waitingTime') }}</p>
-              </div>
-            </transition>
+              </motion.div>
+            </AnimatePresence>
           </div>
         </div>
 
         <!-- RIGHT: Results (takes 3 cols on lg) -->
         <div class="lg:col-span-3">
           <!-- Empty state -->
-          <div v-if="!result && !loading" class="flex flex-col items-center justify-center py-20 text-center animate-fade-in">
+          <AnimatePresence mode="wait">
+          <motion.div
+            v-if="!result && !loading"
+            key="route-planner-empty"
+            class="flex flex-col items-center justify-center py-20 text-center"
+            :initial="{ opacity: 0, y: 18, scale: 0.98 }"
+            :animate="{ opacity: 1, y: 0, scale: 1 }"
+            :exit="{ opacity: 0, y: -10, scale: 0.98 }"
+            :transition="revealTransition"
+          >
             <div class="relative mb-8">
               <div class="w-32 h-32 rounded-3xl bg-gradient-to-br from-tibet-red/5 via-tibet-gold/5 to-tibet-blue/5 border border-tibet-gold/10 flex items-center justify-center">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-tibet-gold/30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -210,11 +273,18 @@
             </div>
             <h3 class="text-xl font-bold text-tibet-brown/50 mb-2">{{ t('routePlanner.emptyTitle') }}</h3>
             <p class="text-sm text-tibet-brown/40 max-w-sm">{{ t('routePlanner.emptyDescription') }}</p>
-          </div>
+          </motion.div>
 
           <!-- Result card -->
-          <transition name="fade-slide">
-            <div v-if="result" class="glass-card rounded-3xl border border-white/50 shadow-xl shadow-slate-900/3 overflow-hidden animate-fade-in-up">
+            <motion.div
+              v-if="result"
+              key="route-planner-result"
+              class="glass-card rounded-3xl border border-white/50 shadow-xl shadow-slate-900/3 overflow-hidden"
+              :initial="{ opacity: 0, y: 24, scale: 0.98 }"
+              :animate="{ opacity: 1, y: 0, scale: 1 }"
+              :exit="{ opacity: 0, y: -12, scale: 0.98 }"
+              :transition="revealTransition"
+            >
               <!-- Result header -->
               <div class="px-6 py-5 border-b border-white/60 bg-white/40 flex flex-wrap items-center justify-between gap-3">
                 <div class="flex items-center gap-3">
@@ -229,13 +299,15 @@
                   </div>
                 </div>
                 <div class="flex gap-1.5">
-                  <button @click="copyResult" :disabled="copying"
+                  <motion.button @click="copyResult" :disabled="copying"
+                          :whileHover="{ y: -1, scale: 1.02 }"
+                          :whileTap="{ scale: 0.96 }"
                           class="inline-flex items-center gap-1.5 rounded-xl border border-tibet-gold/25 bg-white/80 px-3.5 py-2 text-xs font-medium text-gray-600 transition-all hover:bg-gray-50 hover:border-gray-300 disabled:opacity-50">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16h8M8 12h8m-7-8h5a2 2 0 012 2v12a2 2 0 01-2 2H7a2 2 0 01-2-2V6a2 2 0 012-2h1z" />
                     </svg>
                     {{ copying ? t('routePlanner.copying') : t('routePlanner.copyText') }}
-                  </button>
+                  </motion.button>
                 </div>
               </div>
 
@@ -246,30 +318,36 @@
 
               <!-- Result actions -->
               <div class="px-6 py-4 border-t border-white/60 bg-white/30 flex flex-wrap items-center justify-end gap-2">
-                <button @click="generateRoute" :disabled="loading"
+                <motion.button @click="generateRoute" :disabled="loading"
+                        :whileHover="{ y: -1, scale: 1.02 }"
+                        :whileTap="{ scale: 0.96 }"
                         class="inline-flex items-center gap-1.5 rounded-xl border border-tibet-gold/25 bg-white/80 px-4 py-2.5 text-sm font-medium text-gray-600 transition-all hover:bg-gray-50 disabled:opacity-50">
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                   </svg>
                   {{ t('routePlanner.regenerate') }}
-                </button>
-                <button @click="saveRoute" :disabled="saving || !result"
+                </motion.button>
+                <motion.button @click="saveRoute" :disabled="saving || !result"
+                        :whileHover="{ y: -1, scale: 1.02 }"
+                        :whileTap="{ scale: 0.96 }"
                         class="inline-flex items-center gap-1.5 rounded-xl border border-tibet-gold/25 bg-white/80 px-4 py-2.5 text-sm font-medium text-gray-600 transition-all hover:bg-gray-50 disabled:opacity-50">
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
                   </svg>
                   {{ saving ? t('routePlanner.saving') : t('routePlanner.saveRoute') }}
-                </button>
-                <button @click="shareRoute" :disabled="sharing || !result"
+                </motion.button>
+                <motion.button @click="shareRoute" :disabled="sharing || !result"
+                        :whileHover="{ y: -1, scale: 1.02 }"
+                        :whileTap="{ scale: 0.96 }"
                         class="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-tibet-blue to-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-tibet-blue/20 transition-all hover:from-tibet-blue/90 hover:to-indigo-700 hover:shadow-lg disabled:opacity-50">
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                   </svg>
                   {{ sharing ? t('routePlanner.sharing') : t('routePlanner.shareToCommunity') }}
-                </button>
+                </motion.button>
               </div>
-            </div>
-          </transition>
+            </motion.div>
+          </AnimatePresence>
         </div>
       </div>
     </div>
@@ -280,10 +358,20 @@
 import { ref, computed, shallowRef, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { marked } from 'marked'
+import { AnimatePresence, motion } from 'motion-v'
 import DOMPurify from 'dompurify'
 import { generateRouteStream } from '../api/stream'
 import api from '../api'
+import {
+  cardInitial,
+  cardInView,
+  cardTransition,
+  motionEase,
+  revealInitial,
+  revealInView,
+  revealTransition,
+  softSpring
+} from '../motion/presets'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -333,10 +421,70 @@ const streaming = ref(false)
 const charCount = ref(0)
 const streamAbortController = ref<AbortController | null>(null)
 const result = shallowRef('')
+const renderedResult = shallowRef('')
 const statusMessage = ref('')
 const errorMessage = ref('')
+const markdownRenderDebounceMs = 120
+let markdownWorker: Worker | null = null
+let markdownRenderTimer: number | null = null
+let latestRenderJobId = 0
+let latestAppliedRenderId = 0
+let latestMarkdownSnapshot = ''
 
-const renderedResult = computed(() => DOMPurify.sanitize(marked.parse(result.value || '') as string))
+const renderMarkdownSync = (markdown: string) => {
+  renderedResult.value = DOMPurify.sanitize(markdown ? markdown.replace(/\n/g, '<br/>') : '')
+}
+
+const ensureMarkdownWorker = () => {
+  if (markdownWorker || typeof Worker === 'undefined') return markdownWorker
+
+  markdownWorker = new Worker(new URL('../workers/routeMarkdown.worker.ts', import.meta.url), { type: 'module' })
+  markdownWorker.onmessage = (event: MessageEvent<{ id: number; html: string }>) => {
+    const { id, html } = event.data
+    if (id < latestAppliedRenderId) return
+    latestAppliedRenderId = id
+    renderedResult.value = DOMPurify.sanitize(html)
+  }
+  markdownWorker.onerror = () => {
+    markdownWorker?.terminate()
+    markdownWorker = null
+    renderMarkdownSync(latestMarkdownSnapshot)
+  }
+
+  return markdownWorker
+}
+
+const dispatchMarkdownRender = (markdown: string) => {
+  latestMarkdownSnapshot = markdown
+  const worker = ensureMarkdownWorker()
+  if (!worker) {
+    renderMarkdownSync(markdown)
+    return
+  }
+
+  const nextJobId = ++latestRenderJobId
+  worker.postMessage({ id: nextJobId, markdown })
+}
+
+const scheduleMarkdownRender = (markdown: string, immediate = false) => {
+  latestMarkdownSnapshot = markdown
+
+  if (immediate) {
+    if (markdownRenderTimer !== null) {
+      window.clearTimeout(markdownRenderTimer)
+      markdownRenderTimer = null
+    }
+    dispatchMarkdownRender(markdown)
+    return
+  }
+
+  if (markdownRenderTimer !== null) return
+
+  markdownRenderTimer = window.setTimeout(() => {
+    markdownRenderTimer = null
+    dispatchMarkdownRender(latestMarkdownSnapshot)
+  }, markdownRenderDebounceMs)
+}
 
 const hasStoredToken = () => {
   const token = localStorage.getItem('token')
@@ -377,10 +525,12 @@ const generateRoute = async () => {
   loading.value = true
   streaming.value = true
   result.value = ''
+  renderedResult.value = ''
   charCount.value = 0
   copying.value = false
   errorMessage.value = ''
   statusMessage.value = t('routePlanner.aiWritingHint')
+  scheduleMarkdownRender('', true)
 
   const controller = new AbortController()
   streamAbortController.value = controller
@@ -392,19 +542,17 @@ const generateRoute = async () => {
         onMeta: (meta) => {
           statusMessage.value = t('routePlanner.aiGeneratingRoute', { days: meta.days, pref: meta.preference })
         },
-        onDelta: (text: string) => {
-          if (result.value && text.startsWith(result.value)) {
-            result.value = text
-          } else {
-            result.value += text
-          }
-          charCount.value = result.value.length
+        onDelta: (_text: string, fullText: string) => {
+          result.value = fullText
+          charCount.value = fullText.length
+          scheduleMarkdownRender(fullText)
         },
         onDone: (fullText) => {
           if (fullText && fullText.length > result.value.length) {
             result.value = fullText
           }
           charCount.value = result.value.length
+          scheduleMarkdownRender(result.value, true)
           streaming.value = false
           loading.value = false
           if (fullText && fullText.trim().length > 0) {
@@ -506,6 +654,10 @@ const shareRoute = async () => {
 }
 
 onBeforeUnmount(() => {
+  if (markdownRenderTimer !== null) {
+    window.clearTimeout(markdownRenderTimer)
+  }
+  markdownWorker?.terminate()
   if (streamAbortController.value) {
     streamAbortController.value.abort()
   }
@@ -514,27 +666,9 @@ onBeforeUnmount(() => {
 
 <style scoped>
 /* ===== Animations ===== */
-@keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(16px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
 @keyframes shimmerStream {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
-}
-
-.animate-fade-in {
-  animation: fadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-.animate-fade-in-up {
-  animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .animate-shimmer-stream {
@@ -542,27 +676,9 @@ onBeforeUnmount(() => {
   animation: shimmerStream 2s linear infinite;
 }
 
-/* ===== Transitions ===== */
-.fade-slide-enter-active {
-  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.fade-slide-leave-active {
-  transition: all 0.25s ease-in;
-}
-.fade-slide-enter-from {
-  opacity: 0;
-  transform: translateY(-8px);
-}
-.fade-slide-leave-to {
-  opacity: 0;
-  transform: translateY(-4px);
-}
-
 /* ===== Glass Card ===== */
 .glass-card {
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  background: rgba(255, 255, 255, 0.92);
 }
 
 /* ===== Page Background ===== */

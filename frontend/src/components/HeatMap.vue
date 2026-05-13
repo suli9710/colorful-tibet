@@ -2,20 +2,8 @@
 import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useReducedMotion } from 'motion-v'
 import { useI18n } from 'vue-i18n'
-import { init, registerMap, use, type ECharts } from 'echarts/core'
-import { EffectScatterChart, ScatterChart } from 'echarts/charts'
-import { GeoComponent, TitleComponent, TooltipComponent } from 'echarts/components'
-import { CanvasRenderer } from 'echarts/renderers'
-import api from '@/api'
-
-use([
-  ScatterChart,
-  EffectScatterChart,
-  GeoComponent,
-  TitleComponent,
-  TooltipComponent,
-  CanvasRenderer
-])
+import type { ECharts } from '@/lib/echarts'
+import api, { endpoints } from '@/api'
 
 const { locale, t } = useI18n()
 const prefersReducedMotion = useReducedMotion()
@@ -24,8 +12,17 @@ const chartRef = ref<HTMLElement | null>(null)
 let chart: ECharts | null = null
 const zoomLevel = ref(1.0)
 let mapLoaded = false
-let spotsData: any[] = []
-let fluctuationTimer: ReturnType<typeof setInterval> | null = null
+let resizeObserver: ResizeObserver | null = null
+type EChartsKit = ReturnType<typeof import('@/lib/echarts').ensureECharts>
+let echartsLoader: Promise<EChartsKit> | null = null
+
+const loadECharts = async () => {
+  if (!echartsLoader) {
+    echartsLoader = import('@/lib/echarts').then(module => module.ensureECharts())
+  }
+
+  return echartsLoader
+}
 
 const fallbackHeatmapData = [
   { name: '布达拉宫', value: [91.1167, 29.653, 19850] },
@@ -47,50 +44,26 @@ const getHeatLevel = (heat: number): string => {
   return t('heatmap.heatLevel.spot')
 }
 
-const applyFluctuation = (spots: any[]): any[] => {
-  const t0 = Date.now() / 4000
-  return spots.map((spot, i) => {
-    const factor = 1 + Math.sin(t0 + i * 0.7) * 0.06
-    return {
-      ...spot,
-      value: [spot.value[0], spot.value[1], Math.round(spot.value[2] * factor)]
-    }
-  })
-}
-
-const updateChartData = () => {
-  if (!chart || !spotsData.length) return
-
-  const fluctuated = applyFluctuation(spotsData)
-
-  const scatterData = fluctuated
-  const effectData = fluctuated
-    .filter((item: any) => item.value[2] >= 100)
-    .sort((a: any, b: any) => b.value[2] - a.value[2])
-    .slice(0, 10)
-
-  chart.setOption({
-    series: [
-      { data: scatterData },
-      { data: effectData }
-    ]
-  })
+interface HeatmapPoint {
+  id?: number
+  name: string
+  longitude: number
+  latitude: number
+  visitCount: number
 }
 
 const getHeatmapData = async () => {
   try {
-    const response = await api.get('/spots', { params: { size: 100 } })
-    const spots = Array.isArray(response.data) ? response.data : (response.data.content || [])
+    const response = await api.get(endpoints.spots.heatmap, { params: { limit: 100 } })
+    const points = Array.isArray(response.data) ? response.data as HeatmapPoint[] : []
 
-    const data = spots
-      .filter((spot: any) => spot.longitude != null && spot.latitude != null)
-      .map((spot: any) => ({
-        name: spot.name,
-        value: [spot.longitude, spot.latitude, spot.visitCount || 1]
-      }))
+    const data = points.map((point) => ({
+      name: point.name,
+      value: [point.longitude, point.latitude, point.visitCount || 1]
+    }))
 
     if (data.length) return data
-    console.warn('Using fallback heatmap data because the spot response was empty.')
+    console.warn('Using fallback heatmap data because the heatmap response was empty.')
   } catch (error) {
     console.warn('Using fallback heatmap data after request failed:', error)
   }
@@ -117,18 +90,10 @@ const loadChartData = async () => {
   if (!chartRef.value || !chart) return
 
   const data = await getHeatmapData()
-  spotsData = data
-
-  if (fluctuationTimer) {
-    clearInterval(fluctuationTimer)
-    fluctuationTimer = null
-  }
-
-  if (!prefersReducedMotion.value && spotsData.length) {
-    fluctuationTimer = setInterval(updateChartData, 2500)
-  }
 
   const option: any = {
+    animation: !prefersReducedMotion.value,
+    animationDuration: 300,
     title: {
       text: t('heatmap.title'),
       left: 'center',
@@ -275,6 +240,7 @@ const loadChartData = async () => {
 
 onMounted(async () => {
   if (chartRef.value) {
+    const { init, registerMap } = await loadECharts()
     chart = init(chartRef.value)
     
     try {
@@ -290,7 +256,12 @@ onMounted(async () => {
     await loadChartData()
   }
 
-  window.addEventListener('resize', handleResize)
+  if (chartRef.value && typeof ResizeObserver !== 'undefined') {
+    resizeObserver = new ResizeObserver(handleResize)
+    resizeObserver.observe(chartRef.value)
+  } else {
+    window.addEventListener('resize', handleResize)
+  }
 })
 
 watch(zoomLevel, (newZoom) => {
@@ -321,8 +292,12 @@ const handleZoomChange = (event: Event) => {
 }
 
 onUnmounted(() => {
-  window.removeEventListener('resize', handleResize)
-  if (fluctuationTimer) clearInterval(fluctuationTimer)
+  if (resizeObserver) {
+    resizeObserver.disconnect()
+    resizeObserver = null
+  } else {
+    window.removeEventListener('resize', handleResize)
+  }
   chart?.dispose()
 })
 </script>

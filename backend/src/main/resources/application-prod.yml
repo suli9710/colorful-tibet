@@ -50,9 +50,6 @@ spring:
           max-idle: 10
           min-idle: 5
           max-wait: 3000ms
-  h2:
-    console:
-      enabled: false
 
 # 日志配置
 logging:
@@ -65,13 +62,20 @@ logging:
     file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
 
-# 豆包API配置
+# AI API 配置，ARK_* 优先，兼容旧的 DOUBAO_* 环境变量
+ark:
+  api:
+    url: ${ARK_API_URL:https://ark.cn-beijing.volces.com/api/v3/responses}
+    key: ${ARK_API_KEY:${DOUBAO_API_KEY:}}
+    model: ${AI_MODEL:${DOUBAO_MODEL:doubao-seed-2-0-pro-260215}}
+    stream-url: ${ARK_STREAM_API_URL:}  # 流式端点，为空时从url自动推导
+
 doubao:
   api:
     url: ${DOUBAO_API_URL:https://ark.cn-beijing.volces.com/api/v3/chat/completions}
-    key: ${DOUBAO_API_KEY:your-doubao-api-key}
-    model: ${AI_MODEL:doubao-seed-2-0-pro}
-    stream-url: ${DOUBAO_STREAM_API_URL:}  # 流式端点，为空时使用url本身
+    key: ${DOUBAO_API_KEY:${ARK_API_KEY:}}
+    model: ${DOUBAO_MODEL:${AI_MODEL:doubao-seed-2-0-pro-260215}}
+    stream-url: ${DOUBAO_STREAM_API_URL:}
 
 ai:
   route:
@@ -92,9 +96,6 @@ price:
 jwt:
   secret: ${JWT_SECRET}
   expiration: 86400000  # 24小时
-
-
-
 
 
 

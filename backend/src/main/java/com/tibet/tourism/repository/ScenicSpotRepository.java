@@ -40,4 +40,13 @@ public interface ScenicSpotRepository extends JpaRepository<ScenicSpot, Long> {
 
     @Query("SELECT DISTINCT s FROM ScenicSpot s LEFT JOIN FETCH s.tags st WHERE st.tag IN :tags AND s.id NOT IN :excludeIds")
     List<ScenicSpot> findByTagsInAndIdNotIn(@Param("tags") List<String> tags, @Param("excludeIds") Set<Long> excludeIds);
+
+    @Query("""
+        SELECT s
+        FROM ScenicSpot s
+        WHERE s.longitude IS NOT NULL
+          AND s.latitude IS NOT NULL
+        ORDER BY s.visitCount DESC, s.id ASC
+        """)
+    List<ScenicSpot> findHeatmapSpots(Pageable pageable);
 }

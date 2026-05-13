@@ -1,7 +1,12 @@
 <template>
-  <div class="min-h-screen tibet-page-shell py-24">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="text-center mb-10">
+  <div class="min-h-screen tibet-page-shell py-24 relative overflow-hidden">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
+      <motion.div
+        class="text-center mb-10"
+        :initial="revealInitial"
+        :animate="revealInView"
+        :transition="revealTransition"
+      >
         <h1 class="tibet-heading inline-flex justify-center text-4xl font-bold text-tibet-dark mb-4">{{ t('heritage.title') }}</h1>
         <p class="text-lg text-tibet-brown/70 max-w-3xl mx-auto mb-3">
           {{ t('heritage.description') }}
@@ -9,10 +14,16 @@
         <p class="text-sm text-tibet-brown/50 max-w-3xl mx-auto">
           {{ t('heritage.description2') }}
         </p>
-      </div>
+      </motion.div>
 
       <!-- 非遗大类一览（简洁卡片设计） -->
-      <section class="mb-14">
+      <motion.section
+        class="mb-14"
+        :initial="cardInitial"
+        :whileInView="cardInView"
+        :inViewOptions="inViewOnce"
+        :transition="cardTransition(0, 0.05)"
+      >
         <div class="tibet-panel rounded-3xl px-5 sm:px-8 lg:px-10 py-8 lg:py-10">
           <!-- 区块标题 -->
           <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-8">
@@ -33,22 +44,32 @@
 
           <!-- 卡片网格（点击某一大类，在卡片内部展开可滑动的国家级非遗项目列表） -->
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-7">
-            <button
+            <motion.button
               v-for="(category, index) in heritageCategories"
               :key="category.name"
               type="button"
+              layout
               class="group tibet-card-elevated rounded-2xl border border-tibet-gold/20 px-4 py-4 sm:px-5 sm:py-5 flex flex-col gap-3 hover:border-tibet-red/25 text-left w-full cursor-pointer"
-              :style="{ transitionDelay: (index * 60) + 'ms' }"
+              :initial="cardInitial"
+              :whileInView="cardInView"
+              :inViewOptions="inViewOnce"
+              :transition="cardTransition(index, 0.08)"
+              :whileHover="{ y: -5, scale: 1.012 }"
+              :whileTap="{ scale: 0.985 }"
               @click="toggleCategory(category.name)"
             >
               <div class="flex items-center gap-4 w-full">
                 <!-- 图标 -->
                 <div class="flex-shrink-0">
-                  <div class="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-tibet-red via-tibet-gold to-tibet-yellow text-white flex items-center justify-center shadow-sm group-hover:shadow-md group-hover:scale-[1.03] transform transition">
+                  <motion.div
+                    class="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-tibet-red via-tibet-gold to-tibet-yellow text-white flex items-center justify-center shadow-sm group-hover:shadow-md"
+                    :animate="activeCategory === category.name ? { rotate: -4, scale: 1.06 } : { rotate: 0, scale: 1 }"
+                    :transition="softSpring"
+                  >
                     <span class="text-xl sm:text-2xl">
                       {{ category.icon }}
                     </span>
-                  </div>
+                  </motion.div>
                 </div>
 
                 <!-- 文本 -->
@@ -65,130 +86,184 @@
                     {{ t('heritage.clickToExpand') }}
                   </p>
                 </div>
+
+                <motion.span
+                  class="ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-tibet-gold/25 bg-white/70 text-lg leading-none text-tibet-red"
+                  :animate="activeCategory === category.name ? { rotate: 45, scale: 1.04 } : { rotate: 0, scale: 1 }"
+                  :transition="softSpring"
+                  aria-hidden="true"
+                >
+                  +
+                </motion.span>
               </div>
 
               <!-- 卡片内部可滚动的国家级非遗项目列表 -->
-              <div
-                v-if="activeCategory === category.name"
-                class="mt-1 w-full rounded-xl bg-tibet-white/70 border border-tibet-gold/25 px-3 py-2 max-h-44 overflow-y-auto text-xs sm:text-sm text-tibet-brown/80 space-y-2"
-              >
-                <p class="text-[11px] text-tibet-brown/45">
-                  {{ t('heritage.nationalItems') }} · {{ getItemsByCategory(category.name).length }} {{ t('heritage.items') }}
-                </p>
-                <div
-                  v-for="item in getItemsByCategory(category.name)"
-                  :key="item.id"
-                  class="border-b border-tibet-gold/15 last:border-b-0 pb-1.5 last:pb-0"
+              <AnimatePresence>
+                <motion.div
+                  v-if="activeCategory === category.name"
+                  :key="category.name + '-items'"
+                  layout
+                  class="mt-1 w-full origin-top rounded-xl bg-tibet-white/70 border border-tibet-gold/25 px-3 py-2 max-h-44 overflow-y-auto text-xs sm:text-sm text-tibet-brown/80 space-y-2"
+                  :initial="{ opacity: 0, y: -10, scaleY: 0.96 }"
+                  :animate="{ opacity: 1, y: 0, scaleY: 1 }"
+                  :exit="{ opacity: 0, y: -8, scaleY: 0.96 }"
+                  :transition="{ duration: 0.28, ease: motionEase }"
                 >
-                  <div class="flex items-center justify-between gap-2">
-                    <p class="font-medium text-tibet-dark mb-0.5 truncate">
-                      {{ item.name }}
-                    </p>
-                    <a
-                      :href="buildBaikeUrl(item.name)"
-                      target="_blank"
-                      rel="noopener"
-                      class="flex-shrink-0 inline-flex items-center gap-0.5 text-[10px] text-tibet-red hover:text-tibet-brown hover:underline transition"
-                      :title="t('heritage.openBaike') + ': ' + item.name"
-                      @click.stop
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                      </svg>
-                      {{ t('heritage.openBaike') }}
-                    </a>
-                  </div>
-                  <p class="text-[11px] leading-snug text-tibet-brown/70 line-clamp-2">
-                    {{ item.description }}
+                  <p class="text-[11px] text-tibet-brown/45">
+                    {{ t('heritage.nationalItems') }} · {{ getItemsByCategory(category.name).length }} {{ t('heritage.items') }}
                   </p>
-                </div>
-                <p
-                  v-if="!getItemsByCategory(category.name).length"
-                  class="text-[11px] text-stone-400"
-                >
-                  {{ t('heritage.noItemsInCategory') }}
-                </p>
-              </div>
-            </button>
+                  <motion.div
+                    v-for="(item, itemIndex) in getItemsByCategory(category.name)"
+                    :key="item.id"
+                    class="border-b border-tibet-gold/15 last:border-b-0 pb-1.5 last:pb-0"
+                    :initial="{ opacity: 0, x: -8 }"
+                    :animate="{ opacity: 1, x: 0 }"
+                    :transition="cardTransition(itemIndex, 0.06)"
+                    :whileHover="{ x: 3 }"
+                  >
+                    <div class="flex items-center justify-between gap-2">
+                      <p class="font-medium text-tibet-dark mb-0.5 truncate">
+                        {{ item.name }}
+                      </p>
+                      <a
+                        :href="buildBaikeUrl(item.name)"
+                        target="_blank"
+                        rel="noopener"
+                        class="flex-shrink-0 inline-flex items-center gap-0.5 text-[10px] text-tibet-red hover:text-tibet-brown hover:underline transition"
+                        :title="t('heritage.openBaike') + ': ' + item.name"
+                        @click.stop
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                        {{ t('heritage.openBaike') }}
+                      </a>
+                    </div>
+                    <p class="text-[11px] leading-snug text-tibet-brown/70 line-clamp-2">
+                      {{ item.description }}
+                    </p>
+                  </motion.div>
+                  <p
+                    v-if="!getItemsByCategory(category.name).length"
+                    class="text-[11px] text-stone-400"
+                  >
+                    {{ t('heritage.noItemsInCategory') }}
+                  </p>
+                </motion.div>
+              </AnimatePresence>
+            </motion.button>
           </div>
         </div>
-      </section>
+      </motion.section>
 
       <!-- 代表性非遗项目：上来先展示几个可以点击的典型案例 -->
-      <section v-if="!loading && heritageItems.length" class="mb-12">
-        <div class="flex items-center justify-between mb-4">
-          <h2 class="tibet-heading text-2xl font-bold text-tibet-dark">{{ t('heritage.representativeTitle') }}</h2>
-          <p class="text-sm text-tibet-brown/50 hidden md:block">
-            {{ t('heritage.representativeDescription') }}
-          </p>
-        </div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <button
-            v-for="item in representativeItems"
-            :key="item.id"
-            @click="openDetail(item)"
-            class="tibet-card-elevated rounded-2xl p-5 text-left hover:border-tibet-red/25 focus:outline-none focus:ring-2 focus:ring-tibet-gold focus:ring-offset-2"
-          >
-            <div class="mb-3">
-              <span class="inline-block px-3 py-1 rounded-full text-xs font-medium bg-tibet-red/10 text-tibet-red border border-tibet-red/15">
-                {{ item.category }}
-              </span>
-            </div>
-            <h3 class="text-lg font-semibold text-tibet-dark mb-2 line-clamp-1">
-              {{ item.name }}
-            </h3>
-            <p class="text-sm text-tibet-brown/70 mb-3 line-clamp-3">
-              {{ item.description }}
+      <AnimatePresence mode="popLayout">
+        <motion.section
+          v-if="!loading && representativeItems.length"
+          key="heritage-representative"
+          class="mb-12"
+          :initial="{ opacity: 0, y: 24 }"
+          :animate="{ opacity: 1, y: 0 }"
+          :exit="{ opacity: 0, y: 16 }"
+          :transition="{ duration: 0.36, ease: motionEase }"
+        >
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="tibet-heading text-2xl font-bold text-tibet-dark">{{ t('heritage.representativeTitle') }}</h2>
+            <p class="text-sm text-tibet-brown/50 hidden md:block">
+              {{ t('heritage.representativeDescription') }}
             </p>
-            <div class="flex items-center justify-between gap-2">
-              <span class="inline-flex items-center text-sm font-medium text-tibet-red">
-                {{ t('heritage.viewDetails') }}
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  class="h-4 w-4 ml-1"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <motion.button
+              v-for="(item, index) in representativeItems"
+              :key="item.id"
+              layout
+              @click="openDetail(item)"
+              class="group tibet-card-elevated rounded-2xl p-5 text-left hover:border-tibet-red/25 focus:outline-none focus:ring-2 focus:ring-tibet-gold focus:ring-offset-2 overflow-hidden"
+              :initial="cardInitial"
+              :whileInView="cardInView"
+              :exit="cardExit"
+              :inViewOptions="inViewOnce"
+              :transition="cardTransition(index, 0.04)"
+              :whileHover="{ y: -6, scale: 1.015 }"
+              :whileTap="{ scale: 0.985 }"
+            >
+              <div class="h-36 -mx-5 -mt-5 mb-4 overflow-hidden rounded-t-2xl bg-stone-100">
+                <img
+                  :src="resolveHeritageImage(item)"
+                  :alt="item.name"
+                  class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                  loading="lazy"
+                  @error="applyHeritageImageFallback"
+                />
+              </div>
+              <div class="mb-3">
+                <span class="inline-block px-3 py-1 rounded-full text-xs font-medium bg-tibet-red/10 text-tibet-red border border-tibet-red/15">
+                  {{ item.category }}
+                </span>
+              </div>
+              <h3 class="text-lg font-semibold text-tibet-dark mb-2 line-clamp-1">
+                {{ item.name }}
+              </h3>
+              <p class="text-sm text-tibet-brown/70 mb-3 line-clamp-3">
+                {{ item.description }}
+              </p>
+              <div class="flex items-center justify-between gap-2">
+                <span class="inline-flex items-center text-sm font-medium text-tibet-red">
+                  {{ t('heritage.viewDetails') }}
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    class="h-4 w-4 ml-1"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                  </svg>
+                </span>
+                <span
+                  v-if="item.baikeUrl"
+                  class="inline-flex items-center gap-0.5 text-xs text-stone-400 hover:text-red-500 transition cursor-pointer"
+                  :title="t('heritage.openBaike')"
+                  @click.stop="openBaikeUrl(item.baikeUrl)"
                 >
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                </svg>
-              </span>
-              <span
-                v-if="item.baikeUrl"
-                class="inline-flex items-center gap-0.5 text-xs text-stone-400 hover:text-red-500 transition cursor-pointer"
-                :title="t('heritage.openBaike')"
-                @click.stop="openBaikeUrl(item.baikeUrl)"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                </svg>
-                {{ t('heritage.openBaike') }}
-              </span>
-            </div>
-          </button>
-        </div>
-      </section>
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                  {{ t('heritage.openBaike') }}
+                </span>
+              </div>
+            </motion.button>
+          </div>
+        </motion.section>
+      </AnimatePresence>
 
       <!-- 代表性非遗项目详情弹层（带图片与更详细介绍） -->
-      <div
-        v-if="selectedItem"
-        class="fixed inset-0 bg-black/40 flex items-center justify-center px-4 z-40"
-        @click="selectedItem = null"
+      <MotionModal
+        :show="Boolean(selectedItem)"
+        modal-key="heritage-detail-modal"
+        root-class="z-[120] px-4"
+        backdrop-class="bg-black/45 backdrop-blur-sm"
+        panel-class="max-w-3xl rounded-2xl bg-white overflow-hidden p-0"
+        @close="selectedItem = null"
       >
-        <div
-          class="bg-white rounded-2xl max-w-3xl w-full shadow-2xl overflow-hidden"
-          @click.stop
-        >
+        <template v-if="selectedItem">
           <!-- 顶部大图 -->
           <div class="relative h-56 md:h-72 bg-stone-100">
-            <img
-              :src="selectedItem.imageUrl || 'https://images.unsplash.com/photo-1559827291-baf8ef4d3285?w=800&q=60'"
+            <motion.img
+              :src="resolveHeritageImage(selectedItem)"
               :alt="selectedItem.name"
               class="w-full h-full object-cover"
-            >
-            <button
+              :initial="{ opacity: 0, scale: 1.06 }"
+              :animate="{ opacity: 1, scale: 1 }"
+              :transition="{ duration: 0.5, ease: motionEase }"
+              @error="applyHeritageImageFallback"
+            />
+            <motion.button
               type="button"
               class="absolute top-4 right-4 bg-black/50 text-white p-2 rounded-full hover:bg-black/70 transition"
+              :whileHover="{ rotate: 90, scale: 1.08 }"
+              :whileTap="{ scale: 0.92 }"
               @click="selectedItem = null"
             >
               <svg
@@ -203,20 +278,35 @@
                   clip-rule="evenodd"
                 />
               </svg>
-            </button>
-            <div class="absolute bottom-4 left-4 bg-black/45 backdrop-blur px-4 py-2 rounded-xl">
+            </motion.button>
+            <motion.div
+              class="absolute bottom-4 left-4 bg-black/45 backdrop-blur px-4 py-2 rounded-xl"
+              :initial="{ opacity: 0, y: 12 }"
+              :animate="{ opacity: 1, y: 0 }"
+              :transition="{ duration: 0.34, delay: 0.1, ease: motionEase }"
+            >
               <p class="text-xs text-red-100 font-medium mb-1">
                 {{ selectedItem.category || t('heritage.representativeTitle') }}
               </p>
               <h3 class="text-xl md:text-2xl font-bold text-white">
                 {{ selectedItem.name }}
               </h3>
-            </div>
+            </motion.div>
           </div>
 
           <!-- 文字内容区：分段更详细介绍 + 线下体验模块 -->
-          <div class="px-6 py-5 text-sm text-stone-700 space-y-5 max-h-[65vh] overflow-y-auto">
-            <div class="space-y-4">
+          <motion.div
+            class="px-6 py-5 text-sm text-stone-700 space-y-5 max-h-[65vh] overflow-y-auto"
+            :initial="{ opacity: 0, y: 14 }"
+            :animate="{ opacity: 1, y: 0 }"
+            :transition="{ duration: 0.34, delay: 0.12, ease: motionEase }"
+          >
+            <motion.div
+              class="space-y-4"
+              :initial="{ opacity: 0, y: 10 }"
+              :animate="{ opacity: 1, y: 0 }"
+              :transition="{ duration: 0.28, delay: 0.18, ease: motionEase }"
+            >
               <!-- 百度百科跳转按钮 -->
               <a
                 v-if="selectedItem.baikeUrl"
@@ -237,32 +327,49 @@
                 {{ t('heritage.detailNote') }}
               </p>
 
-              <div class="space-y-2">
+              <motion.div
+                class="space-y-2"
+                :initial="{ opacity: 0, y: 8 }"
+                :animate="{ opacity: 1, y: 0 }"
+                :transition="{ duration: 0.26, delay: 0.22, ease: motionEase }"
+              >
                 <h4 class="text-sm font-semibold text-stone-900">
                   {{ t('heritage.basicIntroduction') }}
                 </h4>
                 <p class="leading-relaxed whitespace-pre-line">
                   {{ selectedItem.description || t('heritage.noDetailedDescription') }}
                 </p>
-              </div>
+              </motion.div>
 
-              <div v-if="selectedItem.originStory" class="space-y-2">
+              <motion.div
+                v-if="selectedItem.originStory"
+                class="space-y-2"
+                :initial="{ opacity: 0, y: 8 }"
+                :animate="{ opacity: 1, y: 0 }"
+                :transition="{ duration: 0.26, delay: 0.27, ease: motionEase }"
+              >
                 <h4 class="text-sm font-semibold text-stone-900">
                   {{ t('heritage.originStory') }}
                 </h4>
                 <p class="leading-relaxed whitespace-pre-line">
                   {{ selectedItem.originStory }}
                 </p>
-              </div>
+              </motion.div>
 
-              <div v-if="selectedItem.significance" class="space-y-2 border-t border-dashed border-stone-200 pt-3">
+              <motion.div
+                v-if="selectedItem.significance"
+                class="space-y-2 border-t border-dashed border-stone-200 pt-3"
+                :initial="{ opacity: 0, y: 8 }"
+                :animate="{ opacity: 1, y: 0 }"
+                :transition="{ duration: 0.26, delay: 0.32, ease: motionEase }"
+              >
                 <h4 class="text-sm font-semibold text-stone-900">
                   {{ t('heritage.culturalValue') }}
                 </h4>
                 <p class="text-stone-700 text-sm leading-relaxed whitespace-pre-line">
                   {{ selectedItem.significance }}
                 </p>
-              </div>
+              </motion.div>
 
               <p
                 v-if="!selectedItem.originStory && !selectedItem.significance"
@@ -270,10 +377,15 @@
               >
                 {{ t('heritage.basicDescriptionNote') }}
               </p>
-            </div>
+            </motion.div>
 
             <!-- 线下体验模块：地图示意 + 门店列表 + 导航 -->
-            <div class="border-t border-dashed border-stone-200 pt-4">
+            <motion.div
+              class="border-t border-dashed border-stone-200 pt-4"
+              :initial="{ opacity: 0, y: 12 }"
+              :animate="{ opacity: 1, y: 0 }"
+              :transition="{ duration: 0.3, delay: 0.28, ease: motionEase }"
+            >
               <div class="flex items-center justify-between gap-2 mb-3">
                 <div>
                   <h4 class="text-sm font-semibold text-stone-900">
@@ -293,19 +405,42 @@
                 <div class="md:col-span-2 relative rounded-xl overflow-hidden border border-stone-200 min-h-[220px] bg-stone-100">
                   <div ref="mapContainer" class="w-full h-full min-h-[220px]"></div>
                   <!-- 地图加载提示 -->
-                  <div v-if="mapLoading && !mapError" class="absolute inset-0 flex items-center justify-center bg-stone-100/90 backdrop-blur-sm z-20">
-                    <div class="text-center">
-                      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-red-500 mx-auto mb-2"></div>
-                      <p class="text-xs text-stone-600">{{ t('heritage.mapLoading') }}</p>
-                    </div>
-                  </div>
-                  <!-- 地图加载失败提示 -->
-                  <div v-if="mapError" class="absolute inset-0 flex items-center justify-center bg-stone-100/90 backdrop-blur-sm z-20">
-                    <div class="text-center px-4">
-                      <p class="text-xs text-stone-600 mb-2">{{ t('heritage.mapLoadFailed') }}</p>
-                      <p class="text-xs text-stone-500">{{ t('heritage.checkRightList') }}</p>
-                    </div>
-                  </div>
+                  <AnimatePresence>
+                    <!-- 地图加载提示 -->
+                    <motion.div
+                      v-if="mapLoading && !mapError"
+                      key="heritage-map-loading"
+                      class="absolute inset-0 flex items-center justify-center bg-stone-100/90 backdrop-blur-sm z-20"
+                      :initial="{ opacity: 0 }"
+                      :animate="{ opacity: 1 }"
+                      :exit="{ opacity: 0 }"
+                      :transition="{ duration: 0.22, ease: motionEase }"
+                    >
+                      <div class="text-center">
+                        <motion.div
+                          class="rounded-full h-8 w-8 border-b-2 border-red-500 mx-auto mb-2"
+                          :animate="{ rotate: 360 }"
+                          :transition="{ duration: 1, repeat: Infinity, ease: 'linear' }"
+                        ></motion.div>
+                        <p class="text-xs text-stone-600">{{ t('heritage.mapLoading') }}</p>
+                      </div>
+                    </motion.div>
+                    <!-- 地图加载失败提示 -->
+                    <motion.div
+                      v-if="mapError"
+                      key="heritage-map-error"
+                      class="absolute inset-0 flex items-center justify-center bg-stone-100/90 backdrop-blur-sm z-20"
+                      :initial="{ opacity: 0, scale: 0.98 }"
+                      :animate="{ opacity: 1, scale: 1 }"
+                      :exit="{ opacity: 0, scale: 0.98 }"
+                      :transition="{ duration: 0.22, ease: motionEase }"
+                    >
+                      <div class="text-center px-4">
+                        <p class="text-xs text-stone-600 mb-2">{{ t('heritage.mapLoadFailed') }}</p>
+                        <p class="text-xs text-stone-500">{{ t('heritage.checkRightList') }}</p>
+                      </div>
+                    </motion.div>
+                  </AnimatePresence>
                   <!-- 地图标题覆盖层 -->
                   <div class="absolute top-0 left-0 right-0 p-3 bg-gradient-to-b from-black/40 to-transparent z-10 pointer-events-none">
                     <p class="text-[11px] font-medium uppercase tracking-widest text-amber-200">
@@ -332,10 +467,14 @@
 
                 <!-- 门店列表 -->
                 <div class="md:col-span-3 space-y-3 max-h-[220px] overflow-y-auto pr-1">
-                  <div
-                    v-for="spot in experienceSpots"
+                  <motion.div
+                    v-for="(spot, index) in experienceSpots"
                     :key="spot.name"
                     class="flex items-start justify-between gap-3 rounded-xl border border-stone-200 bg-stone-50/60 px-3 py-2.5 hover:bg-white hover:border-red-200 transition"
+                    :initial="{ opacity: 0, x: 16 }"
+                    :animate="{ opacity: 1, x: 0 }"
+                    :transition="cardTransition(index, 0.18)"
+                    :whileHover="{ x: 4, scale: 1.01 }"
                   >
                     <div class="min-w-0 flex-1">
                       <div class="flex items-center gap-1.5 mb-0.5">
@@ -376,30 +515,57 @@
                         {{ t('heritage.checkIn') }} {{ spot.highlight }}
                       </span>
                     </div>
-                  </div>
+                  </motion.div>
                 </div>
               </div>
-            </div>
-          </div>
-        </div>
-      </div>
+            </motion.div>
+          </motion.div>
+        </template>
+      </MotionModal>
 
-      <div v-if="loading" class="flex justify-center items-center h-64">
-        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
-      </div>
+      <AnimatePresence>
+        <motion.div
+          v-if="loading"
+          key="heritage-loading"
+          class="flex justify-center items-center h-64"
+          :initial="{ opacity: 0 }"
+          :animate="{ opacity: 1 }"
+          :exit="{ opacity: 0 }"
+          :transition="{ duration: 0.22, ease: motionEase }"
+        >
+          <motion.div
+            class="rounded-full h-12 w-12 border-b-2 border-red-600"
+            :animate="{ rotate: 360 }"
+            :transition="{ duration: 1, repeat: Infinity, ease: 'linear' }"
+          ></motion.div>
+        </motion.div>
+      </AnimatePresence>
 
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed, watch, nextTick } from 'vue'
+import { ref, onMounted, computed, watch, nextTick, onBeforeUnmount } from 'vue'
+import { AnimatePresence, motion } from 'motion-v'
 import { useI18n } from 'vue-i18n'
+import MotionModal from '../components/motion/MotionModal.vue'
 import api, { endpoints } from '../api'
+import { loadAmap } from '../utils/amap'
+import {
+  cardExit,
+  cardInitial,
+  cardInView,
+  cardTransition,
+  inViewOnce,
+  motionEase,
+  revealInitial,
+  revealInView,
+  revealTransition,
+  softSpring
+} from '../motion/presets'
 
 const { t, locale } = useI18n()
-
-const cardsEntered = ref(false)
 
 const heritageCategories = computed(() => [
   {
@@ -437,6 +603,18 @@ const heritageCategories = computed(() => [
     prefix: t('heritage.category.traditionalCraft'),
     icon: '🧶',
     layout: 'lg:-mt-6 lg:-mr-6 z-30'
+  },
+  {
+    name: t('heritage.category.traditionalMedicine'),
+    prefix: t('heritage.category.traditionalMedicine'),
+    icon: '🌿',
+    layout: 'lg:mt-6 z-20'
+  },
+  {
+    name: t('heritage.category.folkCustom'),
+    prefix: t('heritage.category.folkCustom'),
+    icon: '🏔️',
+    layout: 'lg:-mt-4 lg:mr-4 z-20'
   }
 ])
 
@@ -461,12 +639,61 @@ const heritageItems = ref<HeritageItem[]>([])
 const loading = ref(true)
 const selectedItem = ref<HeritageItem | null>(null)
 
+const genericHeritageImagePatterns = [
+  'images.unsplash.com/photo-1559827291'
+]
+
+const heritageImageByName: Record<string, string> = {
+  格萨尔史诗: '/heritage/格萨尔史诗.jpg',
+  格萨尔: '/heritage/格萨尔史诗.jpg',
+  藏戏: '/heritage/藏戏.jpg',
+  藏族唐卡: '/heritage/唐卡.jpg',
+  唐卡: '/heritage/唐卡.jpg',
+  藏医药浴法: '/heritage/藏药.jpg',
+  藏药: '/heritage/藏药.jpg',
+  'གེ་སར': '/heritage/格萨尔史诗.jpg',
+  'བོད་ཟློས་གར': '/heritage/藏戏.jpg',
+  'ཐང་ཀ': '/heritage/唐卡.jpg',
+  'བོད་སྨན': '/heritage/藏药.jpg'
+}
+
+const isGenericHeritageImage = (imageUrl?: string | null): boolean =>
+  !imageUrl || genericHeritageImagePatterns.some(pattern => imageUrl.includes(pattern))
+
+const findMappedHeritageImage = (name?: string | null): string => {
+  if (!name) return ''
+  const normalizedName = name.replace(/[（）()《》“”"·\s]/g, '')
+  const direct = heritageImageByName[name] || heritageImageByName[normalizedName]
+  if (direct) return direct
+
+  const match = Object.entries(heritageImageByName).find(([key]) => {
+    const normalizedKey = key.replace(/[（）()《》“”"·\s]/g, '')
+    return normalizedName.includes(normalizedKey) || normalizedKey.includes(normalizedName)
+  })
+  return match?.[1] || ''
+}
+
+const resolveHeritageImage = (item?: HeritageItem | null): string => {
+  const mapped = findMappedHeritageImage(item?.name)
+  if (mapped) return mapped
+
+  const imageUrl = item?.imageUrl?.trim()
+  return isGenericHeritageImage(imageUrl) ? '' : (imageUrl || '')
+}
+
+const applyHeritageImageFallback = (event: Event): void => {
+  const image = event.target as HTMLImageElement
+  image.style.display = 'none'
+}
+
 // 地图相关
 const mapContainer = ref<HTMLElement | null>(null)
 const mapLoading = ref(true)
 const mapError = ref(false) // 地图加载失败标志
 let map: any = null
 let markers: any[] = []
+let pendingMapFrame: number | null = null
+let mapInitVersion = 0
 
 interface ExperienceSpot {
   name: string
@@ -575,7 +802,7 @@ const representativeItems = computed<HeritageItem[]>(() => {
       id: 10001,
       name: '藏药',
       description: '源自雪域高原的传统医学体系，吸收了藏族本土经验与印度、汉地医学精华，以丸、散、膏、丹等剂型闻名。',
-      category: '传统医药',
+      category: t('heritage.category.traditionalMedicine'),
       imageUrl: '/heritage/藏药.jpg',
       videoUrl: '',
       originStory: '',
@@ -621,7 +848,7 @@ const representativeItems = computed<HeritageItem[]>(() => {
       id: 10001,
       name: 'བོད་སྨན།',
       description: 'གངས་ལྗོངས་ས་མཐོ་ནས་བྱུང་བའི་སྲོལ་རྒྱུན་སྨན་རིག་མ་ལག བོད་མིའི་ཉམས་མྱོང་དང་རྒྱ་གར། རྒྱ་ནག་སྨན་རིག་གི་སྙིང་པོ་བསྡུས་ཡོད།',
-      category: 'སྲོལ་རྒྱུན་སྨན་རིག',
+      category: t('heritage.category.traditionalMedicine'),
       imageUrl: '/heritage/藏药.jpg',
       videoUrl: '',
       originStory: '',
@@ -669,11 +896,17 @@ const representativeItems = computed<HeritageItem[]>(() => {
   const extraNames = new Set(extra.map(item => item.name))
 
   const base = heritageItems.value
+    .map(item => ({
+      ...item,
+      imageUrl: resolveHeritageImage(item)
+    }))
     .filter(item => {
       // 1. 排除与固定项目同名的条目
       if (extraNames.has(item.name)) return false
       // 2. 特殊处理：后台里叫“唐卡”，前端固定用“藏族唐卡”，这里直接去掉后台的“唐卡”
       if (item.name === '唐卡' && extraNames.has('藏族唐卡')) return false
+      // 3. 代表卡片只收录能映射到明确本地图片的条目，避免泛图或断链图混入
+      if (!item.imageUrl) return false
       return true
     })
     .slice(0, 4)
@@ -690,9 +923,9 @@ interface NationalHeritageItem {
   description: string
 }
 
-// 直接把你提供的 txt 内容嵌进来，后面做简单解析
-const nationalHeritageRaw = `西藏国家级非物质文化遗产名录 (仅国家级项目)
-西藏自治区共有106 项国家级非物质文化遗产代表性项目，其中 3 项 (格萨尔、藏戏、藏医药浴法) 被列入联合国教科文组织人类非物质文化遗产代表作名录。以下是按照六大类整理的完整名单：
+// 结合本模块已收录内容与国家级非遗类别，保留明确属于非遗的项目。
+const nationalHeritageRaw = `西藏国家级非物质文化遗产项目导览
+西藏自治区拥有丰富的国家级非物质文化遗产代表性项目，其中格萨尔、藏戏、藏医药浴法等项目还被列入联合国教科文组织人类非物质文化遗产代表作名录。以下围绕本模块已收录内容与常见国家级项目，按八类整理，避免把普通景点或泛文化内容混入非遗名录：
 一、民间文学类 (1 项)
 格萨尔（第一批，2006 年）：世界最长的史诗，被誉为 "活形态史诗"，由艺人口头传唱，2009 年入选联合国教科文组织人类非遗代表作名录
 二、传统音乐类 (5 项)
@@ -763,7 +996,12 @@ const nationalHeritageRaw = `西藏国家级非物质文化遗产名录 (仅国�
 藏族扎囊木雕（第五批，2021 年）：扎囊县传统木雕工艺，用于制作佛像和家具
 晒盐技艺（井盐晒制技艺）（第二批，2008 年）：芒康县传统制盐工艺，展示了藏族人民与自然和谐共处的智慧
 墨脱石锅制作技艺（第四批，2014 年）：林芝市墨脱县传统厨具制作技艺，2015 年成为国家批准保护的地理标志产品
-藏族传统榨油技艺（江孜传统榨油技艺）：日喀则市江孜县传统榨油工艺，使用传统的木制榨油设备`
+藏族传统榨油技艺（江孜传统榨油技艺）：日喀则市江孜县传统榨油工艺，使用传统的木制榨油设备
+七、传统医药类 (1 项)
+藏医药浴法（藏医药浴疗法）：以藏医学理论为基础，结合雪域高原药材、温泉资源和浴疗经验形成的外治疗法，2018 年入选联合国教科文组织人类非遗代表作名录
+八、民俗类 (2 项)
+雪顿节（第一批，2006 年）：以展佛、藏戏汇演、民俗游艺等活动为核心的藏族重要节庆
+望果节（第四批，2014 年）：西藏农区秋收前后举行的农耕民俗节日，以绕田巡游、祈愿丰收、歌舞竞技等活动传承乡土共同体记忆`
 
 const getTibetanNationalHeritageItems = (): NationalHeritageItem[] => [
   {
@@ -837,6 +1075,24 @@ const getTibetanNationalHeritageItems = (): NationalHeritageItem[] => [
     category: t('heritage.category.traditionalCraft'),
     name: 'བོད་སྤོས་བཟོ་རྩལ།',
     description: 'མིན་གྲོལ་གླིང་སོགས་སྲོལ་རྒྱུན་ནས་བྱུང་བའི་སྤོས་རྫས་དང་བཟོ་རྩལ།'
+  },
+  {
+    id: 13,
+    category: t('heritage.category.traditionalMedicine'),
+    name: 'བོད་སྨན་ཁྲུས་ཐབས།',
+    description: 'བོད་སྨན་རིག་པའི་གཞི་རྩ་དང་ས་མཐོའི་སྨན་རྩྭ། ཆུ་ཚན་སོགས་ཟུང་འབྲེལ་གྱི་ཕྱི་བཅོས་ཐབས་ལམ།'
+  },
+  {
+    id: 14,
+    category: t('heritage.category.folkCustom'),
+    name: 'ཞོ་སྟོན།',
+    description: 'འགྲེམས་སྟོན་ཆོ་ག བོད་ཟློས་གར་འཁྲབ་སྟོན། དམངས་ཁྲོད་རྩེད་མོ་བཅས་མཉམ་སྡེབ་ཀྱི་བོད་ཀྱི་དུས་ཆེན་གལ་ཆེན།'
+  },
+  {
+    id: 15,
+    category: t('heritage.category.folkCustom'),
+    name: 'འོང་སྐོར།',
+    description: 'ཞིང་ལས་ཐོན་སྐྱེད་དང་ལོ་ལེགས་སྨོན་འདུན་ལ་འབྲེལ་བའི་བོད་ཀྱི་ཞིང་གྲོང་དམངས་སྲོལ།'
   }
 ]
 
@@ -859,7 +1115,7 @@ const nationalHeritageItems = computed<NationalHeritageItem[]>(() => {
   let currentCategory = ''
   let id = 1
 
-  const categoryPrefixes = ['一、', '二、', '三、', '四、', '五、', '六、']
+  const categoryPrefixes = ['一、', '二、', '三、', '四、', '五、', '六、', '七、', '八、']
 
   for (const line of lines) {
     // 分类标题行
@@ -954,169 +1210,106 @@ const buildNavUrl = (spot: ExperienceSpot) => {
   return `${base}?to=${to}&mode=car&utm_source=colorful-tibet`
 }
 
-// 处理地图图片加载错误
-const handleImageError = (event: Event) => {
-  const img = event.target as HTMLImageElement
-  console.warn('地图图片加载失败，使用备用方案')
-  // 如果图片加载失败，可以设置一个备用图片或隐藏图片
-  img.style.display = 'none'
+const clearMap = () => {
+  mapInitVersion += 1
+  if (pendingMapFrame !== null) {
+    window.cancelAnimationFrame(pendingMapFrame)
+    pendingMapFrame = null
+  }
+
+  if (map) {
+    map.destroy()
+    map = null
+  }
+  markers = []
+}
+
+const addExperienceMarkers = (AMap: any) => {
+  if (!map) return
+  markers = []
+
+  experienceSpots.value.forEach((spot) => {
+    try {
+      const marker = new AMap.Marker({
+        position: [spot.lng, spot.lat],
+        title: spot.name,
+        label: {
+          content: `<div style="background: #ef4444; color: white; padding: 2px 6px; border-radius: 4px; font-size: 12px; white-space: nowrap;">${spot.tag}</div>`,
+          direction: 'right',
+          offset: [10, 0]
+        }
+      })
+
+      const infoWindow = new AMap.InfoWindow({
+        content: `
+          <div style="padding: 8px; min-width: 200px;">
+            <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: bold;">${spot.name}</h3>
+            <p style="margin: 4px 0; font-size: 12px; color: #666;">${spot.address}</p>
+            <p style="margin: 4px 0; font-size: 12px; color: #666;">${spot.brief}</p>
+            <p style="margin: 4px 0; font-size: 12px; color: #ef4444;">${spot.highlight}</p>
+          </div>
+        `,
+        offset: [0, -30]
+      })
+
+      marker.on('click', () => {
+        infoWindow.open(map, marker.getPosition())
+      })
+
+      markers.push(marker)
+      map.add(marker)
+    } catch (error) {
+      console.error('添加标记失败:', error)
+    }
+  })
 }
 
 // 初始化高德地图
-const initMap = () => {
+const initMap = async () => {
   if (!mapContainer.value) {
     console.warn('地图容器未找到')
     mapLoading.value = false
     return
   }
-  
-  let retryCount = 0
-  const maxRetries = 20 // 最多重试20次（10秒）
-  
-  // 等待高德地图API加载完成
-  const checkAndInit = () => {
-    const AMap = (window as any).AMap
-    
-    if (!AMap) {
-      retryCount++
-      if (retryCount >= maxRetries) {
-        console.error('高德地图API加载超时，地图功能不可用')
-        mapError.value = true
-        mapLoading.value = false
-        return
-      }
-      // 如果高德地图API还没加载，等待一段时间后重试
-      setTimeout(() => {
-        checkAndInit()
-      }, 500)
-      return
+
+  mapLoading.value = true
+  mapError.value = false
+  const initVersion = ++mapInitVersion
+
+  try {
+    const AMap = await loadAmap()
+    if (!mapContainer.value || !selectedItem.value || initVersion !== mapInitVersion) return
+
+    map = new AMap.Map(mapContainer.value, {
+      zoom: 6,
+      center: [91.117, 29.653],
+      viewMode: '3D',
+      mapStyle: 'amap://styles/normal'
+    })
+
+    let settled = false
+    const finishMapLoad = () => {
+      if (settled || initVersion !== mapInitVersion || !selectedItem.value) return
+      settled = true
+      mapLoading.value = false
+      addExperienceMarkers(AMap)
     }
-    
-    try {
-      // 创建地图实例，中心点设为拉萨
-      map = new AMap.Map(mapContainer.value, {
-        zoom: 6,
-        center: [91.117, 29.653], // 拉萨坐标 [经度, 纬度]
-        viewMode: '3D',
-        mapStyle: 'amap://styles/normal'
-      })
-      
-      let mapComplete = false
-      
-      // 监听地图加载完成事件
-      map.on('complete', () => {
-        if (mapComplete) return // 防止重复触发
-        mapComplete = true
-        mapLoading.value = false
-        
-        // 添加体验点标记
-        try {
-          experienceSpots.value.forEach((spot) => {
-            try {
-              const marker = new AMap.Marker({
-                position: [spot.lng, spot.lat],
-                title: spot.name,
-                label: {
-                  content: `<div style="background: #ef4444; color: white; padding: 2px 6px; border-radius: 4px; font-size: 12px; white-space: nowrap;">${spot.tag}</div>`,
-                  direction: 'right',
-                  offset: [10, 0]
-                }
-              })
-              
-              // 添加信息窗口
-              const infoWindow = new AMap.InfoWindow({
-                content: `
-                  <div style="padding: 8px; min-width: 200px;">
-                    <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: bold;">${spot.name}</h3>
-                    <p style="margin: 4px 0; font-size: 12px; color: #666;">${spot.address}</p>
-                    <p style="margin: 4px 0; font-size: 12px; color: #666;">${spot.brief}</p>
-                    <p style="margin: 4px 0; font-size: 12px; color: #ef4444;">${spot.highlight}</p>
-                  </div>
-                `,
-                offset: [0, -30]
-              })
-              
-              marker.on('click', () => {
-                infoWindow.open(map, marker.getPosition())
-              })
-              
-              markers.push(marker)
-              map.add(marker)
-            } catch (markerError) {
-              console.error('添加标记失败:', markerError)
-            }
-          })
-        } catch (addMarkerError) {
-          console.error('添加标记过程出错:', addMarkerError)
-        }
-      })
-      
-      // 监听地图加载错误
-      map.on('error', (error: any) => {
-        console.error('地图加载错误:', error)
-        mapError.value = true
-        mapLoading.value = false
-      })
-      
-      // 检查地图状态，如果地图已经可用，立即隐藏加载提示
-      const checkMapStatus = () => {
-        try {
-          if (map && map.getStatus && map.getStatus() === 'complete') {
-            if (!mapComplete) {
-              mapComplete = true
-              mapLoading.value = false
-              // 触发添加标记
-              map.fire('complete')
-            }
-          }
-        } catch (e) {
-          // 忽略检查错误
-        }
-      }
-      
-      // 立即检查一次
-      setTimeout(checkMapStatus, 500)
-      
-      // 设置超时，如果5秒后还没加载完成，也隐藏加载提示（地图可能已经显示，只是事件没触发）
-      setTimeout(() => {
-        if (mapLoading.value && !mapComplete) {
-          console.warn('地图加载超时，但地图可能已显示，隐藏加载提示')
-          mapLoading.value = false
-          // 即使超时，也尝试添加标记
-          if (map) {
-            try {
-              experienceSpots.value.forEach((spot) => {
-                try {
-                  const marker = new AMap.Marker({
-                    position: [spot.lng, spot.lat],
-                    title: spot.name,
-                    label: {
-                      content: `<div style="background: #ef4444; color: white; padding: 2px 6px; border-radius: 4px; font-size: 12px; white-space: nowrap;">${spot.tag}</div>`,
-                      direction: 'right',
-                      offset: [10, 0]
-                    }
-                  })
-                  markers.push(marker)
-                  map.add(marker)
-                } catch (e) {
-                  // 忽略单个标记错误
-                }
-              })
-            } catch (e) {
-              console.error('超时后添加标记失败:', e)
-            }
-          }
-        }
-      }, 5000)
-      
-    } catch (error) {
-      console.error('地图初始化失败:', error)
+
+    map.on('complete', finishMapLoad)
+    map.on('error', (error: any) => {
+      if (initVersion !== mapInitVersion) return
+      console.error('地图加载错误:', error)
       mapError.value = true
       mapLoading.value = false
-    }
+    })
+
+    window.setTimeout(finishMapLoad, 5000)
+  } catch (error) {
+    if (initVersion !== mapInitVersion) return
+    console.error('地图初始化失败:', error)
+    mapError.value = true
+    mapLoading.value = false
   }
-  
-  checkAndInit()
 }
 
 // 监听 selectedItem 变化，当地图容器出现时初始化地图
@@ -1124,17 +1317,13 @@ watch(selectedItem, async (newItem) => {
   if (newItem) {
     // 等待DOM更新，确保地图容器已渲染
     await nextTick()
-    // 再等待一小段时间确保容器完全渲染
-    setTimeout(() => {
-      initMap()
-    }, 100)
+    pendingMapFrame = window.requestAnimationFrame(() => {
+      pendingMapFrame = null
+      void initMap()
+    })
   } else {
     // 如果关闭了详情，清理地图
-    if (map) {
-      map.destroy()
-      map = null
-      markers = []
-    }
+    clearMap()
     mapLoading.value = true
     mapError.value = false
   }
@@ -1142,6 +1331,10 @@ watch(selectedItem, async (newItem) => {
 
 onMounted(() => {
   fetchHeritageItems()
+})
+
+onBeforeUnmount(() => {
+  clearMap()
 })
 </script>
 

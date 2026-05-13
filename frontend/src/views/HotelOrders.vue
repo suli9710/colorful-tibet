@@ -11,10 +11,15 @@
         <div v-else-if="sortedOrders.length === 0" class="text-center text-gray-500 py-8">{{ t('hotel.noOrders') }}</div>
         <div v-else class="space-y-4">
           <div v-for="order in sortedOrders" :key="order.id" class="rounded-2xl border border-tibet-gold/20 p-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-              <h2 class="text-lg font-semibold text-gray-900">{{ order.hotelName }} · {{ order.roomName }}</h2>
-              <p class="text-sm text-gray-500 mt-1">{{ order.checkInDate }} {{ t('hotel.dateConnector') }} {{ order.checkOutDate }} · {{ order.guests }}{{ t('hotel.guests') }}</p>
-              <p class="text-sm text-gray-500 mt-1">{{ t('hotel.booker') }}：{{ order.guestName }} · {{ order.phone }}</p>
+            <div class="flex items-center gap-4 min-w-0">
+              <div class="h-20 w-28 rounded-2xl overflow-hidden bg-gray-100 flex-shrink-0">
+                <img :src="resolveHotelBookingImage(order)" class="w-full h-full object-cover" :alt="order.hotelName" @error="applyHotelImageFallback">
+              </div>
+              <div class="min-w-0">
+                <h2 class="text-lg font-semibold text-gray-900 truncate">{{ order.hotelName }} · {{ order.roomName }}</h2>
+                <p class="text-sm text-gray-500 mt-1">{{ order.checkInDate }} {{ t('hotel.dateConnector') }} {{ order.checkOutDate }} · {{ order.guests }}{{ t('hotel.guests') }}</p>
+                <p class="text-sm text-gray-500 mt-1">{{ t('hotel.booker') }}：{{ order.guestName }} · {{ order.phone }}</p>
+              </div>
             </div>
             <div class="text-right">
               <p class="text-xl font-bold text-blue-600">¥{{ order.totalPrice }}</p>
@@ -31,10 +36,17 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import api, { endpoints } from '../api'
+import { applyHotelImageFallback, resolveHotelBookingImage } from '../data/hotelImages'
 
 interface HotelOrder {
   id: string
   hotelId: number
+  hotel?: {
+    id?: number
+    name?: string
+    coverImage?: string
+    imageUrl?: string
+  }
   hotelName: string
   roomId: number
   roomName: string
@@ -90,4 +102,3 @@ onUnmounted(() => {
 
 const sortedOrders = computed(() => [...orders.value].sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt)))
 </script>
-

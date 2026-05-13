@@ -5,22 +5,22 @@
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-tibet-gold mx-auto"></div>
       </div>
       
-      <div v-else-if="route" class="animate-fade-in">
+      <div v-else-if="routeData" class="animate-fade-in">
         <!-- Header -->
         <div class="mb-8">
           <button @click="router.back()" class="text-gray-500 hover:text-gray-900 mb-4 flex items-center">
             ← {{ t('routeDetail.backToList') }}
           </button>
-          <h1 class="text-3xl font-bold text-gray-900 mb-4">{{ route.title }}</h1>
+          <h1 class="text-3xl font-bold text-gray-900 mb-4">{{ routeData.title }}</h1>
           <div class="flex items-center justify-between text-sm text-gray-500">
             <div class="flex items-center gap-4">
-              <span>{{ t('routeDetail.author') }}：{{ route.author?.username || t('routeDetail.anonymous') }}</span>
-              <span>{{ t('routeDetail.publishedAt') }}：{{ formatDate(route.createdAt) }}</span>
+              <span>{{ t('routeDetail.author') }}：{{ routeData.author?.username || t('routeDetail.anonymous') }}</span>
+              <span>{{ t('routeDetail.publishedAt') }}：{{ formatDate(routeData.createdAt) }}</span>
             </div>
             <div class="flex gap-2">
-              <span class="px-2 py-1 bg-blue-50 text-blue-600 rounded-lg">{{ route.days }}{{ t('routeDetail.days') }}</span>
-              <span class="px-2 py-1 bg-gray-100 rounded-lg">{{ route.budget }}</span>
-              <span class="px-2 py-1 bg-gray-100 rounded-lg">{{ route.preference }}</span>
+              <span class="px-2 py-1 bg-blue-50 text-blue-600 rounded-lg">{{ routeData.days }}{{ t('routeDetail.days') }}</span>
+              <span class="px-2 py-1 bg-gray-100 rounded-lg">{{ routeData.budget }}</span>
+              <span class="px-2 py-1 bg-gray-100 rounded-lg">{{ routeData.preference }}</span>
             </div>
           </div>
         </div>
@@ -40,12 +40,12 @@
             :class="isLiked ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-white text-gray-600 border border-tibet-gold/25 hover:bg-gray-50'"
           >
             <span class="text-xl">{{ isLiked ? '❤️' : '🤍' }}</span>
-            <span class="font-medium">{{ route.likeCount }}</span>
+            <span class="font-medium">{{ routeData.likeCount }}</span>
           </button>
           
           <div class="flex items-center gap-2 px-6 py-3 bg-white text-gray-600 rounded-full border border-tibet-gold/25 shadow-sm">
             <span class="text-xl">👁️</span>
-            <span class="font-medium">{{ route.viewCount }}</span>
+            <span class="font-medium">{{ routeData.viewCount }}</span>
           </div>
         </div>
 
@@ -108,9 +108,9 @@ import api from '../api'
 
 const { t } = useI18n()
 
-const route = useRoute()
+const currentRoute = useRoute()
 const router = useRouter()
-const routeId = route.params.id
+const routeId = currentRoute.params.id
 
 const loading = ref(true)
 const routeData = ref<any>(null)

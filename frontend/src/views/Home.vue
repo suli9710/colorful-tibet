@@ -1,7 +1,7 @@
 <template>
   <div class="min-h-screen tibet-page-shell">
     <!-- Hero Section: Multi-layer Parallax -->
-    <div ref="heroRef" class="relative h-[calc(100vh-5rem)] md:h-[calc(100vh-6rem)] flex items-center justify-center overflow-hidden -mt-20 md:-mt-24">
+    <div class="relative h-[calc(100vh-5rem)] md:h-[calc(100vh-6rem)] flex items-center justify-center overflow-hidden -mt-20 md:-mt-24">
       <!-- Layer 0: Sky gradient base -->
       <div class="absolute inset-0 z-0 bg-gradient-to-b from-tibet-dark via-tibet-brown/60 to-tibet-dark/40"></div>
 
@@ -14,20 +14,19 @@
           :initial="{ opacity: 0 }"
           :animate="{ opacity: 0.6 }"
           :exit="{ opacity: 0 }"
-          :transition="{ duration: 1.05, ease: [0.16, 1, 0.3, 1] }"
-          class="absolute inset-0 w-full h-full object-cover z-1 will-change-transform"
-          :style="{ y: heroBgY, scale: heroBgScale, transformOrigin: 'center center' }"
+          :transition="{ duration: 1.05, ease: motionEase }"
+          class="absolute inset-0 w-full h-full object-cover z-1 scale-[1.05]"
         />
       </AnimatePresence>
 
       <!-- Layer 2: Distant mountains (slowest parallax) -->
-      <motion.div class="hero-mountains-far z-2" :style="{ y: heroFarY }" style="bottom: 20%; height: 40%;"></motion.div>
+      <motion.div class="hero-mountains-far z-2" style="bottom: 20%; height: 40%;"></motion.div>
 
       <!-- Layer 3: Mid-ground mountains with snow -->
-      <motion.div class="hero-mountains-mid z-3" :style="{ y: heroMidY }" style="bottom: 10%; height: 50%;"></motion.div>
+      <motion.div class="hero-mountains-mid z-3" style="bottom: 10%; height: 50%;"></motion.div>
 
       <!-- Layer 4: Foreground terrain -->
-      <motion.div class="hero-foreground z-4" :style="{ y: heroFrontY }" style="bottom: 0; height: 30%;"></motion.div>
+      <motion.div class="hero-foreground z-4" style="bottom: 0; height: 30%;"></motion.div>
 
       <!-- Layer 5: Golden light -->
       <motion.div
@@ -39,18 +38,15 @@
       <!-- Layer 6: Floating mist -->
       <div class="hero-mist z-6"></div>
 
-      <!-- Layer 7: Prayer flags -->
-      <div class="hero-prayer-flags z-7"></div>
-
       <!-- Layer 8: Content overlay -->
-      <motion.div class="relative z-10 text-center px-4 max-w-5xl mx-auto" :style="{ y: heroContentY, opacity: heroContentOpacity }">
+      <motion.div class="relative z-10 text-center px-4 max-w-5xl mx-auto">
         <AnimatePresence mode="wait">
           <motion.div
             :key="`hero-content-${currentSlide}`"
-            :initial="{ opacity: 0, y: 28, filter: 'blur(8px)' }"
-            :animate="{ opacity: 1, y: 0, filter: 'blur(0px)' }"
-            :exit="{ opacity: 0, y: -18, filter: 'blur(8px)' }"
-            :transition="{ duration: 0.62, ease: [0.16, 1, 0.3, 1] }"
+            :initial="heroContentInitial"
+            :animate="heroContentAnimate"
+            :exit="heroContentExit"
+            :transition="heroContentTransition"
           >
             <motion.div
               class="mb-6 inline-flex items-center gap-2 rounded-full bg-tibet-red/25 px-4 py-2 text-sm text-tibet-yellow backdrop-blur-md border border-tibet-gold/30 will-change-transform"
@@ -85,15 +81,15 @@
               :animate="heroItemAnimate"
               :transition="heroTransition(0.48)"
             >
-              <motion.div :whileHover="{ y: -3, scale: 1.03 }" :whilePress="{ scale: 0.98 }">
+              <motion.div :whileHover="primaryActionHover" :whilePress="primaryActionPress">
                 <router-link to="/spots" class="tibet-btn text-lg px-8 py-4 shadow-xl will-change-transform">
                   {{ t('home.startExploring') }}
                 </router-link>
               </motion.div>
               <motion.button
                       @click="scrollToHeatmap"
-                      :whileHover="{ y: -3, scale: 1.03 }"
-                      :whilePress="{ scale: 0.98 }"
+                      :whileHover="primaryActionHover"
+                      :whilePress="primaryActionPress"
                       class="tibet-btn-ghost text-white border-white/30 hover:bg-white/10 hover:border-white/50 hover:text-white text-lg px-8 py-4 will-change-transform">
                 {{ t('home.viewHeatmap') }}
               </motion.button>
@@ -191,7 +187,12 @@
           <AnimatePresence mode="popLayout">
           <motion.div v-for="(spot, index) in recommendedSpots" :key="spot.id"
                layout
-               class="group tibet-card-elevated overflow-hidden gpu-accelerated"
+               class="group tibet-card-elevated overflow-hidden gpu-accelerated cursor-pointer focus:outline-none focus:ring-2 focus:ring-tibet-gold/60 focus:ring-offset-4"
+               role="link"
+               tabindex="0"
+               @click="goToSpot(spot)"
+               @keydown.enter.prevent="goToSpot(spot)"
+               @keydown.space.prevent="goToSpot(spot)"
                :initial="cardInitial"
                :whileInView="cardInView"
                :exit="cardExit"
@@ -238,7 +239,7 @@
                     {{ tag.tag }}
                   </motion.span>
                 </div>
-                <motion.button @click="router.push(`/spots/${spot.id}`)"
+                <motion.button @click.stop="goToSpot(spot)"
                         :whileHover="{ x: 3 }"
                         :whilePress="{ scale: 0.96 }"
                         class="tibet-link text-sm flex items-center group/btn tibetan-font">
@@ -259,7 +260,7 @@
 
 <script setup lang="ts">
 import { defineAsyncComponent, ref, onMounted, onUnmounted, watch } from 'vue'
-import { AnimatePresence, motion, useReducedMotion, useScroll, useSpring, useTransform } from 'motion-v'
+import { AnimatePresence, motion, useReducedMotion } from 'motion-v'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import api, { endpoints } from '../api'
@@ -268,43 +269,28 @@ import {
   cardInitial,
   cardInView,
   cardTransition,
+  heroContentAnimate,
+  heroContentExit,
+  heroContentInitial,
+  heroContentTransition,
+  heroItemAnimate,
+  heroItemInitial,
+  heroItemTransition,
   inViewOnce,
   motionEase,
+  primaryActionHover,
+  primaryActionPress,
   revealInitial,
   revealInView,
   revealTransition
 } from '../motion/presets'
 
 const HeatMap = defineAsyncComponent(() => import('../components/HeatMap.vue'))
-const heroItemInitial = { opacity: 0, y: 24, scale: 0.98 }
-const heroItemAnimate = { opacity: 1, y: 0, scale: 1 }
-
-const heroTransition = (delay = 0) => ({
-  duration: 0.7,
-  delay,
-  ease: motionEase
-})
+const heroTransition = heroItemTransition
 
 const router = useRouter()
 const { t, locale } = useI18n()
 const prefersReducedMotion = useReducedMotion()
-const heroRef = ref<HTMLElement | null>(null)
-const { scrollYProgress: heroScrollProgress } = useScroll({
-  target: heroRef,
-  offset: ['start start', 'end start']
-})
-const heroProgress = useSpring(heroScrollProgress, {
-  stiffness: 140,
-  damping: 32,
-  mass: 0.2
-})
-const heroBgY = useTransform(heroProgress, [0, 1], ['0px', '180px'])
-const heroBgScale = useTransform(heroProgress, [0, 1], [1.05, 1.16])
-const heroFarY = useTransform(heroProgress, [0, 1], ['0px', '42px'])
-const heroMidY = useTransform(heroProgress, [0, 1], ['0px', '96px'])
-const heroFrontY = useTransform(heroProgress, [0, 1], ['0px', '150px'])
-const heroContentY = useTransform(heroProgress, [0, 1], ['0px', '-78px'])
-const heroContentOpacity = useTransform(heroProgress, [0, 0.72], [1, 0])
 const recommendedSpots = ref<any[]>([])
 const recommendationReasons = ref<Map<number, string>>(new Map())
 const loading = ref(true)
@@ -413,17 +399,20 @@ const getRecommendationReason = (spotId: number) => {
   return reason || t('home.recommendationReason')
 }
 
+const goToSpot = (spot: any) => {
+  if (spot?.id == null) {
+    console.warn('推荐景点数据缺少 id，无法进入详情页:', spot)
+    return
+  }
+  router.push(`/spots/${encodeURIComponent(String(spot.id))}`)
+}
+
 const fetchRecommendations = async () => {
   try {
     const userStr = localStorage.getItem('user')
     if (userStr) {
       const user = JSON.parse(userStr)
-
-      // 并行请求：常规推荐 + debug 详情
-      const [recommendationRes, debugRes] = await Promise.all([
-        api.get(`${endpoints.spots.recommendations}?userId=${user.id}`),
-        api.get(`${endpoints.spots.recommendationsDebug}?userId=${user.id}`).catch(() => null)
-      ])
+      const recommendationRes = await api.get(`${endpoints.spots.recommendations}?userId=${user.id}`)
 
       recommendedSpots.value = Array.isArray(recommendationRes.data) ? recommendationRes.data : []
 
@@ -432,26 +421,17 @@ const fetchRecommendations = async () => {
         return
       }
 
-      // 使用后端返回的推荐原因
-      if (debugRes && debugRes.data && debugRes.data.recommendationReasons) {
-        const reasonsMap = new Map<number, string>()
-        Object.entries(debugRes.data.recommendationReasons).forEach(([spotId, reason]) => {
-          reasonsMap.set(Number(spotId), reason as string)
-        })
-        recommendationReasons.value = reasonsMap
-      } else {
-        const reasonsMap = new Map<number, string>()
-        recommendedSpots.value.forEach((spot: any) => {
-          if (spot.rating && spot.rating >= 4.0) {
-            reasonsMap.set(spot.id, t('home.highRatingSpot'))
-          } else if (spot.visitCount && spot.visitCount > 15000) {
-            reasonsMap.set(spot.id, t('home.popularSpot'))
-          } else {
-            reasonsMap.set(spot.id, t('home.selectedForYou'))
-          }
-        })
-        recommendationReasons.value = reasonsMap
-      }
+      const reasonsMap = new Map<number, string>()
+      recommendedSpots.value.forEach((spot: any) => {
+        if (spot.rating && spot.rating >= 4.0) {
+          reasonsMap.set(spot.id, t('home.highRatingSpot'))
+        } else if (spot.visitCount && spot.visitCount > 15000) {
+          reasonsMap.set(spot.id, t('home.popularSpot'))
+        } else {
+          reasonsMap.set(spot.id, t('home.selectedForYou'))
+        }
+      })
+      recommendationReasons.value = reasonsMap
     } else {
       const response = await api.get(endpoints.spots.list)
       const spots = response.data?.content || response.data || []
@@ -484,8 +464,10 @@ watch(prefersReducedMotion, () => {
 })
 
 onMounted(async () => {
-  await fetchCarousels()
-  await fetchRecommendations()
+  await Promise.allSettled([
+    fetchCarousels(),
+    fetchRecommendations()
+  ])
   startCarousel()
 })
 

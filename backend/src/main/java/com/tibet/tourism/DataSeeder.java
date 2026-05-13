@@ -560,7 +560,7 @@ public class DataSeeder implements CommandLineRunner {
         createHeritage("藏医药浴法",
                 "将全身或局部浸泡于天然温泉或药物熬制的汤液中，利用水的热能和药物作用防治疾病，是藏医最具特色的外治疗法之一。",
                 "传统医药",
-                "https://images.unsplash.com/photo-1559827291-baf8ef4d3285?w=600&q=50",
+                "/heritage/藏药.jpg",
                 "https://baike.baidu.com/item/%E8%97%8F%E5%8C%BB%E8%8D%AF%E6%B5%B4%E6%B3%95",
                 "藏医药浴法（泷沐）有1300多年的历史，早在公元8世纪的藏医经典《四部医典》中就有系统论述。其理论基础是藏医学的「五源」（土、水、火、风、空）和「三因」（隆、赤巴、培根）学说，认为通过药浴可以调和体内三因平衡。经典药浴方剂「五味甘露」以杜鹃叶、麻黄、圆柏枝、水柏枝、野蒿为主药。在西藏，天然温泉药浴尤为盛行，羊八井、沃卡、德仲等温泉地是著名的浴疗胜地。",
                 "藏医药浴法体现了藏族人民与高原自然环境和谐共生的生存智慧，是藏医学「治未病」理念的实践典范。2018年列入联合国教科文组织人类非物质文化遗产代表作名录，标志着这一古老疗法得到国际社会的广泛认可。");
@@ -843,12 +843,12 @@ public class DataSeeder implements CommandLineRunner {
         createRoomType(h1, "经典双床房", "1380", 2, "2张单床 · 可住2人 · 含早餐", 1);
         createRoomType(h1, "布宫景观套房", "2280", 3, "1大床 · 可观布达拉宫 · 含行政礼遇", 2);
 
-        Hotel h2 = createHotel("拉萨香格里拉大酒店", "拉萨市城关区罗布林卡路19号", "0891-6558888",
+        Hotel shangriLaHotel = createHotel("拉萨香格里拉大酒店", "拉萨市城关区罗布林卡路19号", "0891-6558888",
             "980-2000", "/images/hotels/hotel-lhasa-xianggelila.jpg",
             "WiFi, 停车场, 餐厅, 健身房, 氧气吧, 商务中心", "4.8");
-        createRoomType(h2, "豪华大床房", "980", 2, "1张大床 · 可住2人 · 含早餐", 0);
-        createRoomType(h2, "豪华双床房", "1080", 2, "2张单床 · 可住2人 · 含早餐", 1);
-        createRoomType(h2, "行政套房", "1880", 3, "更大空间 · 含行政酒廊礼遇", 2);
+        createRoomType(shangriLaHotel, "豪华大床房", "980", 2, "1张大床 · 可住2人 · 含早餐", 0);
+        createRoomType(shangriLaHotel, "豪华双床房", "1080", 2, "2张单床 · 可住2人 · 含早餐", 1);
+        createRoomType(shangriLaHotel, "行政套房", "1880", 3, "更大空间 · 含行政酒廊礼遇", 2);
 
         Hotel h3 = createHotel("拉萨凡莲酒店", "拉萨市城关区江苏东路10号", "0891-6677888",
             "680-1280", "/images/hotels/hotel-lhasa-interior.jpg",

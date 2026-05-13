@@ -289,13 +289,6 @@ const extraMessages = {
       setAdmin: '设为管理员',
       unsetAdmin: '取消管理员',
       notOperable: '不可操作',
-      auditLogs: '用户操作审计日志',
-      refreshLogs: '刷新日志',
-      operator: '操作人',
-      targetUser: '目标用户',
-      result: '结果',
-      reason: '原因',
-      noAuditLogs: '暂无审计记录',
       newsManagement: '旅游资讯管理',
       createNews: '+ 创建',
       loadingNews: '正在加载资讯数据...',
@@ -408,10 +401,6 @@ const extraMessages = {
         PENDING: '待确认',
         CONFIRMED: '已确认',
         CANCELLED: '已取消'
-      },
-      auditAction: {
-        DELETE_USER: '删除用户成功',
-        DELETE_USER_DENIED: '删除用户拒绝'
       },
       analytics: {
         title: '运营分析面板',
@@ -644,13 +633,6 @@ const extraMessages = {
       setAdmin: 'དོ་དམ་པར་བསྒྲིག',
       unsetAdmin: 'དོ་དམ་པ་ཕྱིར་འཐེན།',
       notOperable: 'བྱ་སྒོ་མི་ཆོག',
-      auditLogs: 'སྤྱོད་མཁན་བྱ་སྒོའི་ཞིབ་ཐོ།',
-      refreshLogs: 'ཞིབ་ཐོ་བསྐྱར་གསོ།',
-      operator: 'བྱེད་མཁན།',
-      targetUser: 'དམིགས་ཡུལ་སྤྱོད་མཁན།',
-      result: 'འབྲས་བུ།',
-      reason: 'རྒྱུ་མཚན།',
-      noAuditLogs: 'ཞིབ་ཐོ་མེད།',
       newsManagement: 'ཡུལ་སྐོར་གསར་འགྱུར་དོ་དམ།',
       createNews: '+ གསར་བཟོ།',
       loadingNews: 'གསར་འགྱུར་གྲངས་ཐོ་འཇུག་བཞིན་པ་...',
@@ -763,10 +745,6 @@ const extraMessages = {
         PENDING: 'ངེས་སྒུག',
         CONFIRMED: 'ངེས་ཟིན།',
         CANCELLED: 'ཆ་མེད།'
-      },
-      auditAction: {
-        DELETE_USER: 'སྤྱོད་མཁན་སུབ་ལེགས།',
-        DELETE_USER_DENIED: 'སྤྱོད་མཁན་སུབ་མི་ཆོག'
       },
       analytics: {
         title: 'ལས་སྐྱོང་དཔྱད་ཞིབ་པང་།',

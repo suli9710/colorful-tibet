@@ -1,9 +1,12 @@
 package com.tibet.tourism.service;
 
+import com.tibet.tourism.dto.ScenicSpotHeatmapPointDTO;
 import com.tibet.tourism.entity.ScenicSpot;
 import com.tibet.tourism.repository.ScenicSpotRepository;
+import com.tibet.tourism.util.LocaleHelper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -53,5 +56,22 @@ public class ScenicSpotService {
     @Transactional(readOnly = true)
     public Page<ScenicSpot> getSpotsByCategory(ScenicSpot.Category category, Pageable pageable) {
         return scenicSpotRepository.findByCategory(category, pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ScenicSpotHeatmapPointDTO> getHeatmapSpots(String locale, int limit) {
+        int normalizedLimit = Math.min(Math.max(limit, 1), 500);
+        return scenicSpotRepository.findHeatmapSpots(PageRequest.of(0, normalizedLimit)).stream()
+                .map(spot -> {
+                    String localizedName = LocaleHelper.resolveByLocale(locale, spot.getName(), spot.getNameTibetan());
+                    return new ScenicSpotHeatmapPointDTO(
+                            spot.getId(),
+                            localizedName,
+                            spot.getLongitude().doubleValue(),
+                            spot.getLatitude().doubleValue(),
+                            spot.getVisitCount() != null ? spot.getVisitCount() : 0
+                    );
+                })
+                .toList();
     }
 }

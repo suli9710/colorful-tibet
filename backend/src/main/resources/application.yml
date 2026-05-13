@@ -6,8 +6,6 @@ server:
     min-response-size: 1024
 
 spring:
-  profiles:
-    active: local
   application:
     name: colorful-tibet-tourism
   data:
@@ -36,33 +34,42 @@ spring:
     async:
       request-timeout: 120000  # 120秒异步请求超时，适应AI生成时间
   datasource:
-    # 默认使用固定路径的 H2 文件数据库，避免重启后数据丢失
-    url: jdbc:h2:file:./data/h2/tibet_tourism;AUTO_SERVER=TRUE;DB_CLOSE_DELAY=-1
-    username: sa
-    password:
-    driver-class-name: org.h2.Driver
-    # HikariCP 连接池配置（适配 H2 数据库）
+    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:colorful_tibet}?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: ${MYSQL_USERNAME:root}
+    password: ${MYSQL_PASSWORD:031224}
+    driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
       maximum-pool-size: 15
       minimum-idle: 5
       connection-timeout: 30000
       idle-timeout: 600000
       max-lifetime: 1800000
-      pool-name: TibetH2Pool
+      pool-name: TibetMySQLPool
   jpa:
-    database-platform: org.hibernate.dialect.H2Dialect
+    database-platform: org.hibernate.dialect.MySQLDialect
     hibernate:
       ddl-auto: update
     show-sql: false
     properties:
       hibernate:
-        format_sql: true
+        format_sql: false
         # JPA 批量处理优化
         jdbc:
           batch_size: 25
         order_inserts: true
         order_updates: true
         default_batch_fetch_size: 25
+
+springdoc:
+  packages-to-scan: com.tibet.tourism.controller
+  paths-to-match: /api/**
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+    doc-expansion: none
 
 # JWT配置（必须与登录时使用的密钥一致）
 jwt:
@@ -72,9 +79,16 @@ jwt:
 ark:
   api:
     url: ${ARK_API_URL:https://ark.cn-beijing.volces.com/api/v3/responses}
-    key: ${ARK_API_KEY:}
-    model: ${AI_MODEL:doubao-seed-2-0-pro-260215}
+    key: ${ARK_API_KEY:${DOUBAO_API_KEY:}}
+    model: ${AI_MODEL:${DOUBAO_MODEL:doubao-seed-2-0-pro-260215}}
     stream-url: ${ARK_STREAM_API_URL:}  # 流式端点，为空时从url自动推导
+
+doubao:
+  api:
+    url: ${DOUBAO_API_URL:https://ark.cn-beijing.volces.com/api/v3/chat/completions}
+    key: ${DOUBAO_API_KEY:${ARK_API_KEY:}}
+    model: ${DOUBAO_MODEL:${AI_MODEL:doubao-seed-2-0-pro-260215}}
+    stream-url: ${DOUBAO_STREAM_API_URL:}
 
 ai:
   route:

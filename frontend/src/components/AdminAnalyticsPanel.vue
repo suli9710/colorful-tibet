@@ -1,5 +1,5 @@
 <template>
-  <div class="bg-white rounded-2xl shadow overflow-hidden border border-stone-100">
+  <div ref="panelEl" class="bg-white rounded-2xl shadow overflow-hidden border border-stone-100">
     <div class="px-6 py-5 border-b border-stone-200 flex items-center justify-between">
       <div>
         <h3 class="text-xl font-bold text-stone-800">{{ t('admin.analytics.title') }}</h3>
@@ -68,20 +68,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { graphic, init, use, type ECharts } from 'echarts/core'
-import { BarChart, LineChart, PieChart } from 'echarts/charts'
-import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components'
-import { CanvasRenderer } from 'echarts/renderers'
-
-use([
-  BarChart,
-  LineChart,
-  PieChart,
-  GridComponent,
-  LegendComponent,
-  TooltipComponent,
-  CanvasRenderer
-])
+import type { ECharts } from '@/lib/echarts'
 
 interface AnalyticsStats {
   userCount: number
@@ -109,8 +96,21 @@ const trendChartEl = ref<HTMLElement | null>(null)
 const categoryChartEl = ref<HTMLElement | null>(null)
 const spotChartEl = ref<HTMLElement | null>(null)
 const growthChartEl = ref<HTMLElement | null>(null)
+const panelEl = ref<HTMLElement | null>(null)
 const charts: ECharts[] = []
 const { t, locale } = useI18n()
+type EChartsKit = ReturnType<typeof import('@/lib/echarts').ensureECharts>
+let echartsLoader: Promise<EChartsKit> | null = null
+let chartInitRun = 0
+let resizeObserver: ResizeObserver | null = null
+
+const loadECharts = async () => {
+  if (!echartsLoader) {
+    echartsLoader = import('@/lib/echarts').then(module => module.ensureECharts())
+  }
+
+  return echartsLoader
+}
 
 const getCategoryLabel = (category: string) => {
   const key = `admin.analytics.spotCategories.${category}`
@@ -139,8 +139,12 @@ const disposeCharts = () => {
   }
 }
 
-const initCharts = () => {
+const initCharts = async () => {
   if (!props.chartData) return
+  const runId = ++chartInitRun
+  const { graphic, init } = await loadECharts()
+  if (runId !== chartInitRun) return
+
   disposeCharts()
 
   const data = props.chartData
@@ -276,21 +280,33 @@ const handleResize = () => {
 
 watch(() => props.chartData, async () => {
   await nextTick()
-  initCharts()
+  await initCharts()
 }, { deep: true })
 
 watch(locale, async () => {
   await nextTick()
-  initCharts()
+  await initCharts()
 })
 
 onMounted(() => {
-  window.addEventListener('resize', handleResize)
-  nextTick(() => initCharts())
+  if (panelEl.value && typeof ResizeObserver !== 'undefined') {
+    resizeObserver = new ResizeObserver(handleResize)
+    resizeObserver.observe(panelEl.value)
+  } else {
+    window.addEventListener('resize', handleResize)
+  }
+  nextTick(() => {
+    void initCharts()
+  })
 })
 
 onBeforeUnmount(() => {
-  window.removeEventListener('resize', handleResize)
+  if (resizeObserver) {
+    resizeObserver.disconnect()
+    resizeObserver = null
+  } else {
+    window.removeEventListener('resize', handleResize)
+  }
   disposeCharts()
 })
 </script>

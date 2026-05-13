@@ -84,11 +84,11 @@
               <!-- Image -->
               <div class="relative h-52 overflow-hidden bg-tibet-brown/10">
                 <img
-                  :src="hotel.coverImage || defaultHotelImage"
+                  :src="resolveHotelCoverImage(hotel.coverImage)"
                   :alt="hotel.name"
                   class="w-full h-full object-cover tibet-image-hover will-change-transform"
                   loading="lazy"
-                  @error="($event.target as HTMLImageElement).src = defaultHotelImage"
+                  @error="applyHotelImageFallback"
                 />
                 <div class="absolute inset-0 bg-gradient-to-t from-tibet-dark/50 via-transparent to-transparent"></div>
                 <!-- Star Badge — 藏金星星 -->
@@ -170,6 +170,7 @@ import { computed, ref, onMounted } from 'vue'
 import { AnimatePresence, motion } from 'motion-v'
 import { useI18n } from 'vue-i18n'
 import { hotels, hotelsByRegion, hotelRegions, type HotelItem } from '../data/hotels'
+import { applyHotelImageFallback, resolveHotelCoverImage } from '../data/hotelImages'
 import { getCanonicalRegion, localizeHotel, localizeRegion } from '../data/hotelTranslations'
 import api, { endpoints } from '../api'
 import {
@@ -189,8 +190,6 @@ const city = ref('')
 const star = ref('')
 
 // --- Merge API hotels into static data ---
-
-const defaultHotelImage = '/images/hotels/hotel-luxury-1.jpg'
 
 const resolveRegion = (location: string): string => {
   return getCanonicalRegion(location)
@@ -225,7 +224,7 @@ const mapApiHotel = (apiHotel: any, staticHotel?: HotelItem): HotelItem & { isAp
     priceMin: apiHotel.priceRange ? parsePriceMin(apiHotel.priceRange) : (staticHotel?.priceMin || 300),
     available: true,
     tags: amenities.length ? amenities.slice(0, 4) : (staticHotel?.tags || ['可预订']),
-    coverImage: apiHotel.imageUrl || staticHotel?.coverImage || defaultHotelImage,
+    coverImage: resolveHotelCoverImage(staticHotel?.coverImage || apiHotel.imageUrl),
     description: staticHotel?.description || '',
     amenities: amenities.length ? amenities : (staticHotel?.amenities || []),
     rooms: staticHotel?.rooms || [],

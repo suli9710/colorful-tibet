@@ -390,44 +390,6 @@
           </div>
         </div>
 
-        <!-- 审计日志（仅超级管理员） -->
-        <div v-if="isSuperAdmin" class="bg-white rounded-lg shadow overflow-hidden mt-8">
-          <div class="px-6 py-4 border-b border-stone-200 flex justify-between items-center">
-            <h3 class="text-lg font-bold text-stone-800">{{ t('admin.auditLogs') }}</h3>
-            <button @click="fetchAuditLogs" class="text-sm text-blue-600 hover:text-blue-800" :disabled="loadingAuditLogs">
-              {{ loadingAuditLogs ? t('common.loading') : t('admin.refreshLogs') }}
-            </button>
-          </div>
-          <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-stone-200">
-              <thead class="bg-stone-50">
-                <tr>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">{{ t('admin.orderedAt') }}</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">{{ t('admin.operator') }}</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">{{ t('admin.targetUser') }}</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">{{ t('admin.result') }}</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">{{ t('admin.reason') }}</th>
-                </tr>
-              </thead>
-              <tbody class="bg-white divide-y divide-stone-200">
-                <tr v-for="log in auditLogs" :key="log.id" class="hover:bg-stone-50">
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-600">{{ formatDateTime(log.createdAt) }}</td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-stone-800">{{ log.operatorUsername }}</td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-600">{{ log.targetUsername }} (ID: {{ log.targetUserId }})</td>
-                  <td class="px-6 py-4 whitespace-nowrap">
-                    <span :class="getAuditActionClass(log.action)" class="px-2 py-1 rounded-full text-xs font-semibold">
-                      {{ getAuditActionLabel(log.action) }}
-                    </span>
-                  </td>
-                  <td class="px-6 py-4 text-sm text-stone-600">{{ log.detail || '-' }}</td>
-                </tr>
-                <tr v-if="!loadingAuditLogs && auditLogs.length === 0">
-                  <td colspan="5" class="px-6 py-6 text-center text-stone-500">{{ t('admin.noAuditLogs') }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          </div>
         </div>
         <div class="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden mt-8">
           <div class="px-6 py-4 border-b border-stone-100 flex justify-between items-center bg-gradient-to-r from-stone-50 to-white cursor-pointer hover:bg-stone-100/50 transition-colors" @click="showAllNews = !showAllNews">
@@ -703,8 +665,12 @@
         </div>
 
         <!-- Carousel Edit/Create Modal -->
-        <div v-if="showCarouselModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" @click.self="closeCarouselModal">
-          <div class="bg-white rounded-2xl max-w-lg w-full p-6 animate-scale-in">
+        <MotionModal
+          :show="showCarouselModal"
+          modal-key="admin-carousel-modal"
+          panel-class="max-w-lg rounded-2xl bg-white p-6"
+          @close="closeCarouselModal"
+        >
             <h2 class="text-xl font-bold mb-4">{{ t('admin.editOrCreateCarousel', { mode: editingCarousel.id ? t('common.edit') : t('common.create') }) }}</h2>
             <div class="space-y-3">
               <div><label class="block text-sm font-medium mb-1">{{ t('admin.titleLabel') }} *</label><input v-model="carouselForm.title" class="w-full border rounded px-3 py-2" :placeholder="t('admin.titleLabel')"></div>
@@ -722,12 +688,15 @@
               <button @click="saveCarousel" class="flex-1 bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600">{{ t('common.save') }}</button>
               <button @click="closeCarouselModal" class="flex-1 bg-stone-200 py-2 rounded-lg">{{ t('common.cancel') }}</button>
             </div>
-          </div>
-        </div>
+        </MotionModal>
 
         <!-- Route Edit/Create Modal -->
-        <div v-if="showRouteModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" @click.self="closeRouteModal">
-          <div class="bg-white rounded-2xl max-w-2xl w-full p-6 max-h-[85vh] overflow-y-auto animate-scale-in">
+        <MotionModal
+          :show="showRouteModal"
+          modal-key="admin-route-modal"
+          panel-class="max-w-2xl rounded-2xl bg-white p-6 max-h-[85vh] overflow-y-auto"
+          @close="closeRouteModal"
+        >
             <h2 class="text-xl font-bold mb-4">{{ t('admin.editOrCreateRoute', { mode: editingRoute.id ? t('common.edit') : t('common.create') }) }}</h2>
             <div class="grid grid-cols-2 gap-3">
               <div><label class="block text-sm font-medium mb-1">{{ t('admin.name') }} *</label><input v-model="routeForm.name" class="w-full border rounded px-3 py-2"></div>
@@ -746,12 +715,15 @@
               <button @click="saveRoute" class="flex-1 bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600">{{ t('common.save') }}</button>
               <button @click="closeRouteModal" class="flex-1 bg-stone-200 py-2 rounded-lg">{{ t('common.cancel') }}</button>
             </div>
-          </div>
-        </div>
+        </MotionModal>
 
         <!-- Hotel Edit/Create Modal -->
-        <div v-if="showHotelModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" @click.self="closeHotelModal">
-          <div class="bg-white rounded-2xl max-w-2xl w-full p-6 max-h-[85vh] overflow-y-auto animate-scale-in">
+        <MotionModal
+          :show="showHotelModal"
+          modal-key="admin-hotel-modal"
+          panel-class="max-w-2xl rounded-2xl bg-white p-6 max-h-[85vh] overflow-y-auto"
+          @close="closeHotelModal"
+        >
             <h2 class="text-xl font-bold mb-4">{{ t('admin.editOrCreateHotel', { mode: editingHotel.id ? t('common.edit') : t('common.create') }) }}</h2>
             <div class="grid grid-cols-2 gap-3">
               <div><label class="block text-sm font-medium mb-1">{{ t('admin.name') }} *</label><input v-model="hotelForm.name" class="w-full border rounded px-3 py-2"></div>
@@ -769,18 +741,17 @@
               <button @click="saveHotel" class="flex-1 bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600">{{ t('common.save') }}</button>
               <button @click="closeHotelModal" class="flex-1 bg-stone-200 py-2 rounded-lg">{{ t('common.cancel') }}</button>
             </div>
-          </div>
-        </div>
+        </MotionModal>
       </div>
     </div>
 
     <!-- Edit/Create News Modal -->
-    <div
-      v-if="showNewsModal"
-      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto"
-      @click.self="closeNewsModal"
+    <MotionModal
+      :show="showNewsModal"
+      modal-key="admin-news-modal"
+      panel-class="max-w-3xl rounded-2xl bg-white p-8 max-h-[90vh] overflow-y-auto"
+      @close="closeNewsModal"
     >
-      <div class="bg-white rounded-2xl max-w-3xl w-full p-8 animate-scale-in max-h-[90vh] overflow-y-auto">
         <h2 class="text-2xl font-bold mb-6 text-stone-800">{{ editingNews.id ? t('admin.editNewsTitle') : t('admin.createNewsTitle') }}</h2>
         
         <div class="mb-6">
@@ -831,16 +802,15 @@
             {{ t('common.cancel') }}
           </button>
         </div>
-      </div>
-    </div>
+    </MotionModal>
 
     <!-- Edit Spot Modal -->
-    <div
-      v-if="showEditModal"
-      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto"
-      @click.self="closeEditModal"
+    <MotionModal
+      :show="showEditModal"
+      modal-key="admin-spot-modal"
+      panel-class="max-w-2xl rounded-2xl bg-white p-8 max-h-[85vh] overflow-y-auto"
+      @close="closeEditModal"
     >
-      <div class="bg-white rounded-2xl max-w-2xl w-full p-8 animate-scale-in max-h-[85vh] overflow-y-auto">
         <h2 class="text-2xl font-bold mb-6 text-stone-800">{{ t('admin.editSpotInfo') }}</h2>
         
         <div class="mb-6">
@@ -898,17 +868,19 @@
             {{ t('common.cancel') }}
           </button>
         </div>
-      </div>
-    </div>
+    </MotionModal>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import AdminAnalyticsPanel from '../components/AdminAnalyticsPanel.vue'
 import ImageUploadField from '../components/ImageUploadField.vue'
+import MotionModal from '../components/motion/MotionModal.vue'
 import api, { endpoints, clearTokenCache } from '../api'
+import { useAuthStore } from '../stores/auth'
 
 interface Stats {
   userCount: number
@@ -927,6 +899,8 @@ interface Stats {
 }
 
 const { t, locale, te } = useI18n()
+const router = useRouter()
+const auth = useAuthStore()
 
 const stats = ref<Stats>({
   userCount: 0,
@@ -942,34 +916,14 @@ const analyticsData = ref<Stats | null>(null)
 
 const fetchStats = async () => {
   try {
-    const userStr = localStorage.getItem('user')
-    if (!userStr) {
-      window.location.href = '/login'
+    if (!auth.hasValidSession()) {
+      await router.push('/login')
       return
     }
 
-    const user = JSON.parse(userStr)
-    if (!user.token) {
-      localStorage.removeItem('user')
-      localStorage.removeItem('token')
-      window.location.href = '/login'
-      return
-    }
-
-    // 简单检查 token 是否过期（JWT payload 中间段包含 exp）
-    try {
-      const payload = JSON.parse(atob(user.token.split('.')[1]))
-      if (payload.exp && payload.exp * 1000 < Date.now()) {
-        localStorage.removeItem('user')
-        localStorage.removeItem('token')
-        window.location.href = '/login'
-        return
-      }
-    } catch (_) { /* 解析失败继续尝试请求 */ }
-
-    if (user.role !== 'ADMIN') {
+    if (!auth.isAdmin) {
       alert(t('admin.unauthorizedAdmin'))
-      window.location.href = '/'
+      await router.push('/')
       return
     }
 
@@ -981,15 +935,14 @@ const fetchStats = async () => {
     console.error('获取统计数据失败：', error)
     const status = error.response?.status
     if (status === 401) {
-      localStorage.removeItem('user')
-      localStorage.removeItem('token')
+      auth.logout()
       clearTokenCache()
-      window.location.href = '/login'
+      await router.push('/login')
       return
     }
     if (status === 403) {
       alert(t('admin.forbiddenAdmin'))
-      window.location.href = '/'
+      await router.push('/')
     } else {
       analyticsError.value = error.response?.data?.message || error.response?.data?.error || t('admin.analyticsLoadFailed')
     }
@@ -1069,8 +1022,6 @@ const getClickCountPercentage = (spot: any) => {
 
 const users = ref<any[]>([])
 const currentUser = ref<any>(null) // 当前登录用户信息
-const auditLogs = ref<any[]>([])
-const loadingAuditLogs = ref(false)
 const spots = ref<any[]>([])
 const loadingSpots = ref(false)
 const spotsError = ref('')
@@ -1254,20 +1205,6 @@ const deleteUser = async (user: any) => {
   }
 }
 
-const fetchAuditLogs = async () => {
-  if (!isSuperAdmin.value) return
-  loadingAuditLogs.value = true
-  try {
-    const response = await api.get(endpoints.admin.auditLogs)
-    auditLogs.value = Array.isArray(response.data) ? response.data : []
-  } catch (error: any) {
-    console.error('Failed to fetch audit logs:', error)
-    auditLogs.value = []
-  } finally {
-    loadingAuditLogs.value = false
-  }
-}
-
 // Hotel orders management
 const hotelOrders = ref<any[]>([])
 const loadingHotelOrders = ref(false)
@@ -1314,24 +1251,13 @@ const deleteHotelOrder = async (orderId: number) => {
 const fetchNews = async () => {
   loadingNews.value = true
   try {
-    // 检查认证 token
-    const userStr = localStorage.getItem('user')
-    if (!userStr) {
+    if (!auth.hasValidSession()) {
       alert(t('admin.notLoggedIn'))
-      window.location.href = '/login'
+      await router.push('/login')
       return
     }
-    
-    const user = JSON.parse(userStr)
-    
-    if (!user.token) {
-      alert(t('admin.loginExpired'))
-      localStorage.removeItem('user')
-      window.location.href = '/login'
-      return
-    }
-    
-    if (user.role !== 'ADMIN') {
+
+    if (!auth.isAdmin) {
       alert(t('admin.noAdminPermission'))
       return
     }
@@ -1490,22 +1416,6 @@ const getCategoryLabel = (category: string) => {
   return labels[category] || category
 }
 
-const getAuditActionLabel = (action: string) => {
-  const key = `admin.auditAction.${action}`
-  return te(key) ? t(key) : action
-}
-
-const getAuditActionClass = (action: string) => {
-  switch (action) {
-    case 'DELETE_USER':
-      return 'bg-green-100 text-green-800'
-    case 'DELETE_USER_DENIED':
-      return 'bg-red-100 text-red-800'
-    default:
-      return 'bg-gray-100 text-gray-800'
-  }
-}
-
 const getCategoryClass = (category: string) => {
   const classes: Record<string, string> = {
     POLICY: 'bg-blue-100 text-blue-800',
@@ -1522,14 +1432,8 @@ const isSuperAdmin = computed(() => {
 
 // 加载当前用户信息
 const loadCurrentUser = () => {
-  try {
-    const userStr = localStorage.getItem('user')
-    if (userStr) {
-      currentUser.value = JSON.parse(userStr)
-    }
-  } catch (error) {
-    console.error('加载用户信息失败:', error)
-  }
+  auth.restoreFromStorage()
+  currentUser.value = auth.user
 }
 
 // Carousel management
@@ -1724,8 +1628,17 @@ const deleteRoomTypeInline = async (roomTypeId: number, hotelId: number) => {
   } catch (e) { alert(t('admin.deleteFailed')) }
 }
 
-onMounted(() => {
+onMounted(async () => {
   loadCurrentUser()
+  if (!auth.hasValidSession()) {
+    await router.push('/login')
+    return
+  }
+  if (!auth.isAdmin) {
+    await router.push('/')
+    return
+  }
+
   fetchStats()
   fetchUsers()
   fetchSpots()
@@ -1734,7 +1647,6 @@ onMounted(() => {
   fetchCarousels()
   fetchAdminRoutes()
   fetchAdminHotels()
-  fetchAuditLogs()
 })
 
 onUnmounted(() => {
@@ -1755,18 +1667,4 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
-@keyframes scale-in {
-  from {
-    opacity: 0;
-    transform: scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-.animate-scale-in {
-  animation: scale-in 0.2s ease-out;
-}
 </style>

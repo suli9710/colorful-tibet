@@ -130,7 +130,9 @@
       "traditionalDance": "传统舞蹈",
       "traditionalDrama": "传统戏剧",
       "traditionalSports": "传统体育·游艺与杂技",
-      "traditionalCraft": "传统技艺"
+      "traditionalCraft": "传统技艺",
+      "traditionalMedicine": "传统医药",
+      "folkCustom": "民俗"
     }
   },
   "news": {
@@ -411,6 +413,7 @@
     "bookNow": "立即预订",
     "bookingTitle": "酒店预订",
     "bookingSubtitle": "这里将承载入住日期、离店日期、房型和联系人信息。",
+    "bookingFailed": "预订失败，请稍后重试",
     "ordersTitle": "我的酒店订单",
     "ordersSubtitle": "这里将展示待确认、已确认和已取消的酒店订单列表。",
     "searchPlaceholder": "搜索酒店名称或城市...",

@@ -2,6 +2,7 @@ package com.tibet.tourism.controller;
 
 import com.tibet.tourism.dto.RecommendationContext;
 import com.tibet.tourism.dto.RecommendationDebugResponse;
+import com.tibet.tourism.dto.ScenicSpotHeatmapPointDTO;
 import com.tibet.tourism.entity.ScenicSpot;
 import com.tibet.tourism.entity.User;
 import com.tibet.tourism.dto.UserPreferenceDTO;
@@ -68,6 +69,13 @@ public class ScenicSpotController {
         ScenicSpot spot = scenicSpotService.getSpotById(id);
         LocaleHelper.resolveScenicSpotLocale(spot, locale);
         return spot;
+    }
+
+    @GetMapping("/heatmap")
+    public List<ScenicSpotHeatmapPointDTO> getHeatmapSpots(
+            @RequestParam(required = false, defaultValue = "zh") String locale,
+            @RequestParam(required = false, defaultValue = "100") int limit) {
+        return scenicSpotService.getHeatmapSpots(locale, limit);
     }
 
     @GetMapping("/search")
