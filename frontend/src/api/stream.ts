@@ -24,7 +24,7 @@ export interface StreamMeta {
 
 export interface StreamCallbacks {
   onMeta?: (meta: StreamMeta) => void
-  onDelta?: (text: string) => void
+  onDelta?: (text: string, fullText: string) => void
   onDone?: (fullText: string) => void
   onError?: (message: string) => void
 }
@@ -99,7 +99,7 @@ export async function generateRouteStream(
                 } else {
                   fullText += event.text
                 }
-                callbacks.onDelta?.(event.text)
+                callbacks.onDelta?.(event.text, fullText)
               }
               break
             case 'done':

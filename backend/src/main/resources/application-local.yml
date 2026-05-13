@@ -1,8 +1,5 @@
-# 本地部署配置（默认连接 MySQL）
-# 使用方式：
-# 1. 先启动 MySQL，并创建数据库：colorful_tibet
-# 2. 配置环境变量或直接修改下面的连接信息
-# 3. 启动时使用：java -jar app.jar --spring.profiles.active=local
+# 本地部署配置（MySQL）
+# 使用方式：先启动 MySQL，创建数据库 colorful_tibet，并设置 MYSQL_PASSWORD。
 
 server:
   port: 8080
@@ -39,14 +36,19 @@ spring:
       hibernate:
         format_sql: false
 
-# 可选：如果你仍想临时使用 H2，可把上面的 datasource 改回 H2 配置
-
 ark:
   api:
     url: ${ARK_API_URL:https://ark.cn-beijing.volces.com/api/v3/responses}
-    key: ${ARK_API_KEY:}
-    model: ${AI_MODEL:doubao-seed-2-0-pro-260215}
+    key: ${ARK_API_KEY:${DOUBAO_API_KEY:}}
+    model: ${AI_MODEL:${DOUBAO_MODEL:doubao-seed-2-0-pro-260215}}
     stream-url: ${ARK_STREAM_API_URL:}  # 流式端点，为空时从url自动推导
+
+doubao:
+  api:
+    url: ${DOUBAO_API_URL:https://ark.cn-beijing.volces.com/api/v3/chat/completions}
+    key: ${DOUBAO_API_KEY:${ARK_API_KEY:}}
+    model: ${DOUBAO_MODEL:${AI_MODEL:doubao-seed-2-0-pro-260215}}
+    stream-url: ${DOUBAO_STREAM_API_URL:}
 
 ai:
   route:
@@ -68,19 +70,12 @@ jwt:
   secret: ${JWT_SECRET:tibetTourismSecretKey12345678901234567890}
   expiration: 86400000  # 24小时
 
-# 演示用户播种 + H2 -> MySQL 一次性迁移开关
+# 演示用户播种
 app:
   super-admin-username: ${SUPER_ADMIN_USERNAME:lzh}
   seed:
     demo-users:
       enabled: ${SEED_DEMO_USERS:false}
-  migration:
-    h2-to-mysql:
-      enabled: ${H2_TO_MYSQL_MIGRATION_ENABLED:false}
-      h2-url: ${H2_MIGRATION_URL:jdbc:h2:file:./data/h2/tibet_tourism;AUTO_SERVER=TRUE;DB_CLOSE_DELAY=-1}
-      h2-username: ${H2_MIGRATION_USERNAME:sa}
-      h2-password: ${H2_MIGRATION_PASSWORD:}
-      skip-non-empty-table: ${H2_TO_MYSQL_SKIP_NON_EMPTY_TABLE:true}
 
 # 日志配置
 logging:

@@ -308,8 +308,7 @@ import { ref, computed, onMounted, watch, nextTick, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import api, { endpoints } from '../api'
-import L from 'leaflet'
-import 'leaflet/dist/leaflet.css'
+import type * as Leaflet from 'leaflet'
 
 const { t, locale } = useI18n()
 
@@ -321,8 +320,20 @@ const submitting = ref(false)
 const mapContainer = ref<HTMLElement | null>(null)
 const mapReady = ref(false)
 const mapLoading = ref(true)
-let map: L.Map | null = null
-let marker: L.CircleMarker | null = null
+let map: Leaflet.Map | null = null
+let marker: Leaflet.CircleMarker | null = null
+let leafletLoader: Promise<typeof Leaflet> | null = null
+
+const loadLeaflet = async () => {
+  if (!leafletLoader) {
+    leafletLoader = Promise.all([
+      import('leaflet'),
+      import('leaflet/dist/leaflet.css')
+    ]).then(([leaflet]) => leaflet)
+  }
+
+  return leafletLoader
+}
 
 const bookingForm = ref({
   visitDate: '',
@@ -463,6 +474,7 @@ const initOrUpdateMap = async () => {
   const [lng, lat] = wgs84ToGcj02(wgsLng, wgsLat)
 
   await nextTick()
+  const L = await loadLeaflet()
 
   if (!map) {
     mapLoading.value = true

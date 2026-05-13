@@ -1,6 +1,5 @@
 package com.tibet.tourism.controller;
 
-import com.tibet.tourism.entity.AuditLog;
 import com.tibet.tourism.entity.Booking;
 import com.tibet.tourism.entity.Carousel;
 import com.tibet.tourism.entity.Hotel;
@@ -10,7 +9,6 @@ import com.tibet.tourism.entity.RoomType;
 import com.tibet.tourism.entity.ScenicSpot;
 import com.tibet.tourism.entity.TravelRoute;
 import com.tibet.tourism.entity.User;
-import com.tibet.tourism.repository.AuditLogRepository;
 import com.tibet.tourism.repository.BookingRepository;
 import com.tibet.tourism.repository.CarouselRepository;
 import com.tibet.tourism.repository.CommentLikeRepository;
@@ -59,9 +57,6 @@ public class AdminController {
 
     @Autowired
     private UserRepository userRepository;
-
-    @Autowired
-    private AuditLogRepository auditLogRepository;
 
     @Autowired
     private BookingRepository bookingRepository;
@@ -163,12 +158,6 @@ public class AdminController {
         return ResponseEntity.ok(userRepository.findAll());
     }
 
-    @GetMapping("/audit-logs/list")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<List<AuditLog>> getAuditLogs() {
-        return ResponseEntity.ok(auditLogRepository.findAll(Sort.by(Sort.Direction.DESC, "createdAt")));
-    }
-
     @PostMapping("/upload-image")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> uploadImage(@RequestParam("file") MultipartFile file) {
@@ -222,14 +211,12 @@ public class AdminController {
         String operatorUsername = authentication == null ? "anonymous" : authentication.getName();
 
         if (authentication == null || !superAdminUsername.equals(operatorUsername)) {
-            recordAudit(AuditLog.Action.DELETE_USER_DENIED, operatorUsername, targetUser, "非超级管理员尝试删除用户");
             return ResponseEntity.status(403).body(Map.of(
                     "error", "只有超级管理员可以删除用户账户"
             ));
         }
 
         if (superAdminUsername.equals(targetUser.getUsername())) {
-            recordAudit(AuditLog.Action.DELETE_USER_DENIED, operatorUsername, targetUser, "不允许删除超级管理员自身");
             return ResponseEntity.badRequest().body(Map.of("error", "不能删除超级管理员账户"));
         }
 
@@ -251,19 +238,8 @@ public class AdminController {
 
         userVisitHistoryRepository.deleteByUserId(userId);
 
-        recordAudit(AuditLog.Action.DELETE_USER, operatorUsername, targetUser, "成功删除用户: " + targetUser.getUsername());
         userRepository.delete(targetUser);
         return ResponseEntity.ok(Map.of("message", "用户删除成功"));
-    }
-
-    @GetMapping("/audit-logs")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> getAuditLogs(Authentication authentication) {
-        String operatorUsername = authentication == null ? "anonymous" : authentication.getName();
-        if (authentication == null || !superAdminUsername.equals(operatorUsername)) {
-            return ResponseEntity.status(403).body(Map.of("error", "只有超级管理员可以查看审计日志"));
-        }
-        return ResponseEntity.ok(auditLogRepository.findTop200ByOrderByCreatedAtDesc());
     }
 
     private List<Map<String, Object>> buildSpotCategories() {
@@ -329,20 +305,6 @@ public class AdminController {
                 .entrySet().stream()
                 .map(entry -> Map.<String, Object>of("month", entry.getKey(), "count", entry.getValue()))
                 .toList();
-    }
-
-    private void recordAudit(AuditLog.Action action, String operatorUsername, User targetUser, String detail) {
-        try {
-            AuditLog log = new AuditLog();
-            log.setAction(action);
-            log.setOperatorUsername(operatorUsername);
-            log.setTargetUserId(targetUser.getId());
-            log.setTargetUsername(targetUser.getUsername());
-            log.setDetail(detail);
-            auditLogRepository.save(log);
-        } catch (Exception e) {
-            System.err.println("审计日志写入失败: " + e.getMessage());
-        }
     }
 
     /**

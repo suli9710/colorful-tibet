@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { clearStoredAuth } from '../stores/auth'
 
 const apiBaseURL = import.meta.env.VITE_API_BASE_URL || '/api'
 
@@ -96,13 +97,9 @@ api.interceptors.response.use(
       if (!isBookingCreate && !isAiRouteGenerate && !isRouteShare) {
         const currentPath = window.location.pathname
         if (currentPath !== '/login') {
-          localStorage.removeItem('user')
-          localStorage.removeItem('token')
+          clearStoredAuth()
           clearTokenCache()
-          window.dispatchEvent(new CustomEvent('auth-expired'))
-          if (!window.location.pathname.startsWith('/login')) {
-            window.location.href = '/login'
-          }
+          window.dispatchEvent(new CustomEvent('auth-expired', { detail: { redirectTo: '/login' } }))
         }
       }
     }
@@ -145,6 +142,7 @@ export const endpoints = {
   },
   spots: {
     list: '/spots',
+    heatmap: '/spots/heatmap',
     detail: (id: number) => `/spots/${id}`,
     search: '/spots/search',
     recommendations: '/spots/recommendations',
@@ -162,7 +160,6 @@ export const endpoints = {
     users: '/admin/users',
     updateRole: (id: number) => `/admin/users/${id}/role`,
     deleteUser: (id: number) => `/admin/users/${id}`,
-    auditLogs: '/admin/audit-logs/list',
     spots: '/admin/spots',
     updateSpot: (id: number) => `/admin/spots/${id}`,
     news: '/admin/news',

@@ -276,11 +276,13 @@
       </template>
 
       <!-- ==================== ASK QUESTION MODAL ==================== -->
-      <Teleport to="body">
-        <transition name="modal">
-          <div v-if="showAskModal" class="fixed inset-0 z-50 flex items-center justify-center p-4" @click.self="showAskModal = false">
-            <div class="absolute inset-0 bg-black/40 backdrop-blur-sm"></div>
-            <div class="relative bg-white rounded-3xl shadow-2xl max-w-lg w-full p-8 animate-scale-in-spring overflow-auto max-h-[90vh]">
+      <MotionModal
+        :show="showAskModal"
+        modal-key="ask-question-modal"
+        backdrop-class="bg-black/40 backdrop-blur-sm"
+        panel-class="max-w-lg rounded-3xl bg-white p-8 overflow-auto max-h-[90vh]"
+        @close="showAskModal = false"
+      >
               <div class="flex items-center justify-between mb-6">
                 <h2 class="text-xl font-bold text-gray-900">{{ t('community.askQuestion') }}</h2>
                 <button @click="showAskModal = false" class="p-2 rounded-xl hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors">
@@ -318,10 +320,7 @@
                   {{ qaSubmitting ? t('community.postingQuestion') : t('community.postQuestion') }}
                 </button>
               </form>
-            </div>
-          </div>
-        </transition>
-      </Teleport>
+      </MotionModal>
     </div>
   </div>
 </template>
@@ -331,6 +330,7 @@ import { ref, reactive, onMounted, onActivated, computed } from 'vue'
 import { AnimatePresence, LayoutGroup, motion } from 'motion-v'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import MotionModal from '../components/motion/MotionModal.vue'
 import api from '../api'
 import {
   cardExit,
@@ -495,16 +495,3 @@ const formatDate = (dateStr: string) => {
 onMounted(() => { loadRoutes(); loadQuestions() })
 onActivated(() => { loadRoutes(); loadQuestions() })
 </script>
-
-<style scoped>
-@keyframes scaleInSpring {
-  from { opacity: 0; transform: scale(0.92) translateY(12px); }
-  to { opacity: 1; transform: scale(1) translateY(0); }
-}
-.animate-scale-in-spring {
-  animation: scaleInSpring 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
-}
-.modal-enter-active { transition: all 0.3s ease; }
-.modal-leave-active { transition: all 0.2s ease-in; }
-.modal-enter-from, .modal-leave-to { opacity: 0; }
-</style>

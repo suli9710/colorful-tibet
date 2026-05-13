@@ -51,10 +51,13 @@ out/
 # Uploaded files
 backend/uploads/
 
-# Database files (H2)
+# Local database files
 backend/data/*.mv.db
 backend/data/*.trace.db
 backend/data/*.lock.db
+backend/data/**/*.mv.db
+backend/data/**/*.trace.db
+backend/data/**/*.lock.db
 
 # FRP files (optional, can be committed if needed)
 # frp_0.65.0_windows_amd64/

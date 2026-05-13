@@ -1,16 +1,22 @@
 <template>
   <div class="min-h-screen bg-tibet-white py-24">
     <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="text-center mb-12 animate-fade-in">
+      <MotionBlock
+        class="text-center mb-12"
+      >
         <h1 class="text-4xl font-bold text-tibet-dark mb-4">{{ t('createRoute.title') }}</h1>
         <p class="text-lg text-tibet-brown/70">
           {{ t('createRoute.subtitle') }}
         </p>
-      </div>
+      </MotionBlock>
 
-      <div class="glass-card rounded-3xl p-8 md:p-12 mb-12 animate-slide-up shadow-xl border border-white/50">
+      <MotionBlock
+        class="glass-card rounded-3xl p-8 md:p-12 mb-12 shadow-xl border border-white/50"
+        variant="card"
+        :delay="0.08"
+      >
         <form @submit.prevent="submitRoute" class="space-y-8">
-          <div>
+          <MotionBlock :delay="0.16">
             <label class="block text-sm font-medium text-tibet-dark/80 mb-2">
               {{ t('createRoute.routeTitle') }} <span class="text-red-500">*</span>
             </label>
@@ -23,33 +29,45 @@
               maxlength="200"
             />
             <p class="mt-1 text-xs text-gray-500">{{ form.title.length }}/200</p>
-          </div>
+          </MotionBlock>
 
           <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div>
+            <MotionBlock :index="1" :delay="0.16">
               <label class="block text-sm font-medium text-tibet-dark/80 mb-2">
                 {{ t('createRoute.plannedDays') }} <span class="text-red-500">*</span>
               </label>
               <div class="flex items-center space-x-4">
-                <button 
+                <motion.button
                   type="button" 
                   @click="form.days > 1 && form.days--" 
                   class="w-10 h-10 rounded-full bg-tibet-gold/5 hover:bg-tibet-gold/15 flex items-center justify-center text-tibet-brown/80 transition-colors"
+                  :whileHover="{ y: -2, scale: 1.06 }"
+                  :whileTap="{ scale: 0.9 }"
                 >
                   -
-                </button>
-                <span class="text-xl font-bold text-tibet-dark w-8 text-center">{{ form.days }}</span>
-                <button 
+                </motion.button>
+                <motion.span
+                  :key="form.days"
+                  class="text-xl font-bold text-tibet-dark w-8 text-center"
+                  :initial="{ opacity: 0, y: -8 }"
+                  :animate="{ opacity: 1, y: 0 }"
+                  :transition="{ duration: 0.2, ease: motionEase }"
+                >
+                  {{ form.days }}
+                </motion.span>
+                <motion.button
                   type="button" 
                   @click="form.days < 30 && form.days++" 
                   class="w-10 h-10 rounded-full bg-tibet-gold/5 hover:bg-tibet-gold/15 flex items-center justify-center text-tibet-brown/80 transition-colors"
+                  :whileHover="{ y: -2, scale: 1.06 }"
+                  :whileTap="{ scale: 0.9 }"
                 >
                   +
-                </button>
+                </motion.button>
               </div>
-            </div>
+            </MotionBlock>
 
-            <div>
+            <MotionBlock :index="2" :delay="0.16">
               <label class="block text-sm font-medium text-tibet-dark/80 mb-2">
                 {{ t('createRoute.budgetRange') }} <span class="text-red-500">*</span>
               </label>
@@ -61,9 +79,9 @@
                 <option value="">{{ t('createRoute.selectBudget') }}</option>
                 <option v-for="opt in budgetOptions" :key="opt.key" :value="opt.key">{{ opt.label }}</option>
               </select>
-            </div>
+            </MotionBlock>
 
-            <div>
+            <MotionBlock :index="3" :delay="0.16">
               <label class="block text-sm font-medium text-tibet-dark/80 mb-2">
                 {{ t('createRoute.preference') }} <span class="text-red-500">*</span>
               </label>
@@ -75,10 +93,10 @@
                 <option value="">{{ t('createRoute.selectPreference') }}</option>
                 <option v-for="opt in preferenceOptions" :key="opt.key" :value="opt.key">{{ opt.label }}</option>
               </select>
-            </div>
+            </MotionBlock>
           </div>
 
-          <div>
+          <MotionBlock :index="4" :delay="0.16">
             <label class="block text-sm font-medium text-tibet-dark/80 mb-2">
               {{ t('createRoute.routeContent') }} <span class="text-red-500">*</span>
             </label>
@@ -92,42 +110,79 @@
             <p class="mt-1 text-xs text-gray-500">
               {{ t('createRoute.markdownHint') }}
             </p>
-          </div>
+          </MotionBlock>
 
-          <div class="flex justify-end gap-4 pt-4 border-t border-tibet-gold/25">
-            <button 
+          <MotionBlock
+            class="flex justify-end gap-4 pt-4 border-t border-tibet-gold/25"
+            :index="5"
+            :delay="0.16"
+          >
+            <motion.button
               type="button"
               @click="router.back()"
               class="px-6 py-3 rounded-xl border border-tibet-gold/25 hover:bg-gray-50 text-gray-700 font-medium transition-colors"
+              :whileHover="{ y: -2 }"
+              :whileTap="{ scale: 0.98 }"
             >
               {{ t('common.cancel') }}
-            </button>
-            <button 
+            </motion.button>
+            <motion.button
               type="submit" 
               :disabled="submitting"
               class="px-6 py-3 rounded-xl bg-tibet-gold hover:bg-tibet-gold/80 text-white font-medium transition-colors shadow-lg shadow-tibet-gold/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+              :whileHover="submitting ? {} : { y: -2, scale: 1.01 }"
+              :whileTap="submitting ? {} : { scale: 0.98 }"
             >
-              <span v-if="submitting" class="flex items-center">
-                <svg class="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                {{ t('createRoute.publishing') }}
-              </span>
-              <span v-else>{{ t('createRoute.publishToCommunity') }}</span>
-            </button>
-          </div>
+              <AnimatePresence mode="wait">
+                <motion.span
+                  v-if="submitting"
+                  key="publishing"
+                  class="flex items-center"
+                  :initial="{ opacity: 0, y: 6 }"
+                  :animate="{ opacity: 1, y: 0 }"
+                  :exit="{ opacity: 0, y: -6 }"
+                  :transition="{ duration: 0.18, ease: motionEase }"
+                >
+                  <motion.svg
+                    class="-ml-1 mr-2 h-5 w-5 text-white"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    :animate="{ rotate: 360 }"
+                    :transition="{ duration: 1, repeat: Infinity, ease: 'linear' }"
+                  >
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </motion.svg>
+                  {{ t('createRoute.publishing') }}
+                </motion.span>
+                <motion.span
+                  v-else
+                  key="publish"
+                  :initial="{ opacity: 0, y: 6 }"
+                  :animate="{ opacity: 1, y: 0 }"
+                  :exit="{ opacity: 0, y: -6 }"
+                  :transition="{ duration: 0.18, ease: motionEase }"
+                >
+                  {{ t('createRoute.publishToCommunity') }}
+                </motion.span>
+              </AnimatePresence>
+            </motion.button>
+          </MotionBlock>
         </form>
-      </div>
+      </MotionBlock>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
+import { AnimatePresence, motion } from 'motion-v'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import api from '../api'
+import MotionBlock from '../components/motion/MotionBlock.vue'
+import { motionEase } from '../motion/presets'
 
 const { t } = useI18n()
 

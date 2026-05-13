@@ -78,25 +78,13 @@
         </AnimatePresence>
       </div>
 
-      <!-- Modal for details -->
-      <AnimatePresence>
-        <motion.div
-          v-if="selectedItem"
-          key="news-detail-backdrop"
-          class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50"
-          :initial="{ opacity: 0 }"
-          :animate="{ opacity: 1 }"
-          :exit="{ opacity: 0 }"
-          @click="closeDetail">
-            <motion.div
-              v-if="selectedItem"
-              key="news-detail-card"
-              class="tibet-card-elevated rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
-              :initial="{ opacity: 0, y: 24, scale: 0.96, filter: 'blur(8px)' }"
-              :animate="{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }"
-              :exit="{ opacity: 0, y: 16, scale: 0.97, filter: 'blur(6px)' }"
-              :transition="{ duration: 0.34, ease: [0.16, 1, 0.3, 1] }"
-              @click.stop>
+      <MotionModal
+        :show="Boolean(selectedItem)"
+        modal-key="news-detail-modal"
+        panel-class="tibet-card-elevated rounded-2xl max-w-4xl max-h-[90vh] overflow-y-auto p-0"
+        @close="closeDetail"
+      >
+        <template v-if="selectedItem">
               <div class="relative h-64 md:h-96">
                 <img :src="selectedItem.imageUrl || '/images/news/default-news.jpg'" :alt="selectedItem.title" class="w-full h-full object-cover" onerror="this.src='/images/spots/布达拉宫.jpg'">
                 <button @click="closeDetail" class="absolute top-4 right-4 bg-black/50 text-white p-2 rounded-full hover:bg-black/70 transition-colors">
@@ -115,9 +103,8 @@
                   {{ selectedItem.content }}
                 </div>
               </div>
-            </motion.div>
-        </motion.div>
-      </AnimatePresence>
+        </template>
+      </MotionModal>
     </div>
   </div>
 </template>
@@ -126,6 +113,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { AnimatePresence, motion } from 'motion-v'
 import { useI18n } from 'vue-i18n'
+import MotionModal from '../components/motion/MotionModal.vue'
 import api, { endpoints } from '../api'
 import {
   cardExit,

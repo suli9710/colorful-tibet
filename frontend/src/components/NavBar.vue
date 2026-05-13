@@ -1,24 +1,57 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { Menu, X, LogOut } from 'lucide-vue-next'
-import { AnimatePresence, LayoutGroup, motion, useScroll, useTransform } from 'motion-v'
+import { AnimatePresence, LayoutGroup, motion } from 'motion-v'
 import { updateMemoizedLocale, clearTokenCache } from '../api/index'
 import { useAuthStore } from '../stores/auth'
+import {
+  mobileMenuAnimate,
+  mobileMenuExit,
+  mobileMenuInitial,
+  mobileMenuItemAnimate,
+  mobileMenuItemInitial,
+  mobileMenuItemTransition,
+  mobileMenuTransition,
+  navItemHover,
+  navItemPress,
+  navShellAnimate,
+  navShellInitial,
+  navShellTransition,
+  primaryActionHover,
+  primaryActionPress,
+  softSpring,
+  subtleButtonHover,
+  subtleButtonPress
+} from '../motion/presets'
 
 const router = useRouter()
 const { t, locale } = useI18n()
 const auth = useAuthStore()
 const isOpen = ref(false)
-const { scrollY } = useScroll()
-const navMaxWidth = useTransform(scrollY, [0, 120], ['1280px', '1024px'])
-const navBackground = useTransform(scrollY, [0, 120], ['rgba(247, 243, 238, 0.18)', 'rgba(247, 243, 238, 0.86)'])
-const navBlur = useTransform(scrollY, [0, 120], ['blur(4px) saturate(150%)', 'blur(20px) saturate(180%)'])
-const navShadow = useTransform(scrollY, [0, 120], ['0 0 0 rgba(139, 46, 58, 0)', '0 4px 24px rgba(139, 46, 58, 0.12)'])
-const navBorderColor = useTransform(scrollY, [0, 120], ['rgba(197, 150, 75, 0)', 'rgba(197, 150, 75, 0.22)'])
-const navPaddingY = useTransform(scrollY, [0, 120], ['1rem', '0.625rem'])
-const navBrandOpacity = useTransform(scrollY, [0, 120], [0.8, 1])
+const isScrolled = ref(false)
+let ticking = false
+
+const updateScrolledState = () => {
+  isScrolled.value = window.scrollY > 80
+  ticking = false
+}
+
+const handleScroll = () => {
+  if (ticking) return
+  ticking = true
+  window.requestAnimationFrame(updateScrolledState)
+}
+
+onMounted(() => {
+  updateScrolledState()
+  window.addEventListener('scroll', handleScroll, { passive: true })
+})
+
+onUnmounted(() => {
+  window.removeEventListener('scroll', handleScroll)
+})
 
 const currentLocale = computed(() => locale.value)
 const navItems = computed(() => [
@@ -49,26 +82,19 @@ const logout = () => {
   <div class="fixed top-0 left-0 w-full z-50 flex justify-center pt-4 px-4 pointer-events-none">
     <motion.nav
       layout
-      class="pointer-events-auto will-change-transform rounded-full border py-2.5 px-6 tibet-nav-shell"
-      :initial="{ y: -18, opacity: 0, scale: 0.98 }"
-      :animate="{ y: 0, opacity: 1, scale: 1 }"
-      :transition="{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }"
-      :style="{
-        maxWidth: navMaxWidth,
-        backgroundColor: navBackground,
-        backdropFilter: navBlur,
-        boxShadow: navShadow,
-        borderColor: navBorderColor,
-        borderWidth: '1px',
-        paddingTop: navPaddingY,
-        paddingBottom: navPaddingY,
-      }">
+      class="pointer-events-auto rounded-full border px-6 tibet-nav-shell nav-shell-optimized"
+      :class="isScrolled ? 'nav-shell-scrolled' : 'nav-shell-top'"
+      :initial="navShellInitial"
+      :animate="navShellAnimate"
+      :transition="navShellTransition"
+    >
       <div class="flex justify-between items-center">
         <div class="flex-shrink-0 flex items-center">
           <router-link to="/" class="flex items-center space-x-2 group">
             <span class="tibet-brand-sigil flex-shrink-0"></span>
             <motion.span class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-tibet-yellow via-tibet-gold to-tibet-red tibetan-font"
-              :style="{ opacity: navBrandOpacity }">
+              :animate="{ opacity: isScrolled ? 1 : 0.86 }"
+              :transition="{ duration: 0.2 }">
               {{ t('common.brandName') }}
             </motion.span>
           </router-link>
@@ -80,15 +106,15 @@ const logout = () => {
             <motion.a
               :href="href"
               class="relative px-4 py-2 rounded-full text-sm font-medium text-tibet-brown/80 hover:text-tibet-dark transition-colors duration-300 ease-out-expo group will-change-transform"
-              :whileHover="{ y: -2, scale: 1.04 }"
-              :whilePress="{ scale: 0.96 }"
+              :whileHover="navItemHover"
+              :whilePress="navItemPress"
               @click="navigate"
             >
               <motion.span
                 v-if="isActive"
                 layoutId="desktop-nav-active-pill"
                 class="absolute inset-0 rounded-full bg-white/75 shadow-sm border border-tibet-gold/20"
-                :transition="{ type: 'spring', stiffness: 430, damping: 34 }"
+                :transition="softSpring"
               />
               <span class="absolute inset-0 bg-gradient-to-r from-tibet-gold/10 to-tibet-red/10 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 ease-out-expo"></span>
               <span class="relative z-10">{{ item.label }}</span>
@@ -99,15 +125,15 @@ const logout = () => {
             <motion.a
               :href="href"
               class="relative px-4 py-2 rounded-full text-sm font-medium text-tibet-brown/80 hover:text-tibet-dark transition-colors duration-200"
-              :whileHover="{ y: -2, scale: 1.04 }"
-              :whilePress="{ scale: 0.96 }"
+              :whileHover="navItemHover"
+              :whilePress="navItemPress"
               @click="navigate"
             >
               <motion.span
                 v-if="isActive"
                 layoutId="desktop-nav-active-pill"
                 class="absolute inset-0 rounded-full bg-white/75 shadow-sm border border-tibet-gold/20"
-                :transition="{ type: 'spring', stiffness: 430, damping: 34 }"
+                :transition="softSpring"
               />
               <span class="relative z-10">{{ t('common.admin') }}</span>
             </motion.a>
@@ -119,8 +145,8 @@ const logout = () => {
           <motion.button
             @click="switchLanguage('zh')"
             layout
-            :whileHover="{ y: -1, scale: 1.04 }"
-            :whilePress="{ scale: 0.94 }"
+            :whileHover="subtleButtonHover"
+            :whilePress="subtleButtonPress"
             :class="[
               'px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200',
               currentLocale === 'zh'
@@ -132,8 +158,8 @@ const logout = () => {
           <motion.button
             @click="switchLanguage('bo')"
             layout
-            :whileHover="{ y: -1, scale: 1.04 }"
-            :whilePress="{ scale: 0.94 }"
+            :whileHover="subtleButtonHover"
+            :whilePress="subtleButtonPress"
             :class="[
               'px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200',
               currentLocale === 'bo'
@@ -155,7 +181,7 @@ const logout = () => {
             <router-link to="/login" class="text-sm font-medium text-tibet-brown/80 hover:text-tibet-dark transition-colors">
               {{ t('common.login') }}
             </router-link>
-            <motion.div :whileHover="{ y: -3, scale: 1.05 }" :whilePress="{ scale: 0.95 }">
+            <motion.div :whileHover="primaryActionHover" :whilePress="primaryActionPress">
               <router-link to="/register" class="bg-tibet-red hover:bg-tibet-red/90 text-tibet-yellow text-sm font-medium px-4 py-2 rounded-full transition-colors duration-300 ease-out-expo shadow-lg shadow-tibet-red/30 hover:shadow-tibet-red/50 relative overflow-hidden group will-change-transform">
                 <span class="relative z-10">{{ t('common.register') }}</span>
               </router-link>
@@ -164,7 +190,7 @@ const logout = () => {
         </div>
 
         <div class="flex items-center md:hidden">
-          <motion.button @click="isOpen = !isOpen" class="text-tibet-brown/80 hover:text-tibet-dark p-2 rounded-lg hover:bg-white/50 transition-colors" :whileTap="{ scale: 0.9 }">
+          <motion.button @click="isOpen = !isOpen" class="text-tibet-brown/80 hover:text-tibet-dark p-2 rounded-lg hover:bg-white/50 transition-colors" :whileTap="subtleButtonPress">
             <Menu v-if="!isOpen" class="w-6 h-6" />
             <X v-else class="w-6 h-6" />
           </motion.button>
@@ -178,18 +204,18 @@ const logout = () => {
       v-if="isOpen"
       key="mobile-nav"
       class="fixed top-20 left-4 right-4 z-40 md:hidden glass rounded-3xl border border-white/20 shadow-2xl origin-top"
-      :initial="{ opacity: 0, y: -14, scale: 0.96, filter: 'blur(8px)' }"
-      :animate="{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }"
-      :exit="{ opacity: 0, y: -10, scale: 0.97, filter: 'blur(6px)' }"
-      :transition="{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }"
+      :initial="mobileMenuInitial"
+      :animate="mobileMenuAnimate"
+      :exit="mobileMenuExit"
+      :transition="mobileMenuTransition"
     >
       <div class="px-4 pt-2 pb-6 space-y-1">
         <motion.div
           v-for="(item, index) in navItems"
           :key="item.path"
-          :initial="{ opacity: 0, x: -10 }"
-          :animate="{ opacity: 1, x: 0 }"
-          :transition="{ delay: index * 0.035, duration: 0.28, ease: [0.16, 1, 0.3, 1] }"
+          :initial="mobileMenuItemInitial"
+          :animate="mobileMenuItemAnimate"
+          :transition="mobileMenuItemTransition(index)"
         >
           <router-link
             :to="item.path"
@@ -247,3 +273,33 @@ const logout = () => {
     </motion.div>
   </AnimatePresence>
 </template>
+
+<style scoped>
+.nav-shell-optimized {
+  width: min(100%, 1280px);
+  border-width: 1px;
+  transition:
+    width 180ms ease,
+    background-color 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    padding 180ms ease;
+}
+
+.nav-shell-top {
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+  background-color: rgba(247, 243, 238, 0.5);
+  border-color: rgba(197, 150, 75, 0.08);
+  box-shadow: none;
+}
+
+.nav-shell-scrolled {
+  width: min(100%, 1024px);
+  padding-top: 0.625rem;
+  padding-bottom: 0.625rem;
+  background-color: rgba(247, 243, 238, 0.92);
+  border-color: rgba(197, 150, 75, 0.24);
+  box-shadow: 0 4px 22px rgba(139, 46, 58, 0.1);
+}
+</style>

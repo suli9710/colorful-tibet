@@ -12,6 +12,13 @@ public final class LocaleHelper {
 
     private LocaleHelper() {}
 
+    public static String resolveByLocale(String locale, String defaultText, String tibetanText) {
+        if (LOCALE_BO.equals(locale) && tibetanText != null && !tibetanText.isEmpty()) {
+            return tibetanText;
+        }
+        return defaultText;
+    }
+
     public static ScenicSpot resolveScenicSpotLocale(ScenicSpot spot, String locale) {
         if (spot == null || !LOCALE_BO.equals(locale)) return spot;
         if (spot.getNameTibetan() != null && !spot.getNameTibetan().isEmpty()) {

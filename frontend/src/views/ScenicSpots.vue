@@ -108,7 +108,12 @@
              v-for="(spot, index) in filteredSpots"
              :key="spot.id"
              layout
-             class="group tibet-card-elevated rounded-3xl overflow-hidden border border-tibet-gold/20 gpu-accelerated"
+             class="group tibet-card-elevated rounded-3xl overflow-hidden border border-tibet-gold/20 gpu-accelerated cursor-pointer focus:outline-none focus:ring-2 focus:ring-tibet-gold/60 focus:ring-offset-4"
+             role="link"
+             tabindex="0"
+             @click="goToSpot(spot)"
+             @keydown.enter.prevent="goToSpot(spot)"
+             @keydown.space.prevent="goToSpot(spot)"
              :initial="cardInitial"
              :whileInView="cardInView"
              :exit="cardExit"
@@ -118,7 +123,7 @@
              :whilePress="{ scale: 0.996 }">
           
           <!-- Image Container -->
-          <div class="relative h-72 overflow-hidden cursor-pointer bg-gray-200" @click="router.push(`/spots/${spot.id}`)">
+          <div class="relative h-72 overflow-hidden bg-gray-200">
             <img v-if="spot.imageUrl" 
                  :src="spot.imageUrl" 
                  :alt="spot.name"
@@ -162,7 +167,7 @@
                   {{ tag.tag }}
                 </span>
               </div>
-              <button @click="router.push(`/spots/${spot.id}`)" 
+              <button @click.stop="goToSpot(spot)" 
                       class="text-tibet-gold font-medium hover:text-tibet-gold/80 transition-all duration-300 ease-out-expo flex items-center shrink-0 ml-4 group/btn tibetan-font">
                 {{ t('spots.viewDetails') }}
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-1 transform group-hover/btn:translate-x-2 transition-transform duration-300 ease-out-expo will-change-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -253,6 +258,14 @@ const filteredSpots = computed(() => {
   }
   return spots.value.filter(spot => spot.category === selectedCategory.value)
 })
+
+const goToSpot = (spot: any) => {
+  if (spot?.id == null) {
+    console.warn('景点数据缺少 id，无法进入详情页:', spot)
+    return
+  }
+  router.push(`/spots/${encodeURIComponent(String(spot.id))}`)
+}
 
 const handleImageError = (event: Event) => {
   const img = event.target as HTMLImageElement

@@ -3,10 +3,10 @@
     <!-- Hero -->
     <section class="relative h-[50vh] overflow-hidden">
       <img
-        :src="hotel.coverImage || defaultHotelImage"
+        :src="hotelCoverImage"
         :alt="hotel.name"
         class="w-full h-full object-cover"
-        @error="($event.target as HTMLImageElement).src = defaultHotelImage"
+        @error="applyHotelImageFallback"
       />
       <div class="absolute inset-0 bg-gradient-to-b from-tibet-dark/30 via-tibet-dark/10 to-tibet-dark/80"></div>
       <!-- 底部经幡色带 -->
@@ -143,6 +143,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { getHotelById, hotels, type HotelItem } from '../data/hotels'
+import { applyHotelImageFallback, resolveHotelCoverImage } from '../data/hotelImages'
 import { getCanonicalRegion, localizeApiRoom, localizeHotel } from '../data/hotelTranslations'
 import api, { endpoints } from '../api'
 
@@ -152,9 +153,8 @@ const hotelId = Number(route.params.id || 1)
 const rawHotel = ref<any>({})
 const rawRoomTypes = ref<any[]>([])
 const loadingRooms = ref(true)
-const defaultHotelImage = '/images/hotels/hotel-luxury-1.jpg'
-
 const hotel = computed(() => localizeHotel(rawHotel.value, locale.value))
+const hotelCoverImage = computed(() => resolveHotelCoverImage(hotel.value.coverImage))
 const roomTypes = computed(() => rawRoomTypes.value.map(room => localizeApiRoom(room, locale.value)))
 
 const displayPrice = computed(() => {
@@ -186,7 +186,7 @@ const mapApiHotel = (apiHotel: any, staticHotel?: HotelItem) => {
     ...apiHotel,
     id: apiHotel.id,
     region,
-    coverImage: apiHotel.imageUrl || staticHotel?.coverImage || defaultHotelImage,
+    coverImage: resolveHotelCoverImage(staticHotel?.coverImage || apiHotel.imageUrl),
     stars: Math.min(5, Math.max(3, Math.round(Number(apiHotel.rating) || staticHotel?.rating || 4))),
     city: region,
     address: apiHotel.location || staticHotel?.address || '',

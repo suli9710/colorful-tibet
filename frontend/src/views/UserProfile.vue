@@ -1,9 +1,21 @@
 <script setup lang="ts">
-import NavBar from '@/components/NavBar.vue'
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { AnimatePresence, LayoutGroup, motion } from 'motion-v'
 import api, { endpoints } from '@/api'
+import { applyHotelImageFallback, resolveHotelBookingImage } from '@/data/hotelImages'
+import MotionModal from '@/components/motion/MotionModal.vue'
+import {
+  cardExit,
+  cardInitial,
+  cardInView,
+  cardTransition,
+  revealInitial,
+  revealInView,
+  revealTransition,
+  softSpring
+} from '@/motion/presets'
 
 const { t } = useI18n()
 
@@ -17,7 +29,8 @@ const hotelBookings = ref<any[]>([])
 const spotComments = ref<any[]>([])
 const routeComments = ref<any[]>([])
 const loading = ref(true)
-const activeTab = ref<'routes' | 'bookings' | 'hotel-bookings' | 'comments'>('routes')
+type ProfileTabId = 'routes' | 'bookings' | 'hotel-bookings' | 'comments'
+const activeTab = ref<ProfileTabId>('routes')
 const showPasswordModal = ref(false)
 const passwordForm = ref({
   oldPassword: '',
@@ -32,6 +45,13 @@ const nicknameForm = ref({
 const updatingNickname = ref(false)
 const uploadingAvatar = ref(false)
 const avatarFileInput = ref<HTMLInputElement | null>(null)
+
+const profileTabs = computed<Array<{ id: ProfileTabId; label: string; count: number }>>(() => [
+  { id: 'routes', label: t('profile.myRoutesTab'), count: myRoutes.value.length },
+  { id: 'bookings', label: t('profile.myBookingsTab'), count: bookings.value.length },
+  { id: 'hotel-bookings', label: t('profile.myHotelBookingsTab'), count: hotelBookings.value.length },
+  { id: 'comments', label: t('profile.myCommentsTab'), count: spotComments.value.length + routeComments.value.length }
+])
 
 onMounted(async () => {
   const userStr = localStorage.getItem('user')
@@ -316,16 +336,26 @@ const getAvatarUrl = () => {
 
 <template>
   <div class="min-h-screen bg-tibet-white">
-    <NavBar />
-    
-    <main class="max-w-7xl mx-auto px-4 py-8 mt-24">
+    <motion.main
+      class="max-w-7xl mx-auto px-4 py-8"
+      :initial="revealInitial"
+      :animate="revealInView"
+      :transition="revealTransition"
+    >
       <!-- User Info Card -->
-      <div class="glass-card rounded-3xl p-8 mb-8 animate-slide-up shadow-xl border border-white/50">
+      <motion.section
+        class="glass-card rounded-3xl p-8 mb-8 shadow-xl border border-white/50"
+        :initial="cardInitial"
+        :animate="cardInView"
+        :transition="cardTransition(0, 0.04)"
+      >
         <div class="flex flex-col md:flex-row items-center md:items-start gap-6">
           <div class="relative group">
-            <div 
+            <motion.div
               @click="handleAvatarClick"
               class="w-24 h-24 rounded-full flex items-center justify-center text-3xl text-white font-bold shadow-lg cursor-pointer overflow-hidden transition-all hover:ring-4 hover:ring-tibet-gold/60/50"
+              :whileHover="{ scale: 1.04, rotate: -1 }"
+              :whileTap="{ scale: 0.96 }"
               :class="getAvatarUrl() ? '' : 'bg-gradient-to-br from-blue-500 to-purple-600'"
             >
               <img 
@@ -337,7 +367,7 @@ const getAvatarUrl = () => {
               <span v-else>
                 {{ (userInfo?.nickname || userInfo?.username || user?.username || 'U').charAt(0).toUpperCase() }}
               </span>
-            </div>
+            </motion.div>
             <div class="absolute inset-0 bg-black/0 group-hover:bg-black/20 rounded-full flex items-center justify-center transition-all cursor-pointer" @click="handleAvatarClick">
               <svg v-if="!uploadingAvatar" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
@@ -358,59 +388,86 @@ const getAvatarUrl = () => {
               <h1 class="text-3xl font-bold text-tibet-dark">
                 {{ userInfo?.nickname || userInfo?.username || user?.username }}
               </h1>
-              <button 
+              <motion.button
                 @click="openNicknameModal"
                 class="text-tibet-brown/70 hover:text-tibet-gold transition-colors"
+                :whileHover="{ scale: 1.12, rotate: -4 }"
+                :whileTap="{ scale: 0.9 }"
                 :title="t('profile.editNickname')"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                 </svg>
-              </button>
+              </motion.button>
             </div>
             <p class="text-tibet-brown/70 mb-4">
               {{ userInfo?.role === 'ADMIN' ? t('profile.admin') : t('profile.member') }} · 
               {{ t('profile.registeredAt') }} {{ userInfo?.createdAt ? formatDate(userInfo.createdAt) : '' }}
             </p>
             <div class="flex flex-wrap gap-4 justify-center md:justify-start mb-4">
-              <div class="flex items-center gap-2 px-4 py-2 bg-white/50 rounded-xl">
+              <motion.div
+                class="flex items-center gap-2 px-4 py-2 bg-white/50 rounded-xl"
+                :initial="{ opacity: 0, y: 10 }"
+                :animate="{ opacity: 1, y: 0 }"
+                :transition="cardTransition(0, 0.16)"
+                :whileHover="{ y: -2, scale: 1.02 }"
+              >
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-tibet-gold" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
                 </svg>
                 <span class="text-sm font-medium text-tibet-dark/80">
                   <span class="text-tibet-gold font-bold">{{ stats?.routeCount || 0 }}</span> {{ t('profile.routesCount') }}
                 </span>
-              </div>
-              <div class="flex items-center gap-2 px-4 py-2 bg-white/50 rounded-xl">
+              </motion.div>
+              <motion.div
+                class="flex items-center gap-2 px-4 py-2 bg-white/50 rounded-xl"
+                :initial="{ opacity: 0, y: 10 }"
+                :animate="{ opacity: 1, y: 0 }"
+                :transition="cardTransition(1, 0.16)"
+                :whileHover="{ y: -2, scale: 1.02 }"
+              >
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                 </svg>
                 <span class="text-sm font-medium text-tibet-dark/80">
                   <span class="text-green-500 font-bold">{{ stats?.commentCount || 0 }}</span> {{ t('profile.commentsCount') }}
                 </span>
-              </div>
-              <div class="flex items-center gap-2 px-4 py-2 bg-white/50 rounded-xl">
+              </motion.div>
+              <motion.div
+                class="flex items-center gap-2 px-4 py-2 bg-white/50 rounded-xl"
+                :initial="{ opacity: 0, y: 10 }"
+                :animate="{ opacity: 1, y: 0 }"
+                :transition="cardTransition(2, 0.16)"
+                :whileHover="{ y: -2, scale: 1.02 }"
+              >
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                 </svg>
                 <span class="text-sm font-medium text-tibet-dark/80">
                   <span class="text-orange-500 font-bold">{{ stats?.bookingCount || 0 }}</span> {{ t('profile.bookingsCount') }}
                 </span>
-              </div>
+              </motion.div>
             </div>
-            <button 
+            <motion.button
               @click="showPasswordModal = true"
               class="px-4 py-2 bg-tibet-gold hover:bg-tibet-gold/80 text-white rounded-xl transition-colors text-sm font-medium"
+              :whileHover="{ y: -2, scale: 1.02 }"
+              :whileTap="{ scale: 0.96 }"
             >
               {{ t('profile.changePassword') }}
-            </button>
+            </motion.button>
           </div>
         </div>
-      </div>
+      </motion.section>
 
       <!-- Nickname Edit Modal -->
-      <div v-if="showNicknameModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="showNicknameModal = false">
-        <div class="glass rounded-3xl p-8 max-w-md w-full mx-4 shadow-2xl border border-white/50">
+      <MotionModal
+        :show="showNicknameModal"
+        modal-key="nickname-modal"
+        panel-class="glass rounded-3xl p-8 max-w-md mx-4 border border-white/50"
+        backdrop-class="bg-black/50"
+        @close="showNicknameModal = false"
+      >
           <h2 class="text-2xl font-bold text-tibet-dark mb-6">{{ t('profile.editNickname') }}</h2>
           <form @submit.prevent="updateNickname" class="space-y-4">
             <div>
@@ -426,28 +483,36 @@ const getAvatarUrl = () => {
               <p class="mt-1 text-xs text-gray-500">{{ nicknameForm.nickname.length }}/20</p>
             </div>
             <div class="flex gap-4 pt-4">
-              <button 
+              <motion.button
                 type="button"
                 @click="showNicknameModal = false"
                 class="flex-1 px-4 py-2 rounded-xl border border-tibet-gold/25 hover:bg-gray-50 text-gray-700 font-medium transition-colors"
+                :whileHover="{ y: -1, scale: 1.02 }"
+                :whileTap="{ scale: 0.96 }"
               >
                 {{ t('profile.cancel') }}
-              </button>
-              <button 
+              </motion.button>
+              <motion.button
                 type="submit"
                 :disabled="updatingNickname"
                 class="flex-1 px-4 py-2 rounded-xl bg-tibet-gold hover:bg-tibet-gold/80 text-white font-medium transition-colors disabled:opacity-50"
+                :whileHover="{ y: -1, scale: 1.02 }"
+                :whileTap="{ scale: 0.96 }"
               >
                 {{ updatingNickname ? t('profile.updating') : t('profile.confirmUpdate') }}
-              </button>
+              </motion.button>
             </div>
           </form>
-        </div>
-      </div>
+      </MotionModal>
 
       <!-- Password Change Modal -->
-      <div v-if="showPasswordModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="showPasswordModal = false">
-        <div class="glass rounded-3xl p-8 max-w-md w-full mx-4 shadow-2xl border border-white/50">
+      <MotionModal
+        :show="showPasswordModal"
+        modal-key="password-modal"
+        panel-class="glass rounded-3xl p-8 max-w-md mx-4 border border-white/50"
+        backdrop-class="bg-black/50"
+        @close="showPasswordModal = false"
+      >
           <h2 class="text-2xl font-bold text-tibet-dark mb-6">{{ t('profile.changePassword') }}</h2>
           <form @submit.prevent="changePassword" class="space-y-4">
             <div>
@@ -481,81 +546,82 @@ const getAvatarUrl = () => {
               />
             </div>
             <div class="flex gap-4 pt-4">
-              <button 
+              <motion.button
                 type="button"
                 @click="showPasswordModal = false"
                 class="flex-1 px-4 py-2 rounded-xl border border-tibet-gold/25 hover:bg-gray-50 text-gray-700 font-medium transition-colors"
+                :whileHover="{ y: -1, scale: 1.02 }"
+                :whileTap="{ scale: 0.96 }"
               >
                 {{ t('profile.cancel') }}
-              </button>
-              <button 
+              </motion.button>
+              <motion.button
                 type="submit"
                 :disabled="changingPassword"
                 class="flex-1 px-4 py-2 rounded-xl bg-tibet-gold hover:bg-tibet-gold/80 text-white font-medium transition-colors disabled:opacity-50"
+                :whileHover="{ y: -1, scale: 1.02 }"
+                :whileTap="{ scale: 0.96 }"
               >
                 {{ changingPassword ? t('profile.changing') : t('profile.confirmChange') }}
-              </button>
+              </motion.button>
             </div>
           </form>
-        </div>
-      </div>
+      </MotionModal>
 
       <!-- Tabs -->
-      <div class="glass-card rounded-2xl p-6 mb-8 animate-slide-up shadow-xl border border-white/50">
+      <motion.section
+        class="glass-card rounded-2xl p-6 mb-8 shadow-xl border border-white/50"
+        :initial="cardInitial"
+        :animate="cardInView"
+        :transition="cardTransition(1, 0.08)"
+      >
+        <LayoutGroup>
         <div class="flex gap-4 border-b border-tibet-gold/25 mb-6 overflow-x-auto">
-          <button 
-            @click="activeTab = 'routes'"
-            :class="[
-              'px-6 py-3 font-medium transition-all duration-300 border-b-2 whitespace-nowrap',
-              activeTab === 'routes' 
-                ? 'text-tibet-gold border-tibet-gold' 
-                : 'text-tibet-brown/70 border-transparent hover:text-tibet-dark/80'
-            ]"
+          <motion.button
+            v-for="tab in profileTabs"
+            :key="tab.id"
+            @click="activeTab = tab.id"
+            class="relative px-6 py-3 font-medium whitespace-nowrap transition-colors"
+            :class="activeTab === tab.id ? 'text-tibet-gold' : 'text-tibet-brown/70 hover:text-tibet-dark/80'"
+            :whileHover="{ y: -1 }"
+            :whileTap="{ scale: 0.96 }"
           >
-            {{ t('profile.myRoutesTab') }} ({{ myRoutes.length }})
-          </button>
-          <button 
-            @click="activeTab = 'bookings'"
-            :class="[
-              'px-6 py-3 font-medium transition-all duration-300 border-b-2 whitespace-nowrap',
-              activeTab === 'bookings' 
-                ? 'text-tibet-gold border-tibet-gold' 
-                : 'text-tibet-brown/70 border-transparent hover:text-tibet-dark/80'
-            ]"
-          >
-            {{ t('profile.myBookingsTab') }} ({{ bookings.length }})
-          </button>
-          <button 
-            @click="activeTab = 'hotel-bookings'"
-            :class="[
-              'px-6 py-3 font-medium transition-all duration-300 border-b-2 whitespace-nowrap',
-              activeTab === 'hotel-bookings' 
-                ? 'text-tibet-gold border-tibet-gold' 
-                : 'text-tibet-brown/70 border-transparent hover:text-tibet-dark/80'
-            ]"
-          >
-            {{ t('profile.myHotelBookingsTab') }} ({{ hotelBookings.length }})
-          </button>
-          <button 
-            @click="activeTab = 'comments'"
-            :class="[
-              'px-6 py-3 font-medium transition-all duration-300 border-b-2 whitespace-nowrap',
-              activeTab === 'comments' 
-                ? 'text-tibet-gold border-tibet-gold' 
-                : 'text-tibet-brown/70 border-transparent hover:text-tibet-dark/80'
-            ]"
-          >
-            {{ t('profile.myCommentsTab') }} ({{ spotComments.length + routeComments.length }})
-          </button>
+            {{ tab.label }} ({{ tab.count }})
+            <motion.span
+              v-if="activeTab === tab.id"
+              layoutId="profile-tab-underline"
+              class="absolute left-0 right-0 -bottom-px h-0.5 rounded-full bg-tibet-gold"
+              :transition="softSpring"
+            />
+          </motion.button>
         </div>
+        </LayoutGroup>
 
         <!-- Loading -->
-        <div v-if="loading" class="text-center py-12">
+        <AnimatePresence mode="wait">
+        <motion.div
+          v-if="loading"
+          key="profile-loading"
+          class="text-center py-12"
+          :initial="{ opacity: 0, y: 14 }"
+          :animate="{ opacity: 1, y: 0 }"
+          :exit="{ opacity: 0, y: -10 }"
+          :transition="revealTransition"
+        >
           <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-tibet-gold mx-auto"></div>
-        </div>
+        </motion.div>
+
+        <motion.div
+          v-else
+          :key="activeTab"
+          :initial="{ opacity: 0, y: 18, scale: 0.99 }"
+          :animate="{ opacity: 1, y: 0, scale: 1 }"
+          :exit="{ opacity: 0, y: -12, scale: 0.99 }"
+          :transition="revealTransition"
+        >
 
         <!-- My Routes -->
-        <div v-else-if="activeTab === 'routes'">
+        <div v-if="activeTab === 'routes'">
           <div v-if="myRoutes.length === 0" class="text-center py-12">
             <p class="text-gray-500 mb-4">{{ t('profile.noRoutes') }}</p>
             <router-link to="/create-route" class="text-tibet-gold hover:text-tibet-gold/80 font-medium">
@@ -564,10 +630,16 @@ const getAvatarUrl = () => {
           </div>
 
           <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div 
-              v-for="route in myRoutes" 
+            <motion.div
+              v-for="(route, index) in myRoutes"
               :key="route.id"
+              layout
               class="glass-card rounded-2xl p-6 hover:shadow-2xl transition-all duration-500 ease-out border border-white/20 group"
+              :initial="cardInitial"
+              :animate="cardInView"
+              :exit="cardExit"
+              :transition="cardTransition(index)"
+              :whileHover="{ y: -4, scale: 1.01 }"
             >
               <div class="flex justify-between items-start mb-4">
                 <h3 
@@ -576,15 +648,17 @@ const getAvatarUrl = () => {
                 >
                   {{ route.title }}
                 </h3>
-                <button 
+                <motion.button
                   @click="deleteRoute(route.id)"
                   class="ml-2 text-red-500 hover:text-red-700 transition-colors"
+                  :whileHover="{ scale: 1.12, rotate: -4 }"
+                  :whileTap="{ scale: 0.9 }"
                   :title="t('profile.delete')"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                   </svg>
-                </button>
+                </motion.button>
               </div>
               
               <div class="flex gap-2 mb-4 text-sm text-gray-600">
@@ -617,12 +691,12 @@ const getAvatarUrl = () => {
                 </div>
                 <span class="text-xs">{{ formatDate(route.createdAt) }}</span>
               </div>
-            </div>
+            </motion.div>
           </div>
         </div>
 
         <!-- My Bookings -->
-        <div v-else-if="activeTab === 'bookings'">
+        <div v-if="activeTab === 'bookings'">
           <div v-if="bookings.length === 0" class="text-center py-12">
             <p class="text-gray-500 mb-4">{{ t('profile.noBookings') }}</p>
             <router-link to="/spots" class="text-tibet-gold hover:text-tibet-gold/80 font-medium">
@@ -631,10 +705,16 @@ const getAvatarUrl = () => {
           </div>
 
           <div v-else class="space-y-4">
-            <div 
-              v-for="booking in bookings" 
-              :key="booking.id" 
+            <motion.div
+              v-for="(booking, index) in bookings"
+              :key="booking.id"
+              layout
               class="glass-card rounded-2xl p-6 flex flex-col md:flex-row justify-between items-center transition-all hover:shadow-lg border border-white/20"
+              :initial="cardInitial"
+              :animate="cardInView"
+              :exit="cardExit"
+              :transition="cardTransition(index)"
+              :whileHover="{ y: -3, scale: 1.006 }"
             >
               <div class="flex items-center space-x-4 mb-4 md:mb-0 w-full md:w-auto">
                 <div class="h-16 w-16 rounded-xl bg-gray-100 overflow-hidden flex-shrink-0">
@@ -661,20 +741,22 @@ const getAvatarUrl = () => {
                   </span>
                 </div>
                 
-                <button 
+                <motion.button
                   v-if="booking.status === 'CONFIRMED' || booking.status === 'PENDING'"
                   @click="cancelBooking(booking.id)"
                   class="px-4 py-2 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition-colors"
+                  :whileHover="{ y: -1, scale: 1.02 }"
+                  :whileTap="{ scale: 0.96 }"
                 >
                   {{ t('profile.cancelBooking') }}
-                </button>
+                </motion.button>
               </div>
-            </div>
+            </motion.div>
           </div>
         </div>
 
         <!-- My Hotel Bookings -->
-        <div v-else-if="activeTab === 'hotel-bookings'">
+        <div v-if="activeTab === 'hotel-bookings'">
           <div v-if="hotelBookings.length === 0" class="text-center py-12">
             <p class="text-gray-500 mb-4">{{ t('profile.noHotelBookings') }}</p>
             <router-link to="/hotels" class="text-tibet-gold hover:text-tibet-gold/80 font-medium">
@@ -683,19 +765,20 @@ const getAvatarUrl = () => {
           </div>
 
           <div v-else class="space-y-4">
-            <div 
-              v-for="booking in hotelBookings" 
-              :key="booking.id" 
+            <motion.div
+              v-for="(booking, index) in hotelBookings"
+              :key="booking.id"
+              layout
               class="glass-card rounded-2xl p-6 flex flex-col md:flex-row justify-between items-center transition-all hover:shadow-lg border border-white/20"
+              :initial="cardInitial"
+              :animate="cardInView"
+              :exit="cardExit"
+              :transition="cardTransition(index)"
+              :whileHover="{ y: -3, scale: 1.006 }"
             >
               <div class="flex items-center space-x-4 mb-4 md:mb-0 w-full md:w-auto">
                 <div class="h-16 w-16 rounded-xl bg-gray-100 overflow-hidden flex-shrink-0">
-                  <img v-if="booking.hotel?.coverImage" :src="booking.hotel.coverImage" class="w-full h-full object-cover" alt="">
-                  <div v-else class="w-full h-full flex items-center justify-center text-gray-400">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                    </svg>
-                  </div>
+                  <img :src="resolveHotelBookingImage(booking)" class="w-full h-full object-cover" alt="" @error="applyHotelImageFallback">
                 </div>
                 <div>
                   <h3 class="text-lg font-bold text-gray-900 mb-1">{{ booking.hotel?.name || '-' }}</h3>
@@ -722,20 +805,22 @@ const getAvatarUrl = () => {
                   </span>
                 </div>
                 
-                <button 
+                <motion.button
                   v-if="booking.status === 'CONFIRMED' || booking.status === 'PENDING'"
                   @click="cancelHotelBooking(booking.id)"
                   class="px-4 py-2 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition-colors"
+                  :whileHover="{ y: -1, scale: 1.02 }"
+                  :whileTap="{ scale: 0.96 }"
                 >
                   {{ t('profile.cancelBooking') }}
-                </button>
+                </motion.button>
               </div>
-            </div>
+            </motion.div>
           </div>
         </div>
 
         <!-- My Comments -->
-        <div v-else-if="activeTab === 'comments'">
+        <div v-if="activeTab === 'comments'">
           <div v-if="spotComments.length === 0 && routeComments.length === 0" class="text-center py-12">
             <p class="text-gray-500 mb-4">{{ t('profile.noComments') }}</p>
             <router-link to="/spots" class="text-tibet-gold hover:text-tibet-gold/80 font-medium">
@@ -748,10 +833,15 @@ const getAvatarUrl = () => {
             <div v-if="spotComments.length > 0">
               <h3 class="text-lg font-bold text-tibet-dark mb-4">{{ t('profile.spotComments') }} ({{ spotComments.length }})</h3>
               <div class="space-y-4">
-                <div 
-                  v-for="comment in spotComments" 
+                <motion.div
+                  v-for="(comment, index) in spotComments"
                   :key="comment.id"
                   class="glass-card rounded-2xl p-6 border border-white/20 hover:shadow-lg transition-all"
+                  :initial="cardInitial"
+                  :animate="cardInView"
+                  :exit="cardExit"
+                  :transition="cardTransition(index)"
+                  :whileHover="{ y: -3, scale: 1.006 }"
                 >
                   <div class="flex items-start gap-4">
                     <div class="flex-1">
@@ -778,7 +868,7 @@ const getAvatarUrl = () => {
                       </div>
                     </div>
                   </div>
-                </div>
+                </motion.div>
               </div>
             </div>
 
@@ -786,10 +876,15 @@ const getAvatarUrl = () => {
             <div v-if="routeComments.length > 0">
               <h3 class="text-lg font-bold text-tibet-dark mb-4 mt-6">{{ t('profile.routeComments') }} ({{ routeComments.length }})</h3>
               <div class="space-y-4">
-                <div 
-                  v-for="comment in routeComments" 
+                <motion.div
+                  v-for="(comment, index) in routeComments"
                   :key="comment.id"
                   class="glass-card rounded-2xl p-6 border border-white/20 hover:shadow-lg transition-all"
+                  :initial="cardInitial"
+                  :animate="cardInView"
+                  :exit="cardExit"
+                  :transition="cardTransition(index + spotComments.length)"
+                  :whileHover="{ y: -3, scale: 1.006 }"
                 >
                   <div class="flex items-start gap-4">
                     <div class="flex-1">
@@ -807,12 +902,14 @@ const getAvatarUrl = () => {
                       </div>
                     </div>
                   </div>
-                </div>
+                </motion.div>
               </div>
             </div>
           </div>
         </div>
-      </div>
-    </main>
+        </motion.div>
+        </AnimatePresence>
+      </motion.section>
+    </motion.main>
   </div>
 </template>

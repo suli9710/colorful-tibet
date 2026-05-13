@@ -16,7 +16,7 @@
     background-size: 100% 100%, 100% 10px, 180px 96px;
     background-repeat: no-repeat, repeat-x, repeat;
     background-position: top center, top left, center top;
-    background-attachment: fixed;
+    background-attachment: scroll;
   }
 
   h1, h2, h3, h4, .font-display {
@@ -52,9 +52,9 @@
 @layer components {
   /* Glassmorphism 效果 */
   .glass {
-    background: rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(20px) saturate(180%);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    background: rgba(255, 255, 255, 0.86);
+    backdrop-filter: blur(8px) saturate(135%);
+    -webkit-backdrop-filter: blur(8px) saturate(135%);
     border: 1px solid rgba(255, 255, 255, 0.2);
     box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
   }
@@ -63,10 +63,8 @@
   .glass-card {
     position: relative;
     background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.84), rgba(255, 255, 255, 0.72)),
-      rgba(255, 255, 255, 0.75);
-    backdrop-filter: blur(20px) saturate(180%);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
+      linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(255, 252, 247, 0.9)),
+      rgba(255, 255, 255, 0.9);
     border: 1px solid rgba(255, 255, 255, 0.5);
     box-shadow: 0 4px 24px rgba(139, 46, 58, 0.06);
   }
@@ -139,23 +137,32 @@
       linear-gradient(90deg, rgba(45, 95, 138, 0.16) 0 20%, rgba(247, 243, 238, 0.08) 20% 40%, rgba(139, 46, 58, 0.16) 40% 60%, rgba(59, 169, 156, 0.14) 60% 80%, rgba(242, 201, 76, 0.18) 80% 100%),
       url("data:image/svg+xml,%3Csvg width='220' height='110' viewBox='0 0 220 110' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='%23F2C94C' stroke-opacity='.18' stroke-width='1.5'%3E%3Cpath d='M22 64h34c10 0 10-15 0-15h-8c-3-17 27-22 35-5h24'/%3E%3Cpath d='M132 40h28c8 0 8-12 0-12h-6c-3-13 22-17 28-3h18'/%3E%3C/g%3E%3C/svg%3E");
     background-size: 100% 6px, 220px 110px;
-    background-repeat: repeat-x, repeat;
+    background-repeat: no-repeat, repeat-x, repeat;
     background-position: bottom left, center;
   }
 
   .tibet-footer-pattern {
     background-image:
-      linear-gradient(90deg, rgba(45, 95, 138, 0.14) 0 20%, rgba(247, 243, 238, 0.08) 20% 40%, rgba(139, 46, 58, 0.16) 40% 60%, rgba(59, 169, 156, 0.12) 60% 80%, rgba(242, 201, 76, 0.18) 80% 100%),
-      url("data:image/svg+xml,%3Csvg width='180' height='96' viewBox='0 0 180 96' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='%23C5964B' stroke-opacity='.18' stroke-width='1.2'%3E%3Cpath d='M15 54h25c8 0 8-11 0-11h-5c-3-12 19-16 24-4h18'/%3E%3Cpath d='M102 34h22c7 0 7-10 0-10h-5c-2-10 17-13 22-2h15'/%3E%3C/g%3E%3C/svg%3E");
-    background-size: 100% 5px, 180px 96px;
+      linear-gradient(120deg, rgba(26, 21, 32, 0.94), rgba(76, 42, 44, 0.92) 48%, rgba(25, 47, 69, 0.94)),
+      linear-gradient(90deg, rgba(45, 95, 138, 0.18) 0 20%, rgba(247, 243, 238, 0.07) 20% 40%, rgba(139, 46, 58, 0.2) 40% 60%, rgba(59, 169, 156, 0.13) 60% 80%, rgba(242, 201, 76, 0.2) 80% 100%),
+      url("data:image/svg+xml,%3Csvg width='180' height='96' viewBox='0 0 180 96' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='%23C5964B' stroke-opacity='.16' stroke-width='1.2'%3E%3Cpath d='M15 54h25c8 0 8-11 0-11h-5c-3-12 19-16 24-4h18'/%3E%3Cpath d='M102 34h22c7 0 7-10 0-10h-5c-2-10 17-13 22-2h15'/%3E%3C/g%3E%3C/svg%3E");
+    background-size: cover, 100% 5px, 180px 96px;
     background-repeat: repeat-x, repeat;
-    background-position: top left, center;
+    background-position: center, top left, center;
+  }
+
+  .tibet-footer-clouds {
+    background-image:
+      url("data:image/svg+xml,%3Csvg width='180' height='92' viewBox='0 0 180 92' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='%23F2C94C' stroke-opacity='.13' stroke-width='1.4'%3E%3Cpath d='M18 54h25c8 0 8-11 0-11h-5c-3-13 20-17 25-4h18'/%3E%3Cpath d='M106 34h22c7 0 7-10 0-10h-5c-2-11 18-14 23-2h16'/%3E%3C/g%3E%3Cg fill='none' stroke='%23F7F3EE' stroke-opacity='.06' stroke-width='1'%3E%3Cpath d='M38 78h19c6 0 6-8 0-8h-4c-2-9 15-12 19-2h12'/%3E%3C/g%3E%3C/svg%3E");
+    background-repeat: repeat;
+    background-size: 180px 92px;
+    opacity: 0.9;
   }
 
   .glass-dark {
-    background: rgba(0, 0, 0, 0.2);
-    backdrop-filter: blur(20px) saturate(180%);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    background: rgba(0, 0, 0, 0.42);
+    backdrop-filter: blur(8px) saturate(135%);
+    -webkit-backdrop-filter: blur(8px) saturate(135%);
     border: 1px solid rgba(255, 255, 255, 0.1);
   }
 
@@ -172,8 +179,7 @@
 
   /* 图片淡入效果 */
   .img-fade-in {
-    animation: imgFadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-    will-change: opacity, transform;
+    animation: imgFadeIn 0.36s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   }
 
   @keyframes imgFadeIn {
@@ -185,89 +191,6 @@
       opacity: 1;
       transform: scale(1);
     }
-  }
-
-  /* 滚动触发动画（已优化：使用 transform 避免布局抖动） */
-  .animate-on-scroll {
-    will-change: transform, opacity, filter;
-    opacity: 0;
-    transform: translate3d(0, 28px, 0) scale(0.98);
-    filter: blur(4px);
-    backface-visibility: hidden;
-    transform-origin: center bottom;
-  }
-  .animate-on-scroll.revealed {
-    opacity: 1;
-    transform: translate3d(0, 0, 0) scale(1);
-    filter: blur(0);
-    animation: revealUp 0.7s cubic-bezier(0.16, 1, 0.3, 1);
-    animation-fill-mode: backwards;
-  }
-  .animate-on-scroll.revealed.reveal-left {
-    animation: revealLeft 0.7s cubic-bezier(0.16, 1, 0.3, 1);
-    animation-fill-mode: backwards;
-  }
-  .animate-on-scroll.revealed.reveal-right {
-    animation: revealRight 0.7s cubic-bezier(0.16, 1, 0.3, 1);
-    animation-fill-mode: backwards;
-  }
-  .animate-on-scroll.revealed.reveal-scale {
-    animation: revealScale 0.7s cubic-bezier(0.34, 1.56, 0.64, 1);
-    animation-fill-mode: backwards;
-  }
-  .scroll-pop-card.animate-on-scroll {
-    transform: translate3d(0, 30px, 0) scale(0.96);
-    filter: blur(5px);
-  }
-  .scroll-pop-card.animate-on-scroll.revealed {
-    opacity: 1;
-    transform: translate3d(0, 0, 0) scale(1);
-    filter: blur(0);
-    animation: revealCardPop 0.68s cubic-bezier(0.16, 1, 0.3, 1);
-    animation-fill-mode: backwards;
-  }
-
-  @keyframes revealUp {
-    0% { opacity: 0; transform: translate3d(0, 32px, 0) scale(0.98); filter: blur(4px); }
-    100% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); filter: blur(0); }
-  }
-  @keyframes revealLeft {
-    0% { opacity: 0; transform: translate3d(-32px, 0, 0) scale(0.98); filter: blur(4px); }
-    100% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); filter: blur(0); }
-  }
-  @keyframes revealRight {
-    0% { opacity: 0; transform: translate3d(32px, 0, 0) scale(0.98); filter: blur(4px); }
-    100% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); filter: blur(0); }
-  }
-  @keyframes revealScale {
-    0% { opacity: 0; transform: scale(0.92); filter: blur(4px); }
-    100% { opacity: 1; transform: scale(1); filter: blur(0); }
-  }
-  @keyframes revealCardPop {
-    0% { opacity: 0; transform: translate3d(0, 34px, 0) scale(0.95); filter: blur(7px); }
-    72% { opacity: 1; transform: translate3d(0, -2px, 0) scale(1.008); filter: blur(0); }
-    100% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); filter: blur(0); }
-  }
-
-  /* 交错滚动动画：子元素从不同方向入场 */
-  .stagger-children > * {
-    will-change: transform, opacity;
-    opacity: 0;
-  }
-  .stagger-children.revealed > *:nth-child(1) { animation: revealUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.05s forwards; }
-  .stagger-children.revealed > *:nth-child(2) { animation: revealUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.12s forwards; }
-  .stagger-children.revealed > *:nth-child(3) { animation: revealUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.19s forwards; }
-  .stagger-children.revealed > *:nth-child(4) { animation: revealUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.26s forwards; }
-  .stagger-children.revealed > *:nth-child(5) { animation: revealUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.33s forwards; }
-  .stagger-children.revealed > *:nth-child(6) { animation: revealUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.40s forwards; }
-  .stagger-children.revealed > *:nth-child(7) { animation: revealUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.47s forwards; }
-  .stagger-children.revealed > *:nth-child(8) { animation: revealUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.54s forwards; }
-  .stagger-children.revealed > *:nth-child(9) { animation: revealUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.61s forwards; }
-
-  /* 视差滚动层（用于 Hero 背景） */
-  .parallax-layer {
-    will-change: transform;
-    transition: transform 0.1s linear;
   }
 
   /* 脉冲光晕效果 */
@@ -316,34 +239,6 @@
     100% { background-position: 200% 0; }
   }
 
-  /* 页面切换淡入淡出（配合 Vue Transition） */
-  .page-enter-active,
-  .page-leave-active {
-    transition: opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1),
-                transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
-  }
-  .page-enter-from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-  .page-leave-to {
-    opacity: 0;
-    transform: translateY(-8px);
-  }
-
-  /* 移动端菜单展开（配合 Vue Transition） */
-  .mobile-menu-enter-active {
-    transition: opacity 0.3s ease, transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
-  }
-  .mobile-menu-leave-active {
-    transition: opacity 0.2s ease, transform 0.25s ease-in;
-  }
-  .mobile-menu-enter-from,
-  .mobile-menu-leave-to {
-    opacity: 0;
-    transform: translateY(-12px) scale(0.97);
-  }
-
   /* 模态框入场（配合 Vue Transition） */
   .modal-enter-active {
     transition: opacity 0.3s ease;
@@ -371,47 +266,8 @@
     transform: scale(0.97);
   }
 
-  /* 按钮悬停效果优化 */
-  .btn-hover {
-    @apply transition-all duration-300;
-    transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
-    will-change: transform, box-shadow;
-  }
-
-  .btn-hover:hover {
-    transform: translateY(-2px) scale(1.02);
-  }
-
-  .btn-hover:active {
-    transform: translateY(0) scale(0.98);
-  }
-
-  /* 卡片悬停效果 */
-  .card-hover {
-    translate: 0 0;
-    scale: 1;
-    transition-property: translate, scale, box-shadow, border-color, background-color, filter;
-    transition-duration: 420ms;
-    transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
-    backface-visibility: hidden;
-  }
-
-  @media (hover: hover) and (pointer: fine) {
-    .card-hover:hover {
-      translate: 0 -6px;
-      scale: 1.01;
-    }
-  }
-
-  /* 平滑过渡 */
-  .smooth-transition {
-    @apply transition-all duration-300;
-    transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
-  }
-
   /* 性能优化：使用 GPU 加速 */
   .gpu-accelerated {
-    will-change: transform;
     backface-visibility: hidden;
   }
 }
@@ -653,7 +509,7 @@
     background-size: 20px 20px;
   }
 
-  /* ===== 新版卡片系统（替代 card-hover）===== */
+  /* ===== 藏式卡片系统 ===== */
   .tibet-card-elevated {
     background:
       linear-gradient(180deg, #fff, #fffaf4),
@@ -952,69 +808,6 @@
   @keyframes mistDrift {
     0%, 100% { transform: translateX(-2%) translateY(0); opacity: 0.5; }
     50% { transform: translateX(2%) translateY(-1%); opacity: 0.8; }
-  }
-
-  /* ===== Hero 经幡串 ===== */
-  .hero-prayer-flags {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-  }
-  .hero-prayer-flags::before {
-    content: '';
-    position: absolute;
-    top: 8%;
-    left: -5%;
-    width: 110%;
-    height: 3px;
-    background: linear-gradient(90deg,
-      transparent 0%,
-      #2D5F8A 5%, #2D5F8A 8%,
-      #F7F3EE 8%, #F7F3EE 11%,
-      #8B2E3A 11%, #8B2E3A 14%,
-      #3BA99C 14%, #3BA99C 17%,
-      #F2C94C 17%, #F2C94C 20%,
-      #2D5F8A 20%, #2D5F8A 23%,
-      #F7F3EE 23%, #F7F3EE 26%,
-      #8B2E3A 26%, #8B2E3A 29%,
-      #3BA99C 29%, #3BA99C 32%,
-      #F2C94C 32%, #F2C94C 35%,
-      #2D5F8A 35%, #2D5F8A 38%,
-      transparent 40%
-    );
-    transform: rotate(-2deg);
-    transform-origin: left center;
-    animation: flagSway 5s ease-in-out infinite;
-    box-shadow: 0 -2px 4px rgba(0,0,0,0.05);
-  }
-  .hero-prayer-flags::after {
-    content: '';
-    position: absolute;
-    top: 14%;
-    left: -5%;
-    width: 110%;
-    height: 2px;
-    background: linear-gradient(90deg,
-      transparent 5%,
-      #F2C94C 8%, #F2C94C 11%,
-      #3BA99C 11%, #3BA99C 14%,
-      #8B2E3A 14%, #8B2E3A 17%,
-      #F7F3EE 17%, #F7F3EE 20%,
-      #2D5F8A 20%, #2D5F8A 23%,
-      #F2C94C 23%, #F2C94C 26%,
-      #3BA99C 26%, #3BA99C 29%,
-      #8B2E3A 29%, #8B2E3A 32%,
-      #F7F3EE 32%, #F7F3EE 35%,
-      #2D5F8A 35%, #2D5F8A 38%,
-      transparent 42%
-    );
-    transform: rotate(1.5deg);
-    transform-origin: right center;
-    animation: flagSway 4.5s ease-in-out 1s infinite;
-  }
-  @keyframes flagSway {
-    0%, 100% { transform: rotate(-2deg); }
-    50% { transform: rotate(-0.5deg); }
   }
 
   /* ===== Hero 金光 ===== */
