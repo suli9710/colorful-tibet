@@ -8,6 +8,7 @@ import com.tibet.tourism.entity.User;
 import com.tibet.tourism.repository.CommentLikeRepository;
 import com.tibet.tourism.repository.CommentRepository;
 import com.tibet.tourism.repository.ScenicSpotRepository;
+import com.tibet.tourism.security.InputSanitizer;
 import com.tibet.tourism.security.JwtAuthSupport;
 import com.tibet.tourism.service.FileStorageService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -15,6 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
@@ -55,13 +57,12 @@ public class CommentController {
     public ResponseEntity<?> addComment(@RequestBody Map<String, Object> payload, HttpServletRequest request) {
         User user = jwtAuthSupport.resolveCurrentUser(request);
         long spotId = Long.parseLong(payload.get("spotId").toString());
-        String content = payload.get("content") == null ? "" : payload.get("content").toString().trim();
+        String content = InputSanitizer.requiredTextBlock(
+                payload.get("content") == null ? null : payload.get("content").toString(), 1000, "评论内容");
         Integer rating = Integer.valueOf(payload.get("rating").toString());
-        String imageUrl = payload.get("imageUrl") != null ? payload.get("imageUrl").toString() : null;
+        String imageUrl = InputSanitizer.optionalLocalAssetPath(
+                payload.get("imageUrl") == null ? null : payload.get("imageUrl").toString(), "评论图片");
 
-        if (content.isEmpty() || content.length() > 1000) {
-            return ResponseEntity.badRequest().body(Map.of("error", "评论内容长度不合法"));
-        }
         if (rating < 1 || rating > 5) {
             return ResponseEntity.badRequest().body(Map.of("error", "评分必须在1到5之间"));
         }
@@ -121,6 +122,24 @@ public class CommentController {
         Map<String, Object> response = new HashMap<>();
         response.put("liked", liked);
         return ResponseEntity.ok(response);
+    }
+
+    @DeleteMapping("/{commentId}")
+    @Transactional
+    public ResponseEntity<?> deleteComment(@PathVariable long commentId, HttpServletRequest request) {
+        User user = jwtAuthSupport.resolveCurrentUser(request);
+        Comment comment = commentRepository.findById(commentId)
+                .orElseThrow(() -> new RuntimeException("Comment not found"));
+
+        if (comment.getUser() == null || !comment.getUser().getId().equals(user.getId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "只能删除自己的评论"));
+        }
+
+        commentLikeRepository.deleteByCommentId(commentId);
+        commentRepository.delete(comment);
+
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/upload-image")

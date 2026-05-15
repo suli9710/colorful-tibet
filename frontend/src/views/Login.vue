@@ -135,13 +135,8 @@ const handleLogin = async () => {
   try {
     const { data: user } = await api.post('/auth/login', form.value)
 
-    if (!user.token) {
-      alert(t('login.loginFailed') + ' (缺少token)')
-      return
-    }
-
     clearTokenCache()
-    auth.login(user, user.token)
+    auth.login(user)
 
     router.push(user.role === 'ADMIN' ? '/admin' : '/')
   } catch (error: any) {

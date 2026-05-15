@@ -52,7 +52,7 @@ public class PriceController {
                 "currentPrice", spot.getTicketPrice()
             ));
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.badRequest().body(Map.of("error", "价格查询失败，请稍后重试"));
         }
     }
 
@@ -68,7 +68,7 @@ public class PriceController {
             PriceUpdateService.PriceUpdateResult result = priceUpdateService.updateSpotPrice(spotId, force);
             return ResponseEntity.ok(result);
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.badRequest().body(Map.of("error", "价格查询失败，请稍后重试"));
         }
     }
 
@@ -83,7 +83,7 @@ public class PriceController {
             PriceUpdateService.BatchUpdateResult result = priceUpdateService.batchUpdatePrices(force);
             return ResponseEntity.ok(result);
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.badRequest().body(Map.of("error", "价格查询失败，请稍后重试"));
         }
     }
 }

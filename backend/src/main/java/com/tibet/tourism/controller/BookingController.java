@@ -1,11 +1,13 @@
 package com.tibet.tourism.controller;
 
+import com.tibet.tourism.dto.BookingRequest;
 import com.tibet.tourism.entity.Booking;
 import com.tibet.tourism.entity.ScenicSpot;
 import com.tibet.tourism.entity.User;
 import com.tibet.tourism.repository.BookingRepository;
 import com.tibet.tourism.repository.ScenicSpotRepository;
 import com.tibet.tourism.repository.UserRepository;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -14,7 +16,6 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.time.MonthDay;
 import java.util.List;
 import java.util.Map;
@@ -33,45 +34,35 @@ public class BookingController {
     ScenicSpotRepository scenicSpotRepository;
 
     @PostMapping
-    public ResponseEntity<?> createBooking(@RequestBody Map<String, Object> payload) {
+    public ResponseEntity<?> createBooking(@Valid @RequestBody BookingRequest payload) {
         User user = getCurrentUser();
         if (user == null) {
             return ResponseEntity.status(401).body("User not authenticated");
         }
 
-        Long spotId = Long.valueOf(payload.get("spotId").toString());
-        String dateStr = payload.get("visitDate").toString();
-        Integer ticketCount = Integer.valueOf(payload.get("ticketCount").toString());
-        LocalDate visitDate = LocalDate.parse(dateStr);
-
-        if (ticketCount < 1 || ticketCount > 20) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Ticket count must be between 1 and 20"));
+        ScenicSpot spot = scenicSpotRepository.findById(payload.getSpotId()).orElse(null);
+        if (spot == null) {
+            return ResponseEntity.status(404).body(Map.of("error", "Spot not found"));
         }
-        if (visitDate.isBefore(LocalDate.now())) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Visit date cannot be in the past"));
-        }
-
-        ScenicSpot spot = scenicSpotRepository.findById(spotId)
-                .orElseThrow(() -> new RuntimeException("Spot not found"));
 
         Booking booking = new Booking();
         booking.setUser(user);
         booking.setSpot(spot);
-        booking.setVisitDate(visitDate);
-        booking.setTicketCount(ticketCount);
+        booking.setVisitDate(payload.getVisitDate());
+        booking.setTicketCount(payload.getTicketCount());
         booking.setStatus(Booking.Status.CONFIRMED); // Auto-confirm for now
 
         // Calculate total price with seasonal rules (按“每年”月份/日期判断，而不是具体年份):
         // 旺季：5月1日 - 10月31日
         // 淡季：11月1日 - 次年4月30日
         // 其中每年 1 月 1 日 - 3 月 31 日统一实施免票政策
-        BigDecimal unitPrice = spot.getTicketPrice();
-        MonthDay md = MonthDay.from(visitDate);
+        BigDecimal unitPrice = spot.getTicketPrice() == null ? BigDecimal.ZERO : spot.getTicketPrice();
+        MonthDay md = MonthDay.from(payload.getVisitDate());
         MonthDay may1 = MonthDay.of(5, 1);
         MonthDay oct31 = MonthDay.of(10, 31);
 
         // 1-3 月统一免票（全区冬季旅游季政策）
-        int month = visitDate.getMonthValue();
+        int month = payload.getVisitDate().getMonthValue();
         if (month >= 1 && month <= 3) {
             unitPrice = BigDecimal.ZERO;
         } else {
@@ -86,7 +77,7 @@ public class BookingController {
             }
         }
 
-        booking.setTotalPrice(unitPrice.multiply(new BigDecimal(ticketCount)));
+        booking.setTotalPrice(unitPrice.multiply(new BigDecimal(payload.getTicketCount())));
 
         bookingRepository.save(booking);
 
@@ -111,17 +102,55 @@ public class BookingController {
             return ResponseEntity.status(401).body("User not authenticated");
         }
 
-        Booking booking = bookingRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Booking not found"));
+        Booking booking = bookingRepository.findById(id).orElse(null);
+        if (booking == null) {
+            return ResponseEntity.status(404).body(Map.of("error", "Booking not found"));
+        }
 
         if (!booking.getUser().getId().equals(user.getId())) {
             return ResponseEntity.status(403).body("Unauthorized to cancel this booking");
+        }
+
+        if (booking.getStatus() == Booking.Status.CANCELLED) {
+            return ResponseEntity.ok(Map.of("message", "Booking already cancelled"));
         }
 
         booking.setStatus(Booking.Status.CANCELLED);
         bookingRepository.save(booking);
 
         return ResponseEntity.ok(Map.of("message", "Booking cancelled successfully!"));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deleteBooking(@PathVariable Long id) {
+        User user = getCurrentUser();
+        if (user == null) {
+            return ResponseEntity.status(401).body("User not authenticated");
+        }
+
+        Booking booking = bookingRepository.findById(id).orElse(null);
+        if (booking == null) {
+            return ResponseEntity.status(404).body(Map.of("error", "Booking not found"));
+        }
+
+        if (!booking.getUser().getId().equals(user.getId())) {
+            return ResponseEntity.status(403).body(Map.of("error", "Unauthorized to delete this booking"));
+        }
+
+        if (booking.getStatus() != Booking.Status.CANCELLED) {
+            return ResponseEntity.status(409).body(Map.of("error", "Only cancelled bookings can be deleted"));
+        }
+
+        try {
+            int deleted = bookingRepository.deleteByIdAndUserIdAndStatus(id, user.getId(), Booking.Status.CANCELLED);
+            if (deleted == 0) {
+                return ResponseEntity.status(409).body(Map.of("error", "Booking could not be deleted"));
+            }
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", "Failed to delete booking"));
+        }
+
+        return ResponseEntity.ok(Map.of("message", "Booking deleted successfully!"));
     }
 
     private User getCurrentUser() {

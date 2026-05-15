@@ -69,9 +69,9 @@ public class HotelBookingController {
                     "totalPrice", saved.getTotalPrice()
             ));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.badRequest().body(Map.of("error", "酒店预订参数不合法"));
         } catch (NoSuchElementException e) {
-            return ResponseEntity.status(404).body(Map.of("error", e.getMessage()));
+            return ResponseEntity.status(404).body(Map.of("error", "酒店预订资源不存在"));
         }
     }
 
@@ -95,7 +95,7 @@ public class HotelBookingController {
         try {
             return ResponseEntity.ok(hotelBookingService.getAllBookings(user, pageable));
         } catch (SecurityException e) {
-            return ResponseEntity.status(403).body(Map.of("error", e.getMessage()));
+            return ResponseEntity.status(403).body(Map.of("error", "无权操作该资源"));
         }
     }
 
@@ -110,11 +110,11 @@ public class HotelBookingController {
             hotelBookingService.updateStatus(user, id, payload.get("status"));
             return ResponseEntity.ok(Map.of("message", "Status updated successfully"));
         } catch (SecurityException e) {
-            return ResponseEntity.status(403).body(Map.of("error", e.getMessage()));
+            return ResponseEntity.status(403).body(Map.of("error", "无权操作该资源"));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", "Invalid status"));
         } catch (NoSuchElementException e) {
-            return ResponseEntity.status(404).body(Map.of("error", e.getMessage()));
+            return ResponseEntity.status(404).body(Map.of("error", "酒店预订资源不存在"));
         }
     }
 
@@ -129,9 +129,26 @@ public class HotelBookingController {
             hotelBookingService.cancelBooking(user, id);
             return ResponseEntity.ok(Map.of("message", "Booking cancelled successfully"));
         } catch (SecurityException e) {
-            return ResponseEntity.status(403).body(Map.of("error", e.getMessage()));
+            return ResponseEntity.status(403).body(Map.of("error", "无权操作该资源"));
         } catch (NoSuchElementException e) {
-            return ResponseEntity.status(404).body(Map.of("error", e.getMessage()));
+            return ResponseEntity.status(404).body(Map.of("error", "酒店预订资源不存在"));
+        }
+    }
+
+    @DeleteMapping("/{id}/permanent")
+    public ResponseEntity<?> deleteBooking(@PathVariable Long id) {
+        User user = getCurrentUser();
+        if (user == null) {
+            return ResponseEntity.status(401).body(Map.of("error", "User not authenticated"));
+        }
+
+        try {
+            hotelBookingService.deleteBooking(user, id);
+            return ResponseEntity.noContent().build();
+        } catch (SecurityException e) {
+            return ResponseEntity.status(403).body(Map.of("error", "无权操作该资源"));
+        } catch (NoSuchElementException e) {
+            return ResponseEntity.status(404).body(Map.of("error", "酒店预订资源不存在"));
         }
     }
 

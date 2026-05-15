@@ -33,15 +33,13 @@ public class RecommendationService {
     private static final int MAX_SIMILAR_USERS = 15; // 增加相似用户数量以提高召回率
     private static final int MAX_RESULTS = 10;
     private static final double MIN_SIMILARITY = 0.05; // 降低阈值以增加召回
-    @SuppressWarnings("unused")
-    private static final double RECENCY_WINDOW_DAYS = 365d; // 扩展时间窗口（保留用于未来扩展）
     private static final double DEFAULT_RATING = 3d;
     private static final double TAG_SCORE_MULTIPLIER = 0.75d;
-    
+
     // 新增优化参数
     private static final double COLLABORATIVE_WEIGHT = 0.7d; // 协同过滤权重
     private static final double CONTENT_WEIGHT = 0.3d; // 内容过滤权重
-    private static final double DIVERSITY_PENALTY = 0.15d; // 多样性惩罚系数
+    private static final double DIVERSITY_PENALTY = 0.30d; // 多样性惩罚系数（0.15 太弱，相同类别也只扣 15%）
     private static final double EXPLORATION_RATE = 0.1d; // 探索率（ε-greedy）
     private static final double MIN_COMMON_ITEMS = 2; // 最小共同访问景点数
     private static final double EXPONENTIAL_DECAY_FACTOR = 0.95d; // 指数衰减因子
@@ -82,8 +80,21 @@ public class RecommendationService {
     private static final long TAG_PROFILE_CACHE_TTL_MINUTES = 60;
     private static final int LOCAL_CACHE_SIZE_LIMIT = 1000;
 
-    private final Map<Long, Map<Long, Double>> localSimilarityCache = new ConcurrentHashMap<>();
-    private final Map<Long, Map<String, Double>> localTagProfileCache = new ConcurrentHashMap<>();
+    // LRU：满了淘汰最久未访问的条目，避免 clear() 造成的缓存雪崩
+    private final Map<Long, Map<Long, Double>> localSimilarityCache = Collections.synchronizedMap(
+            new LinkedHashMap<Long, Map<Long, Double>>(16, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<Long, Map<Long, Double>> eldest) {
+                    return size() > LOCAL_CACHE_SIZE_LIMIT;
+                }
+            });
+    private final Map<Long, Map<String, Double>> localTagProfileCache = Collections.synchronizedMap(
+            new LinkedHashMap<Long, Map<String, Double>>(16, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<Long, Map<String, Double>> eldest) {
+                    return size() > LOCAL_CACHE_SIZE_LIMIT;
+                }
+            });
     private volatile boolean redisCacheWarningLogged = false;
 
     private static String similarityKey(Long userId) {
@@ -342,36 +353,6 @@ public class RecommendationService {
     }
     
     /**
-     * 计算用户相似度 - 使用多种相似度度量方法的混合
-     * 1. 调整后的余弦相似度（考虑用户评分偏差）
-     * 2. Jaccard相似度（基于共同访问集合）
-     * 3. 时间加权相似度
-     * @deprecated 使用 calculateSimilarityWithDetails 替代以获取详细信息
-     */
-    @SuppressWarnings("unused")
-    private double calculateSimilarity(List<UserVisitHistory> user1History, List<UserVisitHistory> user2History) {
-        Map<Long, Double> user1Ratings = toRatingMap(user1History);
-        Map<Long, Double> user2Ratings = toRatingMap(user2History);
-
-        Set<Long> commonSpots = new HashSet<>(user1Ratings.keySet());
-        commonSpots.retainAll(user2Ratings.keySet());
-
-        if (commonSpots.size() < MIN_COMMON_ITEMS) return 0.0;
-
-        // 1. 调整后的余弦相似度（Adjusted Cosine Similarity）
-        double adjustedCosine = calculateAdjustedCosineSimilarity(user1History, user2History, commonSpots);
-        
-        // 2. Jaccard相似度（基于访问集合）
-        double jaccard = calculateJaccardSimilarity(user1Ratings.keySet(), user2Ratings.keySet());
-        
-        // 3. 时间加权相似度
-        double timeWeighted = calculateTimeWeightedSimilarity(user1History, user2History, commonSpots);
-        
-        // 加权组合：调整余弦(60%) + Jaccard(20%) + 时间加权(20%)
-        return 0.6 * adjustedCosine + 0.2 * jaccard + 0.2 * timeWeighted;
-    }
-    
-    /**
      * 计算用户相似度并返回详细信息
      */
     private SimilarityDetails calculateSimilarityWithDetails(List<UserVisitHistory> user1History, List<UserVisitHistory> user2History) {
@@ -451,13 +432,13 @@ public class RecommendationService {
     }
     
     /**
-     * 时间加权相似度 - 考虑访问时间的接近程度
+     * 时间加权相似度 - 取共同访问景点的时间接近度均值，越接近 1 表示访问时间越同步
      */
     private double calculateTimeWeightedSimilarity(List<UserVisitHistory> user1History,
                                                    List<UserVisitHistory> user2History,
                                                    Set<Long> commonSpots) {
         if (commonSpots.isEmpty()) return 0.0;
-        
+
         Map<Long, LocalDateTime> user1VisitTimes = user1History.stream()
                 .filter(h -> commonSpots.contains(h.getSpot().getId()))
                 .collect(Collectors.toMap(
@@ -465,7 +446,7 @@ public class RecommendationService {
                     h -> h.getVisitDate() != null ? h.getVisitDate() : LocalDateTime.now(),
                     (a, b) -> a.isAfter(b) ? a : b
                 ));
-        
+
         Map<Long, LocalDateTime> user2VisitTimes = user2History.stream()
                 .filter(h -> commonSpots.contains(h.getSpot().getId()))
                 .collect(Collectors.toMap(
@@ -473,23 +454,21 @@ public class RecommendationService {
                     h -> h.getVisitDate() != null ? h.getVisitDate() : LocalDateTime.now(),
                     (a, b) -> a.isAfter(b) ? a : b
                 ));
-        
-        double totalWeight = 0.0;
-        double weightedSum = 0.0;
-        
+
+        double weightSum = 0.0;
+        int counted = 0;
+
         for (Long spotId : commonSpots) {
             LocalDateTime time1 = user1VisitTimes.get(spotId);
             LocalDateTime time2 = user2VisitTimes.get(spotId);
             if (time1 == null || time2 == null) continue;
-            
+
             long daysDiff = Math.abs(Duration.between(time1, time2).toDays());
-            // 时间越接近，权重越高（指数衰减）
-            double timeWeight = Math.pow(EXPONENTIAL_DECAY_FACTOR, daysDiff / 30.0);
-            totalWeight += timeWeight;
-            weightedSum += timeWeight;
+            weightSum += Math.pow(EXPONENTIAL_DECAY_FACTOR, daysDiff / 30.0);
+            counted++;
         }
-        
-        return totalWeight == 0 ? 0.0 : weightedSum / (totalWeight * commonSpots.size());
+
+        return counted == 0 ? 0.0 : weightSum / counted;
     }
 
     private Map<Long, Double> toRatingMap(List<UserVisitHistory> histories) {
@@ -591,10 +570,6 @@ public class RecommendationService {
                 .collect(Collectors.toList());
     }
 
-    private RecommendationComputationContext computeContext(Long userId) {
-        return computeContext(userId, null);
-    }
-    
     private RecommendationComputationContext computeContext(Long userId, RecommendationContext recommendationContext) {
         RecommendationComputationContext context = new RecommendationComputationContext();
         
@@ -689,33 +664,31 @@ public class RecommendationService {
 
         Map<Long, Double> cachedSimilarities = getSimilarityCache(userId);
 
-        // 使用并行流计算相似度以提高性能，同时收集详细信息
+        // 并行计算相似度，过滤低分。ConcurrentHashMap 不允许 null value，所以先 map 再 filter。
         Map<Long, SimilarityDetails> similarityDetailsMap = new ConcurrentHashMap<>();
         Map<Long, Double> userSimilarityMap = overlapHistoryByUser.entrySet().parallelStream()
-                .collect(Collectors.toConcurrentMap(
-                    Map.Entry::getKey,
-                    entry -> {
-                        // 尝试从缓存获取
-                        Long otherUserId = entry.getKey();
-                        if (cachedSimilarities != null && cachedSimilarities.containsKey(otherUserId)) {
-                            return cachedSimilarities.get(otherUserId);
-                        }
-                        
-                        // 计算相似度及详细信息
-                        SimilarityDetails details = calculateSimilarityWithDetails(currentUserHistory, entry.getValue());
-                        double similarity = 0.6 * details.getAdjustedCosine() + 0.2 * details.getJaccard() + 0.2 * details.getTimeWeighted();
-                        
-                        if (similarity >= MIN_SIMILARITY) {
-                            similarityDetailsMap.put(otherUserId, details);
-                            return similarity;
-                        }
+                .map(entry -> {
+                    Long otherUserId = entry.getKey();
+                    if (cachedSimilarities != null && cachedSimilarities.containsKey(otherUserId)) {
+                        return Map.entry(otherUserId, cachedSimilarities.get(otherUserId));
+                    }
+
+                    SimilarityDetails details = calculateSimilarityWithDetails(currentUserHistory, entry.getValue());
+                    double similarity = 0.6 * details.getAdjustedCosine()
+                            + 0.2 * details.getJaccard()
+                            + 0.2 * details.getTimeWeighted();
+
+                    if (similarity < MIN_SIMILARITY) {
                         return null;
-                    },
-                    (v1, v2) -> v1 != null ? v1 : v2
-                ));
-        
-        // 移除null值
-        userSimilarityMap.entrySet().removeIf(entry -> entry.getValue() == null);
+                    }
+                    similarityDetailsMap.put(otherUserId, details);
+                    return Map.entry(otherUserId, similarity);
+                })
+                .filter(Objects::nonNull)
+                .collect(Collectors.toConcurrentMap(
+                        Map.Entry::getKey,
+                        Map.Entry::getValue,
+                        (v1, v2) -> v1));
         
         logger.info("👥 找到 {} 个相似用户（相似度 >= {}）", userSimilarityMap.size(), MIN_SIMILARITY);
         if (!userSimilarityMap.isEmpty()) {
@@ -725,12 +698,12 @@ public class RecommendationService {
                     .forEach(entry -> {
                         SimilarityDetails details = similarityDetailsMap.get(entry.getKey());
                         if (details != null) {
-                            logger.info("   - 用户 {}: 总相似度={:.4f} (余弦={:.4f}, Jaccard={:.4f}, 时间={:.4f}, 共同景点={})",
-                                    entry.getKey(), entry.getValue(), 
-                                    details.getAdjustedCosine(), details.getJaccard(), 
-                                    details.getTimeWeighted(), details.getCommonSpotsCount());
+                            logger.info("   - 用户 {}: 总相似度={} (余弦={}, Jaccard={}, 时间={}, 共同景点={})",
+                                    entry.getKey(), formatScore(entry.getValue()),
+                                    formatScore(details.getAdjustedCosine()), formatScore(details.getJaccard()),
+                                    formatScore(details.getTimeWeighted()), details.getCommonSpotsCount());
                         } else {
-                            logger.info("   - 用户 {}: 相似度={:.4f}", entry.getKey(), entry.getValue());
+                            logger.info("   - 用户 {}: 相似度={}", entry.getKey(), formatScore(entry.getValue()));
                         }
                     });
         }
@@ -1105,25 +1078,11 @@ public class RecommendationService {
         
         return normalized;
     }
-    
-    /**
-     * 应用上下文感知过滤和加权
-     */
-    private Map<Long, Double> applyContextAwareFiltering(
-            Map<Long, Double> candidateScores,
-            RecommendationContext context) {
 
-        if (candidateScores.isEmpty()) {
-            return candidateScores;
-        }
-
-        List<Long> candidateIds = new ArrayList<>(candidateScores.keySet());
-        Map<Long, ScenicSpot> spotMap = spotRepository.findAllById(candidateIds).stream()
-                .collect(Collectors.toMap(ScenicSpot::getId, spot -> spot));
-
-        return applyContextAwareFilteringWithSpotMap(candidateScores, context, spotMap);
+    private static String formatScore(double value) {
+        return String.format(Locale.ROOT, "%.4f", value);
     }
-
+    
     /**
      * 应用上下文感知过滤和加权（复用已查询的 spotMap，避免重复查询）
      */
@@ -1395,17 +1354,10 @@ public class RecommendationService {
     }
     
     /**
-     * 重排序 - 应用多样性惩罚和探索机制
-     */
-    private List<ScenicSpot> rerankWithDiversityAndExploration(
-            Map<Long, Double> candidateScores,
-            Set<Long> visitedSpotIds,
-            Map<String, Double> tagProfile) {
-        return rerankWithDiversityAndExploration(candidateScores, visitedSpotIds, tagProfile, null, null);
-    }
-
-    /**
      * 重排序 - 应用多样性惩罚和探索机制（复用已查询的 spotMap，避免重复查询）
+     *
+     * 多样性惩罚增量计算：每选定一个景点后，只把"它与剩余候选的相似度"合并到累积 maxSim 中，
+     * 整体复杂度由 O(K·N²) 降到 O(K·N)。
      */
     private List<ScenicSpot> rerankWithDiversityAndExploration(
             Map<Long, Double> candidateScores,
@@ -1418,7 +1370,6 @@ public class RecommendationService {
             return Collections.emptyList();
         }
 
-        // 如果没有预加载的 spotMap，则查询
         Map<Long, ScenicSpot> spotMap = preloadedSpotMap;
         List<Long> remainingCandidateIds = new ArrayList<>(candidateScores.keySet());
         if (spotMap == null) {
@@ -1426,74 +1377,66 @@ public class RecommendationService {
                     .collect(Collectors.toMap(ScenicSpot::getId, spot -> spot));
         }
 
-        // 计算多样性惩罚后的得分
         List<Long> selectedSpots = new ArrayList<>();
+        Map<Long, Double> maxSimToSelected = new HashMap<>();
 
         Random random = new Random();
-        int explorationCount = (int) (MAX_RESULTS * EXPLORATION_RATE);
 
         for (int i = 0; i < MAX_RESULTS && !remainingCandidateIds.isEmpty(); i++) {
-            // ε-greedy: 探索机制
-            if (i < explorationCount && random.nextDouble() < EXPLORATION_RATE) {
+            // ε-greedy: 以 EXPLORATION_RATE 概率随机抽一个候选
+            if (random.nextDouble() < EXPLORATION_RATE) {
                 Long randomSpotId = remainingCandidateIds.get(random.nextInt(remainingCandidateIds.size()));
-                ScenicSpot spot = spotMap.get(randomSpotId);
-                if (spot != null) {
+                ScenicSpot randomSpot = spotMap.get(randomSpotId);
+                if (randomSpot != null) {
                     selectedSpots.add(randomSpotId);
                     remainingCandidateIds.remove(randomSpotId);
+                    updateMaxSimAfterSelect(randomSpot, remainingCandidateIds, spotMap, maxSimToSelected);
                     continue;
                 }
             }
 
-            // 计算每个候选的多样性调整得分
-            Map<Long, Double> adjustedScores = new HashMap<>();
+            Long bestSpotId = null;
+            double bestScore = -Double.MAX_VALUE;
             for (Long spotId : remainingCandidateIds) {
                 double baseScore = candidateScores.getOrDefault(spotId, 0.0);
-                double diversityPenalty = calculateDiversityPenalty(spotId, selectedSpots, spotMap);
-                adjustedScores.put(spotId, baseScore * (1.0 - diversityPenalty));
+                double penalty = maxSimToSelected.getOrDefault(spotId, 0.0) * DIVERSITY_PENALTY;
+                double adjusted = baseScore * (1.0 - penalty);
+                if (adjusted > bestScore) {
+                    bestScore = adjusted;
+                    bestSpotId = spotId;
+                }
             }
 
-            // 选择得分最高的
-            Long bestSpotId = adjustedScores.entrySet().stream()
-                    .max(Map.Entry.comparingByValue())
-                    .map(Map.Entry::getKey)
-                    .orElse(null);
-
-            if (bestSpotId != null) {
-                selectedSpots.add(bestSpotId);
-                remainingCandidateIds.remove(bestSpotId);
+            if (bestSpotId == null) {
+                break;
+            }
+            ScenicSpot bestSpot = spotMap.get(bestSpotId);
+            selectedSpots.add(bestSpotId);
+            remainingCandidateIds.remove(bestSpotId);
+            if (bestSpot != null) {
+                updateMaxSimAfterSelect(bestSpot, remainingCandidateIds, spotMap, maxSimToSelected);
             }
         }
 
+        Map<Long, ScenicSpot> finalSpotMap = spotMap;
         return selectedSpots.stream()
-                .map(spotMap::get)
+                .map(finalSpotMap::get)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
     }
-    
-    /**
-     * 计算多样性惩罚 - 避免推荐过于相似的景点
-     */
-    private double calculateDiversityPenalty(Long spotId, List<Long> selectedSpots, Map<Long, ScenicSpot> spotMap) {
-        if (selectedSpots.isEmpty()) return 0.0;
-        
-        ScenicSpot currentSpot = spotMap.get(spotId);
-        if (currentSpot == null) return 0.0;
-        
-        double maxSimilarity = 0.0;
-        for (Long selectedId : selectedSpots) {
-            ScenicSpot selectedSpot = spotMap.get(selectedId);
-            if (selectedSpot == null) continue;
-            
-            // 基于标签的相似度
-            double tagSimilarity = calculateTagSimilarity(currentSpot, selectedSpot);
-            // 基于类别的相似度
-            double categorySimilarity = currentSpot.getCategory() == selectedSpot.getCategory() ? 1.0 : 0.0;
-            
-            double totalSimilarity = 0.7 * tagSimilarity + 0.3 * categorySimilarity;
-            maxSimilarity = Math.max(maxSimilarity, totalSimilarity);
+
+    private void updateMaxSimAfterSelect(ScenicSpot justSelected,
+                                         List<Long> remaining,
+                                         Map<Long, ScenicSpot> spotMap,
+                                         Map<Long, Double> maxSimToSelected) {
+        for (Long spotId : remaining) {
+            ScenicSpot candidate = spotMap.get(spotId);
+            if (candidate == null) continue;
+            double tagSim = calculateTagSimilarity(candidate, justSelected);
+            double catSim = candidate.getCategory() == justSelected.getCategory() ? 1.0 : 0.0;
+            double sim = 0.7 * tagSim + 0.3 * catSim;
+            maxSimToSelected.merge(spotId, sim, Math::max);
         }
-        
-        return maxSimilarity * DIVERSITY_PENALTY;
     }
     
     /**
@@ -1528,17 +1471,11 @@ public class RecommendationService {
     }
 
     private void cacheTagProfile(Long userId, Map<String, Double> tagPreferenceProfile) {
-        if (localTagProfileCache.size() >= LOCAL_CACHE_SIZE_LIMIT && !localTagProfileCache.containsKey(userId)) {
-            localTagProfileCache.clear();
-        }
         localTagProfileCache.put(userId, new HashMap<>(tagPreferenceProfile));
         setRedisValue(tagProfileKey(userId), tagPreferenceProfile, TAG_PROFILE_CACHE_TTL_MINUTES, "set tag profile");
     }
 
     private void cacheSimilarity(Long userId, Map<Long, Double> similarities) {
-        if (localSimilarityCache.size() >= LOCAL_CACHE_SIZE_LIMIT && !localSimilarityCache.containsKey(userId)) {
-            localSimilarityCache.clear();
-        }
         localSimilarityCache.put(userId, new HashMap<>(similarities));
         setRedisValue(similarityKey(userId), new HashMap<>(similarities), SIMILARITY_CACHE_TTL_MINUTES, "set similarity");
     }

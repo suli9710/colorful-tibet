@@ -1,8 +1,11 @@
 package com.tibet.tourism.service;
 
+import com.tibet.tourism.config.CacheConfig;
 import com.tibet.tourism.entity.News;
 import com.tibet.tourism.repository.NewsRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.lang.NonNull;
@@ -21,10 +24,15 @@ public class NewsService {
         return newsRepository.findAll();
     }
 
+    @Cacheable(
+            value = CacheConfig.NEWS_CACHE,
+            key = "'page:' + #pageable.pageNumber + ':' + #pageable.pageSize + ':' + #pageable.sort.toString()",
+            unless = "#result == null || #result.empty")
     public Page<News> getAllNews(Pageable pageable) {
         return newsRepository.findAll(pageable);
     }
 
+    @CacheEvict(value = CacheConfig.NEWS_CACHE, allEntries = true)
     public News createNews(@NonNull News news) {
         return newsRepository.save(news);
     }
@@ -34,6 +42,7 @@ public class NewsService {
     }
 
     @Transactional
+    @CacheEvict(value = CacheConfig.NEWS_CACHE, allEntries = true)
     public News updateNews(@NonNull Long id, @NonNull News updatedNews) {
         News news = newsRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("News not found with id: " + id));
@@ -58,6 +67,7 @@ public class NewsService {
     }
 
     @Transactional
+    @CacheEvict(value = CacheConfig.NEWS_CACHE, allEntries = true)
     public void deleteNews(@NonNull Long id) {
         if (!newsRepository.existsById(id)) {
             throw new RuntimeException("News not found with id: " + id);

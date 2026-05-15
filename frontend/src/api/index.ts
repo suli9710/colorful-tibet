@@ -1,69 +1,106 @@
-import axios from 'axios'
+import axios, { type AxiosResponse } from 'axios'
 import { clearStoredAuth } from '../stores/auth'
 
 const apiBaseURL = import.meta.env.VITE_API_BASE_URL || '/api'
+const DEFAULT_TIMEOUT_MS = 15000
+const LONG_TIMEOUT_MS = 180000
+const UPLOAD_TIMEOUT_MS = 60000
+const GET_CACHE_TTL_MS = 15000
 
 const api = axios.create({
   baseURL: apiBaseURL,
-  timeout: 180000,
+  timeout: DEFAULT_TIMEOUT_MS,
+  withCredentials: true,
+  xsrfCookieName: 'XSRF-TOKEN',
+  xsrfHeaderName: 'X-XSRF-TOKEN',
   headers: { 'Content-Type': 'application/json' }
 })
-
-// Module-level memoization to avoid localStorage reads on every request
-let memoizedToken: string | null = null
-let tokenMemoExpiry = 0
 
 let memoizedLocale: string = localStorage.getItem('locale') || 'zh'
 
 export const updateMemoizedLocale = (locale: string) => {
   memoizedLocale = locale
   localStorage.setItem('locale', locale)
+  clearGetCache()
 }
 
 export const clearTokenCache = () => {
-  memoizedToken = null
-  tokenMemoExpiry = 0
+  clearGetCache()
 }
 
-const getToken = (): string => {
-  const now = Date.now()
-  if (now < tokenMemoExpiry && memoizedToken !== null) {
-    return memoizedToken
-  }
+const pendingGets = new Map<string, Promise<AxiosResponse>>()
+const getResponseCache = new Map<string, { expiresAt: number; response: AxiosResponse }>()
 
-  const token = localStorage.getItem('token')
-  if (token) {
-    memoizedToken = token
-    tokenMemoExpiry = now + 60_000
-    return token
-  }
-
-  const userStr = localStorage.getItem('user')
-  if (!userStr) {
-    memoizedToken = ''
-    tokenMemoExpiry = now + 60_000
-    return ''
-  }
-
-  try {
-    const user = JSON.parse(userStr)
-    const resolved = user?.token || user?.accessToken || user?.jwt || user?.data?.token || user?.data?.accessToken || ''
-    memoizedToken = resolved
-    tokenMemoExpiry = now + 60_000
-    return resolved
-  } catch {
-    memoizedToken = ''
-    tokenMemoExpiry = now + 60_000
-    return ''
-  }
+function clearGetCache() {
+  pendingGets.clear()
+  getResponseCache.clear()
 }
+
+function stableStringify(value: unknown): string {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value)
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`
+  return `{${Object.entries(value as Record<string, unknown>)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([key, item]) => `${JSON.stringify(key)}:${stableStringify(item)}`)
+    .join(',')}}`
+}
+
+function getRequestKey(url: string, config: any = {}) {
+  return stableStringify({
+    baseURL: config.baseURL || apiBaseURL,
+    url,
+    params: config.params || {},
+    locale: memoizedLocale
+  })
+}
+
+function withSpecialTimeout(url: string, config: any = {}) {
+  const nextConfig = { ...config }
+  const requestUrl = String(url || '')
+  const isUpload = nextConfig.data instanceof FormData
+    || requestUrl.includes('/upload-image')
+    || requestUrl.includes('/upload-avatar')
+  const isAiGenerate = requestUrl.includes('/routes/generate')
+
+  if (isAiGenerate && (!nextConfig.timeout || nextConfig.timeout === DEFAULT_TIMEOUT_MS)) {
+    nextConfig.timeout = LONG_TIMEOUT_MS
+  } else if (isUpload && (!nextConfig.timeout || nextConfig.timeout === DEFAULT_TIMEOUT_MS)) {
+    nextConfig.timeout = UPLOAD_TIMEOUT_MS
+  }
+
+  return nextConfig
+}
+
+const rawGet = api.get.bind(api)
+api.get = ((url: string, config?: any) => {
+  const nextConfig = withSpecialTimeout(url, config)
+  const key = getRequestKey(url, nextConfig)
+  const cached = getResponseCache.get(key)
+
+  if (cached && cached.expiresAt > Date.now()) {
+    return Promise.resolve(cached.response)
+  }
+
+  const pending = pendingGets.get(key)
+  if (pending) {
+    return pending
+  }
+
+  const request = rawGet(url, nextConfig)
+    .then(response => {
+      getResponseCache.set(key, { expiresAt: Date.now() + GET_CACHE_TTL_MS, response })
+      return response
+    })
+    .finally(() => {
+      pendingGets.delete(key)
+    })
+
+  pendingGets.set(key, request)
+  return request
+}) as typeof api.get
 
 api.interceptors.request.use(config => {
-  const token = getToken()
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
-  }
-
+  config.timeout = withSpecialTimeout(String(config.url || ''), config).timeout
   config.headers['Accept-Language'] = memoizedLocale
 
   if (config.method?.toLowerCase() === 'get') {
@@ -77,7 +114,12 @@ api.interceptors.request.use(config => {
 })
 
 api.interceptors.response.use(
-  response => response,
+  response => {
+    if (response.config.method?.toLowerCase() !== 'get') {
+      clearGetCache()
+    }
+    return response
+  },
   error => {
     if (error.response && error.response.status === 401) {
       const method = String(error.config?.method || '').toLowerCase()
@@ -138,6 +180,7 @@ export const endpoints = {
     sharedLike: (id: number) => `/routes/shared/${id}/like`,
     sharedLikeStatus: (id: number) => `/routes/shared/${id}/like-status`,
     sharedComments: (id: number) => `/routes/shared/${id}/comments`,
+    deleteSharedComment: (routeId: number, commentId: number) => `/routes/shared/${routeId}/comments/${commentId}`,
     myRoutes: '/routes/my-routes'
   },
   spots: {
@@ -184,7 +227,8 @@ export const endpoints = {
   bookings: {
     create: '/bookings',
     my: '/bookings/my',
-    cancel: (id: number) => `/bookings/${id}/cancel`
+    cancel: (id: number) => `/bookings/${id}/cancel`,
+    delete: (id: number) => `/bookings/${id}`
   },
   hotels: {
     list: '/hotel-bookings/hotels',
@@ -197,13 +241,31 @@ export const endpoints = {
     all: '/hotel-bookings',
     roomTypes: (hotelId: number) => `/hotel-bookings/room-types/${hotelId}`,
     updateStatus: (id: number) => `/hotel-bookings/${id}/status`,
-    cancel: (id: number) => `/hotel-bookings/${id}`
+    cancel: (id: number) => `/hotel-bookings/${id}`,
+    delete: (id: number) => `/hotel-bookings/${id}/permanent`
   },
   adminRoutes: {
     list: '/admin/routes',
     create: '/admin/routes',
     update: (id: number) => `/admin/routes/${id}`,
     delete: (id: number) => `/admin/routes/${id}`
+  },
+  adminCommunity: {
+    routes: '/admin/community/routes',
+    updateRoute: (id: number) => `/admin/community/routes/${id}`,
+    deleteRoute: (id: number) => `/admin/community/routes/${id}`,
+    questions: '/admin/community/questions',
+    updateQuestion: (id: number) => `/admin/community/questions/${id}`,
+    deleteQuestion: (id: number) => `/admin/community/questions/${id}`,
+    comments: '/admin/community/comments',
+    updateComment: (id: number) => `/admin/community/comments/${id}`,
+    deleteComment: (id: number) => `/admin/community/comments/${id}`,
+    spotComments: '/admin/community/spot-comments',
+    updateSpotComment: (id: number) => `/admin/community/spot-comments/${id}`,
+    deleteSpotComment: (id: number) => `/admin/community/spot-comments/${id}`,
+    answers: '/admin/community/answers',
+    updateAnswer: (id: number) => `/admin/community/answers/${id}`,
+    deleteAnswer: (id: number) => `/admin/community/answers/${id}`
   },
   adminHotels: {
     list: '/admin/hotels',
@@ -217,6 +279,7 @@ export const endpoints = {
   comments: {
     list: (spotId: number) => `/comments/spot/${spotId}`,
     create: '/comments',
+    delete: (id: number) => `/comments/${id}`,
     uploadImage: '/comments/upload-image'
   }
 }

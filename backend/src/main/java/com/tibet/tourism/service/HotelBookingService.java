@@ -8,6 +8,7 @@ import com.tibet.tourism.entity.User;
 import com.tibet.tourism.repository.HotelBookingRepository;
 import com.tibet.tourism.repository.HotelRepository;
 import com.tibet.tourism.repository.RoomTypeRepository;
+import com.tibet.tourism.security.InputSanitizer;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -79,9 +80,9 @@ public class HotelBookingService {
         booking.setCheckInDate(request.getCheckInDate());
         booking.setCheckOutDate(request.getCheckOutDate());
         booking.setGuests(request.getGuests());
-        booking.setGuestName(request.getGuestName().trim());
-        booking.setPhone(request.getPhone().trim());
-        booking.setNote(request.getNote());
+        booking.setGuestName(InputSanitizer.requiredPlainText(request.getGuestName(), 64, "入住人姓名"));
+        booking.setPhone(InputSanitizer.requiredPlainText(request.getPhone(), 32, "手机号"));
+        booking.setNote(InputSanitizer.optionalTextBlock(request.getNote(), 500, "备注"));
         booking.setSubtotal(subtotal);
         booking.setServiceFee(serviceFee);
         booking.setDiscount(discount);
@@ -107,7 +108,10 @@ public class HotelBookingService {
         requireAdmin(user);
         HotelBooking booking = hotelBookingRepository.findById(id)
                 .orElseThrow(() -> new NoSuchElementException("Booking not found"));
-        booking.setStatus(HotelBooking.Status.valueOf(status));
+        if (!StringUtils.hasText(status)) {
+            throw new IllegalArgumentException("Invalid status");
+        }
+        booking.setStatus(HotelBooking.Status.valueOf(status.trim().toUpperCase()));
         return hotelBookingRepository.save(booking);
     }
 
@@ -122,6 +126,15 @@ public class HotelBookingService {
 
         booking.setStatus(HotelBooking.Status.CANCELLED);
         return hotelBookingRepository.save(booking);
+    }
+
+    @Transactional
+    public void deleteBooking(User user, Long id) {
+        requireAdmin(user);
+        if (!hotelBookingRepository.existsById(id)) {
+            throw new NoSuchElementException("Booking not found");
+        }
+        hotelBookingRepository.deleteById(id);
     }
 
     private void validateBookingRequest(HotelBookingRequest request, RoomType roomType) {

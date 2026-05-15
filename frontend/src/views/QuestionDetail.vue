@@ -5,7 +5,11 @@
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-tibet-red mx-auto"></div>
       </div>
 
-      <div v-else-if="question" class="animate-fade-in">
+      <motion.div v-else-if="question"
+        :initial="revealInitial"
+        :animate="revealInView"
+        :transition="revealTransition"
+      >
         <!-- Back -->
         <button @click="router.back()" class="text-gray-500 hover:text-gray-900 mb-6 flex items-center gap-1 text-sm">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
@@ -104,7 +108,7 @@
             </button>
           </div>
         </div>
-      </div>
+      </motion.div>
 
       <div v-else class="text-center py-12 text-gray-500">{{ t('questionDetail.questionNotFound') }}</div>
     </div>
@@ -115,6 +119,8 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { motion } from 'motion-v'
+import { revealInitial, revealInView, revealTransition } from '../motion/presets'
 import api from '../api'
 
 const { t } = useI18n()

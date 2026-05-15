@@ -15,7 +15,7 @@ spring:
     async:
       request-timeout: 120000
   datasource:
-    url: jdbc:mysql://localhost:3306/tibet_tourism?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:tibet_tourism}?useUnicode=true&characterEncoding=utf8&sslMode=${DB_SSL_MODE:VERIFY_IDENTITY}&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=false
     username: ${DB_USERNAME:tibet_user}
     password: ${DB_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -28,7 +28,7 @@ spring:
   jpa:
     database-platform: org.hibernate.dialect.MySQL8Dialect
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     show-sql: false
     properties:
       hibernate:
@@ -37,6 +37,14 @@ spring:
           batch_size: 20
         order_inserts: true
         order_updates: true
+        session:
+          events:
+            log:
+              LOG_QUERIES_SLOWER_THAN_MS: ${HIBERNATE_SLOW_QUERY_MS:1000}
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    locations: classpath:db/migration
   data:
     redis:
       host: ${REDIS_HOST:localhost}
@@ -56,11 +64,31 @@ logging:
   level:
     root: INFO
     com.tibet.tourism: INFO
+    org.hibernate.SQL_SLOW: WARN
   file:
-    name: /opt/colorful-tibet/logs/backend.log
-  pattern:
-    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
-    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    name: /app/logs/backend.log
+
+management:
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLING_PROBABILITY:0.1}
+  zipkin:
+    tracing:
+      endpoint: ${ZIPKIN_ENDPOINT:http://zipkin:9411/api/v2/spans}
 
 # AI API 配置，ARK_* 优先，兼容旧的 DOUBAO_* 环境变量
 ark:
@@ -92,10 +120,33 @@ price:
     hourly:
       cron: "0 0 * * * ?"
 
+recommendation:
+  item-similarity:
+    enabled: true
+    preload-on-startup: true
+    cron: "0 30 3 * * ?"
+
 # JWT配置（如果需要）
 jwt:
   secret: ${JWT_SECRET}
   expiration: 86400000  # 24小时
+
+app:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:}
+  security:
+    public-docs-enabled: ${PUBLIC_DOCS_ENABLED:false}
+    require-strong-secrets: ${REQUIRE_STRONG_SECRETS:true}
+    trust-proxy-headers: ${TRUST_PROXY_HEADERS:false}
+    rate-limit:
+      enabled: ${RATE_LIMIT_ENABLED:true}
+      trust-proxy-headers: ${TRUST_PROXY_HEADERS:false}
+    cookie-secure: ${COOKIE_SECURE:true}
+  seed:
+    demo-users:
+      enabled: ${SEED_DEMO_USERS:false}
+      admin-password: ${SEED_DEMO_ADMIN_PASSWORD:AdminDemo2026}
+      user-password: ${SEED_DEMO_USER_PASSWORD:UserDemo2026}
 
 
 

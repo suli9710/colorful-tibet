@@ -24,4 +24,6 @@ public interface RouteLikeRepository extends JpaRepository<RouteLike, Long> {
 
     // 根据用户删除所有路线点赞
     void deleteByUser(User user);
+
+    void deleteByRoute(SharedRoute route);
 }

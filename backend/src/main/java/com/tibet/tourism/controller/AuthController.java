@@ -1,15 +1,26 @@
 package com.tibet.tourism.controller;
 
+import com.tibet.tourism.dto.ChangePasswordRequest;
+import com.tibet.tourism.dto.LoginRequest;
+import com.tibet.tourism.dto.RegisterRequest;
 import com.tibet.tourism.entity.User;
 import com.tibet.tourism.repository.*;
+import com.tibet.tourism.security.CookieAuthConstants;
+import com.tibet.tourism.security.InputSanitizer;
 import com.tibet.tourism.security.JwtAuthSupport;
 import com.tibet.tourism.security.JwtUtils;
 import com.tibet.tourism.service.FileStorageService;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -18,12 +29,20 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
+
+    private static final Logger logger = LoggerFactory.getLogger(AuthController.class);
+    private static final Duration AUTH_COOKIE_MAX_AGE = Duration.ofDays(1);
+
+    @org.springframework.beans.factory.annotation.Value("${app.security.cookie-secure:false}")
+    private boolean secureCookies;
 
     @Autowired
     AuthenticationManager authenticationManager;
@@ -66,7 +85,8 @@ public class AuthController {
     }
 
     private ResponseEntity<?> errorResponse(Exception e) {
-        return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        logger.warn("Authenticated user request failed: {}", e.getMessage());
+        return ResponseEntity.badRequest().body(Map.of("error", "请求处理失败，请检查输入后重试"));
     }
 
     // 获取当前用户信息
@@ -106,26 +126,19 @@ public class AuthController {
 
             return ResponseEntity.ok(stats);
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return errorResponse(e);
         }
     }
 
     // 修改密码
     @PostMapping("/me/change-password")
-    public ResponseEntity<?> changePassword(@RequestBody Map<String, String> payload, HttpServletRequest request) {
+    public ResponseEntity<?> changePassword(@Valid @RequestBody ChangePasswordRequest payload, HttpServletRequest request) {
         try {
             Long userId = getCurrentUserId(request);
-            String oldPassword = payload.get("oldPassword");
-            String newPassword = payload.get("newPassword");
-
-            if (oldPassword == null || newPassword == null) {
-                return ResponseEntity.badRequest().body(Map.of("error", "Old password and new password are required"));
-            }
-
-            userService.changePassword(userId, oldPassword, newPassword);
+            userService.changePassword(userId, payload.getOldPassword(), payload.getNewPassword());
             return ResponseEntity.ok(Map.of("message", "Password changed successfully"));
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return errorResponse(e);
         }
     }
 
@@ -145,7 +158,7 @@ public class AuthController {
 
             return ResponseEntity.ok(comments);
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return errorResponse(e);
         }
     }
 
@@ -163,9 +176,10 @@ public class AuthController {
             
             return ResponseEntity.ok(Map.of("avatarUrl", avatarUrl));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.badRequest().body(Map.of("error", "上传文件不符合要求"));
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("error", "上传失败: " + e.getMessage()));
+            logger.warn("Avatar upload failed: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of("error", "上传失败，请稍后重试"));
         }
     }
 
@@ -174,13 +188,7 @@ public class AuthController {
     public ResponseEntity<?> updateNickname(@RequestBody Map<String, String> payload, HttpServletRequest request) {
         try {
             Long userId = getCurrentUserId(request);
-            String nickname = payload.get("nickname");
-            
-            if (nickname == null || nickname.trim().isEmpty()) {
-                return ResponseEntity.badRequest().body(Map.of("error", "昵称不能为空"));
-            }
-            
-            nickname = nickname.trim();
+            String nickname = InputSanitizer.requiredPlainText(payload.get("nickname"), 32, "昵称");
             
             // 检查昵称是否已被其他用户使用
             User existingUser = userRepository.findByNickname(nickname).orElse(null);
@@ -195,7 +203,7 @@ public class AuthController {
             
             return ResponseEntity.ok(Map.of("message", "昵称更新成功", "nickname", nickname));
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return errorResponse(e);
         }
     }
 
@@ -204,7 +212,7 @@ public class AuthController {
     public ResponseEntity<?> updateAvatar(@RequestBody Map<String, String> payload, HttpServletRequest request) {
         try {
             Long userId = getCurrentUserId(request);
-            String avatarUrl = payload.get("avatarUrl");
+            String avatarUrl = InputSanitizer.optionalPublicImageUrl(payload.get("avatarUrl"), "头像地址");
             
             User user = userRepository.findById(userId)
                     .orElseThrow(() -> new RuntimeException("User not found"));
@@ -213,14 +221,20 @@ public class AuthController {
             
             return ResponseEntity.ok(Map.of("message", "头像更新成功", "avatarUrl", avatarUrl));
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return errorResponse(e);
         }
     }
 
     @PostMapping("/login")
-    public ResponseEntity<?> authenticateUser(@RequestBody Map<String, String> loginRequest, HttpServletRequest request) {
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(loginRequest.get("username"), loginRequest.get("password")));
+    public ResponseEntity<?> authenticateUser(@Valid @RequestBody LoginRequest loginRequest, HttpServletRequest request) {
+        Authentication authentication;
+        try {
+            authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(loginRequest.getUsername().trim(), loginRequest.getPassword()));
+        } catch (AuthenticationException e) {
+            logger.warn("Login failed for username={}", loginRequest.getUsername());
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "用户名或密码错误"));
+        }
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
         String jwt = jwtUtils.generateJwtToken(authentication);
@@ -240,30 +254,38 @@ public class AuthController {
             userRepository.save(user);
         } catch (Exception e) {
             // 如果IP解析失败，不影响登录流程
-            System.err.println("Failed to update user IP location: " + e.getMessage());
+            logger.debug("Failed to update user IP location", e);
         }
 
+        String csrfToken = UUID.randomUUID().toString();
         Map<String, Object> response = new HashMap<>();
-        response.put("token", jwt);
         response.put("id", user.getId());
         response.put("username", user.getUsername());
         response.put("nickname", user.getNickname());
         response.put("role", user.getRole());
 
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.SET_COOKIE, authCookie(jwt, AUTH_COOKIE_MAX_AGE).toString())
+                .header(org.springframework.http.HttpHeaders.SET_COOKIE, csrfCookie(csrfToken, AUTH_COOKIE_MAX_AGE).toString())
+                .body(response);
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<?> logout() {
+        return ResponseEntity.noContent()
+                .header(org.springframework.http.HttpHeaders.SET_COOKIE, authCookie("", Duration.ZERO).toString())
+                .header(org.springframework.http.HttpHeaders.SET_COOKIE, csrfCookie("", Duration.ZERO).toString())
+                .build();
     }
 
     @PostMapping("/register")
-    public ResponseEntity<?> registerUser(@RequestBody Map<String, String> signUpRequest) {
-        String username = signUpRequest.get("username") == null ? null : signUpRequest.get("username").trim();
-        String nickname = signUpRequest.get("nickname") == null ? null : signUpRequest.get("nickname").trim();
-        String plainPassword = signUpRequest.get("password");
+    public ResponseEntity<?> registerUser(@Valid @RequestBody RegisterRequest signUpRequest) {
+        String username = signUpRequest.getUsername().trim();
+        String nickname = InputSanitizer.optionalPlainText(signUpRequest.getNickname(), 32, "昵称");
+        String plainPassword = signUpRequest.getPassword();
 
-        System.out.println("=== [AuthController] register payload username=" + username + ", nickname=" + nickname + ", passwordEmpty=" + !StringUtils.hasText(plainPassword));
-
-        if (!StringUtils.hasText(username) || !StringUtils.hasText(plainPassword)) {
-            return ResponseEntity.badRequest().body(Map.of("message", "用户名和密码不能为空"));
-        }
+        logger.debug("Register payload received. username={}, nickname={}, passwordEmpty={}",
+                username, nickname, !StringUtils.hasText(plainPassword));
 
         if (userRepository.existsByUsernameIgnoreCase(username)) {
             return ResponseEntity
@@ -271,15 +293,34 @@ public class AuthController {
                     .body(Map.of("message", "用户名已存在，请换一个用户名"));
         }
 
-        // Create new user's account
         User user = new User();
         user.setUsername(username);
-        user.setPassword(passwordEncoder.encode(plainPassword)); // BCrypt哈希
+        user.setPassword(passwordEncoder.encode(plainPassword));
         user.setNickname(StringUtils.hasText(nickname) ? nickname : username);
         user.setRole(User.Role.USER);
 
         userRepository.save(user);
 
         return ResponseEntity.ok(Map.of("message", "User registered successfully!"));
+    }
+
+    private ResponseCookie authCookie(String value, Duration maxAge) {
+        return ResponseCookie.from(CookieAuthConstants.AUTH_COOKIE_NAME, value)
+                .httpOnly(true)
+                .secure(secureCookies)
+                .sameSite("Strict")
+                .path("/")
+                .maxAge(maxAge)
+                .build();
+    }
+
+    private ResponseCookie csrfCookie(String value, Duration maxAge) {
+        return ResponseCookie.from(CookieAuthConstants.CSRF_COOKIE_NAME, value)
+                .httpOnly(false)
+                .secure(secureCookies)
+                .sameSite("Strict")
+                .path("/")
+                .maxAge(maxAge)
+                .build();
     }
 }

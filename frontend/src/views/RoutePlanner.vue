@@ -355,13 +355,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, shallowRef, onBeforeUnmount } from 'vue'
+import { ref, computed, shallowRef, onBeforeUnmount, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { AnimatePresence, motion } from 'motion-v'
 import DOMPurify from 'dompurify'
 import { generateRouteStream } from '../api/stream'
 import api from '../api'
+import { useAuthStore } from '../stores/auth'
 import {
   cardInitial,
   cardInView,
@@ -375,16 +376,40 @@ import {
 
 const { t } = useI18n()
 const router = useRouter()
+const auth = useAuthStore()
+
+const routePlannerDraftStorageKey = 'colorful-tibet:route-planner:draft'
+const routePlannerDraftVersion = 1
+
+interface RoutePlannerFormState {
+  days: number
+  budget: string
+  preference: string
+}
+
+interface RoutePlannerDraft {
+  version: number
+  form: RoutePlannerFormState
+  result: string
+  statusMessage: string
+  errorMessage: string
+  completed: boolean
+  updatedAt: number
+}
+
+const defaultForm: RoutePlannerFormState = {
+  days: 7,
+  budget: 'comfort',
+  preference: 'natural'
+}
+
+const hasBrowserStorage = () => typeof window !== 'undefined' && typeof window.localStorage !== 'undefined'
 
 window.addEventListener('auth-expired', () => {
   if (window.location.pathname !== '/login') alert(t('routePlanner.authFailed'))
 })
 
-const form = ref({
-  days: 7,
-  budget: 'comfort',
-  preference: 'natural'
-})
+const form = ref<RoutePlannerFormState>({ ...defaultForm })
 
 const presets = computed(() => [
   { label: t('routePlanner.presetNatural'), days: 6, budget: 'comfort', preference: 'natural' },
@@ -430,6 +455,61 @@ let markdownRenderTimer: number | null = null
 let latestRenderJobId = 0
 let latestAppliedRenderId = 0
 let latestMarkdownSnapshot = ''
+
+const normalizeDraftForm = (draftForm?: Partial<RoutePlannerFormState>): RoutePlannerFormState => {
+  const days = Number(draftForm?.days)
+  return {
+    days: Number.isFinite(days) ? Math.min(30, Math.max(1, Math.round(days))) : defaultForm.days,
+    budget: draftForm?.budget || defaultForm.budget,
+    preference: draftForm?.preference || defaultForm.preference
+  }
+}
+
+const persistRouteDraft = (overrides: Partial<RoutePlannerDraft> = {}) => {
+  if (!hasBrowserStorage()) return
+
+  const payload: RoutePlannerDraft = {
+    version: routePlannerDraftVersion,
+    form: { ...form.value },
+    result: result.value,
+    statusMessage: statusMessage.value,
+    errorMessage: errorMessage.value,
+    completed: !loading.value && !streaming.value && !!result.value && !errorMessage.value,
+    updatedAt: Date.now(),
+    ...overrides
+  }
+
+  try {
+    localStorage.setItem(routePlannerDraftStorageKey, JSON.stringify(payload))
+  } catch (error) {
+    console.warn('Failed to persist route planner draft:', error)
+  }
+}
+
+const restoreRouteDraft = () => {
+  if (!hasBrowserStorage()) return
+
+  const rawDraft = localStorage.getItem(routePlannerDraftStorageKey)
+  if (!rawDraft) return
+
+  try {
+    const draft = JSON.parse(rawDraft) as Partial<RoutePlannerDraft>
+    if (draft.version !== routePlannerDraftVersion) return
+
+    form.value = normalizeDraftForm(draft.form)
+
+    if (!draft.result) return
+
+    result.value = draft.result
+    charCount.value = draft.result.length
+    errorMessage.value = draft.errorMessage || ''
+    statusMessage.value = draft.statusMessage || t('routePlanner.routeGenComplete', { chars: draft.result.trim().length })
+    scheduleMarkdownRender(draft.result, true)
+  } catch (error) {
+    console.warn('Failed to restore route planner draft:', error)
+    localStorage.removeItem(routePlannerDraftStorageKey)
+  }
+}
 
 const renderMarkdownSync = (markdown: string) => {
   renderedResult.value = DOMPurify.sanitize(markdown ? markdown.replace(/\n/g, '<br/>') : '')
@@ -486,21 +566,6 @@ const scheduleMarkdownRender = (markdown: string, immediate = false) => {
   }, markdownRenderDebounceMs)
 }
 
-const hasStoredToken = () => {
-  const token = localStorage.getItem('token')
-  if (token) return true
-
-  const userStr = localStorage.getItem('user')
-  if (!userStr) return false
-
-  try {
-    const user = JSON.parse(userStr)
-    return !!(user?.token || user?.accessToken || user?.jwt || user?.data?.token || user?.data?.accessToken)
-  } catch {
-    return false
-  }
-}
-
 const adjustDays = (delta: number) => {
   form.value.days = Math.min(30, Math.max(1, form.value.days + delta))
 }
@@ -515,7 +580,7 @@ const applyPreset = (preset: { label: string; days: number; budget: string; pref
 }
 
 const generateRoute = async () => {
-  if (!hasStoredToken()) {
+  if (!auth.hasValidSession()) {
     if (confirm(t('routePlanner.loginRequired'))) {
       router.push('/login')
     }
@@ -531,6 +596,7 @@ const generateRoute = async () => {
   errorMessage.value = ''
   statusMessage.value = t('routePlanner.aiWritingHint')
   scheduleMarkdownRender('', true)
+  persistRouteDraft()
 
   const controller = new AbortController()
   streamAbortController.value = controller
@@ -541,11 +607,13 @@ const generateRoute = async () => {
       {
         onMeta: (meta) => {
           statusMessage.value = t('routePlanner.aiGeneratingRoute', { days: meta.days, pref: meta.preference })
+          persistRouteDraft()
         },
         onDelta: (_text: string, fullText: string) => {
           result.value = fullText
           charCount.value = fullText.length
           scheduleMarkdownRender(fullText)
+          persistRouteDraft()
         },
         onDone: (fullText) => {
           if (fullText && fullText.length > result.value.length) {
@@ -561,12 +629,14 @@ const generateRoute = async () => {
             errorMessage.value = t('routePlanner.aiEmptyResult')
             statusMessage.value = t('routePlanner.routeGenFailedStatus')
           }
+          persistRouteDraft()
         },
         onError: (message) => {
           errorMessage.value = message
           statusMessage.value = t('routePlanner.finalFailure')
           streaming.value = false
           loading.value = false
+          persistRouteDraft()
         },
       },
       controller.signal
@@ -581,10 +651,12 @@ const generateRoute = async () => {
     }
     errorMessage.value = message
     statusMessage.value = t('routePlanner.routeGenFailedStatus')
+    persistRouteDraft()
   } finally {
     loading.value = false
     streaming.value = false
     streamAbortController.value = null
+    persistRouteDraft()
   }
 }
 
@@ -595,9 +667,11 @@ const copyResult = async () => {
     await navigator.clipboard.writeText(result.value)
     statusMessage.value = t('routePlanner.copiedToClipboard')
     errorMessage.value = ''
+    persistRouteDraft()
   } catch (error) {
     console.error('Copy failed:', error)
     errorMessage.value = t('routePlanner.copyFailed')
+    persistRouteDraft()
   } finally {
     copying.value = false
   }
@@ -621,7 +695,7 @@ const getPreferenceText = (key: string) => {
 const shareRoute = async () => {
   if (!result.value) return
 
-  if (!hasStoredToken()) {
+  if (!auth.hasValidSession()) {
     if (confirm(t('routePlanner.loginRequired'))) {
       router.push('/login')
     }
@@ -653,14 +727,26 @@ const shareRoute = async () => {
   }
 }
 
+watch(form, () => persistRouteDraft(), { deep: true })
+
+onMounted(() => {
+  restoreRouteDraft()
+})
+
 onBeforeUnmount(() => {
+  if (streamAbortController.value) {
+    streamAbortController.value.abort()
+    loading.value = false
+    streaming.value = false
+    errorMessage.value = ''
+    statusMessage.value = result.value ? t('routePlanner.generationCancelled') : ''
+  }
+
+  persistRouteDraft()
   if (markdownRenderTimer !== null) {
     window.clearTimeout(markdownRenderTimer)
   }
   markdownWorker?.terminate()
-  if (streamAbortController.value) {
-    streamAbortController.value.abort()
-  }
 })
 </script>
 

@@ -5,6 +5,7 @@ import com.tibet.tourism.entity.User;
 import com.tibet.tourism.security.JwtAuthSupport;
 import com.tibet.tourism.service.AiRouteService;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -23,7 +24,7 @@ public class AiRouteController {
     }
 
     @PostMapping("/generate")
-    public ResponseEntity<?> generateRoute(@RequestBody(required = false) AiRouteGenerateRequest request,
+    public ResponseEntity<?> generateRoute(@Valid @RequestBody(required = false) AiRouteGenerateRequest request,
                                            HttpServletRequest httpServletRequest) {
         try {
             AiRouteGenerateRequest safeRequest = request == null ? new AiRouteGenerateRequest() : request;
@@ -39,15 +40,15 @@ public class AiRouteController {
                     )
             );
         } catch (IllegalStateException e) {
-            return ResponseEntity.badRequest().body(java.util.Map.of("error", e.getMessage()));
+            return ResponseEntity.badRequest().body(java.util.Map.of("error", "AI 路线生成配置不可用"));
         } catch (Exception e) {
-            return ResponseEntity.internalServerError().body(java.util.Map.of("error", "AI route generation failed", "detail", e.getMessage()));
+            return ResponseEntity.internalServerError().body(java.util.Map.of("error", "AI route generation failed"));
         }
     }
 
     @PostMapping(value = "/generate/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public ResponseEntity<SseEmitter> generateRouteStream(
-            @RequestBody(required = false) AiRouteGenerateRequest request,
+            @Valid @RequestBody(required = false) AiRouteGenerateRequest request,
             HttpServletRequest httpServletRequest) {
 
         AiRouteGenerateRequest safeRequest = request == null ? new AiRouteGenerateRequest() : request;

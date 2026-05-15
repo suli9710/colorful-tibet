@@ -21,6 +21,7 @@ public class UserService {
             throw new RuntimeException("Username already exists");
         }
         String plainPassword = user.getPassword();
+        validatePassword(plainPassword);
         user.setPassword(passwordEncoder.encode(plainPassword)); // BCrypt哈希
         return userRepository.save(user);
     }
@@ -46,7 +47,17 @@ public class UserService {
             throw new RuntimeException("Old password is incorrect");
         }
         
+        validatePassword(newPassword);
         user.setPassword(passwordEncoder.encode(newPassword)); // BCrypt哈希
         userRepository.save(user);
+    }
+
+    private void validatePassword(String password) {
+        if (password == null || password.length() < 8 || password.length() > 72) {
+            throw new IllegalArgumentException("密码长度需为8到72个字符");
+        }
+        if (!password.matches("^(?=.*[A-Za-z])(?=.*\\d).+$")) {
+            throw new IllegalArgumentException("密码至少需要包含字母和数字");
+        }
     }
 }

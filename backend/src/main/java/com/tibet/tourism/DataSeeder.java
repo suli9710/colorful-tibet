@@ -42,6 +42,9 @@ public class DataSeeder implements CommandLineRunner {
     private TravelRouteRepository travelRouteRepository;
 
     @Autowired
+    private SharedRouteRepository sharedRouteRepository;
+
+    @Autowired
     private HotelRepository hotelRepository;
 
     @Autowired
@@ -58,6 +61,12 @@ public class DataSeeder implements CommandLineRunner {
 
     @Value("${app.seed.demo-users.enabled:false}")
     private boolean seedDemoUsersEnabled;
+
+    @Value("${app.seed.demo-users.admin-password:AdminDemo2026}")
+    private String demoAdminPassword;
+
+    @Value("${app.seed.demo-users.user-password:UserDemo2026}")
+    private String demoUserPassword;
 
     @Override
     public void run(String... args) throws Exception {
@@ -91,6 +100,7 @@ public class DataSeeder implements CommandLineRunner {
         if (travelRouteRepository.count() == 0) {
             seedRoutes();
         }
+        syncDefaultRoutesToCommunity();
         if (hotelRepository.count() < 19) {
             seedHotels();
         }
@@ -101,10 +111,9 @@ public class DataSeeder implements CommandLineRunner {
         userRepository.findByUsername("admin").ifPresentOrElse(
             existing -> System.out.println("admin 用户已存在，跳过默认密码写入"),
             () -> {
-                String plainPassword = "admin123";
                 User admin = new User();
                 admin.setUsername("admin");
-                admin.setPassword(passwordEncoder.encode(plainPassword)); // BCrypt
+                admin.setPassword(passwordEncoder.encode(demoAdminPassword)); // BCrypt
                 admin.setRole(User.Role.ADMIN);
                 admin.setNickname("管理员");
                 userRepository.save(admin);
@@ -116,10 +125,9 @@ public class DataSeeder implements CommandLineRunner {
         userRepository.findByUsername("lzh").ifPresentOrElse(
             existing -> System.out.println("lzh 用户已存在，跳过默认密码写入"),
             () -> {
-                String plainPassword = "031224";
                 User superAdmin = new User();
                 superAdmin.setUsername("lzh");
-                superAdmin.setPassword(passwordEncoder.encode(plainPassword)); // BCrypt
+                superAdmin.setPassword(passwordEncoder.encode(demoAdminPassword)); // BCrypt
                 superAdmin.setRole(User.Role.ADMIN);
                 superAdmin.setNickname("超级管理员");
                 userRepository.save(superAdmin);
@@ -131,10 +139,9 @@ public class DataSeeder implements CommandLineRunner {
         userRepository.findByUsername("user1").ifPresentOrElse(
             existing -> System.out.println("user1 已存在，跳过默认密码写入"),
             () -> {
-                String plainPassword = "123456";
                 User user1 = new User();
                 user1.setUsername("user1");
-                user1.setPassword(passwordEncoder.encode(plainPassword)); // BCrypt
+                user1.setPassword(passwordEncoder.encode(demoUserPassword)); // BCrypt
                 user1.setNickname("扎西");
                 userRepository.save(user1);
                 System.out.println("已创建 user1 用户");
@@ -145,10 +152,9 @@ public class DataSeeder implements CommandLineRunner {
         userRepository.findByUsername("user2").ifPresentOrElse(
             existing -> System.out.println("user2 已存在，跳过默认密码写入"),
             () -> {
-                String plainPassword = "123456";
                 User user2 = new User();
                 user2.setUsername("user2");
-                user2.setPassword(passwordEncoder.encode(plainPassword)); // BCrypt
+                user2.setPassword(passwordEncoder.encode(demoUserPassword)); // BCrypt
                 user2.setNickname("卓玛");
                 userRepository.save(user2);
                 System.out.println("已创建 user2 用户");
@@ -192,7 +198,7 @@ public class DataSeeder implements CommandLineRunner {
                 String city = cities[rand.nextInt(cities.length)];
                 User u = new User();
                 u.setUsername(username);
-                u.setPassword(passwordEncoder.encode("123456"));
+                u.setPassword(passwordEncoder.encode(demoUserPassword));
                 u.setNickname(nickname);
                 u.setCity(city);
                 u.setRole(User.Role.USER);
@@ -809,12 +815,6 @@ public class DataSeeder implements CommandLineRunner {
             "བོད་ཀྱི་ནུབ་ཕྱོགས་མངའ་རིས་ས་ཁུལ་དུ་འགྲོ་བ།",
             7, "3980", TravelRoute.Difficulty.HARD, "5°C - 20°C", "高海拔荒漠草原地带",
             "[20,21,24,25]");
-
-        createRoute("山南文化探索三日游", "ལྷོ་ཁའི་རིག་གནས་ལམ་ཐོག",
-            "探访西藏文明的发源地——山南。游览西藏第一座宫殿雍布拉康、第一座寺庙桑耶寺，感受藏源文化的深厚底蕴。",
-            "བོད་ཀྱི་རིག་གནས་ཀྱི་འབྱུང་ཁུངས་ལྷོ་ཁར་འཚོལ་ཞིབ།",
-            3, "680", TravelRoute.Difficulty.MEDIUM, "12°C - 24°C", "河谷平原，雅鲁藏布江中游",
-            "[14,15,18]");
     }
 
     private void createRoute(String name, String nameTibetan, String description, String descriptionTibetan,
@@ -832,6 +832,104 @@ public class DataSeeder implements CommandLineRunner {
         route.setGeography(geography);
         route.setSpotsJson(spotsJson);
         travelRouteRepository.save(route);
+    }
+
+    private void syncDefaultRoutesToCommunity() {
+        if (sharedRouteRepository.countBySourceType(SharedRoute.SourceType.OFFICIAL) > 0) {
+            return;
+        }
+        User officialAuthor = getOrCreateOfficialRouteAuthor();
+        travelRouteRepository.findAll().stream()
+                .sorted(Comparator.comparing(TravelRoute::getId))
+                .limit(4)
+                .forEach(route -> syncRouteToCommunity(route, officialAuthor));
+    }
+
+    private void syncRouteToCommunity(TravelRoute travelRoute, User officialAuthor) {
+        if (travelRoute.getId() == null || sharedRouteRepository
+                .findBySourceTypeAndSourceRouteId(SharedRoute.SourceType.OFFICIAL, travelRoute.getId())
+                .isPresent()) {
+            return;
+        }
+
+        SharedRoute sharedRoute = new SharedRoute();
+        sharedRoute.setAuthor(officialAuthor);
+        sharedRoute.setTitle(travelRoute.getName());
+        sharedRoute.setContent(buildOfficialRouteContent(travelRoute));
+        sharedRoute.setDays(travelRoute.getDays());
+        sharedRoute.setBudget(resolveBudgetLabel(travelRoute.getPrice()));
+        sharedRoute.setPreference(resolvePreferenceLabel(travelRoute));
+        sharedRoute.setSourceType(SharedRoute.SourceType.OFFICIAL);
+        sharedRoute.setSourceRouteId(travelRoute.getId());
+        sharedRoute.setPrice(travelRoute.getPrice());
+        sharedRoute.setDifficulty(travelRoute.getDifficulty() == null ? null : travelRoute.getDifficulty().name());
+        sharedRoute.setTemperature(travelRoute.getTemperature());
+        sharedRoute.setGeography(travelRoute.getGeography());
+        sharedRouteRepository.save(sharedRoute);
+    }
+
+    private User getOrCreateOfficialRouteAuthor() {
+        return userRepository.findByUsername("official")
+                .orElseGet(() -> {
+                    User official = new User();
+                    official.setUsername("official");
+                    official.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));
+                    official.setRole(User.Role.ADMIN);
+                    official.setNickname("七彩西藏官方");
+                    return userRepository.save(official);
+                });
+    }
+
+    private String buildOfficialRouteContent(TravelRoute route) {
+        StringBuilder builder = new StringBuilder();
+        builder.append("# ").append(route.getName()).append("\n\n");
+        if (route.getDescription() != null && !route.getDescription().isBlank()) {
+            builder.append(route.getDescription()).append("\n\n");
+        }
+        if (route.getDays() != null) {
+            builder.append("- 行程天数：").append(route.getDays()).append("天\n");
+        }
+        if (route.getPrice() != null) {
+            builder.append("- 参考价格：¥").append(route.getPrice()).append("\n");
+        }
+        if (route.getDifficulty() != null) {
+            builder.append("- 难度等级：").append(route.getDifficulty().name()).append("\n");
+        }
+        if (route.getTemperature() != null && !route.getTemperature().isBlank()) {
+            builder.append("- 适宜温度：").append(route.getTemperature()).append("\n");
+        }
+        if (route.getGeography() != null && !route.getGeography().isBlank()) {
+            builder.append("- 地理特征：").append(route.getGeography()).append("\n");
+        }
+        return builder.toString().trim();
+    }
+
+    private String resolveBudgetLabel(BigDecimal price) {
+        if (price == null) {
+            return "舒适型";
+        }
+        if (price.compareTo(new BigDecimal("1000")) < 0) {
+            return "经济型";
+        }
+        if (price.compareTo(new BigDecimal("3000")) < 0) {
+            return "舒适型";
+        }
+        return "豪华型";
+    }
+
+    private String resolvePreferenceLabel(TravelRoute route) {
+        String text = ((route.getName() == null ? "" : route.getName()) + " "
+                + (route.getDescription() == null ? "" : route.getDescription()));
+        if (text.contains("桃花") || text.contains("林芝") || text.contains("珠峰")) {
+            return "自然风光";
+        }
+        if (text.contains("摄影")) {
+            return "深度摄影";
+        }
+        if (text.contains("度假") || text.contains("休闲")) {
+            return "休闲度假";
+        }
+        return "人文历史";
     }
 
     private void seedHotels() {

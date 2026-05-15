@@ -6,7 +6,12 @@
 
     <div v-else-if="spot" class="relative">
       <!-- Immersive Header Image -->
-      <div class="relative h-[60vh] w-full overflow-hidden bg-gray-200 animate-scale-in">
+      <motion.div
+        class="relative h-[60vh] w-full overflow-hidden bg-gray-200"
+        :initial="{ opacity: 0, scale: 1.02 }"
+        :animate="{ opacity: 1, scale: 1 }"
+        :transition="{ duration: 0.5, ease: motionEase }"
+      >
         <img v-if="spot.imageUrl" 
              :src="spot.imageUrl" 
              :alt="spot.name"
@@ -20,7 +25,12 @@
         </div>
         <div class="absolute inset-0 bg-gradient-to-t from-tibet-dark/80 via-transparent to-transparent"></div>
         
-        <div class="absolute bottom-0 left-0 w-full p-8 md:p-16 text-white animate-slide-up">
+        <motion.div
+          class="absolute bottom-0 left-0 w-full p-8 md:p-16 text-white"
+          :initial="{ opacity: 0, y: 24 }"
+          :animate="{ opacity: 1, y: 0 }"
+          :transition="{ duration: 0.6, delay: 0.2, ease: motionEase }"
+        >
           <div class="max-w-7xl mx-auto">
             <div class="flex items-center space-x-4 mb-4">
               <span class="px-4 py-1.5 bg-white/20 backdrop-blur-md rounded-full text-sm font-bold border border-white/30 tibetan-font">
@@ -44,14 +54,20 @@
               <span class="text-2xl font-bold text-tibet-gold">¥{{ unitPrice }}</span>
             </div>
           </div>
-        </div>
-      </div>
+        </motion.div>
+      </motion.div>
 
       <!-- Content Section -->
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 -mt-20 relative z-10">
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-12">
           <!-- Left Column: Description -->
-          <div class="lg:col-span-2 space-y-8 animate-slide-up" style="animation-delay: 0.2s">
+          <motion.div
+            class="lg:col-span-2 space-y-8"
+            :initial="revealInitial"
+            :whileInView="revealInView"
+            :inViewOptions="inViewOnce"
+            :transition="{ duration: 0.5, delay: 0.1, ease: motionEase }"
+          >
             <div class="bg-white rounded-3xl p-8 shadow-xl border border-tibet-gold/20">
               <h2 class="text-2xl font-bold text-tibet-dark mb-6 tibetan-font">{{ t('spotDetail.introduction') }}</h2>
               <p class="text-tibet-brown/80 leading-loose text-lg whitespace-pre-line tibetan-font">
@@ -141,15 +157,24 @@
                   <div class="flex items-center justify-between mb-2">
                     <div class="flex items-center space-x-3">
                       <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold">
-                        {{ comment.user?.nickname?.charAt(0) || comment.user?.username?.charAt(0) }}
+                        {{ getCommentAuthor(comment).charAt(0) }}
                       </div>
                       <div>
-                        <p class="font-bold text-gray-900">{{ comment.user?.nickname || comment.user?.username }}</p>
+                        <p class="font-bold text-gray-900">{{ getCommentAuthor(comment) }}</p>
                         <p class="text-xs text-gray-500">{{ formatDate(comment.createdAt) }}</p>
                       </div>
                     </div>
-                    <div class="flex text-yellow-400">
-                      <span v-for="n in 5" :key="n">{{ n <= comment.rating ? '★' : '☆' }}</span>
+                    <div class="flex items-center gap-3">
+                      <button
+                        v-if="isOwnComment(comment)"
+                        @click="deleteComment(comment)"
+                        class="text-xs font-medium text-red-500 hover:text-red-700 transition-colors tibetan-font"
+                      >
+                        {{ t('common.delete') }}
+                      </button>
+                      <div class="flex text-yellow-400">
+                        <span v-for="n in 5" :key="n">{{ n <= comment.rating ? '★' : '☆' }}</span>
+                      </div>
                     </div>
                   </div>
                   <p class="text-gray-600 leading-relaxed pl-13 mb-3">{{ comment.content }}</p>
@@ -252,10 +277,16 @@
                 </div>
               </div>
             </div>
-          </div>
+          </motion.div>
 
           <!-- Right Column: Booking Form -->
-          <div class="lg:col-span-1 animate-slide-up" style="animation-delay: 0.4s">
+          <motion.div
+            class="lg:col-span-1"
+            :initial="revealInitial"
+            :whileInView="revealInView"
+            :inViewOptions="inViewOnce"
+            :transition="{ duration: 0.5, delay: 0.25, ease: motionEase }"
+          >
               <div class="sticky top-20">
               <div class="glass-card rounded-3xl p-8 border border-white/50">
                 <h2 class="text-2xl font-bold text-tibet-dark mb-6 tibetan-font">{{ t('spotDetail.bookNow') }}</h2>
@@ -296,7 +327,7 @@
                 </form>
               </div>
             </div>
-          </div>
+          </motion.div>
         </div>
       </div>
     </div>
@@ -307,6 +338,8 @@
 import { ref, computed, onMounted, watch, nextTick, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { motion } from 'motion-v'
+import { motionEase, revealInitial, revealInView, inViewOnce } from '../motion/presets'
 import api, { endpoints } from '../api'
 import type * as Leaflet from 'leaflet'
 
@@ -693,6 +726,27 @@ const submitComment = async () => {
     alert(t('spotDetail.commentFailed'))
   } finally {
     submittingComment.value = false
+  }
+}
+
+const getCommentAuthor = (comment: any) => {
+  return comment.user?.nickname || comment.user?.username || comment.nickname || comment.username || t('routeDetail.anonymous')
+}
+
+const isOwnComment = (comment: any) => {
+  if (!user.value) return false
+  return Number(comment.user?.id || comment.userId) === Number(user.value.id) || comment.username === user.value.username
+}
+
+const deleteComment = async (comment: any) => {
+  if (!confirm(t('spotDetail.confirmDeleteComment'))) return
+
+  try {
+    await api.delete(endpoints.comments.delete(comment.id))
+    comments.value = comments.value.filter(item => item.id !== comment.id)
+  } catch (error) {
+    console.error('Failed to delete comment:', error)
+    alert(t('spotDetail.deleteCommentFailed'))
   }
 }
 

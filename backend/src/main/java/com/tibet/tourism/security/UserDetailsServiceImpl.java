@@ -2,6 +2,8 @@ package com.tibet.tourism.security;
 
 import com.tibet.tourism.entity.User;
 import com.tibet.tourism.repository.UserRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -16,6 +18,8 @@ import java.util.List;
 
 @Service
 public class UserDetailsServiceImpl implements UserDetailsService {
+
+    private static final Logger logger = LoggerFactory.getLogger(UserDetailsServiceImpl.class);
 
     @Autowired
     UserRepository userRepository;
@@ -32,7 +36,7 @@ public class UserDetailsServiceImpl implements UserDetailsService {
             // Spring Security需要ROLE_前缀
             String roleName = "ROLE_" + user.getRole().name();
             authorities.add(new SimpleGrantedAuthority(roleName));
-            System.out.println("=== [UserDetailsService] 用户 " + username + " 的角色: " + roleName);
+            logger.debug("Loaded authorities for user {}: {}", username, roleName);
         }
 
         return org.springframework.security.core.userdetails.User

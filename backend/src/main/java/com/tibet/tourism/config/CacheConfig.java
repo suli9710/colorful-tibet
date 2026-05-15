@@ -35,6 +35,7 @@ public class CacheConfig implements CachingConfigurer {
     public static final String IP_LOCATION_CACHE = "ipLocationCache";
     public static final String SPOT_CACHE = "spotCache";
     public static final String POPULAR_SPOTS_CACHE = "popularSpotsCache";
+    public static final String NEWS_CACHE = "newsCache";
     public static final String DICTIONARY_CACHE = "dictionaryCache";
 
     @Bean
@@ -51,6 +52,7 @@ public class CacheConfig implements CachingConfigurer {
         cacheConfigurations.put(IP_LOCATION_CACHE, redisCacheConfiguration(Duration.ofHours(24)));
         cacheConfigurations.put(SPOT_CACHE, redisCacheConfiguration(Duration.ofMinutes(30)));
         cacheConfigurations.put(POPULAR_SPOTS_CACHE, redisCacheConfiguration(Duration.ofMinutes(15)));
+        cacheConfigurations.put(NEWS_CACHE, redisCacheConfiguration(Duration.ofMinutes(15)));
         cacheConfigurations.put(DICTIONARY_CACHE, redisCacheConfiguration(Duration.ofHours(1)));
 
         return RedisCacheManager.builder(connectionFactory)
@@ -65,6 +67,7 @@ public class CacheConfig implements CachingConfigurer {
                 IP_LOCATION_CACHE,
                 SPOT_CACHE,
                 POPULAR_SPOTS_CACHE,
+                NEWS_CACHE,
                 DICTIONARY_CACHE
         );
         cacheManager.setAllowNullValues(false);

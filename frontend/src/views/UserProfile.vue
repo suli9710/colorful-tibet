@@ -146,6 +146,12 @@ const fetchHotelBookings = async () => {
   }
 }
 
+const getApiErrorMessage = (error: any, fallback: string) => {
+  const data = error?.response?.data
+  if (typeof data === 'string') return data
+  return data?.error || data?.message || fallback
+}
+
 const cancelHotelBooking = async (id: number) => {
   if (!confirm(t('profile.confirmCancelHotelBooking'))) return
 
@@ -175,13 +181,25 @@ const fetchMyComments = async () => {
 
 const cancelBooking = async (id: number) => {
   if (!confirm(t('profile.confirmCancelBooking'))) return
-  
+
   try {
     await api.post(endpoints.bookings.cancel(id))
     fetchBookings()
-  } catch (e) {
+  } catch (e: any) {
     console.error(e)
-    alert(t('profile.cancelFailed'))
+    alert(getApiErrorMessage(e, t('profile.cancelFailed')))
+  }
+}
+
+const deleteBooking = async (id: number) => {
+  if (!confirm(t('profile.confirmDeleteBooking'))) return
+
+  try {
+    await api.delete(endpoints.bookings.delete(id))
+    fetchBookings()
+  } catch (e: any) {
+    console.error(e)
+    alert(getApiErrorMessage(e, t('profile.deleteBookingFailed')))
   }
 }
 
@@ -192,6 +210,42 @@ const deleteRoute = async (id: number) => {
     await api.delete(`/routes/shared/${id}`)
     alert(t('profile.deleteSuccess'))
     fetchMyRoutes()
+  } catch (e) {
+    console.error(e)
+    alert(t('profile.deleteFailed'))
+  }
+}
+
+const deleteSpotComment = async (id: number) => {
+  if (!confirm(t('profile.confirmDeleteComment'))) return
+
+  try {
+    await api.delete(endpoints.comments.delete(id))
+    spotComments.value = spotComments.value.filter(comment => comment.id !== id)
+    if (stats.value?.commentCount > 0) {
+      stats.value.commentCount--
+    }
+  } catch (e) {
+    console.error(e)
+    alert(t('profile.deleteFailed'))
+  }
+}
+
+const deleteRouteComment = async (comment: any) => {
+  if (!confirm(t('profile.confirmDeleteComment'))) return
+  const routeId = comment.route?.id
+
+  if (!routeId) {
+    alert(t('profile.deleteFailed'))
+    return
+  }
+
+  try {
+    await api.delete(endpoints.routes.deleteSharedComment(routeId, comment.id))
+    routeComments.value = routeComments.value.filter(item => item.id !== comment.id)
+    if (stats.value?.commentCount > 0) {
+      stats.value.commentCount--
+    }
   } catch (e) {
     console.error(e)
     alert(t('profile.deleteFailed'))
@@ -750,6 +804,15 @@ const getAvatarUrl = () => {
                 >
                   {{ t('profile.cancelBooking') }}
                 </motion.button>
+                <motion.button
+                  v-else-if="booking.status === 'CANCELLED'"
+                  @click="deleteBooking(booking.id)"
+                  class="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors"
+                  :whileHover="{ y: -1, scale: 1.02 }"
+                  :whileTap="{ scale: 0.96 }"
+                >
+                  {{ t('profile.deleteBooking') }}
+                </motion.button>
               </div>
             </motion.div>
           </div>
@@ -865,6 +928,12 @@ const getAvatarUrl = () => {
                       <div class="flex items-center gap-4 text-sm text-gray-500">
                         <span>👍 {{ comment.likeCount || 0 }}</span>
                         <span>{{ formatDate(comment.createdAt) }}</span>
+                        <button
+                          @click="deleteSpotComment(comment.id)"
+                          class="font-medium text-red-500 hover:text-red-700 transition-colors"
+                        >
+                          {{ t('common.delete') }}
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -899,6 +968,12 @@ const getAvatarUrl = () => {
                       <p class="text-gray-700 mb-2">{{ comment.content }}</p>
                       <div class="flex items-center gap-4 text-sm text-gray-500">
                         <span>{{ formatDate(comment.createdAt) }}</span>
+                        <button
+                          @click="deleteRouteComment(comment)"
+                          class="font-medium text-red-500 hover:text-red-700 transition-colors"
+                        >
+                          {{ t('common.delete') }}
+                        </button>
                       </div>
                     </div>
                   </div>

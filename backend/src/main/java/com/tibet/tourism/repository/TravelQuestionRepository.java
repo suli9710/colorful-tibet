@@ -20,5 +20,11 @@ public interface TravelQuestionRepository extends JpaRepository<TravelQuestion, 
     @EntityGraph(attributePaths = {"author"})
     Page<TravelQuestion> findAll(Pageable pageable);
 
+    @EntityGraph(attributePaths = {"author"})
+    List<TravelQuestion> findAllByOrderByCreatedAtDesc();
+
+    @EntityGraph(attributePaths = {"author"})
+    Page<TravelQuestion> findAllByOrderByCreatedAtDesc(Pageable pageable);
+
     void deleteByAuthor(User author);
 }

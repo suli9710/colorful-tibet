@@ -1,16 +1,34 @@
 <template>
   <div class="min-h-screen bg-tibet-white">
     <section class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16 space-y-6">
-      <div class="bg-white rounded-3xl shadow-xl border border-tibet-gold/20 p-8">
+      <motion.div
+        class="bg-white rounded-3xl shadow-xl border border-tibet-gold/20 p-8"
+        :initial="revealInitial"
+        :animate="revealInView"
+        :transition="revealTransition"
+      >
         <h1 class="text-3xl font-bold text-gray-900 mb-4">{{ t('hotel.ordersTitle') }}</h1>
         <p class="text-gray-600">{{ t('hotel.ordersSubtitle') }}</p>
-      </div>
+      </motion.div>
 
-      <div class="bg-white rounded-3xl shadow-xl border border-tibet-gold/20 p-8">
+      <motion.div
+        class="bg-white rounded-3xl shadow-xl border border-tibet-gold/20 p-8"
+        :initial="cardInitial"
+        :animate="cardInView"
+        :transition="cardTransition(0, 0.1)"
+      >
         <div v-if="loading" class="text-center text-gray-500 py-8">{{ t('hotel.ordersLoading') }}</div>
         <div v-else-if="sortedOrders.length === 0" class="text-center text-gray-500 py-8">{{ t('hotel.noOrders') }}</div>
         <div v-else class="space-y-4">
-          <div v-for="order in sortedOrders" :key="order.id" class="rounded-2xl border border-tibet-gold/20 p-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <motion.div
+            v-for="(order, index) in sortedOrders"
+            :key="order.id"
+            class="rounded-2xl border border-tibet-gold/20 p-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4"
+            :initial="cardInitial"
+            :whileInView="cardInView"
+            :inViewOptions="inViewOnce"
+            :transition="cardTransition(index)"
+          >
             <div class="flex items-center gap-4 min-w-0">
               <div class="h-20 w-28 rounded-2xl overflow-hidden bg-gray-100 flex-shrink-0">
                 <img :src="resolveHotelBookingImage(order)" class="w-full h-full object-cover" :alt="order.hotelName" @error="applyHotelImageFallback">
@@ -25,9 +43,9 @@
               <p class="text-xl font-bold text-blue-600">¥{{ order.totalPrice }}</p>
               <p class="text-xs text-gray-400 mt-1">{{ order.status }}</p>
             </div>
-          </div>
+          </motion.div>
         </div>
-      </div>
+      </motion.div>
     </section>
   </div>
 </template>
@@ -35,6 +53,8 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { motion } from 'motion-v'
+import { revealInitial, revealInView, revealTransition, cardInitial, cardInView, cardTransition, inViewOnce } from '../motion/presets'
 import api, { endpoints } from '../api'
 import { applyHotelImageFallback, resolveHotelBookingImage } from '../data/hotelImages'
 

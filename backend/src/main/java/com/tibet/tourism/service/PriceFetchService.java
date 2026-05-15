@@ -1,9 +1,13 @@
 package com.tibet.tourism.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tibet.tourism.dto.PriceInfo;
 import com.tibet.tourism.entity.ScenicSpot;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
@@ -19,6 +23,9 @@ import java.util.regex.Pattern;
  */
 @Service
 public class PriceFetchService {
+
+    private static final Logger logger = LoggerFactory.getLogger(PriceFetchService.class);
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     @Autowired
     private WebClient.Builder webClientBuilder;
@@ -51,7 +58,9 @@ public class PriceFetchService {
                     return priceInfo;
                 }
             } catch (Exception e) {
-                System.err.println("Strategy " + strategy.getClass().getSimpleName() + " failed: " + e.getMessage());
+                logger.warn("Price fetch strategy failed. strategy={}, spotId={}, cause={}",
+                        strategy.getClass().getSimpleName(), spot.getId(), e.getMessage());
+                logger.debug("Price fetch strategy failure details", e);
             }
         }
 
@@ -154,54 +163,59 @@ public class PriceFetchService {
                 return parseAiResponse(response, "AI提取");
 
             } catch (Exception e) {
-                System.err.println("AI提取价格失败: " + e.getMessage());
+                logger.warn("AI price extraction failed. spotId={}, cause={}", spot.getId(), e.getMessage());
+                logger.debug("AI price extraction failure details", e);
                 return null;
             }
         }
 
         private PriceInfo parseAiResponse(String response, String source) {
+            String jsonStr = stripJsonFence(response);
+            if (jsonStr.isBlank() || "null".equalsIgnoreCase(jsonStr)) {
+                return null;
+            }
+
             try {
-                // 提取JSON部分
-                String jsonStr = response.trim();
-                if (jsonStr.startsWith("```json")) {
-                    jsonStr = jsonStr.substring(7);
+                JsonNode root = OBJECT_MAPPER.readTree(jsonStr);
+                if (root == null || root.isNull() || !root.hasNonNull("basePrice") || !root.get("basePrice").isNumber()) {
+                    return null;
                 }
-                if (jsonStr.startsWith("```")) {
-                    jsonStr = jsonStr.substring(3);
+
+                BigDecimal basePrice = root.get("basePrice").decimalValue();
+                if (basePrice.compareTo(BigDecimal.ZERO) <= 0) {
+                    return null;
                 }
-                if (jsonStr.endsWith("```")) {
-                    jsonStr = jsonStr.substring(0, jsonStr.length() - 3);
+
+                PriceInfo info = new PriceInfo(basePrice, source);
+                info.setConfidence(0.85);
+
+                if (root.hasNonNull("peakSeasonPrice") && root.get("peakSeasonPrice").isNumber()) {
+                    info.setPeakSeasonPrice(root.get("peakSeasonPrice").decimalValue());
                 }
-                jsonStr = jsonStr.trim();
 
-                // 简单的JSON解析（实际应该使用Jackson）
-                Pattern pricePattern = Pattern.compile("\"basePrice\"\\s*:\\s*(\\d+(?:\\.\\d+)?)");
-                Matcher matcher = pricePattern.matcher(jsonStr);
-                if (matcher.find()) {
-                    BigDecimal basePrice = new BigDecimal(matcher.group(1));
-                    PriceInfo info = new PriceInfo(basePrice, source);
-                    info.setConfidence(0.85);
-
-                    // 尝试提取旺季价格
-                    Pattern peakPattern = Pattern.compile("\"peakSeasonPrice\"\\s*:\\s*(\\d+(?:\\.\\d+)?)");
-                    Matcher peakMatcher = peakPattern.matcher(jsonStr);
-                    if (peakMatcher.find()) {
-                        info.setPeakSeasonPrice(new BigDecimal(peakMatcher.group(1)));
-                    }
-
-                    // 尝试提取淡季价格
-                    Pattern offPattern = Pattern.compile("\"offSeasonPrice\"\\s*:\\s*(\\d+(?:\\.\\d+)?)");
-                    Matcher offMatcher = offPattern.matcher(jsonStr);
-                    if (offMatcher.find()) {
-                        info.setOffSeasonPrice(new BigDecimal(offMatcher.group(1)));
-                    }
-
-                    return info;
+                if (root.hasNonNull("offSeasonPrice") && root.get("offSeasonPrice").isNumber()) {
+                    info.setOffSeasonPrice(root.get("offSeasonPrice").decimalValue());
                 }
+
+                return info;
             } catch (Exception e) {
-                System.err.println("解析AI响应失败: " + e.getMessage());
+                logger.warn("Failed to parse AI price response: {}", e.getMessage());
+                logger.debug("Raw AI price response: {}", response);
             }
             return null;
+        }
+
+        private String stripJsonFence(String response) {
+            String jsonStr = response == null ? "" : response.trim();
+            if (jsonStr.startsWith("```json")) {
+                jsonStr = jsonStr.substring(7);
+            } else if (jsonStr.startsWith("```")) {
+                jsonStr = jsonStr.substring(3);
+            }
+            if (jsonStr.endsWith("```")) {
+                jsonStr = jsonStr.substring(0, jsonStr.length() - 3);
+            }
+            return jsonStr.trim();
         }
     }
 
@@ -233,7 +247,8 @@ public class PriceFetchService {
                             allPrices.addAll(prices);
                         }
                     } catch (Exception e) {
-                        System.err.println("获取URL失败: " + searchUrl + ", 错误: " + e.getMessage());
+                        logger.warn("Failed to fetch price page. url={}, cause={}", searchUrl, e.getMessage());
+                        logger.debug("Price page fetch failure details", e);
                     }
                 }
 
@@ -247,8 +262,8 @@ public class PriceFetchService {
                 }
 
             } catch (Exception e) {
-                System.err.println("网页爬虫提取价格失败: " + e.getMessage());
-                e.printStackTrace();
+                logger.warn("Web scraping price extraction failed. spotId={}, cause={}", spot.getId(), e.getMessage());
+                logger.debug("Web scraping price extraction failure details", e);
             }
             return null;
         }
@@ -349,7 +364,7 @@ public class PriceFetchService {
             // 过滤掉年份、日期、电话号码等
             double value = price.doubleValue();
             return value >= 10 && value <= 2000 && 
-                   value == price.intValue() || (value * 10) == (int)(value * 10); // 允许小数，但最多一位
+                   (value == price.intValue() || (value * 10) == (int)(value * 10)); // 允许小数，但最多一位
         }
 
         /**

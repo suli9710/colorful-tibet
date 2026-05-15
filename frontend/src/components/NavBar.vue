@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { Menu, X, LogOut } from 'lucide-vue-next'
 import { AnimatePresence, LayoutGroup, motion } from 'motion-v'
-import { updateMemoizedLocale, clearTokenCache } from '../api/index'
+import api, { updateMemoizedLocale, clearTokenCache } from '../api/index'
 import { useAuthStore } from '../stores/auth'
 import {
   mobileMenuAnimate,
@@ -71,10 +71,14 @@ const switchLanguage = (lang: string) => {
   document.documentElement.lang = lang
 }
 
-const logout = () => {
-  clearTokenCache()
-  auth.logout()
-  router.push('/login')
+const logout = async () => {
+  try {
+    await api.post('/auth/logout')
+  } finally {
+    clearTokenCache()
+    auth.logout()
+    router.push('/login')
+  }
 }
 </script>
 

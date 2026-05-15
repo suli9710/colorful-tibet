@@ -17,7 +17,6 @@ export interface AuthUser {
 }
 
 const USER_STORAGE_KEY = 'user'
-const TOKEN_STORAGE_KEY = 'token'
 
 const hasStorage = () => typeof window !== 'undefined' && typeof window.localStorage !== 'undefined'
 
@@ -28,31 +27,28 @@ const resolveToken = (userData: AuthUser | null, explicitToken?: string | null) 
   userData?.jwt ||
   userData?.data?.token ||
   userData?.data?.accessToken ||
-  null
+  'cookie-session'
 
 const readStoredUser = (): AuthUser | null => {
   if (!hasStorage()) return null
 
+  localStorage.removeItem('token')
   const storedUser = localStorage.getItem(USER_STORAGE_KEY)
   if (!storedUser) return null
 
   try {
-    return JSON.parse(storedUser) as AuthUser
+    const stored = JSON.parse(storedUser) as AuthUser
+    const { token: _token, accessToken: _accessToken, jwt: _jwt, data: _data, ...userWithoutToken } = stored
+    return userWithoutToken
   } catch {
     clearStoredAuth()
     return null
   }
 }
 
-const readStoredToken = () => {
-  if (!hasStorage()) return null
-  return localStorage.getItem(TOKEN_STORAGE_KEY)
-}
-
 export const clearStoredAuth = () => {
   if (!hasStorage()) return
   localStorage.removeItem(USER_STORAGE_KEY)
-  localStorage.removeItem(TOKEN_STORAGE_KEY)
 }
 
 const decodeJwtPayload = (authToken: string): { exp?: number } | null => {
@@ -86,15 +82,14 @@ export const useAuthStore = defineStore('auth', () => {
 
   function restoreFromStorage() {
     const storedUser = readStoredUser()
-    const storedToken = readStoredToken()
-    const resolvedToken = resolveToken(storedUser, storedToken)
+    const resolvedToken = resolveToken(storedUser)
 
-    if (!storedUser || !resolvedToken || tokenHasExpired(resolvedToken)) {
+    if (!storedUser || tokenHasExpired(resolvedToken)) {
       logout()
       return false
     }
 
-    user.value = { ...storedUser, token: resolvedToken }
+    user.value = { ...storedUser }
     token.value = resolvedToken
     return true
   }
@@ -106,13 +101,16 @@ export const useAuthStore = defineStore('auth', () => {
       return false
     }
 
-    const nextUser = { ...userData, token: resolvedToken }
+    const nextUser = { ...userData }
+    delete nextUser.token
+    delete nextUser.accessToken
+    delete nextUser.jwt
+    delete nextUser.data
     user.value = nextUser
     token.value = resolvedToken
 
     if (hasStorage()) {
       localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(nextUser))
-      localStorage.setItem(TOKEN_STORAGE_KEY, resolvedToken)
     }
 
     return true
@@ -140,7 +138,7 @@ export const useAuthStore = defineStore('auth', () => {
   if (typeof window !== 'undefined') {
     window.addEventListener('auth-expired', logout)
     window.addEventListener('storage', event => {
-      if (event.key === USER_STORAGE_KEY || event.key === TOKEN_STORAGE_KEY) {
+      if (event.key === USER_STORAGE_KEY) {
         syncFromStorage()
       }
     })

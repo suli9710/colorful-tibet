@@ -5,7 +5,11 @@
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-tibet-gold mx-auto"></div>
       </div>
       
-      <div v-else-if="routeData" class="animate-fade-in">
+      <motion.div v-else-if="routeData"
+        :initial="revealInitial"
+        :animate="revealInView"
+        :transition="revealTransition"
+      >
         <!-- Header -->
         <div class="mb-8">
           <button @click="router.back()" class="text-gray-500 hover:text-gray-900 mb-4 flex items-center">
@@ -14,7 +18,7 @@
           <h1 class="text-3xl font-bold text-gray-900 mb-4">{{ routeData.title }}</h1>
           <div class="flex items-center justify-between text-sm text-gray-500">
             <div class="flex items-center gap-4">
-              <span>{{ t('routeDetail.author') }}：{{ routeData.author?.username || t('routeDetail.anonymous') }}</span>
+              <span>{{ t('routeDetail.author') }}：{{ routeAuthorName(routeData) }}</span>
               <span>{{ t('routeDetail.publishedAt') }}：{{ formatDate(routeData.createdAt) }}</span>
             </div>
             <div class="flex gap-2">
@@ -79,7 +83,16 @@
             <div v-for="comment in comments" :key="comment.id" class="border-b border-tibet-gold/20 last:border-0 pb-6 last:pb-0">
               <div class="flex justify-between items-start mb-2">
                 <span class="font-medium text-gray-900">{{ comment.user?.username || t('routeDetail.anonymous') }}</span>
-                <span class="text-xs text-gray-500">{{ formatDate(comment.createdAt) }}</span>
+                <div class="flex items-center gap-3">
+                  <span class="text-xs text-gray-500">{{ formatDate(comment.createdAt) }}</span>
+                  <button
+                    v-if="isOwnComment(comment)"
+                    @click="deleteComment(comment)"
+                    class="text-xs font-medium text-red-500 hover:text-red-700 transition-colors"
+                  >
+                    {{ t('common.delete') }}
+                  </button>
+                </div>
               </div>
               <p class="text-gray-600">{{ comment.content }}</p>
             </div>
@@ -89,8 +102,8 @@
             </div>
           </div>
         </div>
-      </div>
-      
+      </motion.div>
+
       <div v-else class="text-center py-12 text-gray-500">
         {{ t('routeDetail.notFound') }}
       </div>
@@ -104,7 +117,9 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
-import api from '../api'
+import { motion } from 'motion-v'
+import { revealInitial, revealInView, revealTransition } from '../motion/presets'
+import api, { endpoints } from '../api'
 
 const { t } = useI18n()
 
@@ -118,6 +133,7 @@ const comments = ref<any[]>([])
 const isLiked = ref(false)
 const newComment = ref('')
 const submitting = ref(false)
+const currentUser = ref<any>(JSON.parse(localStorage.getItem('user') || 'null'))
 
 const renderedContent = computed(() => {
   return routeData.value ? DOMPurify.sanitize(marked(routeData.value.content) as string) : ''
@@ -184,6 +200,33 @@ const submitComment = async () => {
     }
   } finally {
     submitting.value = false
+  }
+}
+
+const isOwnComment = (comment: any) => {
+  if (!currentUser.value || !comment?.user) return false
+  return Number(comment.user.id) === Number(currentUser.value.id) || comment.user.username === currentUser.value.username
+}
+
+const routeAuthorName = (route: any) => {
+  if (route?.sourceType === 'OFFICIAL' && !route?.author?.username) {
+    return t('community.officialRoute')
+  }
+  return route?.author?.nickname || route?.author?.username || t('routeDetail.anonymous')
+}
+
+const deleteComment = async (comment: any) => {
+  if (!confirm(t('routeDetail.confirmDeleteComment'))) return
+
+  try {
+    await api.delete(endpoints.routes.deleteSharedComment(Number(routeId), comment.id))
+    comments.value = comments.value.filter(item => item.id !== comment.id)
+    if (routeData.value?.commentCount > 0) {
+      routeData.value.commentCount--
+    }
+  } catch (error) {
+    console.error('Failed to delete comment:', error)
+    alert(t('routeDetail.deleteCommentFailed'))
   }
 }
 

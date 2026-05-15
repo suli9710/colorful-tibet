@@ -1,10 +1,14 @@
 package com.tibet.tourism.entity;
 
 import jakarta.persistence.*;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "shared_routes")
+@Table(name = "shared_routes", indexes = {
+    @Index(name = "idx_shared_routes_author_created", columnList = "author_id, created_at"),
+    @Index(name = "idx_shared_routes_source", columnList = "source_type, source_route_id")
+})
 public class SharedRoute {
     
     @Id
@@ -12,7 +16,7 @@ public class SharedRoute {
     private Long id;
     
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "author_id", nullable = false)
+    @JoinColumn(name = "author_id")
     private User author;
     
     @Column(nullable = false, length = 200)
@@ -29,6 +33,24 @@ public class SharedRoute {
     
     @Column(length = 50)
     private String preference;
+
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    private SourceType sourceType = SourceType.USER;
+
+    @Column(name = "source_route_id")
+    private Long sourceRouteId;
+
+    private BigDecimal price;
+
+    @Column(length = 20)
+    private String difficulty;
+
+    @Column(length = 100)
+    private String temperature;
+
+    @Column(length = 100)
+    private String geography;
     
     @Column(nullable = false)
     private Integer viewCount = 0;
@@ -47,6 +69,9 @@ public class SharedRoute {
     
     @PrePersist
     protected void onCreate() {
+        if (sourceType == null) {
+            sourceType = SourceType.USER;
+        }
         createdAt = LocalDateTime.now();
         updatedAt = LocalDateTime.now();
     }
@@ -113,6 +138,54 @@ public class SharedRoute {
     public void setPreference(String preference) {
         this.preference = preference;
     }
+
+    public SourceType getSourceType() {
+        return sourceType == null ? SourceType.USER : sourceType;
+    }
+
+    public void setSourceType(SourceType sourceType) {
+        this.sourceType = sourceType;
+    }
+
+    public Long getSourceRouteId() {
+        return sourceRouteId;
+    }
+
+    public void setSourceRouteId(Long sourceRouteId) {
+        this.sourceRouteId = sourceRouteId;
+    }
+
+    public BigDecimal getPrice() {
+        return price;
+    }
+
+    public void setPrice(BigDecimal price) {
+        this.price = price;
+    }
+
+    public String getDifficulty() {
+        return difficulty;
+    }
+
+    public void setDifficulty(String difficulty) {
+        this.difficulty = difficulty;
+    }
+
+    public String getTemperature() {
+        return temperature;
+    }
+
+    public void setTemperature(String temperature) {
+        this.temperature = temperature;
+    }
+
+    public String getGeography() {
+        return geography;
+    }
+
+    public void setGeography(String geography) {
+        this.geography = geography;
+    }
     
     public Integer getViewCount() {
         return viewCount;
@@ -176,5 +249,9 @@ public class SharedRoute {
         if (this.commentCount > 0) {
             this.commentCount--;
         }
+    }
+
+    public enum SourceType {
+        USER, OFFICIAL
     }
 }

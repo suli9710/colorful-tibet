@@ -23,6 +23,11 @@ public interface ScenicSpotRepository extends JpaRepository<ScenicSpot, Long> {
     @Query("SELECT s FROM ScenicSpot s")
     Page<ScenicSpot> findAllWithoutTags(Pageable pageable);
 
+    List<ScenicSpot> findTop8ByOrderByVisitCountDescIdAsc();
+
+    @Query("SELECT s.category, COUNT(s) FROM ScenicSpot s GROUP BY s.category")
+    List<Object[]> countByCategoryGroup();
+
     @Query("SELECT s FROM ScenicSpot s WHERE s.category = :category")
     Page<ScenicSpot> findByCategory(@Param("category") ScenicSpot.Category category, Pageable pageable);
 
