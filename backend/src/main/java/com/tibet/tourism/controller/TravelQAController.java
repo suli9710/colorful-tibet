@@ -4,9 +4,13 @@ import com.tibet.tourism.entity.TravelAnswer;
 import com.tibet.tourism.entity.TravelQuestion;
 import com.tibet.tourism.entity.User;
 import com.tibet.tourism.repository.UserRepository;
+import com.tibet.tourism.security.CookieAuthConstants;
+import com.tibet.tourism.security.InputSanitizer;
 import com.tibet.tourism.security.JwtUtils;
 import com.tibet.tourism.service.TravelQAService;
 import jakarta.servlet.http.HttpServletRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -15,6 +19,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.util.WebUtils;
 
 import java.util.List;
 import java.util.Map;
@@ -22,6 +27,8 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/community/questions")
 public class TravelQAController {
+
+    private static final Logger logger = LoggerFactory.getLogger(TravelQAController.class);
 
     @Autowired
     private TravelQAService qaService;
@@ -48,7 +55,13 @@ public class TravelQAController {
         if (StringUtils.hasText(headerAuth) && headerAuth.startsWith("Bearer ")) {
             return headerAuth.substring(7);
         }
-        return null;
+        var authCookie = WebUtils.getCookie(request, CookieAuthConstants.AUTH_COOKIE_NAME);
+        return authCookie == null ? null : authCookie.getValue();
+    }
+
+    private ResponseEntity<Map<String, String>> safeBadRequest(Exception e) {
+        logger.warn("Community question request failed: {}", e.getMessage());
+        return ResponseEntity.badRequest().body(Map.of("error", "请求处理失败，请检查输入后重试"));
     }
 
     // 提问
@@ -63,7 +76,7 @@ public class TravelQAController {
             );
             return ResponseEntity.ok(question);
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return safeBadRequest(e);
         }
     }
 
@@ -85,7 +98,10 @@ public class TravelQAController {
             sorting = Sort.by(Sort.Direction.DESC, "createdAt");
         }
 
-        Pageable pageable = PageRequest.of(page, size, sorting);
+        Pageable pageable = PageRequest.of(
+                InputSanitizer.normalizePage(page),
+                InputSanitizer.normalizePageSize(size, 10, 50),
+                sorting);
         Page<TravelQuestion> questions = qaService.getQuestions(tag, sort, status, pageable);
         return ResponseEntity.ok(questions);
     }
@@ -108,7 +124,7 @@ public class TravelQAController {
             qaService.deleteQuestion(id, getCurrentUserId(request));
             return ResponseEntity.noContent().build();
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return safeBadRequest(e);
         }
     }
 
@@ -123,7 +139,7 @@ public class TravelQAController {
             );
             return ResponseEntity.ok(answer);
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return safeBadRequest(e);
         }
     }
 
@@ -134,7 +150,7 @@ public class TravelQAController {
             List<TravelAnswer> answers = qaService.getAnswers(id);
             return ResponseEntity.ok(answers);
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return safeBadRequest(e);
         }
     }
 
@@ -145,7 +161,7 @@ public class TravelQAController {
             TravelAnswer answer = qaService.acceptAnswer(questionId, answerId, getCurrentUserId(request));
             return ResponseEntity.ok(answer);
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return safeBadRequest(e);
         }
     }
 
@@ -157,7 +173,7 @@ public class TravelQAController {
             TravelQuestion question = qaService.getQuestion(id);
             return ResponseEntity.ok(Map.of("liked", liked, "likeCount", question.getLikeCount()));
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return safeBadRequest(e);
         }
     }
 
@@ -169,7 +185,7 @@ public class TravelQAController {
             TravelQuestion question = qaService.getQuestion(id);
             return ResponseEntity.ok(Map.of("liked", !unliked, "likeCount", question.getLikeCount()));
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return safeBadRequest(e);
         }
     }
 

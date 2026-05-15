@@ -4,7 +4,10 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "route_comments")
+@Table(name = "route_comments", indexes = {
+    @Index(name = "idx_route_comments_route_created", columnList = "route_id, created_at"),
+    @Index(name = "idx_route_comments_user_created", columnList = "user_id, created_at")
+})
 public class RouteComment {
     
     @Id

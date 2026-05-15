@@ -5,10 +5,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.Arrays;
 import java.util.Locale;
 import java.util.UUID;
 
@@ -17,10 +19,10 @@ public class FileStorageService {
 
     private final Path uploadRoot;
     private static final java.util.Set<String> ALLOWED_IMAGE_TYPES = java.util.Set.of(
-            "image/jpeg", "image/png", "image/webp", "image/gif"
+            "image/jpeg", "image/png", "image/webp"
     );
     private static final java.util.Set<String> ALLOWED_EXTENSIONS = java.util.Set.of(
-            ".jpg", ".jpeg", ".png", ".webp", ".gif"
+            ".jpg", ".jpeg", ".png", ".webp"
     );
 
     public FileStorageService(@Value("${file.upload-dir:uploads}") String uploadDir) {
@@ -44,10 +46,14 @@ public class FileStorageService {
         String extension = getFileExtension(file.getOriginalFilename());
         String filename = UUID.randomUUID() + extension;
 
-        Path targetDir = uploadRoot.resolve(folder);
+        Path targetDir = uploadRoot.resolve(folder).normalize();
         Files.createDirectories(targetDir);
 
-        Path targetLocation = targetDir.resolve(filename);
+        Path targetLocation = targetDir.resolve(filename).normalize();
+        if (!targetLocation.startsWith(targetDir) || !targetLocation.startsWith(uploadRoot)) {
+            throw new IllegalArgumentException("非法文件路径");
+        }
+
         Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);
 
         return "/uploads/" + folder + "/" + filename;
@@ -65,11 +71,19 @@ public class FileStorageService {
 
         String extension = getFileExtension(file.getOriginalFilename());
         if (!ALLOWED_EXTENSIONS.contains(extension)) {
-            throw new IllegalArgumentException("仅支持 JPG、PNG、WebP 或 GIF 图片");
+            throw new IllegalArgumentException("仅支持 JPG、PNG 或 WebP 图片");
         }
 
         if (file.getSize() > 5 * 1024 * 1024) { // 5MB
             throw new IllegalArgumentException("图片大小不能超过5MB");
+        }
+
+        try {
+            if (!hasValidImageSignature(file, extension)) {
+                throw new IllegalArgumentException("图片内容与文件类型不匹配");
+            }
+        } catch (IOException e) {
+            throw new IllegalArgumentException("无法读取上传文件");
         }
     }
 
@@ -82,6 +96,37 @@ public class FileStorageService {
             return "";
         }
         return originalFilename.substring(dotIndex).toLowerCase(Locale.ROOT);
+    }
+
+    private boolean hasValidImageSignature(MultipartFile file, String extension) throws IOException {
+        byte[] header = new byte[12];
+        int read;
+        try (InputStream inputStream = file.getInputStream()) {
+            read = inputStream.read(header);
+        }
+        if (read <= 0) {
+            return false;
+        }
+
+        return switch (extension) {
+            case ".jpg", ".jpeg" -> read >= 3
+                    && (header[0] & 0xFF) == 0xFF
+                    && (header[1] & 0xFF) == 0xD8
+                    && (header[2] & 0xFF) == 0xFF;
+            case ".png" -> read >= 8
+                    && Arrays.equals(Arrays.copyOf(header, 8),
+                    new byte[]{(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A});
+            case ".webp" -> read >= 12
+                    && header[0] == 'R'
+                    && header[1] == 'I'
+                    && header[2] == 'F'
+                    && header[3] == 'F'
+                    && header[8] == 'W'
+                    && header[9] == 'E'
+                    && header[10] == 'B'
+                    && header[11] == 'P';
+            default -> false;
+        };
     }
 }
 

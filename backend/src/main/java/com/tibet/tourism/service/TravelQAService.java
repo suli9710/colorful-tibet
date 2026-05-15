@@ -2,6 +2,7 @@ package com.tibet.tourism.service;
 
 import com.tibet.tourism.entity.*;
 import com.tibet.tourism.repository.*;
+import com.tibet.tourism.security.InputSanitizer;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -35,19 +36,20 @@ public class TravelQAService {
 
         TravelQuestion question = new TravelQuestion();
         question.setAuthor(user);
-        question.setTitle(title);
-        question.setContent(content);
-        question.setTags(tags);
+        question.setTitle(InputSanitizer.requiredPlainText(title, 200, "问题标题"));
+        question.setContent(InputSanitizer.requiredTextBlock(content, 4000, "问题内容"));
+        question.setTags(InputSanitizer.optionalTags(tags, 500));
 
         return questionRepository.save(question);
     }
 
     public Page<TravelQuestion> getQuestions(String tag, String sort, String status, Pageable pageable) {
+        String safeTag = InputSanitizer.optionalTagFilter(tag);
         return questionRepository.findAll((Specification<TravelQuestion>) (root, query, criteriaBuilder) -> {
             List<Predicate> predicates = new ArrayList<>();
 
-            if (StringUtils.hasText(tag)) {
-                predicates.add(criteriaBuilder.like(root.get("tags"), "%" + tag + "%"));
+            if (StringUtils.hasText(safeTag)) {
+                predicates.add(criteriaBuilder.like(root.get("tags"), "%" + safeTag + "%"));
             }
 
             if ("unsolved".equals(status)) {
@@ -83,6 +85,8 @@ public class TravelQAService {
             throw new RuntimeException("Unauthorized: You can only delete your own questions");
         }
 
+        likeRepository.deleteByQuestion(question);
+        answerRepository.deleteByQuestion(question);
         questionRepository.delete(question);
     }
 
@@ -97,7 +101,7 @@ public class TravelQAService {
         TravelAnswer answer = new TravelAnswer();
         answer.setQuestion(question);
         answer.setUser(user);
-        answer.setContent(content);
+        answer.setContent(InputSanitizer.requiredTextBlock(content, 4000, "回答内容"));
 
         TravelAnswer saved = answerRepository.save(answer);
 

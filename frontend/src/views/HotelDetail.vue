@@ -1,7 +1,12 @@
 <template>
   <div class="min-h-screen tibet-bg-subtle">
     <!-- Hero -->
-    <section class="relative h-[50vh] overflow-hidden">
+    <motion.section
+      class="relative h-[50vh] overflow-hidden"
+      :initial="{ opacity: 0, scale: 1.02 }"
+      :animate="{ opacity: 1, scale: 1 }"
+      :transition="{ duration: 0.5, ease: motionEase }"
+    >
       <img
         :src="hotelCoverImage"
         :alt="hotel.name"
@@ -15,7 +20,12 @@
       <router-link to="/hotels" class="absolute top-6 left-6 p-2.5 rounded-full bg-tibet-white/15 backdrop-blur border border-tibet-gold/30 text-tibet-white hover:bg-tibet-white/25 transition-colors z-10">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
       </router-link>
-      <div class="absolute bottom-0 left-0 right-0 p-8 max-w-7xl mx-auto">
+      <motion.div
+        class="absolute bottom-0 left-0 right-0 p-8 max-w-7xl mx-auto"
+        :initial="{ opacity: 0, y: 20 }"
+        :animate="{ opacity: 1, y: 0 }"
+        :transition="{ duration: 0.6, delay: 0.2, ease: motionEase }"
+      >
         <div class="flex items-center gap-2 mb-3">
           <span class="flex items-center gap-0.5 text-tibet-yellow text-sm">
             <span v-for="n in hotel.stars" :key="n">★</span>
@@ -29,14 +39,20 @@
           <span>·</span>
           <span class="flex items-center gap-1">★ {{ hotel.rating }} ({{ hotel.reviewCount }}{{ t('hotel.reviewCountUnit') }})</span>
         </div>
-      </div>
-    </section>
+      </motion.div>
+    </motion.section>
 
     <!-- Content -->
     <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <!-- Main -->
-        <div class="lg:col-span-2 space-y-8">
+        <motion.div
+          class="lg:col-span-2 space-y-8"
+          :initial="revealInitial"
+          :whileInView="revealInView"
+          :inViewOptions="inViewOnce"
+          :transition="revealTransition"
+        >
           <!-- Description — 藏式卡片 -->
           <div class="tibet-card rounded-2xl p-8">
             <h2 class="tibet-heading text-xl font-bold text-tibet-dark mb-5">{{ t('hotel.introduction') }}</h2>
@@ -82,10 +98,15 @@
               </div>
             </div>
           </div>
-        </div>
+        </motion.div>
 
         <!-- Sidebar -->
-        <div>
+        <motion.div
+          :initial="revealInitial"
+          :whileInView="revealInView"
+          :inViewOptions="inViewOnce"
+          :transition="{ duration: 0.5, delay: 0.15, ease: motionEase }"
+        >
           <div class="sticky top-24 space-y-6">
             <!-- Price Card — 藏式金边 -->
             <div class="tibet-card rounded-2xl p-8">
@@ -129,7 +150,7 @@
               </div>
             </div>
           </div>
-        </div>
+        </motion.div>
       </div>
     </section>
 
@@ -142,6 +163,8 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { motion } from 'motion-v'
+import { motionEase, revealInitial, revealInView, revealTransition, inViewOnce } from '../motion/presets'
 import { getHotelById, hotels, type HotelItem } from '../data/hotels'
 import { applyHotelImageFallback, resolveHotelCoverImage } from '../data/hotelImages'
 import { getCanonicalRegion, localizeApiRoom, localizeHotel } from '../data/hotelTranslations'

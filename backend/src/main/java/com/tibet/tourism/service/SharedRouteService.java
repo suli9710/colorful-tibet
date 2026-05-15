@@ -2,6 +2,7 @@ package com.tibet.tourism.service;
 
 import com.tibet.tourism.entity.*;
 import com.tibet.tourism.repository.*;
+import com.tibet.tourism.security.InputSanitizer;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -14,9 +15,13 @@ import org.springframework.util.StringUtils;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 @Service
 public class SharedRouteService {
+
+    private static final Set<String> ALLOWED_BUDGETS = Set.of("经济型", "舒适型", "豪华型");
+    private static final Set<String> ALLOWED_PREFERENCES = Set.of("自然风光", "人文历史", "深度摄影", "休闲度假");
 
     @Autowired
     private SharedRouteRepository routeRepository;
@@ -38,28 +43,30 @@ public class SharedRouteService {
 
         SharedRoute route = new SharedRoute();
         route.setAuthor(user);
-        route.setTitle(title);
-        route.setContent(content);
-        route.setDays(days);
-        route.setBudget(budget);
-        route.setPreference(preference);
+        route.setTitle(InputSanitizer.requiredPlainText(title, 200, "路线标题"));
+        route.setContent(InputSanitizer.requiredTextBlock(content, 12000, "路线内容"));
+        route.setDays(validateDays(days));
+        route.setBudget(InputSanitizer.optionalAllowedValue(budget, ALLOWED_BUDGETS, "预算"));
+        route.setPreference(InputSanitizer.optionalAllowedValue(preference, ALLOWED_PREFERENCES, "旅行偏好"));
 
         return routeRepository.save(route);
     }
 
     // 获取路线列表（带筛选）
     public Page<SharedRoute> getRoutes(Integer days, String budget, String preference, Pageable pageable) {
+        String safeBudget = InputSanitizer.optionalAllowedValue(budget, ALLOWED_BUDGETS, "预算");
+        String safePreference = InputSanitizer.optionalAllowedValue(preference, ALLOWED_PREFERENCES, "旅行偏好");
         return routeRepository.findAll((Specification<SharedRoute>) (root, query, criteriaBuilder) -> {
             List<Predicate> predicates = new ArrayList<>();
 
             if (days != null) {
                 predicates.add(criteriaBuilder.equal(root.get("days"), days));
             }
-            if (StringUtils.hasText(budget)) {
-                predicates.add(criteriaBuilder.equal(root.get("budget"), budget));
+            if (StringUtils.hasText(safeBudget)) {
+                predicates.add(criteriaBuilder.equal(root.get("budget"), safeBudget));
             }
-            if (StringUtils.hasText(preference)) {
-                predicates.add(criteriaBuilder.equal(root.get("preference"), preference));
+            if (StringUtils.hasText(safePreference)) {
+                predicates.add(criteriaBuilder.equal(root.get("preference"), safePreference));
             }
 
             return criteriaBuilder.and(predicates.toArray(new Predicate[0]));
@@ -83,7 +90,7 @@ public class SharedRouteService {
         SharedRoute route = routeRepository.findById(routeId)
                 .orElseThrow(() -> new RuntimeException("Route not found"));
 
-        if (!route.getAuthor().getId().equals(userId)) {
+        if (route.getAuthor() == null || !route.getAuthor().getId().equals(userId)) {
             throw new RuntimeException("Unauthorized: You can only delete your own routes");
         }
 
@@ -156,7 +163,7 @@ public class SharedRouteService {
         RouteComment comment = new RouteComment();
         comment.setRoute(route);
         comment.setUser(user);
-        comment.setContent(content);
+        comment.setContent(InputSanitizer.requiredTextBlock(content, 1000, "评论内容"));
         
         RouteComment savedComment = commentRepository.save(comment);
 
@@ -173,8 +180,34 @@ public class SharedRouteService {
         return commentRepository.findByRouteOrderByCreatedAtDesc(route);
     }
 
+    @Transactional
+    public void deleteComment(Long routeId, Long commentId, Long userId) {
+        RouteComment comment = commentRepository.findById(commentId)
+                .orElseThrow(() -> new RuntimeException("Comment not found"));
+
+        if (comment.getRoute() == null || !comment.getRoute().getId().equals(routeId)) {
+            throw new RuntimeException("Comment does not belong to this route");
+        }
+
+        if (comment.getUser() == null || !comment.getUser().getId().equals(userId)) {
+            throw new SecurityException("只能删除自己的评论");
+        }
+
+        SharedRoute route = comment.getRoute();
+        commentRepository.delete(comment);
+        route.decrementCommentCount();
+        routeRepository.save(route);
+    }
+
     // 获取用户创建的路线列表
     public List<SharedRoute> getRoutesByAuthor(User author) {
         return routeRepository.findByAuthorOrderByCreatedAtDesc(author);
+    }
+
+    private Integer validateDays(Integer days) {
+        if (days == null || days < 1 || days > 15) {
+            throw new IllegalArgumentException("行程天数必须在1到15天之间");
+        }
+        return days;
     }
 }

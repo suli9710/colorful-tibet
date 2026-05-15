@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface SharedRouteRepository extends JpaRepository<SharedRoute, Long>, JpaSpecificationExecutor<SharedRoute> {
@@ -17,6 +18,16 @@ public interface SharedRouteRepository extends JpaRepository<SharedRoute, Long>,
     // 获取用户分享的路线（解决 N+1：一次性加载 author）
     @EntityGraph(attributePaths = {"author"})
     List<SharedRoute> findByAuthorOrderByCreatedAtDesc(User author);
+
+    @EntityGraph(attributePaths = {"author"})
+    List<SharedRoute> findAllByOrderByCreatedAtDesc();
+
+    @EntityGraph(attributePaths = {"author"})
+    Page<SharedRoute> findAllByOrderByCreatedAtDesc(Pageable pageable);
+
+    Optional<SharedRoute> findBySourceTypeAndSourceRouteId(SharedRoute.SourceType sourceType, Long sourceRouteId);
+
+    long countBySourceType(SharedRoute.SourceType sourceType);
     
     // 简单的筛选查询（更复杂的筛选将使用Specification）
     Page<SharedRoute> findByDays(Integer days, Pageable pageable);

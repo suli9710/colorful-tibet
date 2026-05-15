@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -18,26 +19,32 @@ public class IpLocationService {
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
 
+    @Value("${app.security.trust-proxy-headers:false}")
+    private boolean trustProxyHeaders;
+
     public IpLocationService() {
         this.restTemplate = new RestTemplate();
         this.objectMapper = new ObjectMapper();
     }
 
     public String getClientIpAddress(jakarta.servlet.http.HttpServletRequest request) {
-        String ip = request.getHeader("X-Forwarded-For");
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getHeader("Proxy-Client-IP");
+        String ip = null;
+        if (trustProxyHeaders) {
+            ip = request.getHeader("X-Forwarded-For");
+            if (!hasUsableIp(ip)) {
+                ip = request.getHeader("Proxy-Client-IP");
+            }
+            if (!hasUsableIp(ip)) {
+                ip = request.getHeader("WL-Proxy-Client-IP");
+            }
+            if (!hasUsableIp(ip)) {
+                ip = request.getHeader("HTTP_CLIENT_IP");
+            }
+            if (!hasUsableIp(ip)) {
+                ip = request.getHeader("HTTP_X_FORWARDED_FOR");
+            }
         }
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getHeader("WL-Proxy-Client-IP");
-        }
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getHeader("HTTP_CLIENT_IP");
-        }
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getHeader("HTTP_X_FORWARDED_FOR");
-        }
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+        if (!hasUsableIp(ip)) {
             ip = request.getRemoteAddr();
         }
 
@@ -50,6 +57,10 @@ public class IpLocationService {
         }
 
         return ip;
+    }
+
+    private boolean hasUsableIp(String value) {
+        return value != null && !value.isBlank() && value.length() <= 128 && !"unknown".equalsIgnoreCase(value.trim());
     }
 
     @Cacheable(value = "ipLocationCache", key = "#ipAddress", unless = "#result == '未知' || #result == '本地网络'")

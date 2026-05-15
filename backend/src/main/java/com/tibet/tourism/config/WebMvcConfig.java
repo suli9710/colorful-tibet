@@ -4,6 +4,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.lang.NonNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
@@ -11,20 +13,30 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Arrays;
 
 @Configuration
 public class WebMvcConfig implements WebMvcConfigurer {
 
+    private static final Logger logger = LoggerFactory.getLogger(WebMvcConfig.class);
+
     @Value("${file.upload-dir:uploads}")
     private String uploadDir;
 
+    @Value("${app.cors.allowed-origins:}")
+    private String allowedOrigins;
+
     @Override
     public void addCorsMappings(CorsRegistry registry) {
+        String[] origins = parseCsvProperty(allowedOrigins);
+        if (origins.length == 0) {
+            return;
+        }
         registry.addMapping("/api/**")
-                .allowedOrigins("*")  // 允许所有来源（生产环境建议指定具体域名）
+                .allowedOriginPatterns(origins)
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH")
                 .allowedHeaders("*")
-                .allowCredentials(false)
+                .allowCredentials(true)
                 .maxAge(3600);
     }
 
@@ -46,5 +58,19 @@ public class WebMvcConfig implements WebMvcConfigurer {
     public WebClient.Builder webClientBuilder() {
         return WebClient.builder();
     }
-}
 
+    private String[] parseCsvProperty(String value) {
+        String[] values = Arrays.stream(value == null ? new String[0] : value.split(","))
+                .map(String::trim)
+                .filter(origin -> !origin.isEmpty())
+                .filter(origin -> {
+                    boolean unsafeWildcard = "*".equals(origin);
+                    if (unsafeWildcard) {
+                        logger.warn("Ignoring wildcard CORS origin because credentials are enabled");
+                    }
+                    return !unsafeWildcard;
+                })
+                .toArray(String[]::new);
+        return values;
+    }
+}

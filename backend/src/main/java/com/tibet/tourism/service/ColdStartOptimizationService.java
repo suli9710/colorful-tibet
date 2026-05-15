@@ -138,12 +138,9 @@ public class ColdStartOptimizationService {
                 logger.warn("无效的类别: {}", preferredCategory);
             }
         }
-        
-        // 基于旅伴类型过滤
-        if (companionType != null) {
-            candidates = filterByCompanionType(candidates, companionType);
-        }
-        
+
+        // companionType 当前无差异化过滤逻辑，保留入参便于后续基于景点标签扩展
+
         // 如果候选不足，补充热门景点
         if (candidates.size() < 10) {
             List<ScenicSpot> popularSpots = getCachedPopularSpots(10 - candidates.size());
@@ -296,14 +293,20 @@ public class ColdStartOptimizationService {
             });
         }
         
-        // 按得分排序
-        return candidateScores.entrySet().stream()
+        // 按得分排序后批量取景点，避免 N 次 findById
+        List<Long> topIds = candidateScores.entrySet().stream()
                 .sorted(Map.Entry.<Long, Double>comparingByValue().reversed())
                 .limit(10)
-                .map(entry -> spotRepository.findById(entry.getKey()))
-                .filter(Optional::isPresent)
-                .map(Optional::get)
-                .collect(Collectors.<ScenicSpot>toList());
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toList());
+
+        Map<Long, ScenicSpot> spotMap = spotRepository.findAllById(topIds).stream()
+                .collect(Collectors.toMap(ScenicSpot::getId, s -> s));
+
+        return topIds.stream()
+                .map(spotMap::get)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
     }
     
     // ========== 辅助方法 ==========
@@ -357,13 +360,7 @@ public class ColdStartOptimizationService {
                 .limit(limit)
                 .collect(Collectors.toList());
     }
-    
-    private List<ScenicSpot> filterByCompanionType(List<ScenicSpot> spots, String companionType) {
-        return spots.stream()
-                .filter(spot -> true) // 占位：可基于景点标签或属性扩展
-                .collect(Collectors.toList());
-    }
-    
+
     private double calculateContentSimilarity(ScenicSpot spot, Set<String> userTags) {
         if (spot.getTags() == null || userTags.isEmpty()) {
             return 0.0;

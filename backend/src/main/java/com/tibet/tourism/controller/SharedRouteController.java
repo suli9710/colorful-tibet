@@ -4,24 +4,36 @@ import com.tibet.tourism.entity.RouteComment;
 import com.tibet.tourism.entity.SharedRoute;
 import com.tibet.tourism.entity.User;
 import com.tibet.tourism.repository.UserRepository;
+import com.tibet.tourism.security.CookieAuthConstants;
+import com.tibet.tourism.security.InputSanitizer;
 import com.tibet.tourism.service.SharedRouteService;
 import com.tibet.tourism.security.JwtUtils;
 import jakarta.servlet.http.HttpServletRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.util.WebUtils;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/api/routes")
 public class SharedRouteController {
+
+    private static final Logger logger = LoggerFactory.getLogger(SharedRouteController.class);
+
+    private static final Set<String> ALLOWED_ROUTE_SORT_FIELDS = Set.of(
+            "createdAt", "updatedAt", "viewCount", "likeCount", "commentCount", "days");
 
     @Autowired
     private SharedRouteService routeService;
@@ -49,7 +61,13 @@ public class SharedRouteController {
         if (StringUtils.hasText(headerAuth) && headerAuth.startsWith("Bearer ")) {
             return headerAuth.substring(7);
         }
-        return null;
+        var authCookie = WebUtils.getCookie(request, CookieAuthConstants.AUTH_COOKIE_NAME);
+        return authCookie == null ? null : authCookie.getValue();
+    }
+
+    private ResponseEntity<Map<String, String>> safeBadRequest(Exception e) {
+        logger.warn("Shared route request failed: {}", e.getMessage());
+        return ResponseEntity.badRequest().body(Map.of("error", "请求处理失败，请检查输入后重试"));
     }
 
     // 分享路线
@@ -65,7 +83,7 @@ public class SharedRouteController {
                     (String) payload.get("preference")
             ));
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return safeBadRequest(e);
         }
     }
 
@@ -78,9 +96,13 @@ public class SharedRouteController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "createdAt") String sortField) {
-        
-        Sort sort = Sort.by(Sort.Direction.DESC, sortField);
-        Pageable pageable = PageRequest.of(page, size, sort);
+
+        String safeSortField = InputSanitizer.safeSortField(sortField, ALLOWED_ROUTE_SORT_FIELDS, "createdAt");
+        Sort sort = Sort.by(Sort.Direction.DESC, safeSortField);
+        Pageable pageable = PageRequest.of(
+                InputSanitizer.normalizePage(page),
+                InputSanitizer.normalizePageSize(size, 10, 50),
+                sort);
         
         Page<SharedRoute> routes = routeService.getRoutes(days, budget, preference, pageable);
         return ResponseEntity.ok(routes);
@@ -105,7 +127,7 @@ public class SharedRouteController {
             routeService.deleteRoute(id, userId);
             return ResponseEntity.noContent().build();
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return safeBadRequest(e);
         }
     }
 
@@ -118,7 +140,7 @@ public class SharedRouteController {
             SharedRoute route = routeService.getRoute(id);
             return ResponseEntity.ok(Map.of("liked", success, "likeCount", route.getLikeCount()));
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return safeBadRequest(e);
         }
     }
 
@@ -131,7 +153,7 @@ public class SharedRouteController {
             SharedRoute route = routeService.getRoute(id);
             return ResponseEntity.ok(Map.of("liked", !success, "likeCount", route.getLikeCount() == null ? 0L : route.getLikeCount()));
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return safeBadRequest(e);
         }
     }
     
@@ -156,7 +178,7 @@ public class SharedRouteController {
             RouteComment comment = routeService.addComment(id, userId, content);
             return ResponseEntity.ok(comment);
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return safeBadRequest(e);
         }
     }
 
@@ -167,7 +189,21 @@ public class SharedRouteController {
             List<RouteComment> comments = routeService.getComments(id);
             return ResponseEntity.ok(comments);
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return safeBadRequest(e);
+        }
+    }
+
+    // 删除自己的评论
+    @DeleteMapping("/shared/{id}/comments/{commentId}")
+    public ResponseEntity<?> deleteComment(@PathVariable Long id, @PathVariable Long commentId, HttpServletRequest request) {
+        try {
+            Long userId = getCurrentUserId(request);
+            routeService.deleteComment(id, commentId, userId);
+            return ResponseEntity.noContent().build();
+        } catch (SecurityException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "无权操作该资源"));
+        } catch (Exception e) {
+            return safeBadRequest(e);
         }
     }
 
@@ -180,7 +216,7 @@ public class SharedRouteController {
             List<SharedRoute> routes = routeService.getRoutesByAuthor(user);
             return ResponseEntity.ok(routes);
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return safeBadRequest(e);
         }
     }
 }

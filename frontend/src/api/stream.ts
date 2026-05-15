@@ -1,18 +1,9 @@
 const apiBaseURL = import.meta.env.VITE_API_BASE_URL || '/api'
 
-function getStoredToken(): string {
-  const token = localStorage.getItem('token')
-  if (token) return token
-
-  const userStr = localStorage.getItem('user')
-  if (!userStr) return ''
-
-  try {
-    const user = JSON.parse(userStr)
-    return user?.token || user?.accessToken || user?.jwt || user?.data?.token || user?.data?.accessToken || ''
-  } catch {
-    return ''
-  }
+function readCookie(name: string): string {
+  const prefix = `${name}=`
+  const cookie = document.cookie.split('; ').find(value => value.startsWith(prefix))
+  return cookie ? decodeURIComponent(cookie.slice(prefix.length)) : ''
 }
 
 export interface StreamMeta {
@@ -34,19 +25,20 @@ export async function generateRouteStream(
   callbacks: StreamCallbacks,
   abortSignal?: AbortSignal
 ): Promise<void> {
-  const token = getStoredToken()
   const locale = requestBody.locale || localStorage.getItem('locale') || 'zh'
+  const csrfToken = readCookie('XSRF-TOKEN')
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'Accept': 'text/event-stream',
     'Accept-Language': locale,
   }
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`
+  if (csrfToken) {
+    headers['X-XSRF-TOKEN'] = csrfToken
   }
 
   const response = await fetch(`${apiBaseURL}/routes/generate/stream`, {
     method: 'POST',
+    credentials: 'include',
     headers,
     body: JSON.stringify({ ...requestBody, locale }),
     signal: abortSignal,

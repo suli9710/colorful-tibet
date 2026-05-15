@@ -18,7 +18,7 @@ import java.time.LocalDateTime;
 import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -136,9 +136,9 @@ class ColdStartOptimizationServiceTest {
         when(spotRepository.findAll()).thenReturn(allSpots);
         when(spotRepository.findByCategory(ScenicSpot.Category.CULTURAL))
                 .thenReturn(Arrays.asList(spot1, spot2, spot5));
-        when(spotRepository.findById(anyLong())).thenAnswer(inv -> {
-            Long id = inv.getArgument(0);
-            return allSpots.stream().filter(s -> s.getId().equals(id)).findFirst();
+        when(spotRepository.findAllById(anyList())).thenAnswer(inv -> {
+            List<Long> ids = inv.getArgument(0);
+            return allSpots.stream().filter(s -> ids.contains(s.getId())).toList();
         });
 
         List<ScenicSpot> result = coldStartService.hybridColdStartRecommendation(
@@ -152,9 +152,9 @@ class ColdStartOptimizationServiceTest {
     void testHybridColdStartFallbackToPopular() {
         when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
         when(spotRepository.findAll()).thenReturn(allSpots);
-        when(spotRepository.findById(anyLong())).thenAnswer(inv -> {
-            Long id = inv.getArgument(0);
-            return allSpots.stream().filter(s -> s.getId().equals(id)).findFirst();
+        when(spotRepository.findAllById(anyList())).thenAnswer(inv -> {
+            List<Long> ids = inv.getArgument(0);
+            return allSpots.stream().filter(s -> ids.contains(s.getId())).toList();
         });
 
         // 不给位置和偏好，只靠用户属性

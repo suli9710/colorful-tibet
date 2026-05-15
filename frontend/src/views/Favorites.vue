@@ -1,10 +1,15 @@
 <template>
   <div class="min-h-screen bg-stone-50 py-12 pt-24">
     <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="text-center mb-12">
+      <motion.div
+        class="text-center mb-12"
+        :initial="revealInitial"
+        :animate="revealInView"
+        :transition="revealTransition"
+      >
         <h1 class="text-4xl font-bold text-stone-800 mb-4">{{ t('favorites.title') }}</h1>
         <p class="text-lg text-stone-600">{{ t('favorites.subtitle') }}</p>
-      </div>
+      </motion.div>
 
       <div v-if="loading" class="flex justify-center h-64">
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
@@ -18,7 +23,16 @@
       </div>
 
       <div v-else class="space-y-4">
-        <div v-for="fav in favorites" :key="fav.id" class="bg-white rounded-lg shadow p-6 hover:shadow-md transition-shadow">
+        <motion.div
+          v-for="(fav, index) in favorites"
+          :key="fav.id"
+          class="bg-white rounded-lg shadow p-6 hover:shadow-md transition-shadow"
+          :initial="cardInitial"
+          :whileInView="cardInView"
+          :inViewOptions="inViewOnce"
+          :transition="cardTransition(index)"
+          :whileHover="{ y: -2, scale: 1.01 }"
+        >
           <div class="flex items-start justify-between">
             <div class="flex-1">
               <h3 class="text-lg font-bold text-stone-800">{{ fav.route?.name || t('favorites.unknownRoute') }}</h3>
@@ -34,13 +48,19 @@
                 <span v-if="fav.route?.temperature" class="text-xs">{{ fav.route.temperature }}</span>
               </div>
             </div>
-            <button @click="removeFavorite(fav.route?.id)" class="text-red-500 hover:text-red-700" :title="t('favorites.remove')">
+            <motion.button
+              @click="removeFavorite(fav.route?.id)"
+              class="text-red-500 hover:text-red-700"
+              :title="t('favorites.remove')"
+              :whileHover="{ scale: 1.2 }"
+              :whilePress="{ scale: 0.9 }"
+            >
               <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
               </svg>
-            </button>
+            </motion.button>
           </div>
-        </div>
+        </motion.div>
       </div>
 
       <div v-if="totalPages > 1" class="flex justify-center mt-8 gap-2">
@@ -55,6 +75,8 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { motion } from 'motion-v'
+import { revealInitial, revealInView, revealTransition, cardInitial, cardInView, cardTransition, inViewOnce } from '../motion/presets'
 import api, { endpoints } from '../api'
 
 const { t } = useI18n()

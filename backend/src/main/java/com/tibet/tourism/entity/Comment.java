@@ -22,11 +22,11 @@ public class Comment {
     
     private Integer likeCount = 0; // 点赞数
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
     private User user;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "spot_id")
     @JsonIgnore  // 防止JSON循环引用
     private ScenicSpot spot;

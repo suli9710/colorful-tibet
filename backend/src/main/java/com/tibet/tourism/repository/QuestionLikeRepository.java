@@ -14,4 +14,6 @@ public interface QuestionLikeRepository extends JpaRepository<QuestionLike, Long
     boolean existsByQuestionAndUser(TravelQuestion question, User user);
 
     Optional<QuestionLike> findByQuestionAndUser(TravelQuestion question, User user);
+
+    void deleteByQuestion(TravelQuestion question);
 }

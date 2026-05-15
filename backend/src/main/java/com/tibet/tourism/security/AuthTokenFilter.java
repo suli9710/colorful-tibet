@@ -15,6 +15,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import org.springframework.web.util.WebUtils;
 
 public class AuthTokenFilter extends OncePerRequestFilter {
 
@@ -37,11 +38,10 @@ public class AuthTokenFilter extends OncePerRequestFilter {
 
             if (jwt == null) {
                 if (path.startsWith("/api/admin/")) {
-                    logger.warn("Admin request without JWT: {} - Authorization header: {}",
-                        path, request.getHeader("Authorization") != null ? "present" : "missing");
+                    logger.warn("Admin request without JWT: {}", path);
                 }
             } else if (jwtUtils == null) {
-                logger.error("JwtUtils is null — injection failure!");
+                logger.error("JwtUtils is null; injection failure");
             } else if (!jwtUtils.validateJwtToken(jwt)) {
                 logger.warn("JWT validation failed for path: {}", path);
             } else {
@@ -53,7 +53,7 @@ public class AuthTokenFilter extends OncePerRequestFilter {
                     authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authentication);
                     if (path.startsWith("/api/admin/")) {
-                        logger.info("Admin auth OK: user={}, authorities={}", username, userDetails.getAuthorities());
+                        logger.debug("Admin auth OK: user={}, authorities={}", username, userDetails.getAuthorities());
                     }
                 }
             }
@@ -106,6 +106,7 @@ public class AuthTokenFilter extends OncePerRequestFilter {
             return headerAuth.substring(7);
         }
 
-        return null;
+        var authCookie = WebUtils.getCookie(request, CookieAuthConstants.AUTH_COOKIE_NAME);
+        return authCookie == null ? null : authCookie.getValue();
     }
 }

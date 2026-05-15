@@ -7,18 +7,21 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "comment_likes", uniqueConstraints = {
     @UniqueConstraint(columnNames = {"user_id", "comment_id"})
+}, indexes = {
+    @Index(name = "idx_comment_likes_comment", columnList = "comment_id"),
+    @Index(name = "idx_comment_likes_user", columnList = "user_id")
 })
 public class CommentLike {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     @JsonIgnore
     private User user;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "comment_id", nullable = false)
     @JsonIgnore
     private Comment comment;
@@ -64,4 +67,3 @@ public class CommentLike {
         this.createdAt = createdAt;
     }
 }
-

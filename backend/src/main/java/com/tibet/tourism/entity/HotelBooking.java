@@ -7,18 +7,20 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "hotel_bookings", indexes = {
-    @Index(name = "idx_hb_user_created", columnList = "user_id, created_at")
+    @Index(name = "idx_hb_user_created", columnList = "user_id, created_at"),
+    @Index(name = "idx_hb_hotel_created", columnList = "hotel_id, created_at"),
+    @Index(name = "idx_hb_status_created", columnList = "status, created_at")
 })
 public class HotelBooking {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
     private User user;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "hotel_id")
     private Hotel hotel;
 

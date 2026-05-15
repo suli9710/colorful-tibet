@@ -121,6 +121,12 @@
               <h3 class="text-xl font-bold text-gray-900 group-hover:text-tibet-gold transition-colors duration-300 line-clamp-2 flex-1">
                 {{ route.title }}
               </h3>
+              <span
+                v-if="route.sourceType === 'OFFICIAL'"
+                class="text-xs px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-full whitespace-nowrap font-semibold ml-2"
+              >
+                {{ t('community.officialRoute') }}
+              </span>
               <span class="text-xs px-2.5 py-1 bg-blue-50 text-blue-600 rounded-full whitespace-nowrap font-semibold transform group-hover:scale-110 transition-transform duration-300 ml-2">
                 {{ route.days }}{{ t('community.days') }}
               </span>

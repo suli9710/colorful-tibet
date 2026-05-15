@@ -5,6 +5,8 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 
 import java.time.LocalDate;
 
@@ -22,11 +24,15 @@ public class HotelBookingRequest {
     private Integer guests;
 
     @NotBlank
+    @Size(max = 64, message = "入住人姓名不能超过64个字符")
     private String guestName;
 
     @NotBlank
+    @Size(max = 32, message = "手机号不能超过32个字符")
+    @Pattern(regexp = "^[0-9+\\-\\s()]{6,32}$", message = "手机号格式不合法")
     private String phone;
 
+    @Size(max = 500, message = "备注不能超过500个字符")
     private String note;
 
     @NotNull

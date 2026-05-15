@@ -331,13 +331,10 @@
               <table class="min-w-full divide-y divide-stone-200">
                 <thead class="bg-stone-50">
                   <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">ID</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">ID</th>
                   <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">{{ t('admin.username') }}</th>
                   <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">{{ t('admin.password') }}</th>
                   <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">{{ t('admin.nickname') }}</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">{{ t('admin.city') }}</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">{{ t('admin.ipAddress') }}</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">{{ t('admin.lastLogin') }}</th>
                   <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">{{ t('admin.registeredAt') }}</th>
                   <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">{{ t('admin.status') }}</th>
                   <th class="px-6 py-3 text-right text-xs font-medium text-stone-500 uppercase tracking-wider">{{ t('admin.action') }}</th>
@@ -355,18 +352,6 @@
                       </div>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-500">{{ u.nickname || '-' }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-600">
-                      <span v-if="u.city" class="px-2 py-1 bg-blue-50 text-blue-700 rounded-full text-xs">{{ u.city }}</span>
-                      <span v-else class="text-stone-400">-</span>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-500 font-mono">
-                      <span v-if="u.ipAddress" class="text-xs">{{ u.ipAddress }}</span>
-                      <span v-else class="text-stone-400">-</span>
-                    </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-500">
-                    <span v-if="u.lastLoginAt">{{ formatDateTime(u.lastLoginAt) }}</span>
-                    <span v-else class="text-stone-400">{{ t('admin.neverLoggedIn') }}</span>
-                    </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-500">
                       <span v-if="u.createdAt">{{ formatDateTime(u.createdAt) }}</span>
                       <span v-else class="text-stone-400">-</span>
@@ -391,6 +376,7 @@
         </div>
 
         </div>
+        <AdminCommunityPanel />
         <div class="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden mt-8">
           <div class="px-6 py-4 border-b border-stone-100 flex justify-between items-center bg-gradient-to-r from-stone-50 to-white cursor-pointer hover:bg-stone-100/50 transition-colors" @click="showAllNews = !showAllNews">
             <div class="flex items-center gap-3">
@@ -513,27 +499,48 @@
             <table class="min-w-full divide-y divide-stone-200">
               <thead class="bg-stone-50">
                 <tr>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-stone-500 uppercase">{{ t('admin.name') }}</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-stone-500 uppercase">{{ t('admin.titleLabel') }}</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-stone-500 uppercase">{{ t('admin.routeSource') }}</th>
                   <th class="px-4 py-3 text-left text-xs font-medium text-stone-500 uppercase">{{ t('admin.days') }}</th>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-stone-500 uppercase">{{ t('admin.price') }}</th>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-stone-500 uppercase">{{ t('admin.difficulty') }}</th>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-stone-500 uppercase">{{ t('admin.temperature') }}</th>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-stone-500 uppercase">{{ t('admin.geography') }}</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-stone-500 uppercase">{{ t('admin.communityMeta') }}</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-stone-500 uppercase">{{ t('admin.content') }}</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-stone-500 uppercase">{{ t('admin.routeStats') }}</th>
                   <th class="px-4 py-3 text-right text-xs font-medium text-stone-500 uppercase">{{ t('admin.action') }}</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-stone-200">
                 <tr v-for="r in adminRoutes" :key="r.id" class="hover:bg-stone-50">
-                  <td class="px-4 py-3 text-sm font-medium">{{ r.name }}</td>
+                  <td class="px-4 py-3 text-sm font-medium text-stone-800 max-w-[220px]">
+                    <span class="block truncate">{{ r.title || r.name }}</span>
+                    <span class="text-xs font-normal text-stone-400">ID: {{ r.id }}</span>
+                  </td>
+                  <td class="px-4 py-3 text-sm text-stone-600">
+                    <span
+                      class="inline-flex px-2 py-1 rounded-full text-xs font-medium"
+                      :class="r.sourceType === 'OFFICIAL' ? 'bg-teal-50 text-teal-700' : 'bg-blue-50 text-blue-700'"
+                    >
+                      {{ routeSourceLabel(r) }}
+                    </span>
+                    <div class="text-xs text-stone-400 mt-1">{{ routeAuthorLabel(r) }}</div>
+                  </td>
                   <td class="px-4 py-3 text-sm">{{ t('admin.daysValue', { count: r.days }) }}</td>
-                  <td class="px-4 py-3 text-sm text-red-600">¥{{ r.price }}</td>
-                  <td class="px-4 py-3 text-sm">{{ r.difficulty }}</td>
-                  <td class="px-4 py-3 text-sm">{{ r.temperature || '-' }}</td>
-                  <td class="px-4 py-3 text-sm">{{ r.geography || '-' }}</td>
+                  <td class="px-4 py-3 text-sm text-stone-500">
+                    <div>{{ r.budget || '-' }} · {{ r.preference || '-' }}</div>
+                    <div class="text-xs text-stone-400">
+                      {{ routePriceLabel(r) }} · {{ routeDifficultyLabel(r.difficulty) }}
+                    </div>
+                  </td>
+                  <td class="px-4 py-3 text-sm text-stone-600 max-w-[320px]">{{ routePreview(r) }}</td>
+                  <td class="px-4 py-3 text-sm text-stone-500">
+                    {{ t('admin.communityCounts', { views: r.viewCount || 0, likes: r.likeCount || 0, comments: r.commentCount || 0 }) }}
+                  </td>
                   <td class="px-4 py-3 text-right text-sm space-x-2">
                     <button @click="openEditRouteModal(r)" class="text-blue-600">{{ t('common.edit') }}</button>
                     <button @click="deleteRoute(r.id)" class="text-red-600">{{ t('common.delete') }}</button>
                   </td>
+                </tr>
+                <tr v-if="adminRoutes.length === 0">
+                  <td colspan="7" class="px-4 py-8 text-center text-stone-500">{{ t('admin.noCommunityRoutes') }}</td>
                 </tr>
               </tbody>
             </table>
@@ -699,17 +706,30 @@
         >
             <h2 class="text-xl font-bold mb-4">{{ t('admin.editOrCreateRoute', { mode: editingRoute.id ? t('common.edit') : t('common.create') }) }}</h2>
             <div class="grid grid-cols-2 gap-3">
-              <div><label class="block text-sm font-medium mb-1">{{ t('admin.name') }} *</label><input v-model="routeForm.name" class="w-full border rounded px-3 py-2"></div>
+              <div><label class="block text-sm font-medium mb-1">{{ t('admin.titleLabel') }} *</label><input v-model="routeForm.title" class="w-full border rounded px-3 py-2"></div>
               <div><label class="block text-sm font-medium mb-1">{{ t('admin.days') }}</label><input v-model.number="routeForm.days" type="number" class="w-full border rounded px-3 py-2"></div>
+              <div><label class="block text-sm font-medium mb-1">{{ t('admin.budget') }}</label>
+                <select v-model="routeForm.budget" class="w-full border rounded px-3 py-2">
+                  <option value="">{{ t('common.unknown') }}</option>
+                  <option v-for="option in adminBudgetOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
+                </select>
+              </div>
+              <div><label class="block text-sm font-medium mb-1">{{ t('admin.preference') }}</label>
+                <select v-model="routeForm.preference" class="w-full border rounded px-3 py-2">
+                  <option value="">{{ t('common.unknown') }}</option>
+                  <option v-for="option in adminPreferenceOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
+                </select>
+              </div>
               <div><label class="block text-sm font-medium mb-1">{{ t('admin.price') }}</label><input v-model.number="routeForm.price" type="number" class="w-full border rounded px-3 py-2"></div>
               <div><label class="block text-sm font-medium mb-1">{{ t('admin.difficulty') }}</label>
                 <select v-model="routeForm.difficulty" class="w-full border rounded px-3 py-2">
+                  <option value="">{{ t('common.unknown') }}</option>
                   <option value="EASY">{{ t('admin.easy') }}</option><option value="MEDIUM">{{ t('admin.medium') }}</option><option value="HARD">{{ t('admin.hard') }}</option>
                 </select>
               </div>
               <div><label class="block text-sm font-medium mb-1">{{ t('admin.temperature') }}</label><input v-model="routeForm.temperature" class="w-full border rounded px-3 py-2" :placeholder="t('admin.temperaturePlaceholder')"></div>
               <div><label class="block text-sm font-medium mb-1">{{ t('admin.geography') }}</label><input v-model="routeForm.geography" class="w-full border rounded px-3 py-2" :placeholder="t('admin.geographyPlaceholder')"></div>
-              <div class="col-span-2"><label class="block text-sm font-medium mb-1">{{ t('admin.description') }}</label><textarea v-model="routeForm.description" rows="3" class="w-full border rounded px-3 py-2"></textarea></div>
+              <div class="col-span-2"><label class="block text-sm font-medium mb-1">{{ t('admin.content') }}</label><textarea v-model="routeForm.content" rows="6" class="w-full border rounded px-3 py-2"></textarea></div>
             </div>
             <div class="flex space-x-3 mt-6">
               <button @click="saveRoute" class="flex-1 bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600">{{ t('common.save') }}</button>
@@ -877,6 +897,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import AdminAnalyticsPanel from '../components/AdminAnalyticsPanel.vue'
+import AdminCommunityPanel from '../components/AdminCommunityPanel.vue'
 import ImageUploadField from '../components/ImageUploadField.vue'
 import MotionModal from '../components/motion/MotionModal.vue'
 import api, { endpoints, clearTokenCache } from '../api'
@@ -895,6 +916,7 @@ interface Stats {
   userGrowthTrend?: Array<{ month: string; count: number }>
   newsPublishTrend?: Array<{ month: string; count: number }>
   spotCategories?: Array<{ name: string; value: number }>
+  visitorCityDistribution?: Array<{ name: string; value: number }>
   updatedAt?: string
 }
 
@@ -913,6 +935,7 @@ const stats = ref<Stats>({
 const loading = ref(true)
 const analyticsError = ref('')
 const analyticsData = ref<Stats | null>(null)
+let operationalRefreshTimer: ReturnType<typeof window.setInterval> | null = null
 
 const fetchStats = async () => {
   try {
@@ -982,6 +1005,39 @@ const getStatusClass = (status: string) => {
 const getStatusLabel = (status: string) => {
   const key = `admin.statusLabel.${status}`
   return te(key) ? t(key) : status
+}
+
+const routeSourceLabel = (route: any) => {
+  return route?.sourceType === 'OFFICIAL' ? t('admin.officialRoute') : t('admin.userSharedRoute')
+}
+
+const routeAuthorLabel = (route: any) => {
+  if (route?.sourceType === 'OFFICIAL' && !route?.author?.username) {
+    return t('admin.officialAuthor')
+  }
+  return route?.author?.nickname || route?.author?.username || t('common.unknown')
+}
+
+const routePreview = (route: any) => {
+  const content = route?.content || route?.description || ''
+  const normalized = content.replace(/\s+/g, ' ').trim()
+  return normalized.length > 90 ? `${normalized.slice(0, 90)}...` : (normalized || '-')
+}
+
+const routePriceLabel = (route: any) => {
+  if (route?.price === null || route?.price === undefined || route?.price === '') {
+    return '-'
+  }
+  return `¥${route.price}`
+}
+
+const routeDifficultyLabel = (difficulty: string) => {
+  const labels: Record<string, string> = {
+    EASY: t('admin.easy'),
+    MEDIUM: t('admin.medium'),
+    HARD: t('admin.hard')
+  }
+  return labels[difficulty] || difficulty || '-'
 }
 
 const getRoleLabel = (role: string) => {
@@ -1055,11 +1111,19 @@ const displayedSpots = computed(() => {
   return showAllSpots.value ? spots.value : spots.value.slice(0, 6)
 })
 
+const adminPageParams = { page: 0, size: 100 }
+const toList = (value: any) => {
+  if (Array.isArray(value)) return value
+  if (Array.isArray(value?.content)) return value.content
+  return []
+}
+
 const fetchUsers = async () => {
   try {
-    const response = await api.get(endpoints.admin.users)
-    if (Array.isArray(response.data)) {
-      users.value = response.data
+    const response = await api.get(endpoints.admin.users, { params: adminPageParams })
+    const userData = toList(response.data)
+    if (Array.isArray(userData)) {
+      users.value = userData
     } else {
       console.error('响应数据格式错误:', response.data)
       users.value = []
@@ -1080,9 +1144,9 @@ const fetchSpots = async () => {
   loadingSpots.value = true
   spotsError.value = ''
   try {
-    const response = await api.get(endpoints.admin.spots)
+    const response = await api.get(endpoints.admin.spots, { params: adminPageParams })
     
-    const spotsData = response.data?.content || response.data
+    const spotsData = toList(response.data)
     if (Array.isArray(spotsData)) {
       spots.value = spotsData
     } else {
@@ -1216,8 +1280,8 @@ const showUsers = ref(false)
 const fetchHotelOrders = async () => {
   loadingHotelOrders.value = true
   try {
-    const response = await api.get(endpoints.hotelBookings.all)
-    hotelOrders.value = Array.isArray(response.data?.content) ? response.data.content : (Array.isArray(response.data) ? response.data : [])
+    const response = await api.get(endpoints.hotelBookings.all, { params: adminPageParams })
+    hotelOrders.value = toList(response.data)
   } catch (error: any) {
     console.error('Failed to fetch hotel orders:', error)
     hotelOrders.value = []
@@ -1226,10 +1290,14 @@ const fetchHotelOrders = async () => {
   }
 }
 
+const refreshOperationalData = async () => {
+  await Promise.all([fetchStats(), fetchHotelOrders()])
+}
+
 const updateHotelOrderStatus = async (orderId: number, status: string) => {
   try {
     await api.put(endpoints.hotelBookings.updateStatus(orderId), { status })
-    await fetchHotelOrders()
+    await refreshOperationalData()
   } catch (error) {
     console.error('Failed to update hotel order status:', error)
     alert(t('admin.statusUpdateFailed'))
@@ -1239,8 +1307,9 @@ const updateHotelOrderStatus = async (orderId: number, status: string) => {
 const deleteHotelOrder = async (orderId: number) => {
   if (!confirm(t('admin.confirmDeleteOrder'))) return
   try {
-    await api.delete(endpoints.hotelBookings.cancel(orderId))
-    await fetchHotelOrders()
+    await api.delete(endpoints.hotelBookings.delete(orderId))
+    hotelOrders.value = hotelOrders.value.filter(order => order.id !== orderId)
+    await refreshOperationalData()
     alert(t('admin.deleteSuccess'))
   } catch (error) {
     console.error('Failed to delete hotel order:', error)
@@ -1262,9 +1331,9 @@ const fetchNews = async () => {
       return
     }
     
-    const response = await api.get(endpoints.admin.news)
+    const response = await api.get(endpoints.admin.news, { params: adminPageParams })
     
-    const newsData = response.data?.content || response.data
+    const newsData = toList(response.data)
     if (Array.isArray(newsData)) {
       newsList.value = newsData
     } else {
@@ -1491,24 +1560,67 @@ const adminRoutes = ref<any[]>([])
 const showRoutes = ref(false)
 const showRouteModal = ref(false)
 const editingRoute = ref<any>({})
-const routeForm = ref({ name: '', days: 1, price: 0, difficulty: 'EASY', description: '', temperature: '', geography: '' })
+const routeForm = ref({
+  title: '',
+  days: 1,
+  budget: '',
+  preference: '',
+  price: null as number | null,
+  difficulty: '',
+  content: '',
+  temperature: '',
+  geography: ''
+})
+
+const adminBudgetOptions = computed(() => [
+  { value: '经济型', label: t('routePlanner.budget.economy') },
+  { value: '舒适型', label: t('routePlanner.budget.comfort') },
+  { value: '豪华型', label: t('routePlanner.budget.luxury') }
+])
+
+const adminPreferenceOptions = computed(() => [
+  { value: '自然风光', label: t('routePlanner.preferenceOptions.natural') },
+  { value: '人文历史', label: t('routePlanner.preferenceOptions.cultural') },
+  { value: '深度摄影', label: t('routePlanner.preferenceOptions.photography') },
+  { value: '休闲度假', label: t('routePlanner.preferenceOptions.relaxation') }
+])
 
 const fetchAdminRoutes = async () => {
   try {
-    const res = await api.get(endpoints.adminRoutes.list)
-    adminRoutes.value = Array.isArray(res.data) ? res.data : []
+    const res = await api.get(endpoints.adminRoutes.list, { params: adminPageParams })
+    adminRoutes.value = toList(res.data)
   } catch (e) { adminRoutes.value = [] }
 }
 
 const openCreateRouteModal = () => {
   editingRoute.value = {}
-  routeForm.value = { name: '', days: 1, price: 0, difficulty: 'EASY', description: '', temperature: '', geography: '' }
+  routeForm.value = {
+    title: '',
+    days: 1,
+    budget: '',
+    preference: '',
+    price: null,
+    difficulty: '',
+    content: '',
+    temperature: '',
+    geography: ''
+  }
   showRouteModal.value = true
 }
 
 const openEditRouteModal = (r: any) => {
   editingRoute.value = { ...r }
-  routeForm.value = { name: r.name || '', days: r.days || 1, price: r.price || 0, difficulty: r.difficulty || 'EASY', description: r.description || '', temperature: r.temperature || '', geography: r.geography || '' }
+  routeForm.value = {
+    title: r.title || r.name || '',
+    days: r.days || 1,
+    budget: r.budget || '',
+    preference: r.preference || '',
+    price: r.price ?? null,
+    difficulty: r.difficulty || '',
+    content: r.content || r.description || '',
+    temperature: r.temperature || '',
+    geography: r.geography || ''
+  }
   showRouteModal.value = true
 }
 
@@ -1516,7 +1628,17 @@ const closeRouteModal = () => { showRouteModal.value = false }
 
 const saveRoute = async () => {
   try {
-    const payload = { ...routeForm.value }
+    const payload = {
+      title: routeForm.value.title,
+      content: routeForm.value.content,
+      days: routeForm.value.days,
+      budget: routeForm.value.budget,
+      preference: routeForm.value.preference,
+      price: routeForm.value.price,
+      difficulty: routeForm.value.difficulty,
+      temperature: routeForm.value.temperature,
+      geography: routeForm.value.geography
+    }
     if (editingRoute.value.id) {
       await api.put(endpoints.adminRoutes.update(editingRoute.value.id), payload)
     } else {
@@ -1546,8 +1668,8 @@ const failedHotelImages = ref<Record<number, boolean>>({})
 
 const fetchAdminHotels = async () => {
   try {
-    const res = await api.get(endpoints.adminHotels.list)
-    adminHotels.value = Array.isArray(res.data) ? res.data : []
+    const res = await api.get(endpoints.adminHotels.list, { params: adminPageParams })
+    adminHotels.value = toList(res.data)
     failedHotelImages.value = {}
   } catch (e) { adminHotels.value = [] }
 }
@@ -1647,9 +1769,18 @@ onMounted(async () => {
   fetchCarousels()
   fetchAdminRoutes()
   fetchAdminHotels()
+
+  operationalRefreshTimer = window.setInterval(() => {
+    void refreshOperationalData()
+  }, 15000)
 })
 
 onUnmounted(() => {
+  if (operationalRefreshTimer !== null) {
+    window.clearInterval(operationalRefreshTimer)
+    operationalRefreshTimer = null
+  }
+
   // 组件卸载时确保恢复主页面滚动
   if (typeof document !== 'undefined' && originalBodyOverflow.value !== null) {
     document.body.style.overflow = originalBodyOverflow.value

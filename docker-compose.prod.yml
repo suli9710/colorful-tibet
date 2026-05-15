@@ -18,6 +18,8 @@ services:
       - DOUBAO_MODEL=${DOUBAO_MODEL}
       - JWT_SECRET=${JWT_SECRET}
       - ADMIN_ENCRYPTION_KEY=${ADMIN_ENCRYPTION_KEY}
+      - REQUIRE_STRONG_SECRETS=${REQUIRE_STRONG_SECRETS:-true}
+      - PUBLIC_DOCS_ENABLED=${PUBLIC_DOCS_ENABLED:-false}
       # MySQL 数据库配置（如果使用 MySQL）
       - DB_USERNAME=${DB_USERNAME:-tibet_user}
       - DB_PASSWORD=${DB_PASSWORD}
@@ -26,8 +28,10 @@ services:
       - DB_NAME=${DB_NAME:-tibet_tourism}
       - REDIS_HOST=${REDIS_HOST:-redis}
       - REDIS_PORT=${REDIS_PORT:-6379}
-      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:?REDIS_PASSWORD is required in production}
       - REDIS_DATABASE=${REDIS_DATABASE:-0}
+      - ZIPKIN_ENDPOINT=${ZIPKIN_ENDPOINT:-http://zipkin:9411/api/v2/spans}
+      - TRACING_SAMPLING_PROBABILITY=${TRACING_SAMPLING_PROBABILITY:-0.1}
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
@@ -35,11 +39,16 @@ services:
       - redis
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/api/spots"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health/readiness"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
     networks:
       - tibet-network
 
@@ -47,25 +56,24 @@ services:
     image: redis:7-alpine
     container_name: colorful-tibet-redis
     command: >
-      sh -c 'if [ -n "$$REDIS_PASSWORD" ]; then
-        redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD";
-      else
-        redis-server --appendonly yes;
-      fi'
+      redis-server --appendonly yes --requirepass "$${REDIS_PASSWORD}"
     environment:
-      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
-    ports:
-      - "${REDIS_HOST_PORT:-6379}:6379"
+      - REDIS_PASSWORD=${REDIS_PASSWORD:?REDIS_PASSWORD is required in production}
     volumes:
       - redis_data:/data
     restart: unless-stopped
     networks:
       - tibet-network
     healthcheck:
-      test: ["CMD-SHELL", "if [ -n \"$$REDIS_PASSWORD\" ]; then redis-cli -a \"$$REDIS_PASSWORD\" ping; else redis-cli ping; fi"]
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping"]
       interval: 10s
       timeout: 3s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
 
   frontend:
     build:
@@ -79,6 +87,90 @@ services:
     depends_on:
       - backend
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+    networks:
+      - tibet-network
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: colorful-tibet-prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
+      - prometheus_data:/prometheus
+    depends_on:
+      - backend
+      - alertmanager
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+    networks:
+      - tibet-network
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: colorful-tibet-alertmanager
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
+    networks:
+      - tibet-network
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    container_name: colorful-tibet-grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD is required in production}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+    networks:
+      - tibet-network
+
+  zipkin:
+    image: openzipkin/zipkin:3.4
+    container_name: colorful-tibet-zipkin
+    ports:
+      - "9411:9411"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
     networks:
       - tibet-network
 
@@ -110,6 +202,8 @@ networks:
 
 volumes:
   redis_data:
+  prometheus_data:
+  grafana_data:
 
 # volumes:
 #   mysql_data:

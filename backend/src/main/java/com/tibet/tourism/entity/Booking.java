@@ -6,17 +6,21 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "bookings")
+@Table(name = "bookings", indexes = {
+    @Index(name = "idx_bookings_user_created", columnList = "user_id, created_at"),
+    @Index(name = "idx_bookings_spot_visit", columnList = "spot_id, visit_date"),
+    @Index(name = "idx_bookings_status_created", columnList = "status, created_at")
+})
 public class Booking {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
     private User user;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "spot_id")
     private ScenicSpot spot;
 

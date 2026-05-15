@@ -206,7 +206,7 @@ public class ScenicSpotController {
         } catch (Exception e) {
             return Map.of(
                 "success", false,
-                "message", "计算失败: " + e.getMessage()
+                "message", "计算失败，请稍后重试"
             );
         }
     }
@@ -227,7 +227,7 @@ public class ScenicSpotController {
     }
     
     /**
-     * 新用户冷启动推荐（基于偏好问卷）
+     * 新用户冷启动推荐
      */
     @PostMapping("/recommendations/cold-start")
     public List<ScenicSpot> getColdStartRecommendations(

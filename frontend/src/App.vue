@@ -78,20 +78,24 @@ onBeforeUnmount(() => {
     <NavBar />
     <main class="flex-grow pt-20 md:pt-24">
       <router-view v-slot="{ Component, route }">
-        <AnimatePresence mode="wait" :initial="false">
-          <motion.div
-            :key="route.fullPath"
-            class="min-h-[calc(100vh-6rem)]"
-            :initial="pageInitial"
-            :animate="pageAnimate"
-            :exit="pageExit"
-            :transition="pageTransition"
-          >
-            <keep-alive include="RoutePlanner">
-              <component :is="Component" :key="route.name || route.path" />
-            </keep-alive>
-          </motion.div>
-        </AnimatePresence>
+        <keep-alive include="RoutePlanner">
+          <component
+            v-if="route.name === 'route-planner'"
+            :is="Component"
+            :key="route.name || route.path"
+          />
+        </keep-alive>
+        <motion.div
+          v-if="route.name !== 'route-planner'"
+          :key="route.fullPath"
+          class="min-h-[calc(100vh-6rem)]"
+          :initial="pageInitial"
+          :animate="pageAnimate"
+          :exit="pageExit"
+          :transition="pageTransition"
+        >
+          <component :is="Component" :key="route.name || route.path" />
+        </motion.div>
       </router-view>
     </main>
     <Footer />

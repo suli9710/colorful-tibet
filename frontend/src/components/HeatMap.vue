@@ -2,10 +2,12 @@
 import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useReducedMotion } from 'motion-v'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import type { ECharts } from '@/lib/echarts'
 import api, { endpoints } from '@/api'
 
 const { locale, t } = useI18n()
+const router = useRouter()
 const prefersReducedMotion = useReducedMotion()
 const chartRef = ref<HTMLElement | null>(null)
 
@@ -24,15 +26,21 @@ const loadECharts = async () => {
   return echartsLoader
 }
 
-const fallbackHeatmapData = [
-  { name: '布达拉宫', value: [91.1167, 29.653, 19850] },
-  { name: '纳木错', value: [90.6, 30.75, 18780] },
-  { name: '羊卓雍措', value: [90.65, 28.95, 18140] },
-  { name: '珠穆朗玛峰', value: [86.925, 27.988, 17620] },
-  { name: '雅鲁藏布大峡谷', value: [94.85, 29.6, 17100] },
-  { name: '扎什伦布寺', value: [88.887, 29.267, 16640] },
-  { name: '巴松措', value: [93.95, 30.0, 16260] },
-  { name: '古格王国遗址', value: [79.67, 31.48, 15720] }
+interface HeatmapChartPoint {
+  id?: number | string
+  name: string
+  value: [number, number, number]
+}
+
+const fallbackHeatmapData: HeatmapChartPoint[] = [
+  { id: 1, name: '布达拉宫', value: [91.1167, 29.653, 19850] },
+  { id: 2, name: '纳木错', value: [90.6, 30.75, 18780] },
+  { id: 3, name: '羊卓雍措', value: [90.65, 28.95, 18140] },
+  { id: 4, name: '珠穆朗玛峰', value: [86.925, 27.988, 17620] },
+  { id: 5, name: '雅鲁藏布大峡谷', value: [94.85, 29.6, 17100] },
+  { id: 6, name: '扎什伦布寺', value: [88.887, 29.267, 16640] },
+  { id: 7, name: '巴松措', value: [93.95, 30.0, 16260] },
+  { id: 8, name: '古格王国遗址', value: [79.67, 31.48, 15720] }
 ]
 
 const getHeatLevel = (heat: number): string => {
@@ -45,22 +53,33 @@ const getHeatLevel = (heat: number): string => {
 }
 
 interface HeatmapPoint {
-  id?: number
+  id?: number | string
   name: string
   longitude: number
   latitude: number
   visitCount: number
 }
 
-const getHeatmapData = async () => {
+const getHeatmapData = async (): Promise<HeatmapChartPoint[]> => {
   try {
     const response = await api.get(endpoints.spots.heatmap, { params: { limit: 100 } })
     const points = Array.isArray(response.data) ? response.data as HeatmapPoint[] : []
 
-    const data = points.map((point) => ({
-      name: point.name,
-      value: [point.longitude, point.latitude, point.visitCount || 1]
-    }))
+    const data = points
+      .map((point): HeatmapChartPoint | null => {
+        const longitude = Number(point.longitude)
+        const latitude = Number(point.latitude)
+        const visitCount = Number(point.visitCount) || 1
+
+        if (!Number.isFinite(longitude) || !Number.isFinite(latitude)) return null
+
+        return {
+          id: point.id,
+          name: point.name,
+          value: [longitude, latitude, visitCount]
+        }
+      })
+      .filter((point): point is HeatmapChartPoint => point !== null)
 
     if (data.length) return data
     console.warn('Using fallback heatmap data because the heatmap response was empty.')
@@ -71,10 +90,22 @@ const getHeatmapData = async () => {
   return fallbackHeatmapData
 }
 
-const getEffectData = (data: any[]) => data
-  .filter((item: any) => item.value[2] >= 100)
-  .sort((a: any, b: any) => b.value[2] - a.value[2])
+const getEffectData = (data: HeatmapChartPoint[]) => data
+  .filter((item) => item.value[2] >= 100)
+  .sort((a, b) => b.value[2] - a.value[2])
   .slice(0, 10)
+
+const goToSpot = (spotId?: number | string) => {
+  if (spotId === undefined || spotId === null || spotId === '') return
+
+  router.push(`/spots/${encodeURIComponent(String(spotId))}`)
+}
+
+const handleChartClick = (params: any) => {
+  if (params?.componentType !== 'series') return
+
+  goToSpot(params.data?.id)
+}
 
 const loadTibetMapJson = async () => {
   const localResponse = await fetch('/geo/540000_full.json')
@@ -109,7 +140,10 @@ const loadChartData = async () => {
       formatter: function (params: any) {
         const heat = params.value[2]
         const level = getHeatLevel(heat)
-        return `<strong style="font-size: 14px">${params.name}</strong><br/>${t('heatmap.accessHeat')}: ${heat}<br/>${t('heatmap.heatLevelLabel')}: ${level}`
+        const clickHint = params.data?.id
+          ? `<br/><span style="color: #fde68a">${t('heatmap.clickToView')}</span>`
+          : ''
+        return `<strong style="font-size: 14px">${params.name}</strong><br/>${t('heatmap.accessHeat')}: ${heat}<br/>${t('heatmap.heatLevelLabel')}: ${level}${clickHint}`
       },
       backgroundColor: 'rgba(0, 0, 0, 0.85)',
       borderColor: '#fbbf24',
@@ -126,6 +160,7 @@ const loadChartData = async () => {
         type: 'scatter',
         coordinateSystem: mapLoaded ? 'geo' : undefined,
         data,
+        cursor: 'pointer',
         symbolSize: function (val: any) {
           const size = val[2] > 0 ? Math.max(Math.min(val[2] / 100, 25), 6) : 6
           return size
@@ -157,6 +192,7 @@ const loadChartData = async () => {
         type: 'effectScatter',
         coordinateSystem: mapLoaded ? 'geo' : undefined,
         data: getEffectData(data),
+        cursor: 'pointer',
         symbolSize: function (val: any) {
           return Math.max(Math.min(val[2] / 80, 30), 18)
         },
@@ -242,6 +278,8 @@ onMounted(async () => {
   if (chartRef.value) {
     const { init, registerMap } = await loadECharts()
     chart = init(chartRef.value)
+    chart.off('click', handleChartClick)
+    chart.on('click', handleChartClick)
     
     try {
       const mapJson = await loadTibetMapJson()
@@ -298,6 +336,7 @@ onUnmounted(() => {
   } else {
     window.removeEventListener('resize', handleResize)
   }
+  chart?.off('click', handleChartClick)
   chart?.dispose()
 })
 </script>

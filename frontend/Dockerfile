@@ -2,7 +2,7 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 COPY package*.json ./
-RUN npm install
+RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
 COPY . .
 
 # 构建时传入的环境变量
@@ -23,6 +23,5 @@ EXPOSE 80
 
 # nginx会自动启动
 CMD ["nginx", "-g", "daemon off;"]
-
 
 

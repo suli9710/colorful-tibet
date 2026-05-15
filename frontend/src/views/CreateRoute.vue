@@ -107,9 +107,6 @@
               class="w-full px-4 py-3 rounded-xl bg-white/50 border border-tibet-gold/25 focus:border-tibet-gold focus:ring-2 focus:ring-blue-100 outline-none transition-all resize-y font-mono text-sm"
               required
             ></textarea>
-            <p class="mt-1 text-xs text-gray-500">
-              {{ t('createRoute.markdownHint') }}
-            </p>
           </MotionBlock>
 
           <MotionBlock
