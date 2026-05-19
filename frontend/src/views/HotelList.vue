@@ -13,7 +13,7 @@
             <svg class="w-4 h-4" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" stroke="currentColor" stroke-width="10" fill="none"/><circle cx="50" cy="50" r="12" fill="currentColor"/><line x1="50" y1="10" x2="50" y2="38" stroke="currentColor" stroke-width="6"/><line x1="50" y1="62" x2="50" y2="90" stroke="currentColor" stroke-width="6"/><line x1="10" y1="50" x2="38" y2="50" stroke="currentColor" stroke-width="6"/><line x1="62" y1="50" x2="90" y2="50" stroke="currentColor" stroke-width="6"/></svg>
             {{ t('hotel.badge') }}
           </span>
-          <h1 class="text-4xl md:text-6xl font-bold tracking-tight mb-6 leading-tight tibetan-font">{{ t('hotel.listTitle') }}</h1>
+          <h1 class="text-4xl md:text-6xl font-bold mb-6 leading-tight tibetan-font">{{ t('hotel.listTitle') }}</h1>
           <p class="text-lg text-tibet-white/70 leading-relaxed max-w-xl">{{ t('hotel.listSubtitle') }}</p>
         </div>
       </div>

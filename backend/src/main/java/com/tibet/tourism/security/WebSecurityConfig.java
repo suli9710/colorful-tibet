@@ -17,6 +17,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
+import org.springframework.security.web.header.writers.StaticHeadersWriter;
+
+import jakarta.servlet.DispatcherType;
 
 @Configuration
 @EnableMethodSecurity
@@ -40,8 +43,14 @@ public class WebSecurityConfig {
     @Autowired
     private AuthEntryPointJwt unauthorizedHandler;
 
+    @Autowired
+    private CsrfCookieFilter csrfCookieFilter;
+
     @Value("${app.security.public-docs-enabled:false}")
     private boolean publicDocsEnabled;
+
+    @Value("${app.security.public-metrics-enabled:false}")
+    private boolean publicMetricsEnabled;
 
     @Bean
     public AuthTokenFilter authenticationJwtTokenFilter() {
@@ -71,6 +80,7 @@ public class WebSecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http.cors(Customizer.withDefaults())
+            // Browser cookie authentication is protected by CsrfCookieFilter with signed double-submit tokens.
             .csrf(csrf -> csrf.disable())
             .exceptionHandling(exception -> exception.authenticationEntryPoint(unauthorizedHandler))
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -78,13 +88,23 @@ public class WebSecurityConfig {
                 if (publicDocsEnabled) {
                     auth.requestMatchers(API_DOCS_PATHS).permitAll();
                 }
-                auth.requestMatchers("/error").permitAll()
-                    .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info", "/actuator/prometheus").permitAll()
+                if (publicMetricsEnabled) {
+                    auth.requestMatchers("/actuator/prometheus").permitAll();
+                } else {
+                    auth.requestMatchers("/actuator/prometheus").hasRole("ADMIN");
+                }
+                auth.dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()
+                    .requestMatchers(HttpMethod.TRACE, "/**").denyAll()
+                    .requestMatchers("/error").permitAll()
+                    .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
+                    .requestMatchers("/actuator/info").hasRole("ADMIN")
                     .requestMatchers("/api/auth/login").permitAll()
                     .requestMatchers("/api/auth/register").permitAll()
                     .requestMatchers("/api/auth/logout").permitAll()
                     .requestMatchers("/api/auth/me").authenticated()
                     .requestMatchers("/api/auth/me/**").authenticated()
+                    .requestMatchers(HttpMethod.POST, "/api/payments/callbacks/**").permitAll()
+                    .requestMatchers("/api/orders/**").authenticated()
                     .requestMatchers("/api/spots/admin/**").hasRole("ADMIN")
                     .requestMatchers("/api/spots/recommendations/**").authenticated()
                     .requestMatchers("/api/spots/companion-type").authenticated()
@@ -96,8 +116,13 @@ public class WebSecurityConfig {
                     .requestMatchers(HttpMethod.GET, "/api/spots/*/similar").permitAll()
                     .requestMatchers("/api/news/**").permitAll()
                     .requestMatchers("/api/heritage/**").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/tibet-specialty/culture-tips").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/tibet-specialty/phrasebook").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/tibet-specialty/sustainable-options").permitAll()
+                    .requestMatchers("/api/tibet-specialty/**").authenticated()
                     .requestMatchers("/images/**").permitAll()
                     .requestMatchers("/uploads/**").permitAll()
+                    .requestMatchers("/api/itineraries/**").authenticated()
                     .requestMatchers(HttpMethod.POST, "/api/routes/generate").authenticated()
                     .requestMatchers(HttpMethod.POST, "/api/routes/generate/**").authenticated()
                     // 分享路线相关的GET请求允许匿名访问（必须在 /api/routes/** 之前）
@@ -129,21 +154,27 @@ public class WebSecurityConfig {
         http.headers(headers -> headers
                 .contentSecurityPolicy(csp -> csp.policyDirectives(
                         "default-src 'self'; " +
-                        "script-src 'self' 'unsafe-inline'; " +
-                        "style-src 'self' 'unsafe-inline'; " +
+                        "script-src 'self'; " +
+                        "style-src 'self'; " +
                         "img-src 'self' data: blob:; " +
                         "object-src 'none'; " +
                         "base-uri 'self'; " +
                         "frame-ancestors 'self'"))
                 .frameOptions(frameOptions -> frameOptions.sameOrigin())
+                .contentTypeOptions(Customizer.withDefaults())
                 .referrerPolicy(referrer -> referrer.policy(
                         ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
+                .addHeaderWriter(new StaticHeadersWriter("Permissions-Policy",
+                        "camera=(), microphone=(), geolocation=(), payment=(), usb=()"))
+                .addHeaderWriter(new StaticHeadersWriter("Cross-Origin-Opener-Policy", "same-origin"))
+                .addHeaderWriter(new StaticHeadersWriter("Cross-Origin-Resource-Policy", "same-origin"))
                 .httpStrictTransportSecurity(hsts -> hsts
                         .includeSubDomains(true)
                         .maxAgeInSeconds(31536000)));
 
         http.authenticationProvider(authenticationProvider());
 
+        http.addFilterBefore(csrfCookieFilter, UsernamePasswordAuthenticationFilter.class);
         http.addFilterBefore(authenticationJwtTokenFilter(), UsernamePasswordAuthenticationFilter.class);
         
         return http.build();

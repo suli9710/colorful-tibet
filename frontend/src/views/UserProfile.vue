@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { AnimatePresence, LayoutGroup, motion } from 'motion-v'
 import api, { endpoints } from '@/api'
+import { useAuthStore } from '@/stores/auth'
 import { applyHotelImageFallback, resolveHotelBookingImage } from '@/data/hotelImages'
 import MotionModal from '@/components/motion/MotionModal.vue'
 import {
@@ -20,6 +21,7 @@ import {
 const { t } = useI18n()
 
 const router = useRouter()
+const auth = useAuthStore()
 const user = ref<any>(null)
 const userInfo = ref<any>(null)
 const stats = ref<any>(null)
@@ -54,18 +56,14 @@ const profileTabs = computed<Array<{ id: ProfileTabId; label: string; count: num
 ])
 
 onMounted(async () => {
-  const userStr = localStorage.getItem('user')
-  if (!userStr) {
-    router.push('/login')
+  if (!(await auth.ensureSession())) {
+    await router.push('/login')
     return
   }
+
+  user.value = auth.user ? { ...auth.user } : null
+
   try {
-    user.value = JSON.parse(userStr)
-    // 检查是否有token
-    if (!user.value?.token) {
-      router.push('/login')
-      return
-    }
     await Promise.all([
       fetchUserInfo(),
       fetchStats(),
@@ -314,13 +312,7 @@ const updateNickname = async () => {
     alert(t('profile.nicknameUpdateSuccess'))
     showNicknameModal.value = false
     await fetchUserInfo()
-    // 更新localStorage中的用户信息
-    const userStr = localStorage.getItem('user')
-    if (userStr) {
-      const userData = JSON.parse(userStr)
-      userData.nickname = nicknameForm.value.nickname.trim()
-      localStorage.setItem('user', JSON.stringify(userData))
-    }
+    auth.updateUser({ nickname: nicknameForm.value.nickname.trim() })
   } catch (e: any) {
     console.error('Failed to update nickname:', e)
     const errorMsg = e.response?.data?.error || t('profile.nicknameUpdateFailed')
@@ -360,13 +352,7 @@ const handleAvatarUpload = async (event: Event) => {
     
     alert(t('profile.avatarUploadSuccess'))
     await fetchUserInfo()
-    // 更新localStorage中的用户信息
-    const userStr = localStorage.getItem('user')
-    if (userStr) {
-      const userData = JSON.parse(userStr)
-      userData.avatar = response.data.avatarUrl
-      localStorage.setItem('user', JSON.stringify(userData))
-    }
+    auth.updateUser({ avatar: response.data.avatarUrl })
   } catch (e: any) {
     console.error('Failed to upload avatar:', e)
     const errorMsg = e.response?.data?.error || t('profile.avatarUploadFailed')

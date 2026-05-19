@@ -124,12 +124,12 @@
           
           <!-- Image Container -->
           <div class="relative h-72 overflow-hidden bg-gray-200">
-            <img v-if="spot.imageUrl" 
-                 :src="spot.imageUrl" 
+            <img v-if="hasSpotImage(spot)"
+                 :src="spot.imageUrl"
                  :alt="spot.name"
                  loading="lazy"
                  class="w-full h-full object-cover tibet-image-hover img-fade-in will-change-transform"
-                 @error="handleImageError($event)">
+                 @error="handleImageError(spot)">
             <div v-else 
                  class="w-full h-full flex items-center justify-center"
                  :class="getGradientClass(spot)">
@@ -206,6 +206,7 @@ const { t, locale } = useI18n()
 const spots = ref<any[]>([])
 const loading = ref(true)
 const selectedCategory = ref<string>('ALL')
+const failedSpotImages = ref<Record<string, boolean>>({})
 
 const categories = computed(() => [
   { label: t('spots.category.all'), value: 'ALL' },
@@ -267,13 +268,12 @@ const goToSpot = (spot: any) => {
   router.push(`/spots/${encodeURIComponent(String(spot.id))}`)
 }
 
-const handleImageError = (event: Event) => {
-  const img = event.target as HTMLImageElement
-  img.style.display = 'none'
-  const parent = img.parentElement
-  if (parent) {
-    parent.classList.add('bg-gradient-to-br', 'from-tibet-blue', 'to-tibet-red')
-  }
+const getSpotImageKey = (spot: any) => String(spot?.id ?? spot?.imageUrl ?? spot?.name ?? '')
+
+const hasSpotImage = (spot: any) => Boolean(spot?.imageUrl) && !failedSpotImages.value[getSpotImageKey(spot)]
+
+const handleImageError = (spot: any) => {
+  failedSpotImages.value[getSpotImageKey(spot)] = true
 }
 
 const getGradientClass = (spot: any) => {

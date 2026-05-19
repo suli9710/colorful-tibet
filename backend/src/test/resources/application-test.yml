@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: jdbc:mysql://${MYSQL_TEST_HOST:${MYSQL_HOST:localhost}}:${MYSQL_TEST_PORT:${MYSQL_PORT:3306}}/${MYSQL_TEST_DATABASE:colorful_tibet_test}?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://${MYSQL_TEST_HOST:${MYSQL_HOST:localhost}}:${MYSQL_TEST_PORT:${MYSQL_PORT:3306}}/${MYSQL_TEST_DATABASE:colorful_tibet_test}?useUnicode=true&characterEncoding=utf8&sslMode=${MYSQL_TEST_SSL_MODE:DISABLED}&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=false
     driver-class-name: com.mysql.cj.jdbc.Driver
     username: ${MYSQL_TEST_USERNAME:${MYSQL_USERNAME:root}}
     password: ${MYSQL_TEST_PASSWORD:${MYSQL_PASSWORD:}}
@@ -17,13 +17,17 @@ spring:
       mode: never
 
 jwt:
-  secret: test-jwt-secret-key-for-unit-tests-only-1234567890
+  secret: test-jwt-secret-key-for-unit-tests-only-1234567890-abcdef-abcdef-abcdef
   expiration: 86400000
 
 app:
   security:
     public-docs-enabled: false
     require-strong-secrets: false
+    csrf-signing-secret: test-csrf-signing-secret-for-unit-tests-only-1234567890-abcdef-abcdef-abcdef
+    pii-encryption-key: test-pii-encryption-key-for-unit-tests-only-1234567890-abcdef-abcdef
+    rate-limit:
+      redis-enabled: false
 
 logging:
   level:

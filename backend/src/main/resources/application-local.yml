@@ -16,7 +16,7 @@ spring:
     async:
       request-timeout: 120000
   datasource:
-    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:colorful_tibet}?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:colorful_tibet}?useUnicode=true&characterEncoding=utf8&sslMode=${MYSQL_SSL_MODE:DISABLED}&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=${MYSQL_ALLOW_PUBLIC_KEY_RETRIEVAL:false}
     username: ${MYSQL_USERNAME:root}
     password: ${MYSQL_PASSWORD:}
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -39,13 +39,26 @@ spring:
           events:
             log:
               LOG_QUERIES_SLOWER_THAN_MS: ${HIBERNATE_SLOW_QUERY_MS:500}
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 3000ms
+      connect-timeout: 2000ms
+      lettuce:
+        pool:
+          min-idle: 0
+          max-active: 8
+          max-idle: 4
+          max-wait: 2000ms
 
 ark:
   api:
-    url: ${ARK_API_URL:https://ark.cn-beijing.volces.com/api/v3/responses}
+    url: ${ARK_API_URL:${DOUBAO_API_URL:https://ark.cn-beijing.volces.com/api/v3/responses}}
     key: ${ARK_API_KEY:${DOUBAO_API_KEY:}}
-    model: ${AI_MODEL:${DOUBAO_MODEL:doubao-seed-2-0-pro-260215}}
-    stream-url: ${ARK_STREAM_API_URL:}  # 流式端点，为空时从url自动推导
+    model: ${AI_MODEL:${ARK_MODEL:${DOUBAO_MODEL:doubao-seed-2-0-pro-260215}}}
+    stream-url: ${ARK_STREAM_API_URL:${DOUBAO_STREAM_API_URL:}}  # 流式端点，为空时从url自动推导
 
 doubao:
   api:
@@ -57,6 +70,12 @@ doubao:
 ai:
   route:
     stream-timeout-seconds: ${AI_STREAM_TIMEOUT:180}
+
+# Scrapling 爬虫微服务配置
+scrapling:
+  service:
+    url: ${SCRAPLING_SERVICE_URL:http://localhost:8000}
+    timeout-seconds: ${SCRAPLING_SERVICE_TIMEOUT:30}
 
 # 价格定时更新配置
 price:
@@ -80,16 +99,32 @@ app:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000}
   security:
     public-docs-enabled: ${PUBLIC_DOCS_ENABLED:true}
+    public-metrics-enabled: ${PUBLIC_METRICS_ENABLED:false}
     require-strong-secrets: ${REQUIRE_STRONG_SECRETS:false}
+    csrf-signing-secret: ${CSRF_SIGNING_SECRET:dev-only-csrf-signing-secret-change-me-before-shared-deployment-2026-05-colorful-tibet}
+    pii-encryption-key: ${PII_ENCRYPTION_KEY:}
+    cookie-secure: ${COOKIE_SECURE:false}
     trust-proxy-headers: ${TRUST_PROXY_HEADERS:false}
     rate-limit:
       enabled: ${RATE_LIMIT_ENABLED:true}
+      redis-enabled: ${RATE_LIMIT_REDIS_ENABLED:true}
+      trust-proxy-headers: ${TRUST_PROXY_HEADERS:false}
+      register:
+        requests: ${RATE_LIMIT_REGISTER_REQUESTS:5}
+        window-seconds: ${RATE_LIMIT_REGISTER_WINDOW_SECONDS:3600}
   super-admin-username: ${SUPER_ADMIN_USERNAME:lzh}
   seed:
+    content:
+      enabled: ${SEED_CONTENT_ENABLED:true}
     demo-users:
       enabled: ${SEED_DEMO_USERS:false}
-      admin-password: ${SEED_DEMO_ADMIN_PASSWORD:AdminDemo2026}
-      user-password: ${SEED_DEMO_USER_PASSWORD:UserDemo2026}
+      admin-password: ${SEED_DEMO_ADMIN_PASSWORD:}
+      super-admin-password: ${SEED_DEMO_SUPER_ADMIN_PASSWORD:}
+      user-password: ${SEED_DEMO_USER_PASSWORD:}
+
+recommendation:
+  item-similarity:
+    preload-on-startup: false
 
 # 日志配置
 logging:

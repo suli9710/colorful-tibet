@@ -7,9 +7,11 @@ import com.tibet.tourism.entity.User;
 import com.tibet.tourism.repository.BookingRepository;
 import com.tibet.tourism.repository.ScenicSpotRepository;
 import com.tibet.tourism.repository.UserRepository;
+import com.tibet.tourism.service.OrderCenterService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -22,6 +24,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/bookings")
+@PreAuthorize("isAuthenticated()")
 public class BookingController {
 
     @Autowired
@@ -32,6 +35,9 @@ public class BookingController {
 
     @Autowired
     ScenicSpotRepository scenicSpotRepository;
+
+    @Autowired
+    OrderCenterService orderCenterService;
 
     @PostMapping
     public ResponseEntity<?> createBooking(@Valid @RequestBody BookingRequest payload) {
@@ -50,7 +56,7 @@ public class BookingController {
         booking.setSpot(spot);
         booking.setVisitDate(payload.getVisitDate());
         booking.setTicketCount(payload.getTicketCount());
-        booking.setStatus(Booking.Status.CONFIRMED); // Auto-confirm for now
+        booking.setStatus(Booking.Status.PENDING);
 
         // Calculate total price with seasonal rules (按“每年”月份/日期判断，而不是具体年份):
         // 旺季：5月1日 - 10月31日
@@ -80,8 +86,12 @@ public class BookingController {
         booking.setTotalPrice(unitPrice.multiply(new BigDecimal(payload.getTicketCount())));
 
         bookingRepository.save(booking);
+        orderCenterService.createFromLegacySpotBooking(booking);
 
-        return ResponseEntity.ok(Map.of("message", "Booking created successfully!", "bookingId", booking.getId()));
+        return ResponseEntity.ok(Map.of(
+                "message", "Booking created successfully and is pending payment.",
+                "bookingId", booking.getId(),
+                "status", booking.getStatus()));
     }
 
     @GetMapping("/my")
@@ -108,7 +118,7 @@ public class BookingController {
         }
 
         if (!booking.getUser().getId().equals(user.getId())) {
-            return ResponseEntity.status(403).body("Unauthorized to cancel this booking");
+            return ResponseEntity.status(404).body(Map.of("error", "Booking not found"));
         }
 
         if (booking.getStatus() == Booking.Status.CANCELLED) {
@@ -117,6 +127,7 @@ public class BookingController {
 
         booking.setStatus(Booking.Status.CANCELLED);
         bookingRepository.save(booking);
+        orderCenterService.cancelLegacyMirror(user, "LEGACY_SPOT_BOOKING", booking.getId(), "旧景点预订取消");
 
         return ResponseEntity.ok(Map.of("message", "Booking cancelled successfully!"));
     }
@@ -134,7 +145,7 @@ public class BookingController {
         }
 
         if (!booking.getUser().getId().equals(user.getId())) {
-            return ResponseEntity.status(403).body(Map.of("error", "Unauthorized to delete this booking"));
+            return ResponseEntity.status(404).body(Map.of("error", "Booking not found"));
         }
 
         if (booking.getStatus() != Booking.Status.CANCELLED) {

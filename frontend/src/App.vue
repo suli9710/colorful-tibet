@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import NavBar from './components/NavBar.vue'
 import Footer from './components/Footer.vue'
+import AiRouteFloatingBall from './components/AiRouteFloatingBall.vue'
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { AnimatePresence, MotionConfig, motion } from 'motion-v'
@@ -99,6 +100,7 @@ onBeforeUnmount(() => {
       </router-view>
     </main>
     <Footer />
+    <AiRouteFloatingBall />
   </div>
   </MotionConfig>
 </template>

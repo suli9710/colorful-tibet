@@ -21,10 +21,16 @@ class InputSanitizerTest {
     void localAssetPathRejectsProtocolAndTraversalPayloads() {
         assertThat(InputSanitizer.optionalLocalAssetPath("/uploads/comments/photo.jpg", "图片"))
                 .isEqualTo("/uploads/comments/photo.jpg");
+        assertThat(InputSanitizer.optionalLocalAssetPath("/images/spots/布达拉宫.jpg", "图片"))
+                .isEqualTo("/images/spots/布达拉宫.jpg");
 
         assertThatThrownBy(() -> InputSanitizer.optionalLocalAssetPath("javascript:alert(1)", "图片"))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> InputSanitizer.optionalLocalAssetPath("/uploads/../secret.txt", "图片"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> InputSanitizer.optionalLocalAssetPath("/uploads/%252e%252e/secret.jpg", "图片"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> InputSanitizer.optionalLocalAssetPath("/uploads/comments/photo.jpg;evil=1", "图片"))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 

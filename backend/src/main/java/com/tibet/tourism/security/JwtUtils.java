@@ -16,6 +16,7 @@ import org.springframework.util.StringUtils;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.UUID;
 import javax.crypto.SecretKey;
 
 @Component
@@ -79,6 +80,7 @@ public class JwtUtils {
 
         return Jwts.builder()
                 .subject(userPrincipal.getUsername())
+                .id(UUID.randomUUID().toString())
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + jwtExpirationMs))
                 .signWith(getSigningKey(), Jwts.SIG.HS512)

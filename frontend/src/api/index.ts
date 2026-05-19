@@ -5,6 +5,7 @@ const apiBaseURL = import.meta.env.VITE_API_BASE_URL || '/api'
 const DEFAULT_TIMEOUT_MS = 15000
 const LONG_TIMEOUT_MS = 180000
 const UPLOAD_TIMEOUT_MS = 60000
+const PRICE_TIMEOUT_MS = 300000
 const GET_CACHE_TTL_MS = 15000
 
 const api = axios.create({
@@ -61,9 +62,12 @@ function withSpecialTimeout(url: string, config: any = {}) {
     || requestUrl.includes('/upload-image')
     || requestUrl.includes('/upload-avatar')
   const isAiGenerate = requestUrl.includes('/routes/generate')
+  const isPriceFetch = requestUrl.includes('/prices/')
 
   if (isAiGenerate && (!nextConfig.timeout || nextConfig.timeout === DEFAULT_TIMEOUT_MS)) {
     nextConfig.timeout = LONG_TIMEOUT_MS
+  } else if (isPriceFetch && (!nextConfig.timeout || nextConfig.timeout === DEFAULT_TIMEOUT_MS)) {
+    nextConfig.timeout = PRICE_TIMEOUT_MS
   } else if (isUpload && (!nextConfig.timeout || nextConfig.timeout === DEFAULT_TIMEOUT_MS)) {
     nextConfig.timeout = UPLOAD_TIMEOUT_MS
   }
@@ -183,6 +187,32 @@ export const endpoints = {
     deleteSharedComment: (routeId: number, commentId: number) => `/routes/shared/${routeId}/comments/${commentId}`,
     myRoutes: '/routes/my-routes'
   },
+  itineraries: {
+    generate: '/itineraries/generate',
+    my: '/itineraries/my',
+    detail: (id: number) => `/itineraries/${id}`,
+    quote: (id: number) => `/itineraries/${id}/quote`,
+    createVersion: (id: number) => `/itineraries/${id}/versions`,
+    bookItem: (id: number, itemId: number) => `/itineraries/${id}/items/${itemId}/bookings`
+  },
+  orders: {
+    create: '/orders',
+    my: '/orders/my',
+    detail: (id: number) => `/orders/${id}`,
+    cancel: (id: number) => `/orders/${id}/cancel`,
+    refunds: (id: number) => `/orders/${id}/refunds`,
+    invoice: (id: number) => `/orders/${id}/invoice`
+  },
+  payments: {
+    mockCallback: '/payments/callbacks/mock'
+  },
+  tibetSpecialty: {
+    travelKit: (itineraryId: number) => `/tibet-specialty/itineraries/${itineraryId}/travel-kit`,
+    highlandAssessment: '/tibet-specialty/highland-assessment',
+    cultureTips: '/tibet-specialty/culture-tips',
+    phrasebook: '/tibet-specialty/phrasebook',
+    sustainableOptions: '/tibet-specialty/sustainable-options'
+  },
   spots: {
     list: '/spots',
     heatmap: '/spots/heatmap',
@@ -203,6 +233,7 @@ export const endpoints = {
     users: '/admin/users',
     updateRole: (id: number) => `/admin/users/${id}/role`,
     deleteUser: (id: number) => `/admin/users/${id}`,
+    unlockUser: (id: number) => `/admin/users/${id}/unlock`,
     spots: '/admin/spots',
     updateSpot: (id: number) => `/admin/spots/${id}`,
     news: '/admin/news',
@@ -217,6 +248,11 @@ export const endpoints = {
     adminCreate: '/admin/carousels',
     adminUpdate: (id: number) => `/admin/carousels/${id}`,
     adminDelete: (id: number) => `/admin/carousels/${id}`
+  },
+  prices: {
+    fetch: (spotId: number) => `/prices/fetch/${spotId}`,
+    update: (spotId: number) => `/prices/update/${spotId}`,
+    batchUpdate: '/prices/batch-update'
   },
   favorites: {
     list: '/favorites',

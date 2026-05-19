@@ -1,10 +1,10 @@
 <template>
   <section class="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden mt-8">
     <div
-      class="px-6 py-4 border-b border-stone-100 flex justify-between items-center bg-gradient-to-r from-stone-50 to-white cursor-pointer hover:bg-stone-100/50 transition-colors"
+      class="flex flex-col gap-3 border-b border-stone-100 bg-gradient-to-r from-stone-50 to-white px-4 py-4 transition-colors hover:bg-stone-100/50 sm:flex-row sm:items-center sm:justify-between sm:px-6 cursor-pointer"
       @click="showPanel = !showPanel"
     >
-      <div class="flex items-center gap-3">
+      <div class="flex min-w-0 items-center gap-3">
         <div class="w-9 h-9 rounded-lg bg-rose-100 flex items-center justify-center">
           <MessagesSquare class="w-5 h-5 text-rose-600" />
         </div>
@@ -13,7 +13,7 @@
           <span class="text-sm font-normal text-stone-400">({{ totalCommunityItems }}{{ t('common.items') }})</span>
         </h3>
       </div>
-      <div class="flex items-center gap-2">
+      <div class="flex flex-wrap items-center gap-2">
         <button
           @click.stop="fetchCommunityContent"
           :disabled="loadingCommunity"
@@ -26,13 +26,13 @@
       </div>
     </div>
 
-    <div v-if="showPanel" class="p-6 space-y-5">
-      <div class="flex flex-wrap gap-2">
+    <div v-if="showPanel" class="space-y-5 p-4 sm:p-6">
+      <div class="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">
         <button
           v-for="tab in communityTabs"
           :key="tab.key"
           @click="activeTab = tab.key"
-          class="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm border transition-colors"
+          class="inline-flex shrink-0 items-center gap-2 px-3 py-2 rounded-lg text-sm border transition-colors"
           :class="activeTab === tab.key ? 'border-rose-200 bg-rose-50 text-rose-700' : 'border-stone-200 bg-white text-stone-600 hover:bg-stone-50'"
         >
           <component :is="tab.icon" class="w-4 h-4" />
@@ -50,7 +50,7 @@
         {{ communityError }}
       </div>
 
-      <div v-else class="overflow-x-auto">
+      <div v-else class="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
         <table v-if="activeTab === 'routes'" class="min-w-full divide-y divide-stone-200">
           <thead class="bg-stone-50">
             <tr>
@@ -253,11 +253,11 @@
     <MotionModal
       :show="showCommunityModal"
       modal-key="admin-community-modal"
-      panel-class="max-w-2xl rounded-2xl bg-white p-8 max-h-[85vh] overflow-y-auto"
+      panel-class="max-w-2xl rounded-2xl bg-white p-4 sm:p-8 max-h-[88dvh] overflow-y-auto"
       @close="closeCommunityModal"
     >
       <form @submit.prevent="saveCommunityItem" class="space-y-5">
-        <div class="flex items-start justify-between gap-4">
+        <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
           <div>
             <p class="text-xs font-semibold uppercase tracking-wide text-rose-600">{{ typeLabel(editingType) }}</p>
             <h2 class="mt-1 text-2xl font-bold text-stone-800">{{ t('admin.communityEditTitle') }}</h2>
@@ -329,7 +329,7 @@
           <input v-model.number="communityForm.rating" type="number" min="1" max="5" class="w-full px-4 py-3 border border-stone-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none">
         </div>
 
-        <div class="flex gap-4 pt-2">
+        <div class="flex flex-col gap-3 pt-2 sm:flex-row sm:gap-4">
           <button type="submit" :disabled="savingCommunity" class="flex-1 bg-rose-600 text-white py-3 rounded-lg hover:bg-rose-700 transition-colors disabled:bg-stone-300">
             {{ savingCommunity ? t('admin.saving') : t('admin.saveEditing') }}
           </button>

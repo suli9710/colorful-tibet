@@ -17,8 +17,12 @@ export interface AuthUser {
 }
 
 const USER_STORAGE_KEY = 'user'
+const COOKIE_SESSION_TOKEN = 'cookie-session'
+const apiBaseURL = import.meta.env.VITE_API_BASE_URL || '/api'
 
 const hasStorage = () => typeof window !== 'undefined' && typeof window.localStorage !== 'undefined'
+
+const normalizedApiBaseURL = () => String(apiBaseURL).replace(/\/+$/, '')
 
 const resolveToken = (userData: AuthUser | null, explicitToken?: string | null) =>
   explicitToken ||
@@ -27,7 +31,12 @@ const resolveToken = (userData: AuthUser | null, explicitToken?: string | null) 
   userData?.jwt ||
   userData?.data?.token ||
   userData?.data?.accessToken ||
-  'cookie-session'
+  COOKIE_SESSION_TOKEN
+
+const stripAuthTokens = (userData: AuthUser): AuthUser => {
+  const { token: _token, accessToken: _accessToken, jwt: _jwt, data: _data, ...userWithoutToken } = userData
+  return userWithoutToken
+}
 
 const readStoredUser = (): AuthUser | null => {
   if (!hasStorage()) return null
@@ -37,18 +46,22 @@ const readStoredUser = (): AuthUser | null => {
   if (!storedUser) return null
 
   try {
-    const stored = JSON.parse(storedUser) as AuthUser
-    const { token: _token, accessToken: _accessToken, jwt: _jwt, data: _data, ...userWithoutToken } = stored
-    return userWithoutToken
+    return stripAuthTokens(JSON.parse(storedUser) as AuthUser)
   } catch {
     clearStoredAuth()
     return null
   }
 }
 
+const persistUser = (userData: AuthUser) => {
+  if (!hasStorage()) return
+  localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(stripAuthTokens(userData)))
+}
+
 export const clearStoredAuth = () => {
   if (!hasStorage()) return
   localStorage.removeItem(USER_STORAGE_KEY)
+  localStorage.removeItem('token')
 }
 
 const decodeJwtPayload = (authToken: string): { exp?: number } | null => {
@@ -66,6 +79,7 @@ const decodeJwtPayload = (authToken: string): { exp?: number } | null => {
 
 const tokenHasExpired = (authToken: string | null) => {
   if (!authToken) return true
+  if (authToken === COOKIE_SESSION_TOKEN) return false
 
   const payload = decodeJwtPayload(authToken)
   if (!payload?.exp) return false
@@ -73,73 +87,111 @@ const tokenHasExpired = (authToken: string | null) => {
   return payload.exp * 1000 < Date.now()
 }
 
+const fetchCurrentUser = async (): Promise<AuthUser> => {
+  const locale = hasStorage() ? localStorage.getItem('locale') || 'zh' : 'zh'
+  const response = await fetch(`${normalizedApiBaseURL()}/auth/me`, {
+    credentials: 'include',
+    headers: {
+      Accept: 'application/json',
+      'Accept-Language': locale
+    }
+  })
+
+  if (!response.ok) {
+    throw new Error(`Session refresh failed with status ${response.status}`)
+  }
+
+  return response.json()
+}
+
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<AuthUser | null>(null)
   const token = ref<string | null>(null)
+  const sessionChecked = ref(false)
+  const sessionLoading = ref(false)
+  let sessionRefreshPromise: Promise<boolean> | null = null
 
-  const isLoggedIn = computed(() => !!token.value && !tokenHasExpired(token.value))
+  const isLoggedIn = computed(() => !!user.value && !!token.value && !tokenHasExpired(token.value))
   const isAdmin = computed(() => isLoggedIn.value && user.value?.role === 'ADMIN')
 
-  function restoreFromStorage() {
-    const storedUser = readStoredUser()
-    const resolvedToken = resolveToken(storedUser)
-
-    if (!storedUser || tokenHasExpired(resolvedToken)) {
+  function applySession(userData: AuthUser, authToken = COOKIE_SESSION_TOKEN) {
+    const resolvedToken = resolveToken(userData, authToken)
+    if (!resolvedToken || tokenHasExpired(resolvedToken)) {
       logout()
       return false
     }
 
-    user.value = { ...storedUser }
+    const nextUser = stripAuthTokens(userData)
+    user.value = nextUser
     token.value = resolvedToken
+    sessionChecked.value = true
+    persistUser(nextUser)
     return true
   }
 
   function login(userData: AuthUser, authToken?: string | null) {
-    const resolvedToken = resolveToken(userData, authToken)
-    if (!resolvedToken) {
-      logout()
-      return false
-    }
-
-    const nextUser = { ...userData }
-    delete nextUser.token
-    delete nextUser.accessToken
-    delete nextUser.jwt
-    delete nextUser.data
-    user.value = nextUser
-    token.value = resolvedToken
-
-    if (hasStorage()) {
-      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(nextUser))
-    }
-
-    return true
+    return applySession(userData, resolveToken(userData, authToken))
   }
 
   function logout() {
     user.value = null
     token.value = null
+    sessionChecked.value = true
     clearStoredAuth()
   }
 
-  function hasValidSession() {
-    if (!token.value || tokenHasExpired(token.value)) {
-      return restoreFromStorage()
+  async function refreshSession() {
+    if (sessionRefreshPromise) {
+      return sessionRefreshPromise
     }
-    return true
+
+    sessionLoading.value = true
+    sessionRefreshPromise = (async () => {
+      try {
+        const currentUser = await fetchCurrentUser()
+        return applySession(currentUser, COOKIE_SESSION_TOKEN)
+      } catch {
+        logout()
+        return false
+      } finally {
+        sessionChecked.value = true
+        sessionLoading.value = false
+        sessionRefreshPromise = null
+      }
+    })()
+
+    return sessionRefreshPromise
   }
 
-  function syncFromStorage() {
-    restoreFromStorage()
+  async function ensureSession() {
+    if (isLoggedIn.value) {
+      return true
+    }
+    return refreshSession()
   }
 
-  restoreFromStorage()
+  function hasValidSession() {
+    return isLoggedIn.value
+  }
+
+  function restoreFromStorage() {
+    return !!readStoredUser()
+  }
+
+  function updateUser(patch: Partial<AuthUser>) {
+    if (!user.value) return
+    applySession({ ...user.value, ...patch }, token.value || COOKIE_SESSION_TOKEN)
+  }
 
   if (typeof window !== 'undefined') {
     window.addEventListener('auth-expired', logout)
     window.addEventListener('storage', event => {
       if (event.key === USER_STORAGE_KEY) {
-        syncFromStorage()
+        if (event.newValue) {
+          void refreshSession()
+        } else {
+          logout()
+        }
       }
     })
   }
@@ -147,11 +199,16 @@ export const useAuthStore = defineStore('auth', () => {
   return {
     user,
     token,
+    sessionChecked,
+    sessionLoading,
     isLoggedIn,
     isAdmin,
     login,
     logout,
+    refreshSession,
+    ensureSession,
     restoreFromStorage,
-    hasValidSession
+    hasValidSession,
+    updateUser
   }
 })

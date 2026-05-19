@@ -34,7 +34,7 @@ spring:
     async:
       request-timeout: 120000  # 120秒异步请求超时，适应AI生成时间
   datasource:
-    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:colorful_tibet}?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:colorful_tibet}?useUnicode=true&characterEncoding=utf8&sslMode=${MYSQL_SSL_MODE:VERIFY_CA}&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=false
     username: ${MYSQL_USERNAME:root}
     password: ${MYSQL_PASSWORD:}
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -48,7 +48,7 @@ spring:
   jpa:
     database-platform: org.hibernate.dialect.MySQLDialect
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     show-sql: false
     properties:
       hibernate:
@@ -110,10 +110,10 @@ jwt:
 
 ark:
   api:
-    url: ${ARK_API_URL:https://ark.cn-beijing.volces.com/api/v3/responses}
+    url: ${ARK_API_URL:${DOUBAO_API_URL:https://ark.cn-beijing.volces.com/api/v3/responses}}
     key: ${ARK_API_KEY:${DOUBAO_API_KEY:}}
-    model: ${AI_MODEL:${DOUBAO_MODEL:doubao-seed-2-0-pro-260215}}
-    stream-url: ${ARK_STREAM_API_URL:}  # 流式端点，为空时从url自动推导
+    model: ${AI_MODEL:${ARK_MODEL:${DOUBAO_MODEL:doubao-seed-2-0-pro-260215}}}
+    stream-url: ${ARK_STREAM_API_URL:${DOUBAO_STREAM_API_URL:}}  # 流式端点，为空时从url自动推导
 
 doubao:
   api:
@@ -126,6 +126,12 @@ ai:
   route:
     timeout-seconds: 180
     stream-timeout-seconds: ${AI_STREAM_TIMEOUT:180}
+
+# Scrapling 爬虫微服务配置
+scrapling:
+  service:
+    url: ${SCRAPLING_SERVICE_URL:}
+    timeout-seconds: ${SCRAPLING_SERVICE_TIMEOUT:30}
 
 # 价格定时更新配置
 price:
@@ -149,16 +155,25 @@ app:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000}
   security:
     public-docs-enabled: ${PUBLIC_DOCS_ENABLED:false}
-    require-strong-secrets: ${REQUIRE_STRONG_SECRETS:false}
+    public-metrics-enabled: ${PUBLIC_METRICS_ENABLED:false}
+    require-strong-secrets: ${REQUIRE_STRONG_SECRETS:true}
+    csrf-signing-secret: ${CSRF_SIGNING_SECRET:dev-only-csrf-signing-secret-change-me-before-shared-deployment-2026-05-colorful-tibet}
+    pii-encryption-key: ${PII_ENCRYPTION_KEY:}
+    cookie-secure: ${COOKIE_SECURE:true}
     trust-proxy-headers: ${TRUST_PROXY_HEADERS:false}
     rate-limit:
       enabled: ${RATE_LIMIT_ENABLED:true}
+      redis-enabled: ${RATE_LIMIT_REDIS_ENABLED:true}
+      trust-proxy-headers: ${TRUST_PROXY_HEADERS:false}
       default:
         requests: ${RATE_LIMIT_DEFAULT_REQUESTS:300}
         window-seconds: ${RATE_LIMIT_DEFAULT_WINDOW_SECONDS:60}
       auth:
         requests: ${RATE_LIMIT_AUTH_REQUESTS:12}
         window-seconds: ${RATE_LIMIT_AUTH_WINDOW_SECONDS:60}
+      register:
+        requests: ${RATE_LIMIT_REGISTER_REQUESTS:5}
+        window-seconds: ${RATE_LIMIT_REGISTER_WINDOW_SECONDS:3600}
       ai:
         requests: ${RATE_LIMIT_AI_REQUESTS:6}
         window-seconds: ${RATE_LIMIT_AI_WINDOW_SECONDS:600}
@@ -168,9 +183,17 @@ app:
       admin:
         requests: ${RATE_LIMIT_ADMIN_REQUESTS:120}
         window-seconds: ${RATE_LIMIT_ADMIN_WINDOW_SECONDS:60}
+    brute-force:
+      enabled: ${BRUTE_FORCE_ENABLED:true}
+      max-attempts: ${BRUTE_FORCE_MAX_ATTEMPTS:5}
+      redis-enabled: ${BRUTE_FORCE_REDIS_ENABLED:true}
+      exempt-usernames: ${BRUTE_FORCE_EXEMPT_USERNAMES:}
   super-admin-username: ${SUPER_ADMIN_USERNAME:lzh}
   seed:
+    content:
+      enabled: ${SEED_CONTENT_ENABLED:true}
     demo-users:
       enabled: ${SEED_DEMO_USERS:false}
-      admin-password: ${SEED_DEMO_ADMIN_PASSWORD:AdminDemo2026}
-      user-password: ${SEED_DEMO_USER_PASSWORD:UserDemo2026}
+      admin-password: ${SEED_DEMO_ADMIN_PASSWORD:}
+      super-admin-password: ${SEED_DEMO_SUPER_ADMIN_PASSWORD:}
+      user-password: ${SEED_DEMO_USER_PASSWORD:}

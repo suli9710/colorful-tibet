@@ -1,6 +1,7 @@
 package com.tibet.tourism.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.tibet.tourism.security.PiiCryptoConverter;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
@@ -18,12 +19,17 @@ public class User {
     @Column(nullable = false)
     private String password; // BCrypt哈希，用于登录验证
 
+    @Column(unique = true)
     private String nickname;
     private String avatar;
+    @Convert(converter = PiiCryptoConverter.class)
+    @Column(length = 512)
     private String phone;
     private String city; // 用户所在城市
-    private String ipAddress; // 最后登录IP地址
+    @Column(length = 64)
+    private String ipAddress; // 最后登录IP地址哈希
     private LocalDateTime lastLoginAt; // 最后登录时间
+    private Boolean mustChangePassword = false;
 
     @Enumerated(EnumType.STRING)
     private Role role = Role.USER;
@@ -123,6 +129,14 @@ public class User {
 
     public void setLastLoginAt(LocalDateTime lastLoginAt) {
         this.lastLoginAt = lastLoginAt;
+    }
+
+    public Boolean getMustChangePassword() {
+        return mustChangePassword;
+    }
+
+    public void setMustChangePassword(Boolean mustChangePassword) {
+        this.mustChangePassword = mustChangePassword;
     }
 
     public enum Role {

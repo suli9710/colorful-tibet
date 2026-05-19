@@ -42,4 +42,5 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
 
     // 根据用户ID删除所有订单
     void deleteByUserId(Long userId);
+    void deleteBySpotId(Long spotId);
 }

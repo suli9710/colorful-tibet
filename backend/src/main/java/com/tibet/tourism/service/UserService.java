@@ -2,6 +2,7 @@ package com.tibet.tourism.service;
 
 import com.tibet.tourism.entity.User;
 import com.tibet.tourism.repository.UserRepository;
+import com.tibet.tourism.security.InputSanitizer;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -49,15 +50,11 @@ public class UserService {
         
         validatePassword(newPassword);
         user.setPassword(passwordEncoder.encode(newPassword)); // BCrypt哈希
+        user.setMustChangePassword(false);
         userRepository.save(user);
     }
 
     private void validatePassword(String password) {
-        if (password == null || password.length() < 8 || password.length() > 72) {
-            throw new IllegalArgumentException("密码长度需为8到72个字符");
-        }
-        if (!password.matches("^(?=.*[A-Za-z])(?=.*\\d).+$")) {
-            throw new IllegalArgumentException("密码至少需要包含字母和数字");
-        }
+        InputSanitizer.validatePassword(password);
     }
 }

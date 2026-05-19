@@ -54,20 +54,26 @@
             <label for="username" class="sr-only">{{ t('login.username') }}</label>
             <input id="username" name="username" type="text" required v-model="form.username"
                    class="appearance-none rounded-xl relative block w-full px-4 py-3 border border-tibet-gold/25 placeholder-tibet-brown/40 text-tibet-dark bg-tibet-white focus:outline-none focus:ring-2 focus:ring-tibet-gold/60 focus:border-transparent sm:text-sm input-focus"
-                   :placeholder="t('login.username')">
+                   :placeholder="t('login.username')"
+                   @input="clearError">
           </motion.div>
           <motion.div :initial="authItemInitial" :animate="authItemAnimate" :transition="authItemTransition(0.36)">
             <label for="password" class="sr-only">{{ t('login.password') }}</label>
             <input id="password" name="password" type="password" required v-model="form.password"
                    class="appearance-none rounded-xl relative block w-full px-4 py-3 border border-tibet-gold/25 placeholder-tibet-brown/40 text-tibet-dark bg-tibet-white focus:outline-none focus:ring-2 focus:ring-tibet-gold/60 focus:border-transparent sm:text-sm input-focus"
-                   :placeholder="t('login.password')">
+                   :placeholder="t('login.password')"
+                   @input="clearError">
           </motion.div>
         </div>
 
+        <div v-if="errorMessage" class="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+          {{ errorMessage }}<span v-if="lockCountdown > 0">（{{ lockCountdown }}秒后可重试）</span>
+        </div>
+
         <motion.div :initial="authItemInitial" :animate="authItemAnimate" :transition="authItemTransition(0.44)">
-          <motion.button type="submit" :disabled="loading"
-                  :whileHover="loading ? {} : authSubmitHover"
-                  :whileTap="loading ? {} : authSubmitPress"
+          <motion.button type="submit" :disabled="loading || lockCountdown > 0"
+                  :whileHover="(loading || lockCountdown > 0) ? {} : authSubmitHover"
+                  :whileTap="(loading || lockCountdown > 0) ? {} : authSubmitPress"
                   class="tibet-btn w-full flex justify-center py-3 text-base disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none">
             <span v-if="loading" class="absolute left-0 inset-y-0 flex items-center pl-3 z-10">
               <svg class="animate-spin h-5 w-5 text-tibet-yellow" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -75,7 +81,7 @@
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
             </span>
-            <span class="relative z-10">{{ loading ? t('login.loggingIn') : t('common.login') }}</span>
+            <span class="relative z-10">{{ lockCountdown > 0 ? `请等待 ${lockCountdown} 秒` : loading ? t('login.loggingIn') : t('common.login') }}</span>
           </motion.button>
         </motion.div>
       </motion.form>
@@ -125,12 +131,45 @@ const router = useRouter()
 const auth = useAuthStore()
 const prefersReducedMotion = useReducedMotion()
 const loading = ref(false)
+const errorMessage = ref('')
+const lockCountdown = ref(0)
+let countdownTimer: ReturnType<typeof setInterval> | null = null
 const form = ref({
   username: '',
   password: ''
 })
 
+function clearError() {
+  errorMessage.value = ''
+}
+
+function startCountdown(seconds: number) {
+  stopCountdown()
+  lockCountdown.value = seconds
+  countdownTimer = setInterval(() => {
+    lockCountdown.value--
+    if (lockCountdown.value <= 0) {
+      stopCountdown()
+      errorMessage.value = ''
+    }
+  }, 1000)
+}
+
+function stopCountdown() {
+  if (countdownTimer !== null) {
+    clearInterval(countdownTimer)
+    countdownTimer = null
+  }
+  lockCountdown.value = 0
+}
+
+function parseLockSeconds(message: string): number {
+  const match = message.match(/(\d+)\s*秒/)
+  return match ? parseInt(match[1], 10) : 0
+}
+
 const handleLogin = async () => {
+  errorMessage.value = ''
   loading.value = true
   try {
     const { data: user } = await api.post('/auth/login', form.value)
@@ -140,7 +179,13 @@ const handleLogin = async () => {
 
     router.push(user.role === 'ADMIN' ? '/admin' : '/')
   } catch (error: any) {
-    alert(error.response?.data?.message || error.response?.data?.error || t('login.loginFailed'))
+    const msg = error.response?.data?.message || error.response?.data?.error || t('login.loginFailed')
+    errorMessage.value = msg
+
+    const lockSeconds = parseLockSeconds(msg)
+    if (lockSeconds > 0) {
+      startCountdown(lockSeconds)
+    }
   } finally {
     loading.value = false
   }

@@ -27,10 +27,12 @@ import com.tibet.tourism.repository.RoomTypeRepository;
 import com.tibet.tourism.repository.RouteCommentRepository;
 import com.tibet.tourism.repository.RouteLikeRepository;
 import com.tibet.tourism.repository.SharedRouteRepository;
+import com.tibet.tourism.repository.SpotTagRepository;
 import com.tibet.tourism.repository.TravelAnswerRepository;
 import com.tibet.tourism.repository.TravelQuestionRepository;
 import com.tibet.tourism.repository.UserVisitHistoryRepository;
 import com.tibet.tourism.security.InputSanitizer;
+import com.tibet.tourism.security.LoginAttemptService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -50,6 +52,12 @@ import org.springframework.security.core.Authentication;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -73,8 +81,32 @@ public class AdminController {
     private static final Set<String> ALLOWED_ROUTE_BUDGETS = Set.of("经济型", "舒适型", "豪华型");
     private static final Set<String> ALLOWED_ROUTE_PREFERENCES = Set.of("自然风光", "人文历史", "深度摄影", "休闲度假");
 
+    public record CarouselRequest(
+            @NotBlank(message = "标题不能为空") @Size(max = 80, message = "标题长度不能超过80个字符") String title,
+            @Size(max = 160, message = "副标题长度不能超过160个字符") String subtitle,
+            @Size(max = 40, message = "标签长度不能超过40个字符") String tag,
+            @Size(max = 512, message = "图片地址长度不能超过512个字符") String imageUrl,
+            @Size(max = 512, message = "跳转地址长度不能超过512个字符") String linkUrl,
+            @Min(value = 0, message = "排序值不能为负数") @Max(value = 10000, message = "排序值过大") Integer sortOrder,
+            Boolean active
+    ) {
+    }
+
+    public record RoomTypeRequest(
+            @NotBlank(message = "房型名称不能为空") @Size(max = 80, message = "房型名称长度不能超过80个字符") String name,
+            @DecimalMin(value = "0.00", message = "价格不能为负数") BigDecimal price,
+            @Min(value = 1, message = "入住人数至少为1") @Max(value = 20, message = "入住人数过大") Integer capacity,
+            @Size(max = 512, message = "图片地址长度不能超过512个字符") String imageUrl,
+            @Size(max = 500, message = "设施描述长度不能超过500个字符") String amenities,
+            @Min(value = 0, message = "排序值不能为负数") @Max(value = 10000, message = "排序值过大") Integer sortOrder
+    ) {
+    }
+
     @Autowired
     private ScenicSpotRepository scenicSpotRepository;
+
+    @Autowired
+    private SpotTagRepository tagRepository;
 
     @Autowired
     private NewsRepository newsRepository;
@@ -136,6 +168,9 @@ public class AdminController {
     @Autowired
     private RecommendationEvaluationService recommendationEvaluationService;
 
+    @Autowired
+    private LoginAttemptService loginAttemptService;
+
     @Value("${app.super-admin-username:lzh}")
     private String superAdminUsername;
 
@@ -167,12 +202,12 @@ public class AdminController {
 
         // 最新混合订单（景点 + 酒店，各取最新的5条）
         List<Booking> recentScenicBookings = bookingRepository.findTop5ByStatusOrderByCreatedAtDesc(Booking.Status.CONFIRMED);
-        List<HotelBooking> recentHotelBookings = hotelBookingRepository.findTop5ByStatusOrderByCreatedAtDesc(HotelBooking.Status.CONFIRMED);
+        List<HotelBooking> recentHotelBookings = hotelBookingRepository.findTop5ByStatusAndDeletedAtIsNullOrderByCreatedAtDesc(HotelBooking.Status.CONFIRMED);
         LocalDateTime trendStartAt = YearMonth.now().minusMonths(5).atDay(1).atStartOfDay();
         List<Booking> confirmedScenicBookings = bookingRepository
                 .findByStatusAndCreatedAtAfterOrderByCreatedAtAsc(Booking.Status.CONFIRMED, trendStartAt);
         List<HotelBooking> confirmedHotelBookings = hotelBookingRepository
-                .findByStatusAndCreatedAtAfterOrderByCreatedAtAsc(HotelBooking.Status.CONFIRMED, trendStartAt);
+                .findByStatusAndDeletedAtIsNullAndCreatedAtAfterOrderByCreatedAtAsc(HotelBooking.Status.CONFIRMED, trendStartAt);
 
         Map<String, Object> stats = new HashMap<>();
         stats.put("userCount", userCount);
@@ -203,7 +238,7 @@ public class AdminController {
     public ResponseEntity<Page<AdminUserSummary>> getAllUsers(
             @PageableDefault(size = 50, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         Page<AdminUserSummary> users = userRepository.findAll(pageable)
-                .map(AdminUserSummary::from);
+                .map(user -> AdminUserSummary.from(user, loginAttemptService));
         return ResponseEntity.ok(users);
     }
 
@@ -212,16 +247,37 @@ public class AdminController {
             String username,
             String nickname,
             User.Role role,
-            LocalDateTime createdAt
+            LocalDateTime createdAt,
+            boolean locked,
+            long lockRemainingSeconds,
+            int failureCount
     ) {
-        static AdminUserSummary from(User user) {
+        static AdminUserSummary from(User user, LoginAttemptService service) {
+            long remaining = service.remainingLockSeconds(user.getUsername());
             return new AdminUserSummary(
                     user.getId(),
                     user.getUsername(),
                     user.getNickname(),
                     user.getRole(),
-                    user.getCreatedAt());
+                    user.getCreatedAt(),
+                    remaining > 0,
+                    remaining,
+                    service.failureCount(user.getUsername()));
         }
+    }
+
+    /**
+     * 解除用户登录锁定
+     */
+    @PostMapping("/users/{id}/unlock")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> unlockUser(@PathVariable Long id) {
+        User user = userRepository.findById(id).orElse(null);
+        if (user == null) {
+            return ResponseEntity.notFound().build();
+        }
+        loginAttemptService.reset(user.getUsername());
+        return ResponseEntity.ok(Map.of("message", "已解除登录锁定"));
     }
 
     @PostMapping("/upload-image")
@@ -469,7 +525,7 @@ public class AdminController {
         boolean autoTranslate = request.getOrDefault("autoTranslate", true).equals(true);
 
         if (request.containsKey("name")) {
-            String name = (String) request.get("name");
+            String name = InputSanitizer.requiredPlainText((String) request.get("name"), 200, "景点名称");
             spot.setName(name);
             if (autoTranslate && (spot.getNameTibetan() == null || spot.getNameTibetan().isEmpty())) {
                 String tibetanName = translationService.translateOrCreate(name, null, com.tibet.tourism.entity.TibetanDictionary.Type.WORD);
@@ -480,9 +536,9 @@ public class AdminController {
         }
 
         if (request.containsKey("description")) {
-            String description = (String) request.get("description");
+            String description = InputSanitizer.optionalTextBlock((String) request.get("description"), 5000, "景点描述");
             spot.setDescription(description);
-            if (autoTranslate && (spot.getDescriptionTibetan() == null || spot.getDescriptionTibetan().isEmpty())) {
+            if (autoTranslate && description != null && (spot.getDescriptionTibetan() == null || spot.getDescriptionTibetan().isEmpty())) {
                 String tibetanDesc = translationService.translateDescription(description);
                 if (tibetanDesc != null) {
                     spot.setDescriptionTibetan(tibetanDesc);
@@ -491,13 +547,13 @@ public class AdminController {
         }
 
         if (request.containsKey("nameTibetan")) {
-            spot.setNameTibetan((String) request.get("nameTibetan"));
+            spot.setNameTibetan(InputSanitizer.optionalPlainText((String) request.get("nameTibetan"), 200, "藏语名称"));
         }
         if (request.containsKey("descriptionTibetan")) {
-            spot.setDescriptionTibetan((String) request.get("descriptionTibetan"));
+            spot.setDescriptionTibetan(InputSanitizer.optionalTextBlock((String) request.get("descriptionTibetan"), 5000, "藏语描述"));
         }
         if (request.containsKey("imageUrl")) {
-            spot.setImageUrl((String) request.get("imageUrl"));
+            spot.setImageUrl(safeImageUrl(request.get("imageUrl"), "景点图片"));
         }
         if (request.containsKey("ticketPrice")) {
             Object priceObj = request.get("ticketPrice");
@@ -512,10 +568,10 @@ public class AdminController {
             }
         }
         if (request.containsKey("altitude")) {
-            spot.setAltitude((String) request.get("altitude"));
+            spot.setAltitude(InputSanitizer.optionalPlainText((String) request.get("altitude"), 100, "海拔"));
         }
         if (request.containsKey("location")) {
-            spot.setLocation((String) request.get("location"));
+            spot.setLocation(InputSanitizer.optionalPlainText((String) request.get("location"), 200, "位置"));
         }
         if (request.containsKey("category")) {
             try {
@@ -525,12 +581,10 @@ public class AdminController {
             }
         }
         if (request.containsKey("num")) spot.setNum(((Number) request.get("num")).intValue());
-        if (request.containsKey("openInfo")) spot.setOpenInfo((String) request.get("openInfo"));
-        if (request.containsKey("entryTime")) spot.setEntryTime((String) request.get("entryTime"));
+        if (request.containsKey("openInfo")) spot.setOpenInfo(InputSanitizer.optionalPlainText((String) request.get("openInfo"), 500, "开放信息"));
+        if (request.containsKey("entryTime")) spot.setEntryTime(InputSanitizer.optionalPlainText((String) request.get("entryTime"), 200, "入园时间"));
         if (request.containsKey("latitude")) spot.setLatitude(new BigDecimal(request.get("latitude").toString()));
         if (request.containsKey("longitude")) spot.setLongitude(new BigDecimal(request.get("longitude").toString()));
-        if (request.containsKey("altitude")) spot.setAltitude((String) request.get("altitude"));
-        if (request.containsKey("location")) spot.setLocation((String) request.get("location"));
 
         scenicSpotRepository.save(spot);
         return ResponseEntity.ok(spot);
@@ -545,11 +599,7 @@ public class AdminController {
         ScenicSpot spot = new ScenicSpot();
         boolean autoTranslate = request.getOrDefault("autoTranslate", true).equals(true);
 
-        String name = (String) request.get("name");
-        if (name == null || name.trim().isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "景点名称不能为空"));
-        }
-        spot.setName(name);
+        String name = InputSanitizer.requiredPlainText((String) request.get("name"), 200, "景点名称");
 
         if (autoTranslate) {
             String tibetanName = translationService.translateOrCreate(name, null, com.tibet.tourism.entity.TibetanDictionary.Type.WORD);
@@ -557,23 +607,24 @@ public class AdminController {
                 spot.setNameTibetan(tibetanName);
             }
         } else if (request.containsKey("nameTibetan")) {
-            spot.setNameTibetan((String) request.get("nameTibetan"));
+            spot.setNameTibetan(InputSanitizer.optionalPlainText((String) request.get("nameTibetan"), 200, "藏语名称"));
         }
+        spot.setName(name);
 
         if (request.containsKey("description")) {
-            String description = (String) request.get("description");
+            String description = InputSanitizer.optionalTextBlock((String) request.get("description"), 5000, "景点描述");
             spot.setDescription(description);
-            if (autoTranslate) {
+            if (autoTranslate && description != null) {
                 String tibetanDesc = translationService.translateDescription(description);
                 if (tibetanDesc != null) {
                     spot.setDescriptionTibetan(tibetanDesc);
                 }
             } else if (request.containsKey("descriptionTibetan")) {
-                spot.setDescriptionTibetan((String) request.get("descriptionTibetan"));
+                spot.setDescriptionTibetan(InputSanitizer.optionalTextBlock((String) request.get("descriptionTibetan"), 5000, "藏语描述"));
             }
         }
         if (request.containsKey("imageUrl")) {
-            spot.setImageUrl((String) request.get("imageUrl"));
+            spot.setImageUrl(safeImageUrl(request.get("imageUrl"), "景点图片"));
         }
         if (request.containsKey("ticketPrice")) {
             Object priceObj = request.get("ticketPrice");
@@ -589,12 +640,12 @@ public class AdminController {
             }
         }
         if (request.containsKey("num")) spot.setNum(((Number) request.get("num")).intValue());
-        if (request.containsKey("openInfo")) spot.setOpenInfo((String) request.get("openInfo"));
-        if (request.containsKey("entryTime")) spot.setEntryTime((String) request.get("entryTime"));
+        if (request.containsKey("openInfo")) spot.setOpenInfo(InputSanitizer.optionalPlainText((String) request.get("openInfo"), 500, "开放信息"));
+        if (request.containsKey("entryTime")) spot.setEntryTime(InputSanitizer.optionalPlainText((String) request.get("entryTime"), 200, "入园时间"));
         if (request.containsKey("latitude")) spot.setLatitude(new BigDecimal(request.get("latitude").toString()));
         if (request.containsKey("longitude")) spot.setLongitude(new BigDecimal(request.get("longitude").toString()));
-        if (request.containsKey("altitude")) spot.setAltitude((String) request.get("altitude"));
-        if (request.containsKey("location")) spot.setLocation((String) request.get("location"));
+        if (request.containsKey("altitude")) spot.setAltitude(InputSanitizer.optionalPlainText((String) request.get("altitude"), 100, "海拔"));
+        if (request.containsKey("location")) spot.setLocation(InputSanitizer.optionalPlainText((String) request.get("location"), 200, "位置"));
 
         scenicSpotRepository.save(spot);
         return ResponseEntity.ok(spot);
@@ -605,10 +656,17 @@ public class AdminController {
      */
     @DeleteMapping("/spots/{id}")
     @PreAuthorize("hasRole('ADMIN')")
+    @Transactional
     public ResponseEntity<?> deleteSpot(@PathVariable Long id) {
         if (!scenicSpotRepository.existsById(id)) {
             return ResponseEntity.notFound().build();
         }
+        commentRepository.findBySpotIdOrderByCreatedAtDesc(id)
+                .forEach(comment -> commentLikeRepository.deleteByCommentId(comment.getId()));
+        commentRepository.deleteBySpotId(id);
+        bookingRepository.deleteBySpotId(id);
+        userVisitHistoryRepository.deleteBySpotId(id);
+        tagRepository.deleteBySpotId(id);
         scenicSpotRepository.deleteById(id);
         return ResponseEntity.ok(Map.of("message", "删除成功"));
     }
@@ -633,11 +691,7 @@ public class AdminController {
         News news = new News();
         boolean autoTranslate = request.getOrDefault("autoTranslate", true).equals(true);
 
-        String title = (String) request.get("title");
-        if (title == null || title.trim().isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "标题不能为空"));
-        }
-        news.setTitle(title);
+        String title = InputSanitizer.requiredPlainText((String) request.get("title"), 200, "标题");
 
         if (autoTranslate) {
             String tibetanTitle = translationService.translateOrCreate(title, null, com.tibet.tourism.entity.TibetanDictionary.Type.SENTENCE);
@@ -645,14 +699,11 @@ public class AdminController {
                 news.setTitleTibetan(tibetanTitle);
             }
         } else if (request.containsKey("titleTibetan")) {
-            news.setTitleTibetan((String) request.get("titleTibetan"));
+            news.setTitleTibetan(InputSanitizer.optionalPlainText((String) request.get("titleTibetan"), 200, "藏语标题"));
         }
+        news.setTitle(title);
 
-        String content = (String) request.get("content");
-        if (content == null || content.trim().isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "内容不能为空"));
-        }
-        news.setContent(content);
+        String content = InputSanitizer.requiredTextBlock((String) request.get("content"), 20000, "内容");
 
         if (autoTranslate) {
             String tibetanContent = translationService.translateDescription(content);
@@ -660,8 +711,9 @@ public class AdminController {
                 news.setContentTibetan(tibetanContent);
             }
         } else if (request.containsKey("contentTibetan")) {
-            news.setContentTibetan((String) request.get("contentTibetan"));
+            news.setContentTibetan(InputSanitizer.optionalTextBlock((String) request.get("contentTibetan"), 20000, "藏语内容"));
         }
+        news.setContent(content);
 
         if (request.containsKey("category")) {
             try {
@@ -671,7 +723,7 @@ public class AdminController {
             }
         }
         if (request.containsKey("imageUrl")) {
-            news.setImageUrl((String) request.get("imageUrl"));
+            news.setImageUrl(safeImageUrl(request.get("imageUrl"), "资讯图片"));
         }
         if (request.containsKey("viewCount")) {
             Object viewCountObj = request.get("viewCount");
@@ -700,7 +752,7 @@ public class AdminController {
         boolean autoTranslate = request.getOrDefault("autoTranslate", true).equals(true);
 
         if (request.containsKey("title")) {
-            String title = (String) request.get("title");
+            String title = InputSanitizer.requiredPlainText((String) request.get("title"), 200, "标题");
             news.setTitle(title);
             if (autoTranslate && (news.getTitleTibetan() == null || news.getTitleTibetan().isEmpty())) {
                 String tibetanTitle = translationService.translateOrCreate(title, null, com.tibet.tourism.entity.TibetanDictionary.Type.SENTENCE);
@@ -711,7 +763,7 @@ public class AdminController {
         }
 
         if (request.containsKey("content")) {
-            String content = (String) request.get("content");
+            String content = InputSanitizer.requiredTextBlock((String) request.get("content"), 20000, "内容");
             news.setContent(content);
             if (autoTranslate && (news.getContentTibetan() == null || news.getContentTibetan().isEmpty())) {
                 String tibetanContent = translationService.translateDescription(content);
@@ -722,10 +774,10 @@ public class AdminController {
         }
 
         if (request.containsKey("titleTibetan")) {
-            news.setTitleTibetan((String) request.get("titleTibetan"));
+            news.setTitleTibetan(InputSanitizer.optionalPlainText((String) request.get("titleTibetan"), 200, "藏语标题"));
         }
         if (request.containsKey("contentTibetan")) {
-            news.setContentTibetan((String) request.get("contentTibetan"));
+            news.setContentTibetan(InputSanitizer.optionalTextBlock((String) request.get("contentTibetan"), 20000, "藏语内容"));
         }
         if (request.containsKey("category")) {
             try {
@@ -735,7 +787,7 @@ public class AdminController {
             }
         }
         if (request.containsKey("imageUrl")) {
-            news.setImageUrl((String) request.get("imageUrl"));
+            news.setImageUrl(safeImageUrl(request.get("imageUrl"), "资讯图片"));
         }
         if (request.containsKey("viewCount")) {
             Object viewCountObj = request.get("viewCount");
@@ -772,27 +824,20 @@ public class AdminController {
 
     @PostMapping("/carousels")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> createCarousel(@RequestBody Carousel carousel) {
-        if (carousel.getTitle() == null || carousel.getTitle().trim().isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "标题不能为空"));
-        }
+    public ResponseEntity<?> createCarousel(@Valid @RequestBody CarouselRequest request) {
+        Carousel carousel = new Carousel();
+        applyCarouselRequest(carousel, request);
         return ResponseEntity.ok(carouselRepository.save(carousel));
     }
 
     @PutMapping("/carousels/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> updateCarousel(@PathVariable Long id, @RequestBody Carousel carousel) {
+    public ResponseEntity<?> updateCarousel(@PathVariable Long id, @Valid @RequestBody CarouselRequest request) {
         Carousel existing = carouselRepository.findById(id).orElse(null);
         if (existing == null) {
             return ResponseEntity.notFound().build();
         }
-        existing.setTitle(carousel.getTitle());
-        existing.setSubtitle(carousel.getSubtitle());
-        existing.setTag(carousel.getTag());
-        existing.setImageUrl(carousel.getImageUrl());
-        existing.setLinkUrl(carousel.getLinkUrl());
-        existing.setSortOrder(carousel.getSortOrder());
-        existing.setActive(carousel.getActive());
+        applyCarouselRequest(existing, request);
         return ResponseEntity.ok(carouselRepository.save(existing));
     }
 
@@ -819,16 +864,13 @@ public class AdminController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> createHotel(@RequestBody Map<String, Object> request) {
         Hotel hotel = new Hotel();
-        String name = (String) request.get("name");
-        if (name == null || name.trim().isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "酒店名称不能为空"));
-        }
+        String name = InputSanitizer.requiredPlainText((String) request.get("name"), 200, "酒店名称");
         hotel.setName(name);
-        if (request.containsKey("location")) hotel.setLocation((String) request.get("location"));
-        if (request.containsKey("phone")) hotel.setPhone((String) request.get("phone"));
-        if (request.containsKey("priceRange")) hotel.setPriceRange((String) request.get("priceRange"));
-        if (request.containsKey("imageUrl")) hotel.setImageUrl((String) request.get("imageUrl"));
-        if (request.containsKey("facilities")) hotel.setFacilities((String) request.get("facilities"));
+        if (request.containsKey("location")) hotel.setLocation(InputSanitizer.optionalPlainText((String) request.get("location"), 200, "位置"));
+        if (request.containsKey("phone")) hotel.setPhone(InputSanitizer.optionalPlainText((String) request.get("phone"), 32, "电话"));
+        if (request.containsKey("priceRange")) hotel.setPriceRange(InputSanitizer.optionalPlainText((String) request.get("priceRange"), 100, "价格区间"));
+        if (request.containsKey("imageUrl")) hotel.setImageUrl(safeImageUrl(request.get("imageUrl"), "酒店图片"));
+        if (request.containsKey("facilities")) hotel.setFacilities(InputSanitizer.optionalPlainText((String) request.get("facilities"), 500, "设施"));
         if (request.containsKey("rating")) {
             hotel.setRating(new java.math.BigDecimal(request.get("rating").toString()));
         }
@@ -843,12 +885,12 @@ public class AdminController {
         if (hotel == null) {
             return ResponseEntity.notFound().build();
         }
-        if (request.containsKey("name")) hotel.setName((String) request.get("name"));
-        if (request.containsKey("location")) hotel.setLocation((String) request.get("location"));
-        if (request.containsKey("phone")) hotel.setPhone((String) request.get("phone"));
-        if (request.containsKey("priceRange")) hotel.setPriceRange((String) request.get("priceRange"));
-        if (request.containsKey("imageUrl")) hotel.setImageUrl((String) request.get("imageUrl"));
-        if (request.containsKey("facilities")) hotel.setFacilities((String) request.get("facilities"));
+        if (request.containsKey("name")) hotel.setName(InputSanitizer.requiredPlainText((String) request.get("name"), 200, "酒店名称"));
+        if (request.containsKey("location")) hotel.setLocation(InputSanitizer.optionalPlainText((String) request.get("location"), 200, "位置"));
+        if (request.containsKey("phone")) hotel.setPhone(InputSanitizer.optionalPlainText((String) request.get("phone"), 32, "电话"));
+        if (request.containsKey("priceRange")) hotel.setPriceRange(InputSanitizer.optionalPlainText((String) request.get("priceRange"), 100, "价格区间"));
+        if (request.containsKey("imageUrl")) hotel.setImageUrl(safeImageUrl(request.get("imageUrl"), "酒店图片"));
+        if (request.containsKey("facilities")) hotel.setFacilities(InputSanitizer.optionalPlainText((String) request.get("facilities"), 500, "设施"));
         if (request.containsKey("rating")) {
             hotel.setRating(new java.math.BigDecimal(request.get("rating").toString()));
         }
@@ -1451,6 +1493,29 @@ public class AdminController {
         return isBlank(string) ? null : string.trim();
     }
 
+    private String safeImageUrl(Object value, String fieldName) {
+        return InputSanitizer.optionalPublicImageUrl(stringValue(value), fieldName);
+    }
+
+    private void applyCarouselRequest(Carousel carousel, CarouselRequest request) {
+        carousel.setTitle(InputSanitizer.requiredPlainText(request.title(), 80, "轮播图标题"));
+        carousel.setSubtitle(InputSanitizer.optionalPlainText(request.subtitle(), 160, "轮播图副标题"));
+        carousel.setTag(InputSanitizer.optionalPlainText(request.tag(), 40, "轮播图标签"));
+        carousel.setImageUrl(safeImageUrl(request.imageUrl(), "轮播图图片"));
+        carousel.setLinkUrl(InputSanitizer.optionalSafeLinkUrl(request.linkUrl(), "轮播图跳转地址"));
+        carousel.setSortOrder(request.sortOrder() == null ? 0 : request.sortOrder());
+        carousel.setActive(request.active() == null || request.active());
+    }
+
+    private void applyRoomTypeRequest(RoomType roomType, RoomTypeRequest request) {
+        roomType.setName(InputSanitizer.requiredPlainText(request.name(), 80, "房型名称"));
+        roomType.setPrice(request.price() == null ? BigDecimal.ZERO : request.price());
+        roomType.setCapacity(request.capacity() == null ? 1 : request.capacity());
+        roomType.setImageUrl(safeImageUrl(request.imageUrl(), "房型图片"));
+        roomType.setAmenities(InputSanitizer.optionalPlainText(request.amenities(), 500, "房型设施"));
+        roomType.setSortOrder(request.sortOrder() == null ? 0 : request.sortOrder());
+    }
+
     private Integer integerValue(Object value) {
         if (value instanceof Number number) {
             return number.intValue();
@@ -1485,22 +1550,23 @@ public class AdminController {
 
     @PostMapping("/hotels/{hotelId}/room-types")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> createRoomType(@PathVariable Long hotelId, @RequestBody RoomType roomType) {
-        hotelRepository.findById(hotelId).ifPresent(roomType::setHotel);
+    public ResponseEntity<?> createRoomType(@PathVariable Long hotelId, @Valid @RequestBody RoomTypeRequest request) {
+        Hotel hotel = hotelRepository.findById(hotelId).orElse(null);
+        if (hotel == null) {
+            return ResponseEntity.notFound().build();
+        }
+        RoomType roomType = new RoomType();
+        roomType.setHotel(hotel);
+        applyRoomTypeRequest(roomType, request);
         return ResponseEntity.ok(roomTypeRepository.save(roomType));
     }
 
     @PutMapping("/room-types/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> updateRoomType(@PathVariable Long id, @RequestBody RoomType roomType) {
+    public ResponseEntity<?> updateRoomType(@PathVariable Long id, @Valid @RequestBody RoomTypeRequest request) {
         RoomType existing = roomTypeRepository.findById(id).orElse(null);
         if (existing == null) return ResponseEntity.notFound().build();
-        existing.setName(roomType.getName());
-        existing.setPrice(roomType.getPrice());
-        existing.setCapacity(roomType.getCapacity());
-        existing.setImageUrl(roomType.getImageUrl());
-        existing.setAmenities(roomType.getAmenities());
-        existing.setSortOrder(roomType.getSortOrder());
+        applyRoomTypeRequest(existing, request);
         return ResponseEntity.ok(roomTypeRepository.save(existing));
     }
 

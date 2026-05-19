@@ -18,26 +18,33 @@ import org.springframework.util.StringUtils;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.Set;
 
 @Service
 public class HotelBookingService {
 
     private static final int MAX_NIGHTS = 30;
+    private static final Set<HotelBooking.Status> ACTIVE_BOOKING_STATUSES =
+            Set.of(HotelBooking.Status.PENDING, HotelBooking.Status.CONFIRMED);
 
     private final HotelBookingRepository hotelBookingRepository;
     private final HotelRepository hotelRepository;
     private final RoomTypeRepository roomTypeRepository;
+    private final OrderCenterService orderCenterService;
 
     public HotelBookingService(HotelBookingRepository hotelBookingRepository,
                                HotelRepository hotelRepository,
-                               RoomTypeRepository roomTypeRepository) {
+                               RoomTypeRepository roomTypeRepository,
+                               OrderCenterService orderCenterService) {
         this.hotelBookingRepository = hotelBookingRepository;
         this.hotelRepository = hotelRepository;
         this.roomTypeRepository = roomTypeRepository;
+        this.orderCenterService = orderCenterService;
     }
 
     @Transactional(readOnly = true)
@@ -59,10 +66,11 @@ public class HotelBookingService {
     public HotelBooking createBooking(User user, HotelBookingRequest request) {
         Hotel hotel = hotelRepository.findById(request.getHotelId())
                 .orElseThrow(() -> new NoSuchElementException("Hotel not found"));
-        RoomType roomType = roomTypeRepository.findById(request.getRoomId())
+        RoomType roomType = roomTypeRepository.findByIdForUpdate(request.getRoomId())
                 .orElseThrow(() -> new NoSuchElementException("Room type not found"));
 
         validateBookingRequest(request, roomType);
+        ensureRoomAvailable(roomType, request.getCheckInDate(), request.getCheckOutDate());
 
         long nights = ChronoUnit.DAYS.between(request.getCheckInDate(), request.getCheckOutDate());
         BigDecimal roomPrice = roomType.getPrice() == null ? BigDecimal.ZERO : roomType.getPrice();
@@ -75,6 +83,7 @@ public class HotelBookingService {
         booking.setUser(user);
         booking.setHotel(hotel);
         booking.setRoomName(roomType.getName());
+        booking.setRoomTypeId(roomType.getId());
         booking.setRoomPrice(roomPrice);
         booking.setNights((int) nights);
         booking.setCheckInDate(request.getCheckInDate());
@@ -87,7 +96,7 @@ public class HotelBookingService {
         booking.setServiceFee(serviceFee);
         booking.setDiscount(discount);
         booking.setTotalPrice(totalPrice);
-        booking.setStatus(HotelBooking.Status.CONFIRMED);
+        booking.setStatus(HotelBooking.Status.PENDING);
 
         return hotelBookingRepository.save(booking);
     }
@@ -111,8 +120,12 @@ public class HotelBookingService {
         if (!StringUtils.hasText(status)) {
             throw new IllegalArgumentException("Invalid status");
         }
-        booking.setStatus(HotelBooking.Status.valueOf(status.trim().toUpperCase()));
-        return hotelBookingRepository.save(booking);
+        transitionStatus(booking, HotelBooking.Status.valueOf(status.trim().toUpperCase()));
+        HotelBooking saved = hotelBookingRepository.save(booking);
+        if (saved.getStatus() == HotelBooking.Status.CONFIRMED) {
+            orderCenterService.createFromLegacyHotelBooking(saved);
+        }
+        return saved;
     }
 
     @Transactional
@@ -124,17 +137,25 @@ public class HotelBookingService {
             throw new SecurityException("Unauthorized");
         }
 
-        booking.setStatus(HotelBooking.Status.CANCELLED);
-        return hotelBookingRepository.save(booking);
+        transitionStatus(booking, HotelBooking.Status.CANCELLED);
+        HotelBooking saved = hotelBookingRepository.save(booking);
+        orderCenterService.cancelLegacyMirror(user, "LEGACY_HOTEL_BOOKING", saved.getId(), "旧酒店预订取消");
+        return saved;
     }
 
     @Transactional
     public void deleteBooking(User user, Long id) {
         requireAdmin(user);
-        if (!hotelBookingRepository.existsById(id)) {
+        HotelBooking booking = hotelBookingRepository.findById(id)
+                .orElseThrow(() -> new NoSuchElementException("Booking not found"));
+        if (booking.getDeletedAt() != null) {
             throw new NoSuchElementException("Booking not found");
         }
-        hotelBookingRepository.deleteById(id);
+        if (booking.getStatus() != HotelBooking.Status.CANCELLED) {
+            transitionStatus(booking, HotelBooking.Status.CANCELLED);
+        }
+        booking.setDeletedAt(LocalDateTime.now());
+        hotelBookingRepository.save(booking);
     }
 
     private void validateBookingRequest(HotelBookingRequest request, RoomType roomType) {
@@ -154,6 +175,30 @@ public class HotelBookingService {
         if (request.getCheckInDate().isBefore(LocalDate.now()) || nights < 1 || nights > MAX_NIGHTS) {
             throw new IllegalArgumentException("Invalid check-in or check-out date");
         }
+    }
+
+    private void ensureRoomAvailable(RoomType roomType, LocalDate checkIn, LocalDate checkOut) {
+        List<HotelBooking> overlapping = hotelBookingRepository.findOverlappingActiveBookingsForUpdate(
+                roomType.getId(), ACTIVE_BOOKING_STATUSES, checkIn, checkOut);
+        if (!overlapping.isEmpty()) {
+            throw new IllegalStateException("Room type is unavailable for the selected dates");
+        }
+    }
+
+    private void transitionStatus(HotelBooking booking, HotelBooking.Status nextStatus) {
+        HotelBooking.Status currentStatus = booking.getStatus() == null ? HotelBooking.Status.PENDING : booking.getStatus();
+        if (currentStatus == nextStatus) {
+            return;
+        }
+        boolean allowed = switch (currentStatus) {
+            case PENDING -> nextStatus == HotelBooking.Status.CONFIRMED || nextStatus == HotelBooking.Status.CANCELLED;
+            case CONFIRMED -> nextStatus == HotelBooking.Status.CANCELLED;
+            case CANCELLED -> false;
+        };
+        if (!allowed) {
+            throw new IllegalStateException("Illegal booking status transition");
+        }
+        booking.setStatus(nextStatus);
     }
 
     private void requireAdmin(User user) {

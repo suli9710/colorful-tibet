@@ -64,12 +64,15 @@ public class HotelBookingController {
         try {
             HotelBooking saved = hotelBookingService.createBooking(user, request);
             return ResponseEntity.ok(Map.of(
-                    "message", "Hotel booking created successfully!",
+                    "message", "Hotel booking created successfully and is pending payment.",
                     "bookingId", saved.getId(),
+                    "status", saved.getStatus(),
                     "totalPrice", saved.getTotalPrice()
             ));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", "酒店预订参数不合法"));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(409).body(Map.of("error", "所选日期房型不可预订"));
         } catch (NoSuchElementException e) {
             return ResponseEntity.status(404).body(Map.of("error", "酒店预订资源不存在"));
         }
@@ -113,6 +116,8 @@ public class HotelBookingController {
             return ResponseEntity.status(403).body(Map.of("error", "无权操作该资源"));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", "Invalid status"));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(409).body(Map.of("error", "预订状态不允许这样变更"));
         } catch (NoSuchElementException e) {
             return ResponseEntity.status(404).body(Map.of("error", "酒店预订资源不存在"));
         }
@@ -130,6 +135,8 @@ public class HotelBookingController {
             return ResponseEntity.ok(Map.of("message", "Booking cancelled successfully"));
         } catch (SecurityException e) {
             return ResponseEntity.status(403).body(Map.of("error", "无权操作该资源"));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(409).body(Map.of("error", "预订状态不允许这样变更"));
         } catch (NoSuchElementException e) {
             return ResponseEntity.status(404).body(Map.of("error", "酒店预订资源不存在"));
         }

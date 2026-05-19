@@ -10,6 +10,7 @@ const { locale, t } = useI18n()
 const router = useRouter()
 const prefersReducedMotion = useReducedMotion()
 const chartRef = ref<HTMLElement | null>(null)
+const chartError = ref(false)
 
 let chart: ECharts | null = null
 const zoomLevel = ref(1.0)
@@ -275,23 +276,30 @@ const loadChartData = async () => {
 }
 
 onMounted(async () => {
-  if (chartRef.value) {
-    const { init, registerMap } = await loadECharts()
-    chart = init(chartRef.value)
-    chart.off('click', handleChartClick)
-    chart.on('click', handleChartClick)
-    
-    try {
-      const mapJson = await loadTibetMapJson()
-      if (mapJson && typeof mapJson === 'object') {
-        registerMap('tibet', mapJson)
-        mapLoaded = true
-      }
-    } catch (e) {
-      console.warn('Failed to load Tibet map data, falling back to simple scatter plot', e)
-    }
+  try {
+    chartError.value = false
 
-    await loadChartData()
+    if (chartRef.value) {
+      const { init, registerMap } = await loadECharts()
+      chart = init(chartRef.value)
+      chart.off('click', handleChartClick)
+      chart.on('click', handleChartClick)
+
+      try {
+        const mapJson = await loadTibetMapJson()
+        if (mapJson && typeof mapJson === 'object') {
+          registerMap('tibet', mapJson)
+          mapLoaded = true
+        }
+      } catch (e) {
+        console.warn('Failed to load Tibet map data, falling back to simple scatter plot', e)
+      }
+
+      await loadChartData()
+    }
+  } catch (error) {
+    chartError.value = true
+    console.warn('Failed to initialize heatmap chart:', error)
   }
 
   if (chartRef.value && typeof ResizeObserver !== 'undefined') {
@@ -344,6 +352,14 @@ onUnmounted(() => {
 <template>
   <div class="relative w-full h-[600px] bg-white rounded-2xl shadow-lg border border-tibet-gold/25">
     <div ref="chartRef" class="w-full h-full"></div>
+    <div
+      v-if="chartError"
+      class="absolute inset-4 flex items-center justify-center rounded-xl border border-tibet-gold/20 bg-tibet-cream/80 text-center text-tibet-brown"
+    >
+      <div>
+        <p class="text-lg font-semibold">{{ t('spotDetail.mapLoadFailed') }}</p>
+      </div>
+    </div>
     <div class="absolute left-4 bottom-4 bg-white/90 backdrop-blur-sm rounded-lg shadow-lg border border-tibet-gold/25 p-4 min-w-[200px]">
       <div class="flex items-center justify-between mb-2">
         <span class="text-sm font-medium text-gray-700">{{ t('heatmap.zoomLevel') }}</span>

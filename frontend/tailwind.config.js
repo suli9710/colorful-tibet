@@ -121,12 +121,12 @@ export default {
           '50%': { transform: 'translateY(-5px)' },
         },
         shimmer: {
-          '0%': { backgroundPosition: '-1000px 0' },
-          '100%': { backgroundPosition: '1000px 0' },
+          '0%, 100%': { opacity: '0.5' },
+          '50%': { opacity: '1' },
         },
         gradient: {
-          '0%, 100%': { backgroundPosition: '0% 50%' },
-          '50%': { backgroundPosition: '100% 50%' },
+          '0%, 100%': { opacity: '0.7' },
+          '50%': { opacity: '1' },
         },
         zoomIn: {
           '0%': { opacity: '0', transform: 'scale(0.9)' },

@@ -1,37 +1,22 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { Menu, X, LogOut } from 'lucide-vue-next'
-import { AnimatePresence, LayoutGroup, motion } from 'motion-v'
 import api, { updateMemoizedLocale, clearTokenCache } from '../api/index'
 import { useAuthStore } from '../stores/auth'
-import {
-  mobileMenuAnimate,
-  mobileMenuExit,
-  mobileMenuInitial,
-  mobileMenuItemAnimate,
-  mobileMenuItemInitial,
-  mobileMenuItemTransition,
-  mobileMenuTransition,
-  navItemHover,
-  navItemPress,
-  navShellAnimate,
-  navShellInitial,
-  navShellTransition,
-  primaryActionHover,
-  primaryActionPress,
-  softSpring,
-  subtleButtonHover,
-  subtleButtonPress
-} from '../motion/presets'
 
 const router = useRouter()
+const route = useRoute()
 const { t, locale } = useI18n()
 const auth = useAuthStore()
 const isOpen = ref(false)
 const isScrolled = ref(false)
 let ticking = false
+
+watch(() => route.fullPath, () => {
+  isOpen.value = false
+})
 
 const updateScrolledState = () => {
   isScrolled.value = window.scrollY > 80
@@ -62,7 +47,10 @@ const navItems = computed(() => [
   { path: '/hotels', label: t('common.hotels') },
   { path: '/heritage', label: t('common.heritage') },
   { path: '/news', label: t('common.news') },
-  ...(auth.user ? [{ path: '/profile', label: t('common.profile') }] : []),
+  ...(auth.user ? [
+    { path: '/orders', label: t('common.orders') },
+    { path: '/profile', label: t('common.profile') }
+  ] : []),
 ])
 
 const switchLanguage = (lang: string) => {
@@ -83,147 +71,123 @@ const logout = async () => {
 </script>
 
 <template>
-  <div class="fixed top-0 left-0 w-full z-50 flex justify-center pt-4 px-4 pointer-events-none">
-    <motion.nav
-      layout
-      class="pointer-events-auto rounded-full border px-6 tibet-nav-shell nav-shell-optimized"
+  <div class="fixed top-0 left-0 w-full z-50 flex justify-center pt-3 px-3 sm:pt-4 sm:px-4 pointer-events-none">
+    <nav
+      class="pointer-events-auto rounded-[1.35rem] sm:rounded-full border px-3 sm:px-6 tibet-nav-shell nav-shell-optimized"
       :class="isScrolled ? 'nav-shell-scrolled' : 'nav-shell-top'"
-      :initial="navShellInitial"
-      :animate="navShellAnimate"
-      :transition="navShellTransition"
     >
       <div class="flex justify-between items-center">
         <div class="flex-shrink-0 flex items-center">
-          <router-link to="/" class="flex items-center space-x-2 group">
+          <router-link to="/" class="flex min-w-0 items-center space-x-2 group">
             <span class="tibet-brand-sigil flex-shrink-0"></span>
-            <motion.span class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-tibet-yellow via-tibet-gold to-tibet-red tibetan-font"
-              :animate="{ opacity: isScrolled ? 1 : 0.86 }"
-              :transition="{ duration: 0.2 }">
+            <span class="max-w-[12rem] truncate text-[1.05rem] font-bold bg-clip-text text-transparent bg-gradient-to-r from-tibet-yellow via-tibet-gold to-tibet-red sm:max-w-none sm:text-2xl tibetan-font"
+              :class="isScrolled ? 'opacity-100' : 'opacity-90'">
               {{ t('common.brandName') }}
-            </motion.span>
+            </span>
           </router-link>
         </div>
 
-        <LayoutGroup>
         <div class="hidden md:flex items-center space-x-1">
           <router-link v-for="item in navItems" :key="item.path" :to="item.path" custom v-slot="{ href, navigate, isActive }">
-            <motion.a
+            <a
               :href="href"
-              class="relative px-4 py-2 rounded-full text-sm font-medium text-tibet-brown/80 hover:text-tibet-dark transition-colors duration-300 ease-out-expo group will-change-transform"
-              :whileHover="navItemHover"
-              :whilePress="navItemPress"
+              class="relative px-4 py-2 rounded-full text-sm font-medium text-tibet-brown/80 hover:text-tibet-dark transition-all duration-300 ease-out-expo group will-change-transform hover:-translate-y-0.5 hover:scale-[1.03] active:scale-95"
               @click="navigate"
             >
-              <motion.span
+              <span
                 v-if="isActive"
-                layoutId="desktop-nav-active-pill"
                 class="absolute inset-0 rounded-full bg-white/75 shadow-sm border border-tibet-gold/20"
-                :transition="softSpring"
               />
               <span class="absolute inset-0 bg-gradient-to-r from-tibet-gold/10 to-tibet-red/10 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 ease-out-expo"></span>
               <span class="relative z-10">{{ item.label }}</span>
-            </motion.a>
+            </a>
           </router-link>
 
           <router-link v-if="auth.user && auth.user.role === 'ADMIN'" to="/admin" custom v-slot="{ href, navigate, isActive }">
-            <motion.a
+            <a
               :href="href"
-              class="relative px-4 py-2 rounded-full text-sm font-medium text-tibet-brown/80 hover:text-tibet-dark transition-colors duration-200"
-              :whileHover="navItemHover"
-              :whilePress="navItemPress"
+              class="relative px-4 py-2 rounded-full text-sm font-medium text-tibet-brown/80 hover:text-tibet-dark transition-all duration-200 hover:-translate-y-0.5 hover:scale-[1.03] active:scale-95"
               @click="navigate"
             >
-              <motion.span
+              <span
                 v-if="isActive"
-                layoutId="desktop-nav-active-pill"
                 class="absolute inset-0 rounded-full bg-white/75 shadow-sm border border-tibet-gold/20"
-                :transition="softSpring"
               />
               <span class="relative z-10">{{ t('common.admin') }}</span>
-            </motion.a>
+            </a>
           </router-link>
         </div>
-        </LayoutGroup>
 
         <div class="hidden md:flex items-center space-x-2 mr-4">
-          <motion.button
+          <button
             @click="switchLanguage('zh')"
-            layout
-            :whileHover="subtleButtonHover"
-            :whilePress="subtleButtonPress"
             :class="[
-              'px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200',
+              'px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 hover:-translate-y-0.5 active:scale-95',
               currentLocale === 'zh'
                 ? 'bg-tibet-red text-tibet-yellow shadow-md'
                 : 'bg-white/50 text-tibet-brown/80 hover:bg-white/70'
             ]">
             {{ t('common.chinese') }}
-          </motion.button>
-          <motion.button
+          </button>
+          <button
             @click="switchLanguage('bo')"
-            layout
-            :whileHover="subtleButtonHover"
-            :whilePress="subtleButtonPress"
             :class="[
-              'px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200',
+              'px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 hover:-translate-y-0.5 active:scale-95',
               currentLocale === 'bo'
                 ? 'bg-tibet-red text-tibet-yellow shadow-md'
                 : 'bg-white/50 text-tibet-brown/80 hover:bg-white/70'
             ]">
             {{ t('common.tibetan') }}
-          </motion.button>
+          </button>
         </div>
 
         <div class="hidden md:flex items-center space-x-4">
           <div v-if="auth.user" class="flex items-center space-x-3 bg-white/50 backdrop-blur-sm px-4 py-1.5 rounded-full border border-white/20 shadow-sm">
             <span class="text-sm font-medium text-tibet-dark/80">{{ auth.user.nickname || auth.user.username }}</span>
-            <motion.button @click="logout" class="text-tibet-brown/70 hover:text-red-500 transition-colors" :whileHover="{ rotate: -8, scale: 1.1 }" :whilePress="{ scale: 0.9 }">
+            <button @click="logout" class="text-tibet-brown/70 hover:text-red-500 transition-transform hover:-rotate-6 hover:scale-110 active:scale-90">
               <LogOut class="w-4 h-4" />
-            </motion.button>
+            </button>
           </div>
           <div v-else class="flex items-center space-x-3">
             <router-link to="/login" class="text-sm font-medium text-tibet-brown/80 hover:text-tibet-dark transition-colors">
               {{ t('common.login') }}
             </router-link>
-            <motion.div :whileHover="primaryActionHover" :whilePress="primaryActionPress">
-              <router-link to="/register" class="bg-tibet-red hover:bg-tibet-red/90 text-tibet-yellow text-sm font-medium px-4 py-2 rounded-full transition-colors duration-300 ease-out-expo shadow-lg shadow-tibet-red/30 hover:shadow-tibet-red/50 relative overflow-hidden group will-change-transform">
-                <span class="relative z-10">{{ t('common.register') }}</span>
-              </router-link>
-            </motion.div>
+            <router-link to="/register" class="bg-tibet-red hover:bg-tibet-red/90 text-tibet-yellow text-sm font-medium px-4 py-2 rounded-full transition-all duration-300 ease-out-expo shadow-lg shadow-tibet-red/30 hover:shadow-tibet-red/50 relative overflow-hidden group will-change-transform hover:-translate-y-0.5 hover:scale-[1.03] active:scale-95">
+              <span class="relative z-10">{{ t('common.register') }}</span>
+            </router-link>
           </div>
         </div>
 
         <div class="flex items-center md:hidden">
-          <motion.button @click="isOpen = !isOpen" class="text-tibet-brown/80 hover:text-tibet-dark p-2 rounded-lg hover:bg-white/50 transition-colors" :whileTap="subtleButtonPress">
+          <button
+            @click="isOpen = !isOpen"
+            class="flex h-11 w-11 items-center justify-center rounded-xl text-tibet-brown/80 hover:text-tibet-dark hover:bg-white/50 transition-colors active:scale-95"
+            :aria-label="isOpen ? '关闭菜单' : '打开菜单'"
+            :aria-expanded="isOpen"
+          >
             <Menu v-if="!isOpen" class="w-6 h-6" />
             <X v-else class="w-6 h-6" />
-          </motion.button>
+          </button>
         </div>
       </div>
-    </motion.nav>
+    </nav>
   </div>
 
-  <AnimatePresence>
-    <motion.div
+  <div
       v-if="isOpen"
       key="mobile-nav"
-      class="fixed top-20 left-4 right-4 z-40 md:hidden glass rounded-3xl border border-white/20 shadow-2xl origin-top"
-      :initial="mobileMenuInitial"
-      :animate="mobileMenuAnimate"
-      :exit="mobileMenuExit"
-      :transition="mobileMenuTransition"
+      class="fixed left-3 right-3 top-[4.75rem] z-40 max-h-[calc(100dvh-5.5rem)] origin-top overflow-y-auto overscroll-contain rounded-3xl border border-white/20 shadow-2xl md:hidden glass animate-fade-in"
     >
-      <div class="px-4 pt-2 pb-6 space-y-1">
-        <motion.div
+      <div class="px-3 pt-2 pb-5 space-y-1 sm:px-4 sm:pb-6">
+        <div
           v-for="(item, index) in navItems"
           :key="item.path"
-          :initial="mobileMenuItemInitial"
-          :animate="mobileMenuItemAnimate"
-          :transition="mobileMenuItemTransition(index)"
+          :style="{ animationDelay: `${Math.min(index, 8) * 25}ms` }"
+          class="animate-fade-slide-in"
         >
           <router-link
             :to="item.path"
-            class="block px-4 py-3 rounded-xl text-base font-medium text-tibet-brown/80 hover:text-tibet-dark hover:bg-white/60 transition-all duration-300 ease-out-expo active:scale-98 hover:translate-x-2 group will-change-transform"
+            class="block rounded-xl px-4 py-3 text-base font-medium text-tibet-brown/80 hover:text-tibet-dark hover:bg-white/60 transition-all duration-300 ease-out-expo active:scale-98 sm:hover:translate-x-2 group will-change-transform"
             @click="isOpen = false">
             <span class="flex items-center">
               <span class="flex-1">{{ item.label }}</span>
@@ -232,7 +196,7 @@ const logout = async () => {
               </svg>
             </span>
           </router-link>
-        </motion.div>
+        </div>
 
         <router-link v-if="auth.user && auth.user.role === 'ADMIN'" to="/admin"
           class="block px-4 py-3 rounded-xl text-base font-medium text-tibet-brown/80 hover:text-tibet-dark hover:bg-white/50 transition-all active:scale-98"
@@ -240,7 +204,7 @@ const logout = async () => {
           {{ t('common.admin') }}
         </router-link>
 
-        <div class="px-4 py-3 flex items-center justify-center space-x-2 border-t border-tibet-gold/20 mt-2">
+        <div class="mt-2 flex items-center justify-center gap-2 border-t border-tibet-gold/20 px-2 py-3 sm:px-4">
           <button
             @click="switchLanguage('zh')"
             :class="[
@@ -274,8 +238,7 @@ const logout = async () => {
           </div>
         </div>
       </div>
-    </motion.div>
-  </AnimatePresence>
+    </div>
 </template>
 
 <style scoped>
@@ -305,5 +268,23 @@ const logout = async () => {
   background-color: rgba(247, 243, 238, 0.92);
   border-color: rgba(197, 150, 75, 0.24);
   box-shadow: 0 4px 22px rgba(139, 46, 58, 0.1);
+}
+
+.animate-fade-in {
+  animation: fadeIn 180ms ease-out both;
+}
+
+.animate-fade-slide-in {
+  animation: fadeSlideIn 220ms ease-out both;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateX(-8px); }
+  to { opacity: 1; transform: translateX(0); }
 }
 </style>

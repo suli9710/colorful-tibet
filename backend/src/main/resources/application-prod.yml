@@ -3,6 +3,7 @@
 
 server:
   port: 8080
+  forward-headers-strategy: ${SERVER_FORWARD_HEADERS_STRATEGY:framework}
   compression:
     enabled: true
     mime-types: application/json,application/xml,text/html,text/xml,text/plain,text/css,text/javascript,application/javascript
@@ -15,7 +16,7 @@ spring:
     async:
       request-timeout: 120000
   datasource:
-    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:tibet_tourism}?useUnicode=true&characterEncoding=utf8&sslMode=${DB_SSL_MODE:VERIFY_IDENTITY}&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=false
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:tibet_tourism}?useUnicode=true&characterEncoding=utf8&sslMode=${DB_SSL_MODE:VERIFY_IDENTITY}&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=${DB_ALLOW_PUBLIC_KEY_RETRIEVAL:false}
     username: ${DB_USERNAME:tibet_user}
     password: ${DB_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -93,10 +94,10 @@ management:
 # AI API 配置，ARK_* 优先，兼容旧的 DOUBAO_* 环境变量
 ark:
   api:
-    url: ${ARK_API_URL:https://ark.cn-beijing.volces.com/api/v3/responses}
+    url: ${ARK_API_URL:${DOUBAO_API_URL:https://ark.cn-beijing.volces.com/api/v3/responses}}
     key: ${ARK_API_KEY:${DOUBAO_API_KEY:}}
-    model: ${AI_MODEL:${DOUBAO_MODEL:doubao-seed-2-0-pro-260215}}
-    stream-url: ${ARK_STREAM_API_URL:}  # 流式端点，为空时从url自动推导
+    model: ${AI_MODEL:${ARK_MODEL:${DOUBAO_MODEL:doubao-seed-2-0-pro-260215}}}
+    stream-url: ${ARK_STREAM_API_URL:${DOUBAO_STREAM_API_URL:}}  # 流式端点，为空时从url自动推导
 
 doubao:
   api:
@@ -108,6 +109,12 @@ doubao:
 ai:
   route:
     stream-timeout-seconds: ${AI_STREAM_TIMEOUT:180}
+
+# Scrapling 爬虫微服务配置
+scrapling:
+  service:
+    url: ${SCRAPLING_SERVICE_URL:http://scrapling:8000}
+    timeout-seconds: ${SCRAPLING_SERVICE_TIMEOUT:30}
 
 # 价格定时更新配置
 price:
@@ -122,8 +129,8 @@ price:
 
 recommendation:
   item-similarity:
-    enabled: true
-    preload-on-startup: true
+    enabled: ${RECOMMENDATION_ITEM_SIMILARITY_ENABLED:true}
+    preload-on-startup: ${RECOMMENDATION_ITEM_SIMILARITY_PRELOAD_ON_STARTUP:false}
     cron: "0 30 3 * * ?"
 
 # JWT配置（如果需要）
@@ -136,17 +143,28 @@ app:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:}
   security:
     public-docs-enabled: ${PUBLIC_DOCS_ENABLED:false}
+    public-metrics-enabled: ${PUBLIC_METRICS_ENABLED:false}
     require-strong-secrets: ${REQUIRE_STRONG_SECRETS:true}
+    csrf-signing-secret: ${CSRF_SIGNING_SECRET}
+    pii-encryption-key: ${PII_ENCRYPTION_KEY}
     trust-proxy-headers: ${TRUST_PROXY_HEADERS:false}
     rate-limit:
       enabled: ${RATE_LIMIT_ENABLED:true}
+      redis-enabled: ${RATE_LIMIT_REDIS_ENABLED:true}
       trust-proxy-headers: ${TRUST_PROXY_HEADERS:false}
+      register:
+        requests: ${RATE_LIMIT_REGISTER_REQUESTS:5}
+        window-seconds: ${RATE_LIMIT_REGISTER_WINDOW_SECONDS:3600}
     cookie-secure: ${COOKIE_SECURE:true}
+  super-admin-username: ${SUPER_ADMIN_USERNAME}
   seed:
+    content:
+      enabled: ${SEED_CONTENT_ENABLED:false}
     demo-users:
       enabled: ${SEED_DEMO_USERS:false}
-      admin-password: ${SEED_DEMO_ADMIN_PASSWORD:AdminDemo2026}
-      user-password: ${SEED_DEMO_USER_PASSWORD:UserDemo2026}
+      admin-password: ${SEED_DEMO_ADMIN_PASSWORD:}
+      super-admin-password: ${SEED_DEMO_SUPER_ADMIN_PASSWORD:}
+      user-password: ${SEED_DEMO_USER_PASSWORD:}
 
 
 

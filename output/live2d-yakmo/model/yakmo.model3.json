@@ -1,0 +1,59 @@
+{
+  "Version": 3,
+  "Meta": {
+    "Name": "Yakmo Live2D-like Browser Model",
+    "Note": "This is a browser Live2D-style package, not a proprietary Cubism .moc3 export. Use runtime/yakmo-live2d.js."
+  },
+  "FileReferences": {
+    "Textures": [
+      "../assets/parts/yakmo-base.png"
+    ],
+    "Motions": {
+      "idle": [
+        {
+          "File": "yakmo.live2d.json#motions.idle"
+        }
+      ],
+      "running-right": [
+        {
+          "File": "yakmo.live2d.json#motions.running-right"
+        }
+      ],
+      "running-left": [
+        {
+          "File": "yakmo.live2d.json#motions.running-left"
+        }
+      ],
+      "waving": [
+        {
+          "File": "yakmo.live2d.json#motions.waving"
+        }
+      ],
+      "jumping": [
+        {
+          "File": "yakmo.live2d.json#motions.jumping"
+        }
+      ],
+      "failed": [
+        {
+          "File": "yakmo.live2d.json#motions.failed"
+        }
+      ],
+      "waiting": [
+        {
+          "File": "yakmo.live2d.json#motions.waiting"
+        }
+      ],
+      "running": [
+        {
+          "File": "yakmo.live2d.json#motions.running"
+        }
+      ],
+      "review": [
+        {
+          "File": "yakmo.live2d.json#motions.review"
+        }
+      ]
+    }
+  }
+}

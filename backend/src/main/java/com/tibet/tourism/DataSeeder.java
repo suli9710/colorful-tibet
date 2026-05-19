@@ -5,6 +5,7 @@ import com.tibet.tourism.repository.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.core.env.Environment;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
@@ -14,9 +15,14 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.*;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 @Component
 public class DataSeeder implements CommandLineRunner {
+    private static final Logger logger = LoggerFactory.getLogger(DataSeeder.class);
     private static final String SPOT_IMAGE_BASE = "/images/spots/";
+    private static final String[] AUDIT_USERNAMES = {"admin", "lzh"};
 
     @Autowired
     private UserRepository userRepository;
@@ -55,6 +61,9 @@ public class DataSeeder implements CommandLineRunner {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private Environment environment;
     
     @Autowired
     private com.tibet.tourism.service.TibetanTranslationService tibetanTranslationService;
@@ -62,27 +71,50 @@ public class DataSeeder implements CommandLineRunner {
     @Value("${app.seed.demo-users.enabled:false}")
     private boolean seedDemoUsersEnabled;
 
-    @Value("${app.seed.demo-users.admin-password:AdminDemo2026}")
+    @Value("${app.seed.content.enabled:true}")
+    private boolean seedContentEnabled;
+
+    @Value("${app.seed.demo-users.admin-password:}")
     private String demoAdminPassword;
 
-    @Value("${app.seed.demo-users.user-password:UserDemo2026}")
+    @Value("${app.seed.demo-users.super-admin-password:}")
+    private String demoSuperAdminPassword;
+
+    @Value("${app.seed.demo-users.user-password:}")
     private String demoUserPassword;
+
+    @Value("${app.super-admin-username:lzh}")
+    private String superAdminUsername;
 
     @Override
     public void run(String... args) throws Exception {
-        // 初始化藏语词典
-        System.out.println("初始化藏语词典...");
+        if (isProdProfile() && seedDemoUsersEnabled) {
+            throw new IllegalStateException("Demo user seeding is not allowed with the prod profile");
+        }
+        if (!seedContentEnabled && !seedDemoUsersEnabled) {
+            logger.info("Data seeding disabled; startup will not create demo or content records.");
+            return;
+        }
+
+        logger.info("初始化藏语词典...");
         tibetanTranslationService.initializeDefaultDictionary();
-        
+
+        auditExistingDemoAccounts();
+
         if (seedDemoUsersEnabled) {
             seedUsers();
         } else {
-            System.out.println("Demo user seeding disabled; existing users are left unchanged.");
+            logger.info("Demo user seeding disabled; existing users are left unchanged.");
+        }
+
+        if (!seedContentEnabled) {
+            logger.info("Content seeding disabled; skipping scenic spots, news, routes, and hotels.");
+            return;
         }
         
         // 只在数据库为空时才播种景点和资讯数据，避免破坏已有数据
         if (spotRepository.count() == 0) {
-            System.out.println("数据库为空，开始播种景点数据...");
+            logger.info("数据库为空，开始播种景点数据...");
             seedSpots();
             if (newsRepository.count() == 0) {
                 seedNews();
@@ -107,64 +139,73 @@ public class DataSeeder implements CommandLineRunner {
     }
 
     private void seedUsers() {
+        String adminPassword = resolvePassword(demoAdminPassword, "admin");
+        String superAdminPassword = resolvePassword(demoSuperAdminPassword, "super-admin");
+        String user1Password = resolvePassword(demoUserPassword, "user1");
+        String user2Password = resolvePassword("", "user2");
+
         // 创建演示 admin 用户；已有用户永不覆盖密码
         userRepository.findByUsername("admin").ifPresentOrElse(
-            existing -> System.out.println("admin 用户已存在，跳过默认密码写入"),
+            existing -> logger.info("admin 用户已存在，跳过创建"),
             () -> {
                 User admin = new User();
                 admin.setUsername("admin");
-                admin.setPassword(passwordEncoder.encode(demoAdminPassword)); // BCrypt
+                admin.setPassword(passwordEncoder.encode(adminPassword));
                 admin.setRole(User.Role.ADMIN);
                 admin.setNickname("管理员");
+                admin.setMustChangePassword(true);
                 userRepository.save(admin);
-                System.out.println("已创建 admin 用户");
+                logger.warn("已创建 admin 演示用户（角色=ADMIN），请尽快修改密码");
             }
         );
 
-        // 创建演示 lzh 超级管理员；已有用户永不覆盖密码
-        userRepository.findByUsername("lzh").ifPresentOrElse(
-            existing -> System.out.println("lzh 用户已存在，跳过默认密码写入"),
+        // 创建演示超级管理员；已有用户永不覆盖密码
+        userRepository.findByUsername(superAdminUsername).ifPresentOrElse(
+            existing -> logger.info("{} 用户已存在，跳过创建", superAdminUsername),
             () -> {
                 User superAdmin = new User();
-                superAdmin.setUsername("lzh");
-                superAdmin.setPassword(passwordEncoder.encode(demoAdminPassword)); // BCrypt
+                superAdmin.setUsername(superAdminUsername);
+                superAdmin.setPassword(passwordEncoder.encode(superAdminPassword));
                 superAdmin.setRole(User.Role.ADMIN);
                 superAdmin.setNickname("超级管理员");
+                superAdmin.setMustChangePassword(true);
                 userRepository.save(superAdmin);
-                System.out.println("已创建 lzh 用户");
+                logger.warn("已创建 {} 超管演示用户（角色=ADMIN），请尽快修改密码", superAdminUsername);
             }
         );
 
         // 创建演示 user1；已有用户永不覆盖密码
         userRepository.findByUsername("user1").ifPresentOrElse(
-            existing -> System.out.println("user1 已存在，跳过默认密码写入"),
+            existing -> logger.info("user1 用户已存在，跳过创建"),
             () -> {
                 User user1 = new User();
                 user1.setUsername("user1");
-                user1.setPassword(passwordEncoder.encode(demoUserPassword)); // BCrypt
+                user1.setPassword(passwordEncoder.encode(user1Password));
                 user1.setNickname("扎西");
+                user1.setMustChangePassword(true);
                 userRepository.save(user1);
-                System.out.println("已创建 user1 用户");
+                logger.info("已创建 user1 演示用户");
             }
         );
 
         // 创建演示 user2；已有用户永不覆盖密码
         userRepository.findByUsername("user2").ifPresentOrElse(
-            existing -> System.out.println("user2 已存在，跳过默认密码写入"),
+            existing -> logger.info("user2 用户已存在，跳过创建"),
             () -> {
                 User user2 = new User();
                 user2.setUsername("user2");
-                user2.setPassword(passwordEncoder.encode(demoUserPassword)); // BCrypt
+                user2.setPassword(passwordEncoder.encode(user2Password));
                 user2.setNickname("卓玛");
+                user2.setMustChangePassword(true);
                 userRepository.save(user2);
-                System.out.println("已创建 user2 用户");
+                logger.info("已创建 user2 演示用户");
             }
         );
 
         // 批量生成模拟用户（user3 ~ user98，共96个），使数据集达到100用户规模
         long existingUserCount = userRepository.count();
         if (existingUserCount < 100) {
-            System.out.println("批量生成模拟用户（user3 ~ user98）...");
+            logger.info("批量生成模拟用户（user3 ~ user98）...");
             String[][] nicknamesPool = {
                 {"丹增", "索朗", "格桑", "次仁", "巴桑", "普布", "洛桑", "拉姆", "央金", "米玛"},
                 {"张伟", "李娜", "王芳", "刘洋", "陈静", "杨帆", "赵敏", "黄磊", "周洁", "吴鑫"},
@@ -198,15 +239,49 @@ public class DataSeeder implements CommandLineRunner {
                 String city = cities[rand.nextInt(cities.length)];
                 User u = new User();
                 u.setUsername(username);
-                u.setPassword(passwordEncoder.encode(demoUserPassword));
+                u.setPassword(passwordEncoder.encode(generateRandomPassword()));
                 u.setNickname(nickname);
                 u.setCity(city);
                 u.setRole(User.Role.USER);
+                u.setMustChangePassword(true);
                 userRepository.save(u);
                 userNum++;
             }
-            System.out.println("批量生成模拟用户完成，当前用户总数: " + userRepository.count());
+            logger.info("批量生成模拟用户完成，当前用户总数: {}", userRepository.count());
         }
+    }
+
+    private String resolvePassword(String configuredPassword, String role) {
+        if (configuredPassword != null && !configuredPassword.isBlank()) {
+            return configuredPassword;
+        }
+        String randomPassword = generateRandomPassword();
+        logger.warn("未配置 {} 演示用户密码，已生成随机密码（仅本次启动可见）。"
+                + "请通过 SEED_DEMO_ADMIN_PASSWORD / SEED_DEMO_USER_PASSWORD 环境变量设置固定密码。", role);
+        return randomPassword;
+    }
+
+    private String generateRandomPassword() {
+        java.security.SecureRandom secureRandom = new java.security.SecureRandom();
+        byte[] bytes = new byte[18];
+        secureRandom.nextBytes(bytes);
+        return java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+    }
+
+    private void auditExistingDemoAccounts() {
+        for (String username : AUDIT_USERNAMES) {
+            userRepository.findByUsername(username).ifPresent(user -> {
+                if (user.getRole() == User.Role.ADMIN) {
+                    logger.warn("审计: 管理员账户 '{}' 存在于数据库中（角色={}），如为演示种子账户请确认已修改默认密码。",
+                            username, user.getRole());
+                }
+            });
+        }
+    }
+
+    private boolean isProdProfile() {
+        return environment != null
+                && Arrays.stream(environment.getActiveProfiles()).anyMatch("prod"::equalsIgnoreCase);
     }
 
     private void seedSpots() {
@@ -247,30 +322,30 @@ public class DataSeeder implements CommandLineRunner {
         createSpot("当惹雍错", "དང་རེ་གཡུ་མཚོ", "苯教崇拜的最大圣湖。", "བོན་པོའི་གནས་ས་རྙེད་པའི་མཚོ་ཆེན་པོ་གཙོ་བོ།", ScenicSpot.Category.NATURAL, "0", "31.0000", "86.6333", spotImage("当惹雍错.png"), Arrays.asList("湖泊", "苯教", "那曲"), 15000 + 50);
 
         // 更多精选景点（扩展热力图覆盖范围）
-        createSpot("普莫雍错", "ཕུ་མོ་གཡུ་མཚོ", "海拔最高的淡水湖之一，冰蓝梦境。", "མཐོ་ཚད་ཆེས་མཐོ་བའི་ཆུ་མཚོ་གཙོ་བོ། དར་ཡུལ་གྱི་རྨི་ལམ་ལྟ་བུ།", ScenicSpot.Category.NATURAL, "0", "28.5667", "90.4167", spotImage("普莫雍错.jpg"), Arrays.asList("湖泊", "自然", "山南"), 15000 + 350);
-        createSpot("班公错", "སྤང་གོང་མཚོ", "中印边境的国际湖泊，鸟类的天堂。", "རྒྱ་དང་ཧིན་རྫིའི་མཚོ་ཆེན་པོ། བྱེའུ་རིགས་ཀྱི་གནས་ས།", ScenicSpot.Category.NATURAL, "30", "33.7333", "79.4667", spotImage("班公错.jpg"), Arrays.asList("湖泊", "边境", "阿里"), 15000 + 300);
-        createSpot("色林错", "གཟི་ལིང་མཚོ", "西藏面积最大的湖泊。", "བོད་ཀྱི་མཚོ་ཆེན་པོ་གཙོ་བོ།", ScenicSpot.Category.NATURAL, "0", "31.8333", "88.7333", spotImage("色林错.jpg"), Arrays.asList("湖泊", "自然", "那曲"), 15000 + 250);
-        createSpot("佩枯措", "པད་གུ་མཚོ", "珠峰保护区内的蓝宝石湖泊。", "ཇོ་མོ་གླང་མའི་སྲུང་སྐྱོབ་ས་ཁུལ་གྱི་མཚོ་མོ།", ScenicSpot.Category.NATURAL, "0", "28.8167", "85.5833", spotImage("佩枯措.jpg"), Arrays.asList("湖泊", "珠峰", "日喀则"), 15000 + 200);
+        createSpot("普莫雍错", "ཕུ་མོ་གཡུ་མཚོ", "海拔最高的淡水湖之一，冰蓝梦境。", "མཐོ་ཚད་ཆེས་མཐོ་བའི་ཆུ་མཚོ་གཙོ་བོ། དར་ཡུལ་གྱི་རྨི་ལམ་ལྟ་བུ།", ScenicSpot.Category.NATURAL, "0", "28.5667", "90.4167", spotImage("羊卓雍措.jpg"), Arrays.asList("湖泊", "自然", "山南"), 15000 + 350);
+        createSpot("班公错", "སྤང་གོང་མཚོ", "中印边境的国际湖泊，鸟类的天堂。", "རྒྱ་དང་ཧིན་རྫིའི་མཚོ་ཆེན་པོ། བྱེའུ་རིགས་ཀྱི་གནས་ས།", ScenicSpot.Category.NATURAL, "30", "33.7333", "79.4667", spotImage("玛旁雍措.jpg"), Arrays.asList("湖泊", "边境", "阿里"), 15000 + 300);
+        createSpot("色林错", "གཟི་ལིང་མཚོ", "西藏面积最大的湖泊。", "བོད་ཀྱི་མཚོ་ཆེན་པོ་གཙོ་བོ།", ScenicSpot.Category.NATURAL, "0", "31.8333", "88.7333", spotImage("纳木错.jpg"), Arrays.asList("湖泊", "自然", "那曲"), 15000 + 250);
+        createSpot("佩枯措", "པད་གུ་མཚོ", "珠峰保护区内的蓝宝石湖泊。", "ཇོ་མོ་གླང་མའི་སྲུང་སྐྱོབ་ས་ཁུལ་གྱི་མཚོ་མོ།", ScenicSpot.Category.NATURAL, "0", "28.8167", "85.5833", spotImage("羊卓雍措.jpg"), Arrays.asList("湖泊", "珠峰", "日喀则"), 15000 + 200);
 
-        createSpot("江孜宗山古堡", "རྒྱལ་རྩེ་རྫོང", "抗英遗址，英雄之城的地标。", "དམག་འཁྲུག་གི་གནས་ས་དང་དཔའ་བའི་གྲོང་གི་རྫོང་།", ScenicSpot.Category.HISTORICAL, "30", "28.9167", "89.6000", spotImage("江孜宗山古堡.jpg"), Arrays.asList("古堡", "历史", "日喀则"), 15000 + 450);
-        createSpot("白居寺", "དཔལ་འཁོར་ཆོས་སྡེ", "塔中有寺，寺中有塔的奇观。", "མཆོད་རྟེན་ནང་དུ་དགོན་པ་དང་དགོན་པའི་ནང་དུ་མཆོད་རྟེན་གྱི་གནས་ས།", ScenicSpot.Category.CULTURAL, "45", "28.9167", "89.6000", spotImage("白居寺.jpg"), Arrays.asList("寺庙", "佛塔", "日喀则"), 15000 + 400);
-        createSpot("绒布寺", "རོང་བུ་དགོན་པ", "世界海拔最高的寺庙。", "འཛམ་གླིང་གི་མཐོ་ཚད་ཆེས་མཐོ་བའི་དགོན་པ།", ScenicSpot.Category.CULTURAL, "35", "28.2000", "86.8333", spotImage("绒布寺.jpg"), Arrays.asList("寺庙", "珠峰", "日喀则"), 15000 + 350);
+        createSpot("江孜宗山古堡", "རྒྱལ་རྩེ་རྫོང", "抗英遗址，英雄之城的地标。", "དམག་འཁྲུག་གི་གནས་ས་དང་དཔའ་བའི་གྲོང་གི་རྫོང་།", ScenicSpot.Category.HISTORICAL, "30", "28.9167", "89.6000", spotImage("古格王国遗址.jpeg"), Arrays.asList("古堡", "历史", "日喀则"), 15000 + 450);
+        createSpot("白居寺", "དཔལ་འཁོར་ཆོས་སྡེ", "塔中有寺，寺中有塔的奇观。", "མཆོད་རྟེན་ནང་དུ་དགོན་པ་དང་དགོན་པའི་ནང་དུ་མཆོད་རྟེན་གྱི་གནས་ས།", ScenicSpot.Category.CULTURAL, "45", "28.9167", "89.6000", spotImage("桑耶寺.jpg"), Arrays.asList("寺庙", "佛塔", "日喀则"), 15000 + 400);
+        createSpot("绒布寺", "རོང་བུ་དགོན་པ", "世界海拔最高的寺庙。", "འཛམ་གླིང་གི་མཐོ་ཚད་ཆེས་མཐོ་བའི་དགོན་པ།", ScenicSpot.Category.CULTURAL, "35", "28.2000", "86.8333", spotImage("珠穆朗玛峰.jpg"), Arrays.asList("寺庙", "珠峰", "日喀则"), 15000 + 350);
 
-        createSpot("盐井古盐田", "ཚྭ་ཁྲོན་ཚྭ་ཞིང", "千年盐田，茶马古道上的活化石。", "ལོ་སྟོང་གི་ཚྭ་ཞིང་། ཇ་ལམ་གྱི་གསོན་པོའི་གནས་ས།", ScenicSpot.Category.HISTORICAL, "50", "29.0500", "98.6000", spotImage("盐井古盐田.jpg"), Arrays.asList("盐田", "历史", "昌都"), 15000 + 300);
-        createSpot("孜珠寺", "རྩི་འབྲུ་དགོན་པ", "悬崖上的苯教圣地，海拔4800米。", "གཡང་གཞུང་གི་བོན་པོའི་གནས་ས། མཐོ་ཚད་4800 མི་ཡིན།", ScenicSpot.Category.CULTURAL, "30", "31.0833", "96.7000", spotImage("孜珠寺.jpg"), Arrays.asList("寺庙", "苯教", "昌都"), 15000 + 250);
-        createSpot("强巴林寺", "བྱམས་པ་གླིང་དགོན་པ", "昌都最大的格鲁派寺院。", "ཆབ་མདོའི་དགོན་པ་ཆེན་པོ་དང་དགེ་ལུགས་པའི་དགོན་པ།", ScenicSpot.Category.CULTURAL, "0", "31.1500", "97.1833", spotImage("强巴林寺.jpg"), Arrays.asList("寺庙", "佛教", "昌都"), 15000 + 200);
+        createSpot("盐井古盐田", "ཚྭ་ཁྲོན་ཚྭ་ཞིང", "千年盐田，茶马古道上的活化石。", "ལོ་སྟོང་གི་ཚྭ་ཞིང་། ཇ་ལམ་གྱི་གསོན་པོའི་གནས་ས།", ScenicSpot.Category.HISTORICAL, "50", "29.0500", "98.6000", spotImage("扎达土林.png"), Arrays.asList("盐田", "历史", "昌都"), 15000 + 300);
+        createSpot("孜珠寺", "རྩི་འབྲུ་དགོན་པ", "悬崖上的苯教圣地，海拔4800米。", "གཡང་གཞུང་གི་བོན་པོའི་གནས་ས། མཐོ་ཚད་4800 མི་ཡིན།", ScenicSpot.Category.CULTURAL, "30", "31.0833", "96.7000", spotImage("甘丹寺.jpg"), Arrays.asList("寺庙", "苯教", "昌都"), 15000 + 250);
+        createSpot("强巴林寺", "བྱམས་པ་གླིང་དགོན་པ", "昌都最大的格鲁派寺院。", "ཆབ་མདོའི་དགོན་པ་ཆེན་པོ་དང་དགེ་ལུགས་པའི་དགོན་པ།", ScenicSpot.Category.CULTURAL, "0", "31.1500", "97.1833", spotImage("大昭寺.jpg"), Arrays.asList("寺庙", "佛教", "昌都"), 15000 + 200);
 
-        createSpot("勒布沟", "ལེབ་བུ་ལུང་པ", "山南的亚热带秘境，门巴族故乡。", "ལྷོ་ཁའི་ཚ་བའི་གནས་ས་དང་མོན་པའི་གནས་ས།", ScenicSpot.Category.NATURAL, "0", "27.8500", "91.8333", spotImage("勒布沟.jpg"), Arrays.asList("峡谷", "森林", "山南"), 15000 + 200);
-        createSpot("40冰川", "40 གངས་རི", "中不边境的蓝冰世界。", "རྒྱ་དང་འབྲུག་གི་གངས་རི། སྔོན་པོའི་གངས་རི།", ScenicSpot.Category.NATURAL, "0", "28.0000", "89.9500", spotImage("40冰川.jpg"), Arrays.asList("冰川", "自然", "山南"), 15000 + 150);
+        createSpot("勒布沟", "ལེབ་བུ་ལུང་པ", "山南的亚热带秘境，门巴族故乡。", "ལྷོ་ཁའི་ཚ་བའི་གནས་ས་དང་མོན་པའི་གནས་ས།", ScenicSpot.Category.NATURAL, "0", "27.8500", "91.8333", spotImage("鲁朗林海.jpg"), Arrays.asList("峡谷", "森林", "山南"), 15000 + 200);
+        createSpot("40冰川", "40 གངས་རི", "中不边境的蓝冰世界。", "རྒྱ་དང་འབྲུག་གི་གངས་རི། སྔོན་པོའི་གངས་རི།", ScenicSpot.Category.NATURAL, "0", "28.0000", "89.9500", spotImage("卡若拉冰川.jpg"), Arrays.asList("冰川", "自然", "山南"), 15000 + 150);
 
-        createSpot("狮泉河镇", "སེང་གཅུག་ཁ", "阿里地区的中心城镇。", "མངའ་རིས་ས་ཁུལ་གྱི་གྲོང་གཙོ།", ScenicSpot.Category.CULTURAL, "0", "32.5000", "80.1000", spotImage("狮泉河镇.jpg"), Arrays.asList("城镇", "阿里", "边境"), 15000 + 150);
-        createSpot("托林寺", "མཐོ་གླིང་དགོན་པ", "阿里古格王朝的皇家寺院。", "མངའ་རིས་གུ་གེའི་རྒྱལ་དགོན།", ScenicSpot.Category.HISTORICAL, "45", "31.1333", "79.9167", spotImage("托林寺.jpg"), Arrays.asList("寺庙", "历史", "阿里"), 15000 + 100);
+        createSpot("狮泉河镇", "སེང་གཅུག་ཁ", "阿里地区的中心城镇。", "མངའ་རིས་ས་ཁུལ་གྱི་གྲོང་གཙོ།", ScenicSpot.Category.CULTURAL, "0", "32.5000", "80.1000", spotImage("扎达土林.png"), Arrays.asList("城镇", "阿里", "边境"), 15000 + 150);
+        createSpot("托林寺", "མཐོ་གླིང་དགོན་པ", "阿里古格王朝的皇家寺院。", "མངའ་རིས་གུ་གེའི་རྒྱལ་དགོན།", ScenicSpot.Category.HISTORICAL, "45", "31.1333", "79.9167", spotImage("萨迦寺.jpg"), Arrays.asList("寺庙", "历史", "阿里"), 15000 + 100);
 
-        createSpot("波密桃花沟", "སྤོ་མེས་ཤིང་ཏོག་ལུང་པ", "中国最长的桃花沟。", "རྒྱ་ནག་གི་ཤིང་ཏོག་ལུང་པ་ཆེས་རིང་བ།", ScenicSpot.Category.NATURAL, "0", "29.8667", "95.7667", spotImage("波密桃花沟.jpg"), Arrays.asList("桃花", "自然", "林芝"), 15000 + 250);
-        createSpot("希夏邦马峰", "ཞི་ཞ་སྤང་མ", "唯一完全在中国境内的8000米级山峰。", "རྒྱ་ནག་གི་ནང་དུ་ཆ་ཚང་དུ་གནས་པའི་8000 མི་ཡིན་པའི་རི་གནོན་པོ།", ScenicSpot.Category.NATURAL, "0", "28.3500", "85.7833", spotImage("希夏邦马峰.jpg"), Arrays.asList("雪山", "自然", "日喀则"), 15000 + 150);
+        createSpot("波密桃花沟", "སྤོ་མེས་ཤིང་ཏོག་ལུང་པ", "中国最长的桃花沟。", "རྒྱ་ནག་གི་ཤིང་ཏོག་ལུང་པ་ཆེས་རིང་བ།", ScenicSpot.Category.NATURAL, "0", "29.8667", "95.7667", spotImage("鲁朗林海.jpg"), Arrays.asList("桃花", "自然", "林芝"), 15000 + 250);
+        createSpot("希夏邦马峰", "ཞི་ཞ་སྤང་མ", "唯一完全在中国境内的8000米级山峰。", "རྒྱ་ནག་གི་ནང་དུ་ཆ་ཚང་དུ་གནས་པའི་8000 མི་ཡིན་པའི་རི་གནོན་པོ།", ScenicSpot.Category.NATURAL, "0", "28.3500", "85.7833", spotImage("南迦巴瓦峰.jpg"), Arrays.asList("雪山", "自然", "日喀则"), 15000 + 150);
 
-        createSpot("易贡国家地质公园", "ཡིད་འོང་ས་རི་སྤྱི་གླིང", "世界最大规模的山体崩塌遗迹。", "འཛམ་གླིང་གི་ས་རི་ལྷུང་བའི་གནས་ས་ཆེས་ཆེ་བ།", ScenicSpot.Category.NATURAL, "40", "30.2667", "94.8167", spotImage("易贡国家地质公园.jpg"), Arrays.asList("地质", "自然", "林芝"), 15000 + 100);
-        createSpot("比如骷髅墙", "འབྲི་རུ་ཐོད་པའི་རྩིག་པ", "藏北神秘的天葬台文化景观。", "བྱང་ཐང་གི་གསང་བའི་དུར་ཁྲོད་ཀྱི་རིག་གནས།", ScenicSpot.Category.CULTURAL, "50", "31.4833", "93.5667", spotImage("比如骷髅墙.jpg"), Arrays.asList("天葬", "神秘", "那曲"), 15000 + 50);
+        createSpot("易贡国家地质公园", "ཡིད་འོང་ས་རི་སྤྱི་གླིང", "世界最大规模的山体崩塌遗迹。", "འཛམ་གླིང་གི་ས་རི་ལྷུང་བའི་གནས་ས་ཆེས་ཆེ་བ།", ScenicSpot.Category.NATURAL, "40", "30.2667", "94.8167", spotImage("雅鲁藏布江大峡谷.jpg"), Arrays.asList("地质", "自然", "林芝"), 15000 + 100);
+        createSpot("比如骷髅墙", "འབྲི་རུ་ཐོད་པའི་རྩིག་པ", "藏北神秘的天葬台文化景观。", "བྱང་ཐང་གི་གསང་བའི་དུར་ཁྲོད་ཀྱི་རིག་གནས།", ScenicSpot.Category.CULTURAL, "50", "31.4833", "93.5667", spotImage("古格王国遗址.jpeg"), Arrays.asList("天葬", "神秘", "那曲"), 15000 + 50);
     }
 
     private void createSpot(String name, String desc, ScenicSpot.Category category, String price, String lat, String lng, String imgUrl, List<String> tags, int visitCount) {
@@ -620,7 +695,7 @@ public class DataSeeder implements CommandLineRunner {
                 "羌姆（金刚法舞）起源于公元8世纪，由莲花生大师在建造桑耶寺时首次引入。当时为降服阻碍建寺的妖魔，莲花生大师跳起了象征降魔的金刚法舞。此后，羌姆成为藏传佛教各教派寺院法会中的重要仪式。表演时，僧侣头戴造型夸张的立体面具，身着锦缎法衣，按照严格的仪轨，合着法号、铙钹的节奏跳出规定动作，以舞蹈语言传达密宗教义。",
                 "羌姆是宗教、舞蹈、音乐、面具艺术的综合体，是藏传佛教密宗修行的艺术化体现。它将深奥的佛教哲理转化为可视可感的舞蹈语言，让普通信众也能直观地感受佛法的力量。2006年作为「日喀则扎什伦布寺羌姆」被列入第一批国家级非物质文化遗产扩展项目名录。");
 
-        System.out.println("已播种 " + heritageRepository.count() + " 项非遗文化数据");
+        logger.info("已播种 {} 项非遗文化数据", heritageRepository.count());
     }
 
     private void createHeritage(String name, String desc, String category, String imgUrl,
@@ -637,7 +712,7 @@ public class DataSeeder implements CommandLineRunner {
     }
 
     private void seedHistory() {
-        System.out.println("开始生成用户访问历史数据（目标：1000+条记录）...");
+        logger.info("开始生成用户访问历史数据（目标：1000+条记录）...");
         List<ScenicSpot> spots = spotRepository.findAll();
         if (spots.isEmpty()) return;
 
@@ -649,11 +724,11 @@ public class DataSeeder implements CommandLineRunner {
         int targetTotal = 1200;
         int toGenerate = targetTotal - (int) existingCount;
         if (toGenerate <= 0) {
-            System.out.println("历史记录已足够: " + existingCount + " 条");
+            logger.info("历史记录已足够: {} 条", existingCount);
             return;
         }
 
-        System.out.println("当前历史记录: " + existingCount + " 条，需生成: " + toGenerate + " 条");
+        logger.info("当前历史记录: {} 条，需生成: {} 条", existingCount, toGenerate);
 
         Random rand = new Random(42);
         LocalDateTime now = LocalDateTime.now();
@@ -688,27 +763,16 @@ public class DataSeeder implements CommandLineRunner {
             double r = rand.nextDouble();
             if ("拉萨".equals(city) || "日喀则".equals(city) || "山南".equals(city)) {
                 // 本地用户：偏好中等和冷门景点（短途可达）
-                spotIdx = r < 0.15 ? rand.nextInt(hotCount)
-                        : r < 0.6 ? rand.nextInt(midCount - hotCount) + hotCount
-                        : rand.nextInt(spots.size() - midCount) + midCount;
+                spotIdx = pickWeightedSpotIndex(rand, hotCount, midCount, spots.size(), r, 0.15, 0.6);
             } else if ("那曲".equals(city) || "林芝".equals(city) || "昌都".equals(city) || "阿里".equals(city)) {
                 // 藏区用户：均衡分布
-                spotIdx = r < 0.3 ? rand.nextInt(hotCount)
-                        : r < 0.6 ? rand.nextInt(midCount - hotCount) + hotCount
-                        : rand.nextInt(spots.size() - midCount) + midCount;
+                spotIdx = pickWeightedSpotIndex(rand, hotCount, midCount, spots.size(), r, 0.3, 0.6);
             } else {
                 // 内地用户：偏好热门景点
-                spotIdx = r < 0.55 ? rand.nextInt(hotCount)
-                        : r < 0.85 ? rand.nextInt(midCount - hotCount) + hotCount
-                        : rand.nextInt(spots.size() - midCount) + midCount;
+                spotIdx = pickWeightedSpotIndex(rand, hotCount, midCount, spots.size(), r, 0.55, 0.85);
             }
 
             ScenicSpot spot = spots.get(Math.min(spotIdx, spots.size() - 1));
-
-            // 检查是否已有该用户对该景点的记录
-            boolean exists = historyRepository.findByUserId(user.getId()).stream()
-                    .anyMatch(h -> h.getSpot() != null && h.getSpot().getId().equals(spot.getId()));
-            if (exists) continue;
 
             // 评分分布：4-5分60%，3分25%，1-2分15%
             double ratingRoll = rand.nextDouble();
@@ -752,14 +816,31 @@ public class DataSeeder implements CommandLineRunner {
                 historyRepository.saveAll(batch);
                 batch.clear();
                 if (generated % 400 == 0) {
-                    System.out.println("  已生成 " + generated + " 条记录...");
+                    logger.info("  已生成 {} 条记录...", generated);
                 }
             }
         }
         if (!batch.isEmpty()) {
             historyRepository.saveAll(batch);
         }
-        System.out.println("用户访问历史数据生成完成，总计: " + historyRepository.count() + " 条");
+        logger.info("用户访问历史数据生成完成，总计: {} 条", historyRepository.count());
+    }
+
+    private int pickWeightedSpotIndex(Random rand, int hotCount, int midCount, int totalCount,
+                                      double roll, double hotCutoff, double midCutoff) {
+        if (totalCount <= 1 || hotCount == 0) {
+            return 0;
+        }
+        if (roll < hotCutoff) {
+            return rand.nextInt(hotCount);
+        }
+        if (roll < midCutoff && midCount > hotCount) {
+            return rand.nextInt(midCount - hotCount) + hotCount;
+        }
+        if (totalCount > midCount) {
+            return rand.nextInt(totalCount - midCount) + midCount;
+        }
+        return rand.nextInt(totalCount);
     }
 
     private void createHistory(User user, ScenicSpot spot, Integer rating, Integer clickCount, Integer dwellSeconds) {
@@ -870,11 +951,18 @@ public class DataSeeder implements CommandLineRunner {
 
     private User getOrCreateOfficialRouteAuthor() {
         return userRepository.findByUsername("official")
+                .map(existing -> {
+                    if (existing.getRole() != User.Role.USER) {
+                        existing.setRole(User.Role.USER);
+                        return userRepository.save(existing);
+                    }
+                    return existing;
+                })
                 .orElseGet(() -> {
                     User official = new User();
                     official.setUsername("official");
                     official.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));
-                    official.setRole(User.Role.ADMIN);
+                    official.setRole(User.Role.USER);
                     official.setNickname("七彩西藏官方");
                     return userRepository.save(official);
                 });

@@ -12,7 +12,8 @@ public class ChangePasswordRequest {
 
     @NotBlank(message = "新密码不能为空")
     @Size(min = 8, max = 72, message = "新密码长度需为8到72个字符")
-    @Pattern(regexp = "^(?=.*[A-Za-z])(?=.*\\d).+$", message = "新密码至少需要包含字母和数字")
+    @Pattern(regexp = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[^A-Za-z0-9]).+$",
+            message = "新密码需包含大小写字母、数字和特殊字符")
     private String newPassword;
 
     public String getOldPassword() {

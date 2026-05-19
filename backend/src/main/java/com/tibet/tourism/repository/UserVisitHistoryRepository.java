@@ -12,4 +12,5 @@ public interface UserVisitHistoryRepository extends JpaRepository<UserVisitHisto
 
     // 根据用户ID删除访问历史
     void deleteByUserId(Long userId);
+    void deleteBySpotId(Long spotId);
 }
