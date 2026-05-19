@@ -7,7 +7,10 @@ import com.tibet.tourism.entity.User;
 import com.tibet.tourism.repository.BookingRepository;
 import com.tibet.tourism.repository.ScenicSpotRepository;
 import com.tibet.tourism.repository.UserRepository;
+import com.tibet.tourism.security.antibot.RiskAssessmentService;
+import com.tibet.tourism.security.antibot.RiskResult;
 import com.tibet.tourism.service.OrderCenterService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -39,11 +42,28 @@ public class BookingController {
     @Autowired
     OrderCenterService orderCenterService;
 
+    @Autowired
+    RiskAssessmentService riskAssessmentService;
+
     @PostMapping
-    public ResponseEntity<?> createBooking(@Valid @RequestBody BookingRequest payload) {
+    public ResponseEntity<?> createBooking(
+            @Valid @RequestBody BookingRequest payload,
+            @RequestHeader(value = "X-Recaptcha-Token", required = false) String recaptchaToken,
+            @RequestHeader(value = "X-Device-Fingerprint", required = false) String fingerprint,
+            @RequestHeader(value = "X-Behavior-Data", required = false) String behaviorData,
+            HttpServletRequest request) {
         User user = getCurrentUser();
         if (user == null) {
             return ResponseEntity.status(401).body("User not authenticated");
+        }
+
+        RiskResult risk = riskAssessmentService.assess(
+                recaptchaToken, fingerprint, user.getId(), behaviorData,
+                request.getRemoteAddr(), "/api/bookings");
+        if (risk.decision() != RiskResult.Decision.ALLOW) {
+            return ResponseEntity.status(403).body(Map.of(
+                    "error", risk.decision() == RiskResult.Decision.BLOCK ? "请求被安全系统拦截" : "请完成安全验证",
+                    "code", "ANTIBOT_" + risk.decision().name()));
         }
 
         ScenicSpot spot = scenicSpotRepository.findById(payload.getSpotId()).orElse(null);

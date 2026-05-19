@@ -197,6 +197,13 @@
       </motion.div>
     </motion.section>
   </div>
+
+  <PaymentModal
+    :show="showPaymentModal"
+    :amount="totalPrice"
+    @close="showPaymentModal = false"
+    @paid="handlePaymentConfirmed"
+  />
 </template>
 
 <script setup lang="ts">
@@ -208,6 +215,9 @@ import { getHotelById, getRoomById, hotels } from '../data/hotels'
 import { applyHotelImageFallback, resolveHotelCoverImage } from '../data/hotelImages'
 import { getCanonicalRegion, localizeApiRoom, localizeHotel } from '../data/hotelTranslations'
 import api, { endpoints } from '../api'
+import PaymentModal from '../components/PaymentModal.vue'
+import { useBehaviorTracker } from '../composables/useBehaviorTracker'
+import { getRecaptchaToken } from '../utils/recaptcha'
 import {
   cardInitial,
   cardInView,
@@ -215,6 +225,8 @@ import {
   motionEase,
   revealTransition
 } from '../motion/presets'
+
+const { encodeBehaviorData, reset: resetBehavior } = useBehaviorTracker()
 
 const { t, locale } = useI18n()
 const route = useRoute()
@@ -326,7 +338,9 @@ const totalPrice = computed(() => {
 const submitting = ref(false)
 const submitError = ref('')
 
-const submitBooking = async () => {
+const showPaymentModal = ref(false)
+
+const submitBooking = () => {
   submitError.value = ''
   if (!form.value.checkInDate || !form.value.checkOutDate) {
     submitError.value = t('hotel.checkInRequired')
@@ -340,8 +354,14 @@ const submitBooking = async () => {
     submitError.value = t('hotel.phoneRequired')
     return
   }
+  showPaymentModal.value = true
+}
 
+const handlePaymentConfirmed = async () => {
+  showPaymentModal.value = false
   submitting.value = true
+  const recaptchaToken = await getRecaptchaToken('hotel_booking')
+  const behaviorData = encodeBehaviorData()
   try {
     await api.post(endpoints.hotelBookings.create, {
       hotelId: hotelId.value,
@@ -355,6 +375,11 @@ const submitBooking = async () => {
       guestName: form.value.guestName,
       phone: form.value.phone,
       note: form.value.note,
+    }, {
+      headers: {
+        ...(recaptchaToken ? { 'X-Recaptcha-Token': recaptchaToken } : {}),
+        ...(behaviorData ? { 'X-Behavior-Data': behaviorData } : {}),
+      }
     })
   } catch (error: any) {
     if (error.response) {
@@ -386,6 +411,7 @@ const submitBooking = async () => {
     localStorage.setItem('hotel-orders', JSON.stringify([order, ...existing]))
   } finally {
     submitting.value = false
+    resetBehavior()
   }
 
   window.dispatchEvent(new CustomEvent('hotel-orders-updated'))

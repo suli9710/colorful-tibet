@@ -154,9 +154,10 @@ public class WebSecurityConfig {
         http.headers(headers -> headers
                 .contentSecurityPolicy(csp -> csp.policyDirectives(
                         "default-src 'self'; " +
-                        "script-src 'self'; " +
+                        "script-src 'self' https://www.recaptcha.net https://www.gstatic.com https://www.gstatic.cn; " +
                         "style-src 'self'; " +
                         "img-src 'self' data: blob:; " +
+                        "frame-src 'self' https://www.recaptcha.net; " +
                         "object-src 'none'; " +
                         "base-uri 'self'; " +
                         "frame-ancestors 'self'"))

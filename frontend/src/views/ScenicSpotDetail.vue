@@ -333,6 +333,13 @@
       </div>
     </div>
   </div>
+
+  <PaymentModal
+    :show="showPaymentModal"
+    :amount="totalPrice"
+    @close="showPaymentModal = false"
+    @paid="handlePaymentConfirmed"
+  />
 </template>
 
 <script setup lang="ts">
@@ -342,9 +349,14 @@ import { useI18n } from 'vue-i18n'
 import { motion } from 'motion-v'
 import { motionEase, revealInitial, revealInView, inViewOnce } from '../motion/presets'
 import api, { endpoints } from '../api'
+import PaymentModal from '../components/PaymentModal.vue'
+import { useBehaviorTracker } from '../composables/useBehaviorTracker'
+import { getRecaptchaToken } from '../utils/recaptcha'
 import type * as Leaflet from 'leaflet'
 
 const { t, locale } = useI18n()
+
+const { encodeBehaviorData, reset: resetBehavior } = useBehaviorTracker()
 
 const route = useRoute()
 const router = useRouter()
@@ -587,21 +599,37 @@ onBeforeUnmount(() => {
   clearCommentImagePreview()
 })
 
-const handleBooking = async () => {
+const showPaymentModal = ref(false)
+
+const handleBooking = () => {
   const userStr = localStorage.getItem('user')
   if (!userStr) {
     router.push('/login')
     return
   }
+  if (!bookingForm.value.visitDate) {
+    alert(t('spotDetail.pleaseSelectDate'))
+    return
+  }
+  showPaymentModal.value = true
+}
 
-  const user = JSON.parse(userStr)
+const handlePaymentConfirmed = async () => {
+  showPaymentModal.value = false
   submitting.value = true
+  const recaptchaToken = await getRecaptchaToken('booking')
+  const behaviorData = encodeBehaviorData()
 
   try {
     await api.post('/bookings', {
       spotId: spot.value.id,
       visitDate: bookingForm.value.visitDate,
       ticketCount: bookingForm.value.ticketCount
+    }, {
+      headers: {
+        ...(recaptchaToken ? { 'X-Recaptcha-Token': recaptchaToken } : {}),
+        ...(behaviorData ? { 'X-Behavior-Data': behaviorData } : {}),
+      }
     })
     alert(t('spotDetail.bookingSuccess'))
     router.push('/profile')
@@ -610,6 +638,7 @@ const handleBooking = async () => {
     alert(t('spotDetail.bookingFailed'))
   } finally {
     submitting.value = false
+    resetBehavior()
   }
 }
 

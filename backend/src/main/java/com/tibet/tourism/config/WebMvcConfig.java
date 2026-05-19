@@ -42,7 +42,10 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         "Accept",
                         "X-XSRF-TOKEN",
                         "X-Requested-With",
-                        "Idempotency-Key")
+                        "Idempotency-Key",
+                        "X-Device-Fingerprint",
+                        "X-Recaptcha-Token",
+                        "X-Behavior-Data")
                 .allowCredentials(true)
                 .maxAge(3600);
     }

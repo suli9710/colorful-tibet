@@ -267,7 +267,16 @@
               </section>
 
               <section class="px-5 py-4">
-                <div class="grid gap-2 sm:grid-cols-3">
+                <div class="grid gap-2 sm:grid-cols-4">
+                  <button
+                    v-if="selectedOrder.status === 'PENDING_PAYMENT'"
+                    type="button"
+                    class="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100"
+                    @click="showPaymentForOrder(selectedOrder)"
+                  >
+                    <WalletCards class="h-4 w-4" />
+                    去支付
+                  </button>
                   <button
                     type="button"
                     class="inline-flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-40"
@@ -366,6 +375,13 @@
       </div>
     </main>
   </div>
+
+  <PaymentModal
+    :show="showPaymentModal"
+    :amount="paymentOrder?.payableAmount ?? undefined"
+    @close="showPaymentModal = false; paymentOrder = null"
+    @paid="handlePaymentConfirmed"
+  />
 </template>
 
 <script setup lang="ts">
@@ -388,6 +404,9 @@ import {
   WalletCards
 } from 'lucide-vue-next'
 import api, { endpoints } from '../api'
+import PaymentModal from '../components/PaymentModal.vue'
+import { useBehaviorTracker } from '../composables/useBehaviorTracker'
+import { getRecaptchaToken } from '../utils/recaptcha'
 import { useAuthStore } from '../stores/auth'
 
 interface OrderItem {
@@ -483,6 +502,8 @@ type ActionType = 'cancel' | 'refund' | 'invoice'
 const router = useRouter()
 const auth = useAuthStore()
 
+const { encodeBehaviorData, reset: resetBehavior } = useBehaviorTracker()
+
 const orders = ref<Order[]>([])
 const selectedOrderId = ref<number | null>(null)
 const selectedTab = ref('ALL')
@@ -491,6 +512,46 @@ const loading = ref(false)
 const errorMessage = ref('')
 const statusMessage = ref('')
 const activeAction = ref<ActionType | null>(null)
+
+// Payment modal state
+const showPaymentModal = ref(false)
+const paymentOrder = ref<Order | null>(null)
+
+const showPaymentForOrder = (order: Order) => {
+  paymentOrder.value = order
+  showPaymentModal.value = true
+}
+
+const handlePaymentConfirmed = async () => {
+  const order = paymentOrder.value
+  if (!order) return
+  showPaymentModal.value = false
+  const recaptchaToken = await getRecaptchaToken('payment')
+  const behaviorData = encodeBehaviorData()
+
+  try {
+    await api.post(endpoints.payments.mockCallback, {
+      orderNo: order.orderNo,
+      transactionNo: `MOCK-${Date.now()}`,
+      provider: 'WECHAT_PAY',
+      amount: order.payableAmount,
+      status: 'SUCCESS',
+      signature: 'mock-signature'
+    }, {
+      headers: {
+        ...(recaptchaToken ? { 'X-Recaptcha-Token': recaptchaToken } : {}),
+        ...(behaviorData ? { 'X-Behavior-Data': behaviorData } : {}),
+      }
+    })
+    statusMessage.value = '支付成功，订单已确认。'
+    await loadOrders(selectedOrderId.value || undefined)
+  } catch (error: any) {
+    actionError.value = error.response?.data?.error || '支付确认失败，请稍后重试'
+  } finally {
+    paymentOrder.value = null
+    resetBehavior()
+  }
+}
 const actionLoading = ref(false)
 const actionError = ref('')
 const actionReason = ref('')
