@@ -174,6 +174,19 @@ public class OrderCenterService {
     }
 
     @Transactional
+    public void deleteClosedOrder(User user, Long id) {
+        PlatformOrder order = orderRepository.findByIdAndUserId(id, user.getId())
+                .orElseThrow(() -> new NoSuchElementException("Order not found"));
+        expireIfNeeded(order);
+        if (!isClosedOrder(order)) {
+            throw new IllegalStateException("仅已关闭订单可以删除");
+        }
+
+        inventoryLockRepository.deleteAll(inventoryLockRepository.findByOrder(order));
+        orderRepository.delete(order);
+    }
+
+    @Transactional
     public OrderResponse handlePaymentCallback(PaymentCallbackRequest request) {
         PlatformOrder order = orderRepository.findByOrderNo(request.orderNo())
                 .orElseThrow(() -> new NoSuchElementException("Order not found"));
@@ -458,6 +471,12 @@ public class OrderCenterService {
                 .filter(item -> itemId.equals(item.getId()))
                 .findFirst()
                 .orElseThrow(() -> new NoSuchElementException("Order item not found"));
+    }
+
+    private boolean isClosedOrder(PlatformOrder order) {
+        return order.getStatus() == PlatformOrder.Status.CANCELLED
+                || order.getStatus() == PlatformOrder.Status.EXPIRED
+                || order.getStatus() == PlatformOrder.Status.REFUNDED;
     }
 
     private PlatformOrder confirmedLegacyOrder(User user, String idempotencyKey, String sourceType, Long sourceReferenceId) {

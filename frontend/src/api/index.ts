@@ -207,6 +207,7 @@ export const endpoints = {
     my: '/orders/my',
     detail: (id: number) => `/orders/${id}`,
     cancel: (id: number) => `/orders/${id}/cancel`,
+    delete: (id: number) => `/orders/${id}`,
     refunds: (id: number) => `/orders/${id}/refunds`,
     invoice: (id: number) => `/orders/${id}/invoice`
   },

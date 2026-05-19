@@ -114,6 +114,19 @@ public class OrderCenterController {
         }
     }
 
+    @DeleteMapping("/api/orders/{id}")
+    public ResponseEntity<?> deleteClosedOrder(@PathVariable Long id, HttpServletRequest httpRequest) {
+        User user = jwtAuthSupport.resolveCurrentUser(httpRequest);
+        try {
+            orderCenterService.deleteClosedOrder(user, id);
+            return ResponseEntity.noContent().build();
+        } catch (NoSuchElementException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "订单不存在"));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", e.getMessage()));
+        }
+    }
+
     @PostMapping("/api/payments/callbacks/mock")
     public ResponseEntity<?> paymentCallback(
             @Valid @RequestBody PaymentCallbackRequest request,

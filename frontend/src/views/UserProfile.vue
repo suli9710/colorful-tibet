@@ -162,6 +162,18 @@ const cancelHotelBooking = async (id: number) => {
   }
 }
 
+const deleteHotelBooking = async (id: number) => {
+  if (!confirm(t('profile.confirmDeleteBooking'))) return
+
+  try {
+    await api.delete(endpoints.hotelBookings.delete(id))
+    hotelBookings.value = hotelBookings.value.filter(booking => booking.id !== id)
+  } catch (e: any) {
+    console.error(e)
+    alert(getApiErrorMessage(e, t('profile.deleteBookingFailed')))
+  }
+}
+
 const fetchMyComments = async () => {
   try {
     const response = await api.get('/auth/me/comments')
@@ -862,6 +874,15 @@ const getAvatarUrl = () => {
                   :whileTap="{ scale: 0.96 }"
                 >
                   {{ t('profile.cancelBooking') }}
+                </motion.button>
+                <motion.button
+                  v-else-if="booking.status === 'CANCELLED'"
+                  @click="deleteHotelBooking(booking.id)"
+                  class="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors"
+                  :whileHover="{ y: -1, scale: 1.02 }"
+                  :whileTap="{ scale: 0.96 }"
+                >
+                  {{ t('profile.deleteBooking') }}
                 </motion.button>
               </div>
             </motion.div>
