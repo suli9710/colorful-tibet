@@ -2,8 +2,9 @@ package com.tibet.tourism.service;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -19,8 +20,7 @@ public class AiQuotaService {
     private static final String QUOTA_KEY_PREFIX = "ai:quota:daily:";
     private static final String CACHE_KEY_PREFIX = "ai:cache:route:";
 
-    private final StringRedisTemplate redisTemplate;
-    private final boolean redisAvailable;
+    private final RedisTemplate<String, Object> redisTemplate;
 
     @Value("${app.security.ai-quota.daily-limit:${AI_DAILY_QUOTA_PER_USER:20}}")
     private int dailyLimit;
@@ -32,27 +32,21 @@ public class AiQuotaService {
     private final ConcurrentHashMap<String, CacheEntry> fallbackCache = new ConcurrentHashMap<>();
     private volatile String fallbackDateKey = "";
 
-    public AiQuotaService(StringRedisTemplate redisTemplate) {
-        this.redisTemplate = redisTemplate;
-        boolean available;
-        try {
-            redisTemplate.getConnectionFactory().getConnection().ping();
-            available = true;
-        } catch (Exception e) {
-            available = false;
-            log.warn("Redis unavailable for AI quota, using in-memory fallback");
-        }
-        this.redisAvailable = available;
+    public AiQuotaService(ObjectProvider<RedisTemplate<String, Object>> redisTemplateProvider) {
+        this.redisTemplate = redisTemplateProvider.getIfAvailable();
     }
 
     public boolean isQuotaExceeded(Long userId) {
+        if (userId == null) {
+            return false;
+        }
         String dateKey = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE);
         String key = QUOTA_KEY_PREFIX + dateKey + ":" + userId;
 
-        if (redisAvailable) {
+        if (redisTemplate != null) {
             try {
-                String val = redisTemplate.opsForValue().get(key);
-                int count = val == null ? 0 : Integer.parseInt(val);
+                Object val = redisTemplate.opsForValue().get(key);
+                int count = parseInt(val);
                 return count >= dailyLimit;
             } catch (Exception e) {
                 log.warn("Redis quota check failed, allowing request: {}", e.getMessage());
@@ -65,13 +59,16 @@ public class AiQuotaService {
     }
 
     public void incrementQuota(Long userId) {
+        if (userId == null) {
+            return;
+        }
         String dateKey = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE);
         String key = QUOTA_KEY_PREFIX + dateKey + ":" + userId;
 
-        if (redisAvailable) {
+        if (redisTemplate != null) {
             try {
                 Long count = redisTemplate.opsForValue().increment(key);
-                if (count != null && count == 1) {
+                if (count != null && count == 1L) {
                     redisTemplate.expire(key, Duration.ofHours(25));
                 }
                 return;
@@ -84,14 +81,17 @@ public class AiQuotaService {
     }
 
     public int getRemainingQuota(Long userId) {
+        if (userId == null) {
+            return dailyLimit;
+        }
         String dateKey = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE);
         String key = QUOTA_KEY_PREFIX + dateKey + ":" + userId;
 
         int used = 0;
-        if (redisAvailable) {
+        if (redisTemplate != null) {
             try {
-                String val = redisTemplate.opsForValue().get(key);
-                used = val == null ? 0 : Integer.parseInt(val);
+                Object val = redisTemplate.opsForValue().get(key);
+                used = parseInt(val);
             } catch (Exception e) {
                 return dailyLimit;
             }
@@ -104,9 +104,10 @@ public class AiQuotaService {
     }
 
     public String getCachedRoute(String cacheKey) {
-        if (redisAvailable) {
+        if (redisTemplate != null) {
             try {
-                return redisTemplate.opsForValue().get(CACHE_KEY_PREFIX + cacheKey);
+                Object val = redisTemplate.opsForValue().get(CACHE_KEY_PREFIX + cacheKey);
+                return val == null ? null : val.toString();
             } catch (Exception e) {
                 log.warn("Redis cache read failed: {}", e.getMessage());
             }
@@ -120,7 +121,7 @@ public class AiQuotaService {
     }
 
     public void cacheRoute(String cacheKey, String content) {
-        if (redisAvailable) {
+        if (redisTemplate != null) {
             try {
                 redisTemplate.opsForValue().set(
                         CACHE_KEY_PREFIX + cacheKey, content, Duration.ofSeconds(cacheTtlSeconds));
@@ -137,6 +138,20 @@ public class AiQuotaService {
 
     public String buildCacheKey(Long userId, int days, String budget, String preference, String locale) {
         return userId + ":" + days + ":" + normalize(budget) + ":" + normalize(preference) + ":" + normalize(locale);
+    }
+
+    private static int parseInt(Object val) {
+        if (val == null) {
+            return 0;
+        }
+        if (val instanceof Number n) {
+            return n.intValue();
+        }
+        try {
+            return Integer.parseInt(val.toString());
+        } catch (NumberFormatException e) {
+            return 0;
+        }
     }
 
     private String normalize(String val) {
