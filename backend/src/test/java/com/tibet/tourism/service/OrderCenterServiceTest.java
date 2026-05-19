@@ -127,6 +127,41 @@ class OrderCenterServiceTest {
         assertEquals("SUCCESS", response.paymentTransactions().get(0).status());
     }
 
+    @Test
+    void deleteClosedOrderRemovesOrderAndInventoryLocks() {
+        PlatformOrder order = new PlatformOrder();
+        order.setId(99L);
+        order.setUser(user);
+        order.setStatus(PlatformOrder.Status.EXPIRED);
+        InventoryLock lock = new InventoryLock();
+
+        when(orderRepository.findByIdAndUserId(99L, 1L)).thenReturn(Optional.of(order));
+        when(inventoryLockRepository.findByOrder(order)).thenReturn(List.of(lock));
+
+        orderCenterService.deleteClosedOrder(user, 99L);
+
+        verify(inventoryLockRepository).deleteAll(List.of(lock));
+        verify(orderRepository).delete(order);
+    }
+
+    @Test
+    void deleteClosedOrderRejectsOpenOrder() {
+        PlatformOrder order = new PlatformOrder();
+        order.setId(99L);
+        order.setUser(user);
+        order.setStatus(PlatformOrder.Status.PENDING_PAYMENT);
+
+        when(orderRepository.findByIdAndUserId(99L, 1L)).thenReturn(Optional.of(order));
+
+        IllegalStateException error = assertThrows(
+                IllegalStateException.class,
+                () -> orderCenterService.deleteClosedOrder(user, 99L));
+
+        assertEquals("仅已关闭订单可以删除", error.getMessage());
+        verify(inventoryLockRepository, never()).deleteAll(anyList());
+        verify(orderRepository, never()).delete(any());
+    }
+
     private CreateOrderRequest scenicOrderRequest() {
         CreateOrderItemRequest item = new CreateOrderItemRequest();
         item.setProductType("SCENIC_SPOT");

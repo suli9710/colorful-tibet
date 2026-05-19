@@ -145,13 +145,20 @@ public class HotelBookingService {
 
     @Transactional
     public void deleteBooking(User user, Long id) {
-        requireAdmin(user);
         HotelBooking booking = hotelBookingRepository.findById(id)
                 .orElseThrow(() -> new NoSuchElementException("Booking not found"));
         if (booking.getDeletedAt() != null) {
             throw new NoSuchElementException("Booking not found");
         }
-        if (booking.getStatus() != HotelBooking.Status.CANCELLED) {
+        boolean isAdmin = user.getRole() == User.Role.ADMIN;
+        boolean isOwner = booking.getUser() != null && booking.getUser().getId().equals(user.getId());
+        if (!isAdmin && !isOwner) {
+            throw new SecurityException("Unauthorized");
+        }
+        if (!isAdmin && booking.getStatus() != HotelBooking.Status.CANCELLED) {
+            throw new IllegalStateException("仅已取消酒店预订可以删除");
+        }
+        if (isAdmin && booking.getStatus() != HotelBooking.Status.CANCELLED) {
             transitionStatus(booking, HotelBooking.Status.CANCELLED);
         }
         booking.setDeletedAt(LocalDateTime.now());

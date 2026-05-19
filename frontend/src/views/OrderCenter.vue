@@ -30,7 +30,7 @@
           </router-link>
           <motion.button
             type="button"
-            @click="loadOrders(selectedOrderId || undefined)"
+            @click="loadOrders(selectedOrderId)"
             :disabled="loading"
             :whileHover="{ y: -1, scale: 1.01 }"
             :whileTap="{ scale: 0.98 }"
@@ -111,7 +111,11 @@
         </div>
       </div>
 
-      <div v-else class="grid gap-6 lg:grid-cols-[minmax(0,1.02fr)_minmax(360px,0.98fr)]">
+      <div
+        v-else
+        class="grid gap-6"
+        :class="selectedOrder ? 'lg:grid-cols-[minmax(0,1.02fr)_minmax(360px,0.98fr)]' : 'lg:grid-cols-1'"
+      >
         <section class="space-y-3">
           <motion.article
             v-for="(order, index) in filteredOrders"
@@ -142,6 +146,25 @@
                 <p class="mt-1 text-xs font-medium" :class="paymentMeta(order.paymentStatus).textClass">
                   {{ paymentMeta(order.paymentStatus).label }}
                 </p>
+                <div class="mt-3 flex items-center gap-2 sm:justify-end">
+                  <button
+                    type="button"
+                    class="inline-flex items-center gap-1.5 rounded-lg border border-tibet-gold/20 bg-white/80 px-2.5 py-1.5 text-xs font-semibold text-tibet-brown transition hover:bg-amber-50"
+                    @click.stop="selectOrder(order.id)"
+                  >
+                    查看详情
+                  </button>
+                  <button
+                    v-if="canDelete(order)"
+                    type="button"
+                    class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    :disabled="deletingOrderId === order.id"
+                    @click.stop="deleteClosedOrder(order)"
+                  >
+                    <Trash2 class="h-3.5 w-3.5" />
+                    {{ deletingOrderId === order.id ? '删除中' : '删除' }}
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -166,17 +189,27 @@
           </div>
         </section>
 
-        <aside class="lg:sticky lg:top-28">
-          <section v-if="selectedOrder" class="overflow-hidden rounded-3xl border border-white/65 bg-white/82 shadow-lg shadow-slate-900/5">
+        <aside v-if="selectedOrder" class="lg:sticky lg:top-28">
+          <section class="overflow-hidden rounded-3xl border border-white/65 bg-white/82 shadow-lg shadow-slate-900/5">
             <div class="border-b border-tibet-gold/10 bg-white/55 px-5 py-4">
               <div class="flex items-start justify-between gap-3">
                 <div class="min-w-0">
                   <p class="text-xs font-semibold text-tibet-brown/45">{{ selectedOrder.orderNo }}</p>
                   <h2 class="mt-1 text-xl font-bold text-tibet-dark">{{ selectedOrder.productSummary || '旅行订单' }}</h2>
                 </div>
-                <span class="shrink-0 rounded-full border px-3 py-1 text-xs font-semibold" :class="statusMeta(selectedOrder.status).className">
-                  {{ statusMeta(selectedOrder.status).label }}
-                </span>
+                <div class="flex shrink-0 items-center gap-2">
+                  <span class="rounded-full border px-3 py-1 text-xs font-semibold" :class="statusMeta(selectedOrder.status).className">
+                    {{ statusMeta(selectedOrder.status).label }}
+                  </span>
+                  <button
+                    type="button"
+                    class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-tibet-gold/20 bg-white/80 text-tibet-brown transition hover:bg-amber-50"
+                    aria-label="关闭订单详情"
+                    @click="closeOrderDetail"
+                  >
+                    <X class="h-4 w-4" />
+                  </button>
+                </div>
               </div>
 
               <div class="mt-4 grid gap-3 sm:grid-cols-3">
@@ -267,7 +300,7 @@
               </section>
 
               <section class="px-5 py-4">
-                <div class="grid gap-2 sm:grid-cols-4">
+                <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                   <button
                     v-if="selectedOrder.status === 'PENDING_PAYMENT'"
                     type="button"
@@ -306,6 +339,16 @@
                   >
                     <FileText class="h-4 w-4" />
                     开票
+                  </button>
+                  <button
+                    v-if="canDelete(selectedOrder)"
+                    type="button"
+                    class="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    :disabled="deletingOrderId === selectedOrder.id"
+                    @click="deleteClosedOrder(selectedOrder)"
+                  >
+                    <Trash2 class="h-4 w-4" />
+                    {{ deletingOrderId === selectedOrder.id ? '删除中' : '删除' }}
                   </button>
                 </div>
 
@@ -366,11 +409,6 @@
               </section>
             </div>
           </section>
-
-          <section v-else class="rounded-3xl border border-white/65 bg-white/75 p-8 text-center text-tibet-brown/60">
-            <WalletCards class="mx-auto mb-3 h-10 w-10 text-tibet-gold" />
-            <p class="text-sm font-semibold">选择左侧订单查看详情。</p>
-          </section>
         </aside>
       </div>
     </main>
@@ -401,6 +439,8 @@ import {
   Search,
   Sparkles,
   TicketCheck,
+  Trash2,
+  X,
   WalletCards
 } from 'lucide-vue-next'
 import api, { endpoints } from '../api'
@@ -512,6 +552,7 @@ const loading = ref(false)
 const errorMessage = ref('')
 const statusMessage = ref('')
 const activeAction = ref<ActionType | null>(null)
+const deletingOrderId = ref<number | null>(null)
 
 // Payment modal state
 const showPaymentModal = ref(false)
@@ -583,7 +624,7 @@ const statusMeta = (status?: string) =>
 const paymentMeta = (status?: string) =>
   paymentLabels[status || ''] || { label: status || '未知支付', textClass: 'text-tibet-brown/65' }
 
-const selectedOrder = computed(() => orders.value.find(order => order.id === selectedOrderId.value) || null)
+const selectedOrder = computed(() => filteredOrders.value.find(order => order.id === selectedOrderId.value) || null)
 
 const statusBucket = (order: Order) => {
   if (['CANCELLED', 'EXPIRED', 'REFUNDED'].includes(order.status)) return 'CLOSED'
@@ -639,16 +680,19 @@ const actionSubmitLabel = computed(() => {
   return '申请开票'
 })
 
-const loadOrders = async (preferredId?: number) => {
+const loadOrders = async (preferredId?: number | null) => {
   loading.value = true
   errorMessage.value = ''
   try {
     const { data } = await api.get(endpoints.orders.my, { params: { _ts: Date.now() } })
     orders.value = Array.isArray(data) ? data : []
-    const nextId = preferredId || selectedOrderId.value
+    const nextId = preferredId ?? selectedOrderId.value
     selectedOrderId.value = orders.value.some(order => order.id === nextId)
       ? nextId
-      : (orders.value[0]?.id || null)
+      : null
+    if (!selectedOrderId.value) {
+      resetActionForm()
+    }
   } catch (error: any) {
     console.error('Failed to load orders:', error)
     errorMessage.value = error.response?.data?.error || '订单加载失败'
@@ -659,6 +703,11 @@ const loadOrders = async (preferredId?: number) => {
 
 const selectOrder = (id: number) => {
   selectedOrderId.value = id
+  resetActionForm()
+}
+
+const closeOrderDetail = () => {
+  selectedOrderId.value = null
   resetActionForm()
 }
 
@@ -729,6 +778,32 @@ const canRefund = (order: Order) =>
 
 const canInvoice = (order: Order) =>
   order.paymentStatus !== 'UNPAID' && !['CANCELLED', 'EXPIRED'].includes(order.status)
+
+const canDelete = (order: Order) =>
+  ['CANCELLED', 'EXPIRED', 'REFUNDED'].includes(order.status)
+
+const deleteClosedOrder = async (order: Order) => {
+  if (!canDelete(order) || deletingOrderId.value) return
+  const confirmed = window.confirm(`确定删除订单 ${order.orderNo}？删除后列表中将不再显示。`)
+  if (!confirmed) return
+
+  deletingOrderId.value = order.id
+  errorMessage.value = ''
+  statusMessage.value = ''
+  try {
+    await api.delete(endpoints.orders.delete(order.id))
+    orders.value = orders.value.filter(item => item.id !== order.id)
+    if (selectedOrderId.value === order.id) {
+      closeOrderDetail()
+    }
+    statusMessage.value = '已删除关闭订单。'
+  } catch (error: any) {
+    console.error('Failed to delete order:', error)
+    errorMessage.value = error.response?.data?.error || '订单删除失败，请稍后重试'
+  } finally {
+    deletingOrderId.value = null
+  }
+}
 
 const formatCurrency = (value?: number | string | null, currency?: string | null) => {
   const amount = Number(value ?? 0)

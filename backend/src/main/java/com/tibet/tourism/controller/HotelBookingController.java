@@ -176,6 +176,8 @@ public class HotelBookingController {
             return ResponseEntity.noContent().build();
         } catch (SecurityException e) {
             return ResponseEntity.status(403).body(Map.of("error", "无权操作该资源"));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(409).body(Map.of("error", e.getMessage()));
         } catch (NoSuchElementException e) {
             return ResponseEntity.status(404).body(Map.of("error", "酒店预订资源不存在"));
         }
