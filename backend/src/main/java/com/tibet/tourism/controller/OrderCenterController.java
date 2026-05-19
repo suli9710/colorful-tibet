@@ -3,6 +3,8 @@ package com.tibet.tourism.controller;
 import com.tibet.tourism.dto.order.*;
 import com.tibet.tourism.entity.User;
 import com.tibet.tourism.security.JwtAuthSupport;
+import com.tibet.tourism.security.antibot.RiskAssessmentService;
+import com.tibet.tourism.security.antibot.RiskResult;
 import com.tibet.tourism.service.OrderCenterService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -19,17 +21,34 @@ public class OrderCenterController {
 
     private final OrderCenterService orderCenterService;
     private final JwtAuthSupport jwtAuthSupport;
+    private final RiskAssessmentService riskAssessmentService;
 
-    public OrderCenterController(OrderCenterService orderCenterService, JwtAuthSupport jwtAuthSupport) {
+    public OrderCenterController(OrderCenterService orderCenterService,
+                                 JwtAuthSupport jwtAuthSupport,
+                                 RiskAssessmentService riskAssessmentService) {
         this.orderCenterService = orderCenterService;
         this.jwtAuthSupport = jwtAuthSupport;
+        this.riskAssessmentService = riskAssessmentService;
     }
 
     @PostMapping("/api/orders")
     public ResponseEntity<?> createOrder(@Valid @RequestBody CreateOrderRequest request,
                                          @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+                                         @RequestHeader(value = "X-Recaptcha-Token", required = false) String recaptchaToken,
+                                         @RequestHeader(value = "X-Device-Fingerprint", required = false) String fingerprint,
+                                         @RequestHeader(value = "X-Behavior-Data", required = false) String behaviorData,
                                          HttpServletRequest httpRequest) {
         User user = jwtAuthSupport.resolveCurrentUser(httpRequest);
+
+        RiskResult risk = riskAssessmentService.assess(
+                recaptchaToken, fingerprint, user.getId(), behaviorData,
+                httpRequest.getRemoteAddr(), "/api/orders");
+        if (risk.decision() != RiskResult.Decision.ALLOW) {
+            return ResponseEntity.status(403).body(Map.of(
+                    "error", risk.decision() == RiskResult.Decision.BLOCK ? "请求被安全系统拦截" : "请完成安全验证",
+                    "code", "ANTIBOT_" + risk.decision().name()));
+        }
+
         try {
             return ResponseEntity.status(HttpStatus.CREATED).body(orderCenterService.createOrder(user, request, idempotencyKey));
         } catch (NoSuchElementException e) {
@@ -96,7 +115,21 @@ public class OrderCenterController {
     }
 
     @PostMapping("/api/payments/callbacks/mock")
-    public ResponseEntity<?> paymentCallback(@Valid @RequestBody PaymentCallbackRequest request) {
+    public ResponseEntity<?> paymentCallback(
+            @Valid @RequestBody PaymentCallbackRequest request,
+            @RequestHeader(value = "X-Recaptcha-Token", required = false) String recaptchaToken,
+            @RequestHeader(value = "X-Device-Fingerprint", required = false) String fingerprint,
+            @RequestHeader(value = "X-Behavior-Data", required = false) String behaviorData,
+            HttpServletRequest httpRequest) {
+        RiskResult risk = riskAssessmentService.assess(
+                recaptchaToken, fingerprint, null, behaviorData,
+                httpRequest.getRemoteAddr(), "/api/payments/callbacks/mock");
+        if (risk.decision() == RiskResult.Decision.BLOCK) {
+            return ResponseEntity.status(403).body(Map.of(
+                    "error", "请求被安全系统拦截",
+                    "code", "ANTIBOT_BLOCK"));
+        }
+
         try {
             return ResponseEntity.ok(orderCenterService.handlePaymentCallback(request));
         } catch (SecurityException e) {

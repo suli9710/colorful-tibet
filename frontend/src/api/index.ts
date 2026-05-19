@@ -1,5 +1,6 @@
 import axios, { type AxiosResponse } from 'axios'
 import { clearStoredAuth } from '../stores/auth'
+import { getDeviceFingerprint } from '../utils/deviceFingerprint'
 
 const apiBaseURL = import.meta.env.VITE_API_BASE_URL || '/api'
 const DEFAULT_TIMEOUT_MS = 15000
@@ -103,7 +104,7 @@ api.get = ((url: string, config?: any) => {
   return request
 }) as typeof api.get
 
-api.interceptors.request.use(config => {
+api.interceptors.request.use(async config => {
   config.timeout = withSpecialTimeout(String(config.url || ''), config).timeout
   config.headers['Accept-Language'] = memoizedLocale
 
@@ -114,6 +115,12 @@ api.interceptors.request.use(config => {
   if (config.data instanceof FormData) {
     delete config.headers['Content-Type']
   }
+
+  try {
+    const fp = await getDeviceFingerprint()
+    if (fp) config.headers['X-Device-Fingerprint'] = fp
+  } catch { /* ignore */ }
+
   return config
 })
 

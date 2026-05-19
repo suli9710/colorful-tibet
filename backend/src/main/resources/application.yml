@@ -188,6 +188,30 @@ app:
       max-attempts: ${BRUTE_FORCE_MAX_ATTEMPTS:5}
       redis-enabled: ${BRUTE_FORCE_REDIS_ENABLED:true}
       exempt-usernames: ${BRUTE_FORCE_EXEMPT_USERNAMES:}
+    antibot:
+      enabled: ${ANTIBOT_ENABLED:false}
+      recaptcha:
+        enabled: ${RECAPTCHA_ENABLED:false}
+        site-key: ${RECAPTCHA_SITE_KEY:}
+        secret-key: ${RECAPTCHA_SECRET_KEY:}
+        min-score: ${RECAPTCHA_MIN_SCORE:0.5}
+        verify-url: ${RECAPTCHA_VERIFY_URL:https://www.recaptcha.net/recaptcha/api/siteverify}
+      fingerprint:
+        enabled: ${FINGERPRINT_ENABLED:false}
+        max-users-per-fingerprint: 5
+        max-fingerprints-per-user: 10
+        ttl-seconds: 86400
+      behavior:
+        enabled: ${BEHAVIOR_ENABLED:false}
+        max-straightness-ratio: 0.95
+        min-speed-std-dev: 0.5
+        min-interval-std-dev: 5.0
+      risk:
+        recaptcha-weight: 0.3
+        behavior-weight: 0.4
+        fingerprint-weight: 0.3
+        challenge-threshold: 60
+        block-threshold: 85
   super-admin-username: ${SUPER_ADMIN_USERNAME:lzh}
   seed:
     content:

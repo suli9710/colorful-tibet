@@ -748,6 +748,13 @@
       </div>
     </div>
   </div>
+
+  <PaymentModal
+    :show="showPaymentModal"
+    :amount="pendingPaymentItem?.estimatedCost"
+    @close="showPaymentModal = false; pendingPaymentItem = null"
+    @paid="handleItineraryPaymentConfirmed"
+  />
 </template>
 
 <script setup lang="ts">
@@ -778,6 +785,9 @@ import {
 import DOMPurify from 'dompurify'
 import { generateRouteStream } from '../api/stream'
 import api, { endpoints } from '../api'
+import PaymentModal from '../components/PaymentModal.vue'
+import { useBehaviorTracker } from '../composables/useBehaviorTracker'
+import { getRecaptchaToken } from '../utils/recaptcha'
 import { useAuthStore } from '../stores/auth'
 import { useRouteGenerationStore } from '../stores/routeGeneration'
 import {
@@ -795,6 +805,7 @@ const { t } = useI18n()
 const router = useRouter()
 const auth = useAuthStore()
 const generationStore = useRouteGenerationStore()
+const { encodeBehaviorData, reset: resetBehavior } = useBehaviorTracker()
 
 const routePlannerDraftStorageKey = 'colorful-tibet:route-planner:draft'
 const routePlannerDraftVersion = 1
@@ -1591,6 +1602,9 @@ const shareRoute = async () => {
   }
 }
 
+const showPaymentModal = ref(false)
+const pendingPaymentItem = ref<ItineraryItem | null>(null)
+
 const bookItineraryItem = async (item: ItineraryItem) => {
   if (!bookableItinerary.value || !isBookableItem(item)) return
 
@@ -1602,7 +1616,6 @@ const bookItineraryItem = async (item: ItineraryItem) => {
   }
 
   const user = auth.user || {}
-  const guestName = String(user.nickname || user.username || '')
   let phone = typeof user.phone === 'string' ? user.phone : ''
 
   if (item.bookingAction === 'BOOK_HOTEL' && !phone) {
@@ -1610,12 +1623,33 @@ const bookItineraryItem = async (item: ItineraryItem) => {
     if (!phone.trim()) return
   }
 
+  pendingPaymentItem.value = item
+  showPaymentModal.value = true
+}
+
+const handleItineraryPaymentConfirmed = async () => {
+  const item = pendingPaymentItem.value
+  if (!item || !bookableItinerary.value) return
+
+  showPaymentModal.value = false
+  const recaptchaToken = await getRecaptchaToken('itinerary_booking')
+  const behaviorData = encodeBehaviorData()
+
+  const user = auth.user || {}
+  const guestName = String(user.nickname || user.username || '')
+  let phone = typeof user.phone === 'string' ? user.phone : ''
+
   itineraryBookingItemId.value = item.id
   try {
     const { data } = await api.post(endpoints.itineraries.bookItem(bookableItinerary.value.id, item.id), {
       travelers: 2,
       guestName,
       phone
+    }, {
+      headers: {
+        ...(recaptchaToken ? { 'X-Recaptcha-Token': recaptchaToken } : {}),
+        ...(behaviorData ? { 'X-Behavior-Data': behaviorData } : {}),
+      }
     })
     statusMessage.value = `${data.message || '预订成功'}，可在订单中心查看。`
     errorMessage.value = ''
@@ -1627,6 +1661,8 @@ const bookItineraryItem = async (item: ItineraryItem) => {
     errorMessage.value = error.response?.data?.error || '预订失败'
   } finally {
     itineraryBookingItemId.value = null
+    pendingPaymentItem.value = null
+    resetBehavior()
   }
 }
 

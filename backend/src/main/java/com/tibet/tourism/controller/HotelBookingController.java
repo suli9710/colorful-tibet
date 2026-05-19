@@ -4,7 +4,10 @@ import com.tibet.tourism.dto.HotelBookingRequest;
 import com.tibet.tourism.entity.HotelBooking;
 import com.tibet.tourism.entity.User;
 import com.tibet.tourism.repository.UserRepository;
+import com.tibet.tourism.security.antibot.RiskAssessmentService;
+import com.tibet.tourism.security.antibot.RiskResult;
 import com.tibet.tourism.service.HotelBookingService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -19,6 +22,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -31,10 +35,14 @@ public class HotelBookingController {
 
     private final HotelBookingService hotelBookingService;
     private final UserRepository userRepository;
+    private final RiskAssessmentService riskAssessmentService;
 
-    public HotelBookingController(HotelBookingService hotelBookingService, UserRepository userRepository) {
+    public HotelBookingController(HotelBookingService hotelBookingService,
+                                  UserRepository userRepository,
+                                  RiskAssessmentService riskAssessmentService) {
         this.hotelBookingService = hotelBookingService;
         this.userRepository = userRepository;
+        this.riskAssessmentService = riskAssessmentService;
     }
 
     @GetMapping("/room-types/{hotelId}")
@@ -55,10 +63,24 @@ public class HotelBookingController {
     }
 
     @PostMapping
-    public ResponseEntity<?> createBooking(@Valid @RequestBody HotelBookingRequest request) {
+    public ResponseEntity<?> createBooking(
+            @Valid @RequestBody HotelBookingRequest request,
+            @RequestHeader(value = "X-Recaptcha-Token", required = false) String recaptchaToken,
+            @RequestHeader(value = "X-Device-Fingerprint", required = false) String fingerprint,
+            @RequestHeader(value = "X-Behavior-Data", required = false) String behaviorData,
+            HttpServletRequest httpRequest) {
         User user = getCurrentUser();
         if (user == null) {
             return ResponseEntity.status(401).body(Map.of("error", "User not authenticated"));
+        }
+
+        RiskResult risk = riskAssessmentService.assess(
+                recaptchaToken, fingerprint, user.getId(), behaviorData,
+                httpRequest.getRemoteAddr(), "/api/hotel-bookings");
+        if (risk.decision() != RiskResult.Decision.ALLOW) {
+            return ResponseEntity.status(403).body(Map.of(
+                    "error", risk.decision() == RiskResult.Decision.BLOCK ? "请求被安全系统拦截" : "请完成安全验证",
+                    "code", "ANTIBOT_" + risk.decision().name()));
         }
 
         try {

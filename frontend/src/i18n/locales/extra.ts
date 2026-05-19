@@ -228,6 +228,14 @@ const extraMessages = {
       officialRoute: '官方推荐',
       userSharedRoute: '用户分享'
     },
+    payment: {
+      title: '扫码支付',
+      qrAlt: '支付二维码',
+      scanHint: '请使用微信或支付宝扫描二维码完成支付',
+      payAmount: '支付金额：',
+      confirmPaid: '我已支付完成',
+      cancel: '取消'
+    },
     hotel: {
       bookable: '可预订',
       apiHotelDescription: '{name}位于{location}，电话：{phone}',
@@ -637,6 +645,14 @@ const extraMessages = {
       publishFailedRetry: 'སྤེལ་མ་ཐུབ། ཏོག་ཙམ་རྗེས་སུ་བསྐྱར་ཚོད།',
       officialRoute: 'གཞུང་ཕྱོགས་འོས་སྦྱོར།',
       userSharedRoute: 'སྤྱོད་མཁན་མཉམ་སྤྱོད།'
+    },
+    payment: {
+      title: 'ཡིག་ཚགས་ཇུས་ནས་སྤྲོད།',
+      qrAlt: 'སྤྲོད་པའི་ཡིག་ཚགས།',
+      scanHint: 'དངུལ་སྤྲོད་བྱེད་པར་微信 དང་ Alipay ཡིག་ཚགས་ཇུས་སྤྱོད་རོགས།',
+      payAmount: 'དངུལ་སྤྲོད་ཚད།',
+      confirmPaid: 'དངུལ་སྤྲོད་ཚར།',
+      cancel: 'ཆ་མེད།'
     },
     hotel: {
       bookable: 'ཐོ་འགོད་ཆོག',

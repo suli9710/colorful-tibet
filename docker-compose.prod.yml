@@ -53,6 +53,12 @@ services:
       - ZIPKIN_ENDPOINT=${ZIPKIN_ENDPOINT:-http://zipkin:9411/api/v2/spans}
       - TRACING_SAMPLING_PROBABILITY=${TRACING_SAMPLING_PROBABILITY:-0.1}
       - SCRAPLING_SERVICE_URL=${SCRAPLING_SERVICE_URL:-http://scrapling:8000}
+      - ANTIBOT_ENABLED=${ANTIBOT_ENABLED:-false}
+      - RECAPTCHA_ENABLED=${RECAPTCHA_ENABLED:-false}
+      - RECAPTCHA_SITE_KEY=${RECAPTCHA_SITE_KEY:-}
+      - RECAPTCHA_SECRET_KEY=${RECAPTCHA_SECRET_KEY:-}
+      - FINGERPRINT_ENABLED=${FINGERPRINT_ENABLED:-false}
+      - BEHAVIOR_ENABLED=${BEHAVIOR_ENABLED:-false}
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
@@ -155,6 +161,7 @@ services:
       dockerfile: Dockerfile
       args:
         - VITE_API_BASE_URL=${VITE_API_BASE_URL:-/api}
+        - VITE_RECAPTCHA_SITE_KEY=${VITE_RECAPTCHA_SITE_KEY:-}
     container_name: colorful-tibet-frontend
     ports:
       - "80:80"
