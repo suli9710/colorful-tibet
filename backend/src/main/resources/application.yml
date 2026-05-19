@@ -183,6 +183,9 @@ app:
       admin:
         requests: ${RATE_LIMIT_ADMIN_REQUESTS:120}
         window-seconds: ${RATE_LIMIT_ADMIN_WINDOW_SECONDS:60}
+    ai-quota:
+      daily-limit: ${AI_DAILY_QUOTA_PER_USER:20}
+      cache-ttl-seconds: ${AI_CACHE_TTL_SECONDS:300}
     brute-force:
       enabled: ${BRUTE_FORCE_ENABLED:true}
       max-attempts: ${BRUTE_FORCE_MAX_ATTEMPTS:5}
