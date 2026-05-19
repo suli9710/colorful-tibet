@@ -6,6 +6,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.lang.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
@@ -35,7 +36,13 @@ public class WebMvcConfig implements WebMvcConfigurer {
         registry.addMapping("/api/**")
                 .allowedOriginPatterns(origins)
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH")
-                .allowedHeaders("*")
+                .allowedHeaders(
+                        "Authorization",
+                        "Content-Type",
+                        "Accept",
+                        "X-XSRF-TOKEN",
+                        "X-Requested-With",
+                        "Idempotency-Key")
                 .allowCredentials(true)
                 .maxAge(3600);
     }
@@ -56,7 +63,10 @@ public class WebMvcConfig implements WebMvcConfigurer {
 
     @Bean
     public WebClient.Builder webClientBuilder() {
-        return WebClient.builder();
+        ExchangeStrategies strategies = ExchangeStrategies.builder()
+            .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(2 * 1024 * 1024))
+            .build();
+        return WebClient.builder().exchangeStrategies(strategies);
     }
 
     private String[] parseCsvProperty(String value) {

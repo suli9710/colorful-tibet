@@ -1,25 +1,25 @@
 <template>
-  <div class="min-h-screen bg-stone-50 py-12 pt-24">
+  <div class="min-h-screen bg-stone-50 py-8 pt-24 sm:py-12">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="text-center mb-12">
-        <h1 class="text-4xl font-bold text-stone-800 mb-4">{{ t('admin.title') }}</h1>
-        <p class="text-lg text-stone-600">{{ t('admin.subtitle') }}</p>
+      <div class="mb-8 text-center sm:mb-12">
+        <h1 class="mb-3 text-3xl font-bold text-stone-800 sm:mb-4 sm:text-4xl">{{ t('admin.title') }}</h1>
+        <p class="text-base text-stone-600 sm:text-lg">{{ t('admin.subtitle') }}</p>
       </div>
 
       <div v-if="loading" class="flex justify-center items-center h-64">
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
       </div>
 
-      <div v-else class="space-y-8">
+      <div v-else class="space-y-6 sm:space-y-8">
         <AdminAnalyticsPanel :loading="loading" :chart-data="analyticsData" :error="analyticsError" />
 
         <!-- Stats Cards -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div class="bg-white rounded-lg shadow p-6 border-l-4 border-blue-500">
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-3 md:gap-6">
+          <div class="bg-white rounded-lg shadow p-5 sm:p-6 border-l-4 border-blue-500">
             <div class="flex items-center justify-between">
               <div>
                 <p class="text-sm text-stone-500 uppercase font-semibold">{{ t('admin.totalUsers') }}</p>
-                <p class="text-3xl font-bold text-stone-800">{{ stats.userCount }}</p>
+                <p class="text-2xl font-bold text-stone-800 sm:text-3xl">{{ stats.userCount }}</p>
               </div>
               <div class="bg-blue-100 p-3 rounded-full">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -29,11 +29,11 @@
             </div>
           </div>
 
-          <div class="bg-white rounded-lg shadow p-6 border-l-4 border-green-500">
+          <div class="bg-white rounded-lg shadow p-5 sm:p-6 border-l-4 border-green-500">
             <div class="flex items-center justify-between">
               <div>
                 <p class="text-sm text-stone-500 uppercase font-semibold">{{ t('admin.totalOrders') }}</p>
-                <p class="text-3xl font-bold text-stone-800">{{ stats.orderCount }}</p>
+                <p class="text-2xl font-bold text-stone-800 sm:text-3xl">{{ stats.orderCount }}</p>
               </div>
               <div class="bg-green-100 p-3 rounded-full">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -43,11 +43,11 @@
             </div>
           </div>
 
-          <div class="bg-white rounded-lg shadow p-6 border-l-4 border-yellow-500">
+          <div class="bg-white rounded-lg shadow p-5 sm:p-6 border-l-4 border-yellow-500">
             <div class="flex items-center justify-between">
               <div>
                 <p class="text-sm text-stone-500 uppercase font-semibold">{{ t('admin.totalRevenue') }}</p>
-                <p class="text-3xl font-bold text-stone-800">¥{{ stats.totalRevenue?.toLocaleString() || 0 }}</p>
+                <p class="text-2xl font-bold text-stone-800 sm:text-3xl">¥{{ stats.totalRevenue?.toLocaleString() || 0 }}</p>
               </div>
               <div class="bg-yellow-100 p-3 rounded-full">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -60,14 +60,14 @@
 
         <!-- Hotel Orders Management -->
         <div class="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden">
-          <div class="px-6 py-4 border-b border-stone-100 flex justify-between items-center bg-gradient-to-r from-stone-50 to-white cursor-pointer hover:bg-stone-100/50 transition-colors" @click="showAllHotelOrders = !showAllHotelOrders">
-            <div class="flex items-center gap-3">
+          <div class="flex flex-col gap-3 border-b border-stone-100 bg-gradient-to-r from-stone-50 to-white px-4 py-4 transition-colors hover:bg-stone-100/50 sm:flex-row sm:items-center sm:justify-between sm:px-6 cursor-pointer" @click="showAllHotelOrders = !showAllHotelOrders">
+            <div class="flex min-w-0 items-center gap-3">
               <div class="w-9 h-9 rounded-lg bg-amber-100 flex items-center justify-center">
                 <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
               </div>
                 <h3 class="text-lg font-bold text-stone-800">{{ t('admin.hotelOrders') }} <span class="text-sm font-normal text-stone-400">({{ hotelOrders.length }}{{ t('common.items') }})</span></h3>
             </div>
-            <div class="flex items-center gap-2">
+            <div class="flex flex-wrap items-center gap-2">
               <button @click.stop="fetchHotelOrders" :disabled="loadingHotelOrders" class="text-xs px-3 py-1.5 rounded-lg bg-stone-100 text-stone-600 hover:bg-stone-200 transition-colors">
                 {{ loadingHotelOrders ? t('common.loading') : t('common.refresh') }}
               </button>
@@ -149,7 +149,7 @@
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-8">
           <!-- Recent Bookings -->
           <div class="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden">
-            <div class="px-6 py-4 border-b border-stone-100 flex justify-between items-center bg-gradient-to-r from-stone-50 to-white cursor-pointer hover:bg-stone-100/50 transition-colors" @click="showRecentOrders = !showRecentOrders">
+            <div class="flex flex-col gap-3 border-b border-stone-100 bg-gradient-to-r from-stone-50 to-white px-4 py-4 transition-colors hover:bg-stone-100/50 sm:flex-row sm:items-center sm:justify-between sm:px-6 cursor-pointer" @click="showRecentOrders = !showRecentOrders">
               <div class="flex items-center gap-3">
                 <div class="w-9 h-9 rounded-lg bg-blue-100 flex items-center justify-center">
                   <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
@@ -183,7 +183,7 @@
 
           <!-- Popular Spots -->
           <div class="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden">
-            <div class="px-6 py-4 border-b border-stone-100 flex justify-between items-center bg-gradient-to-r from-stone-50 to-white cursor-pointer hover:bg-stone-100/50 transition-colors" @click="showPopularSpots = !showPopularSpots">
+            <div class="flex flex-col gap-3 border-b border-stone-100 bg-gradient-to-r from-stone-50 to-white px-4 py-4 transition-colors hover:bg-stone-100/50 sm:flex-row sm:items-center sm:justify-between sm:px-6 cursor-pointer" @click="showPopularSpots = !showPopularSpots">
               <div class="flex items-center gap-3">
                 <div class="w-9 h-9 rounded-lg bg-rose-100 flex items-center justify-center">
                   <svg class="w-5 h-5 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>
@@ -222,7 +222,7 @@
         
         <!-- Spots Management Section -->
         <div class="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden mt-8">
-          <div class="px-6 py-4 border-b border-stone-100 flex justify-between items-center bg-gradient-to-r from-stone-50 to-white cursor-pointer hover:bg-stone-100/50 transition-colors" @click="showSpots = !showSpots">
+          <div class="flex flex-col gap-3 border-b border-stone-100 bg-gradient-to-r from-stone-50 to-white px-4 py-4 transition-colors hover:bg-stone-100/50 sm:flex-row sm:items-center sm:justify-between sm:px-6 cursor-pointer" @click="showSpots = !showSpots">
             <div class="flex items-center gap-3">
               <div class="w-9 h-9 rounded-lg bg-emerald-100 flex items-center justify-center">
                 <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
@@ -232,6 +232,9 @@
             <div class="flex items-center gap-2">
               <button @click.stop="fetchSpots" :disabled="loadingSpots" class="text-xs px-3 py-1.5 rounded-lg bg-stone-100 text-stone-600 hover:bg-stone-200 transition-colors">
                 {{ loadingSpots ? t('common.loading') : t('common.refresh') }}
+              </button>
+              <button @click.stop="batchFetchPrices" :disabled="batchFetching" class="text-xs px-3 py-1.5 rounded-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-colors font-medium">
+                {{ batchFetching ? t('admin.fetchingPrices') : t('admin.batchFetchPrices') }}
               </button>
               <button v-if="spots.length > 6 && showSpots" @click.stop="showAllSpots = !showAllSpots" class="text-xs px-3 py-1.5 rounded-lg bg-stone-100 text-stone-600 hover:bg-stone-200 transition-colors">
                 {{ showAllSpots ? t('common.collapse') : t('common.expandAll') + '(' + spots.length + ')' }}
@@ -276,9 +279,20 @@
                   <div v-if="!spot.imageUrl" class="w-full h-full flex items-center justify-center bg-gradient-to-br from-emerald-400 to-teal-600">
                     <span class="text-4xl font-bold text-white/80">{{ spot.name?.charAt(0) }}</span>
                   </div>
-                  <!-- Price badge -->
-                  <div class="absolute top-3 right-3 px-2.5 py-1 rounded-full bg-white/90 backdrop-blur text-emerald-700 text-xs font-bold shadow-sm">
-                    ¥{{ spot.ticketPrice || '-' }}
+                  <!-- Price badge + fetch button -->
+                  <div class="absolute top-3 right-3 flex items-center gap-1">
+                    <span class="px-2.5 py-1 rounded-full bg-white/90 backdrop-blur text-emerald-700 text-xs font-bold shadow-sm">
+                      ¥{{ spot.ticketPrice || '-' }}
+                    </span>
+                    <button
+                      @click.stop="fetchSpotPrice(spot)"
+                      :disabled="fetchingPriceId === spot.id"
+                      class="w-6 h-6 rounded-full bg-white/90 backdrop-blur text-stone-500 hover:text-emerald-600 hover:bg-emerald-50 shadow-sm flex items-center justify-center transition-colors"
+                      :title="t('admin.fetchPrice')"
+                    >
+                      <svg v-if="fetchingPriceId !== spot.id" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                      <svg v-else class="w-3.5 h-3.5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>
+                    </button>
                   </div>
                   <!-- Edit overlay on hover -->
                   <div class="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all flex items-center justify-center">
@@ -313,7 +327,7 @@
 
         <!-- User Management Section -->
         <div class="bg-white rounded-lg shadow overflow-hidden mt-8">
-          <div class="px-6 py-4 border-b border-stone-100 flex justify-between items-center bg-gradient-to-r from-stone-50 to-white cursor-pointer hover:bg-stone-100/50 transition-colors" @click="showUsers = !showUsers">
+          <div class="flex flex-col gap-3 border-b border-stone-100 bg-gradient-to-r from-stone-50 to-white px-4 py-4 transition-colors hover:bg-stone-100/50 sm:flex-row sm:items-center sm:justify-between sm:px-6 cursor-pointer" @click="showUsers = !showUsers">
             <div class="flex items-center gap-3">
               <div class="w-9 h-9 rounded-lg bg-violet-100 flex items-center justify-center">
                 <svg class="w-5 h-5 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"/></svg>
@@ -326,7 +340,44 @@
             </div>
           </div>
           <div v-if="showUsers">
-          <div class="overflow-x-auto">
+            <div class="divide-y divide-stone-100 md:hidden">
+              <div v-for="u in users" :key="u.id" class="space-y-3 px-4 py-4" :class="{ 'bg-red-50/50': u.locked }">
+                <div class="flex items-start justify-between gap-3">
+                  <div class="min-w-0">
+                    <p class="break-all text-base font-semibold" :class="u.locked ? 'text-red-600' : 'text-stone-900'">{{ u.username }}</p>
+                    <p class="mt-1 text-xs text-stone-500">ID: {{ u.id }} · {{ u.nickname || '-' }}</p>
+                  </div>
+                  <div class="flex shrink-0 flex-col items-end gap-1">
+                    <span :class="u.role === 'ADMIN' ? 'bg-purple-100 text-purple-800' : 'bg-gray-100 text-gray-800'"
+                          class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold">
+                      {{ u.role === 'ADMIN' ? t('admin.adminRole') : t('admin.userRole') }}
+                    </span>
+                    <span v-if="u.locked" class="inline-flex rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">
+                      {{ t('admin.locked') }}
+                    </span>
+                  </div>
+                </div>
+                <div class="grid grid-cols-1 gap-2 rounded-lg bg-stone-50 p-3 text-xs text-stone-500">
+                  <div>
+                    <span class="font-medium text-stone-600">{{ t('admin.registeredAt') }}：</span>
+                    <span v-if="u.createdAt">{{ formatDateTime(u.createdAt) }}</span>
+                    <span v-else>-</span>
+                  </div>
+                  <div>
+                    <span class="font-medium text-stone-600">{{ t('admin.password') }}：</span>
+                    <span class="rounded bg-white px-2 py-1 font-mono" :title="t('admin.passwordHashTitle')">{{ t('admin.bcryptHash') }}</span>
+                  </div>
+                </div>
+                <div class="flex flex-wrap gap-3 text-sm font-medium">
+                  <button v-if="u.locked" @click="unlockUser(u)" class="text-green-600 hover:text-green-900">{{ t('admin.unlock') }}</button>
+                  <button v-if="u.role !== 'ADMIN' && !u.locked" @click="updateRole(u.id, 'ADMIN')" class="text-blue-600 hover:text-blue-900">{{ t('admin.setAdmin') }}</button>
+                  <button v-else-if="u.username !== 'lzh' && !u.locked" @click="updateRole(u.id, 'USER')" class="text-orange-600 hover:text-orange-900">{{ t('admin.unsetAdmin') }}</button>
+                  <button v-if="isSuperAdmin && u.username !== 'lzh'" @click="deleteUser(u)" class="text-red-600 hover:text-red-900">{{ t('common.delete') }}</button>
+                  <span v-if="u.username === 'lzh'" class="text-gray-400">{{ t('admin.notOperable') }}</span>
+                </div>
+              </div>
+            </div>
+          <div class="hidden overflow-x-auto md:block">
             <div class="overflow-x-auto">
               <table class="min-w-full divide-y divide-stone-200">
                 <thead class="bg-stone-50">
@@ -341,9 +392,9 @@
                   </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-stone-200">
-                  <tr v-for="u in users" :key="u.id" class="hover:bg-stone-50">
+                  <tr v-for="u in users" :key="u.id" class="hover:bg-stone-50" :class="{ 'bg-red-50/50': u.locked }">
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-500">{{ u.id }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-stone-900">{{ u.username }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium" :class="u.locked ? 'text-red-600' : 'text-stone-900'">{{ u.username }}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-500 font-mono">
                       <div class="flex items-center gap-2">
                     <span class="text-xs bg-gray-100 px-2 py-1 rounded" :title="t('admin.passwordHashTitle')">
@@ -351,20 +402,26 @@
                         </span>
                       </div>
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-500">{{ u.nickname || '-' }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm" :class="u.locked ? 'text-red-600' : 'text-stone-500'">{{ u.nickname || '-' }}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-500">
                       <span v-if="u.createdAt">{{ formatDateTime(u.createdAt) }}</span>
                       <span v-else class="text-stone-400">-</span>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
-                      <span :class="u.role === 'ADMIN' ? 'bg-purple-100 text-purple-800' : 'bg-gray-100 text-gray-800'" 
-                            class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full">
+                      <div class="flex items-center gap-1.5">
+                        <span :class="u.role === 'ADMIN' ? 'bg-purple-100 text-purple-800' : 'bg-gray-100 text-gray-800'"
+                              class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full">
                     {{ u.role === 'ADMIN' ? t('admin.adminRole') : t('admin.userRole') }}
-                      </span>
+                        </span>
+                        <span v-if="u.locked" class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-700">
+                          {{ t('admin.locked') }}
+                        </span>
+                      </div>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button v-if="u.role !== 'ADMIN'" @click="updateRole(u.id, 'ADMIN')" class="text-blue-600 hover:text-blue-900 mr-4">{{ t('admin.setAdmin') }}</button>
-                    <button v-else-if="u.username !== 'lzh'" @click="updateRole(u.id, 'USER')" class="text-orange-600 hover:text-orange-900 mr-4">{{ t('admin.unsetAdmin') }}</button>
+                    <button v-if="u.locked" @click="unlockUser(u)" class="text-green-600 hover:text-green-900 mr-4">{{ t('admin.unlock') }}</button>
+                    <button v-if="u.role !== 'ADMIN' && !u.locked" @click="updateRole(u.id, 'ADMIN')" class="text-blue-600 hover:text-blue-900 mr-4">{{ t('admin.setAdmin') }}</button>
+                    <button v-else-if="u.username !== 'lzh' && !u.locked" @click="updateRole(u.id, 'USER')" class="text-orange-600 hover:text-orange-900 mr-4">{{ t('admin.unsetAdmin') }}</button>
                     <button v-if="isSuperAdmin && u.username !== 'lzh'" @click="deleteUser(u)" class="text-red-600 hover:text-red-900">{{ t('common.delete') }}</button>
                     <span v-if="u.username === 'lzh'" class="text-gray-400 cursor-not-allowed">{{ t('admin.notOperable') }}</span>
                     </td>
@@ -378,7 +435,7 @@
         </div>
         <AdminCommunityPanel />
         <div class="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden mt-8">
-          <div class="px-6 py-4 border-b border-stone-100 flex justify-between items-center bg-gradient-to-r from-stone-50 to-white cursor-pointer hover:bg-stone-100/50 transition-colors" @click="showAllNews = !showAllNews">
+          <div class="flex flex-col gap-3 border-b border-stone-100 bg-gradient-to-r from-stone-50 to-white px-4 py-4 transition-colors hover:bg-stone-100/50 sm:flex-row sm:items-center sm:justify-between sm:px-6 cursor-pointer" @click="showAllNews = !showAllNews">
             <div class="flex items-center gap-3">
               <div class="w-9 h-9 rounded-lg bg-cyan-100 flex items-center justify-center">
                 <svg class="w-5 h-5 text-cyan-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"/></svg>
@@ -404,16 +461,16 @@
           
           <!-- News List (Collapsible) -->
           <div v-else-if="showAllNews" class="divide-y divide-stone-200">
-            <div v-for="news in newsList" :key="news.id" class="px-6 py-4 hover:bg-stone-50 transition-colors">
-              <div class="flex items-start space-x-4">
-                <div class="flex-shrink-0 w-24 h-24 bg-gray-200 rounded-lg overflow-hidden flex-shrink-0">
+            <div v-for="news in newsList" :key="news.id" class="px-4 py-4 transition-colors hover:bg-stone-50 sm:px-6">
+              <div class="flex flex-col gap-4 sm:flex-row sm:items-start">
+                <div class="h-40 w-full flex-shrink-0 overflow-hidden rounded-lg bg-gray-200 sm:h-24 sm:w-24">
                   <img v-if="news.imageUrl" :src="news.imageUrl" :alt="news.title" class="w-full h-full object-cover">
                   <div v-else class="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-500 to-purple-600 text-white text-2xl font-bold">
                     {{ news.title?.charAt(0) || 'N' }}
                   </div>
                 </div>
                 <div class="flex-1 min-w-0 flex flex-col">
-                  <div class="flex items-start justify-between gap-4">
+                  <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                     <div class="flex-1 min-w-0">
                       <h4 class="text-lg font-bold text-stone-800 mb-1 line-clamp-1">{{ news.title }}</h4>
                       <p class="text-sm text-stone-600 line-clamp-2 mb-2">{{ news.content }}</p>
@@ -425,7 +482,7 @@
                         <span class="whitespace-nowrap">{{ formatDate(news.createdAt) }}</span>
                       </div>
                     </div>
-                    <div class="flex space-x-2 flex-shrink-0">
+                    <div class="flex flex-shrink-0 gap-4 sm:gap-2">
                       <button @click="openEditNewsModal(news)" class="text-blue-600 hover:text-blue-800 text-sm font-medium whitespace-nowrap">
                         {{ t('common.edit') }}
                       </button>
@@ -448,7 +505,7 @@
 
         <!-- Carousel Management Section -->
         <div class="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden mt-8">
-          <div class="px-6 py-4 border-b border-stone-100 flex justify-between items-center bg-gradient-to-r from-stone-50 to-white cursor-pointer hover:bg-stone-100/50 transition-colors" @click="showCarousels = !showCarousels">
+          <div class="flex flex-col gap-3 border-b border-stone-100 bg-gradient-to-r from-stone-50 to-white px-4 py-4 transition-colors hover:bg-stone-100/50 sm:flex-row sm:items-center sm:justify-between sm:px-6 cursor-pointer" @click="showCarousels = !showCarousels">
             <div class="flex items-center gap-3">
               <div class="w-9 h-9 rounded-lg bg-pink-100 flex items-center justify-center">
                 <svg class="w-5 h-5 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
@@ -482,7 +539,7 @@
 
         <!-- Route Management Section -->
         <div class="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden mt-8">
-          <div class="px-6 py-4 border-b border-stone-100 flex justify-between items-center bg-gradient-to-r from-stone-50 to-white cursor-pointer hover:bg-stone-100/50 transition-colors" @click="showRoutes = !showRoutes">
+          <div class="flex flex-col gap-3 border-b border-stone-100 bg-gradient-to-r from-stone-50 to-white px-4 py-4 transition-colors hover:bg-stone-100/50 sm:flex-row sm:items-center sm:justify-between sm:px-6 cursor-pointer" @click="showRoutes = !showRoutes">
             <div class="flex items-center gap-3">
               <div class="w-9 h-9 rounded-lg bg-teal-100 flex items-center justify-center">
                 <svg class="w-5 h-5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
@@ -549,7 +606,7 @@
 
         <!-- Hotel Management Section -->
         <div class="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden mt-8">
-          <div class="px-6 py-4 border-b border-stone-100 flex justify-between items-center bg-gradient-to-r from-stone-50 to-white cursor-pointer hover:bg-stone-100/50 transition-colors" @click="showHotels = !showHotels">
+          <div class="flex flex-col gap-3 border-b border-stone-100 bg-gradient-to-r from-stone-50 to-white px-4 py-4 transition-colors hover:bg-stone-100/50 sm:flex-row sm:items-center sm:justify-between sm:px-6 cursor-pointer" @click="showHotels = !showHotels">
             <div class="flex items-center gap-3">
               <div class="w-9 h-9 rounded-lg bg-indigo-100 flex items-center justify-center">
                 <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
@@ -675,7 +732,7 @@
         <MotionModal
           :show="showCarouselModal"
           modal-key="admin-carousel-modal"
-          panel-class="max-w-lg rounded-2xl bg-white p-6"
+          panel-class="max-w-lg rounded-2xl bg-white p-4 sm:p-6"
           @close="closeCarouselModal"
         >
             <h2 class="text-xl font-bold mb-4">{{ t('admin.editOrCreateCarousel', { mode: editingCarousel.id ? t('common.edit') : t('common.create') }) }}</h2>
@@ -701,7 +758,7 @@
         <MotionModal
           :show="showRouteModal"
           modal-key="admin-route-modal"
-          panel-class="max-w-2xl rounded-2xl bg-white p-6 max-h-[85vh] overflow-y-auto"
+          panel-class="max-w-2xl rounded-2xl bg-white p-4 sm:p-6 max-h-[88dvh] overflow-y-auto"
           @close="closeRouteModal"
         >
             <h2 class="text-xl font-bold mb-4">{{ t('admin.editOrCreateRoute', { mode: editingRoute.id ? t('common.edit') : t('common.create') }) }}</h2>
@@ -741,7 +798,7 @@
         <MotionModal
           :show="showHotelModal"
           modal-key="admin-hotel-modal"
-          panel-class="max-w-2xl rounded-2xl bg-white p-6 max-h-[85vh] overflow-y-auto"
+          panel-class="max-w-2xl rounded-2xl bg-white p-4 sm:p-6 max-h-[88dvh] overflow-y-auto"
           @close="closeHotelModal"
         >
             <h2 class="text-xl font-bold mb-4">{{ t('admin.editOrCreateHotel', { mode: editingHotel.id ? t('common.edit') : t('common.create') }) }}</h2>
@@ -769,7 +826,7 @@
     <MotionModal
       :show="showNewsModal"
       modal-key="admin-news-modal"
-      panel-class="max-w-3xl rounded-2xl bg-white p-8 max-h-[90vh] overflow-y-auto"
+      panel-class="max-w-3xl rounded-2xl bg-white p-4 sm:p-8 max-h-[90dvh] overflow-y-auto"
       @close="closeNewsModal"
     >
         <h2 class="text-2xl font-bold mb-6 text-stone-800">{{ editingNews.id ? t('admin.editNewsTitle') : t('admin.createNewsTitle') }}</h2>
@@ -828,7 +885,7 @@
     <MotionModal
       :show="showEditModal"
       modal-key="admin-spot-modal"
-      panel-class="max-w-2xl rounded-2xl bg-white p-8 max-h-[85vh] overflow-y-auto"
+      panel-class="max-w-2xl rounded-2xl bg-white p-4 sm:p-8 max-h-[88dvh] overflow-y-auto"
       @close="closeEditModal"
     >
         <h2 class="text-2xl font-bold mb-6 text-stone-800">{{ t('admin.editSpotInfo') }}</h2>
@@ -939,7 +996,7 @@ let operationalRefreshTimer: ReturnType<typeof window.setInterval> | null = null
 
 const fetchStats = async () => {
   try {
-    if (!auth.hasValidSession()) {
+    if (!(await auth.ensureSession())) {
       await router.push('/login')
       return
     }
@@ -1080,6 +1137,8 @@ const users = ref<any[]>([])
 const currentUser = ref<any>(null) // 当前登录用户信息
 const spots = ref<any[]>([])
 const loadingSpots = ref(false)
+const fetchingPriceId = ref<number | null>(null)
+const batchFetching = ref(false)
 const spotsError = ref('')
 const showSpots = ref(false)
 const showAllSpots = ref(false)
@@ -1243,6 +1302,43 @@ const updateSpotImage = async () => {
   }
 }
 
+// 单独抓取某个景点价格
+const fetchSpotPrice = async (spot: any) => {
+  fetchingPriceId.value = spot.id
+  try {
+    const response = await api.get(endpoints.prices.fetch(spot.id))
+    const data = response.data
+    if (data.success && data.priceInfo) {
+      alert(t('admin.priceFetched', { name: spot.name, price: data.priceInfo.basePrice || data.priceInfo.peakSeasonPrice || 'N/A' }))
+      await fetchSpots()
+    } else {
+      alert(t('admin.priceFetchFailed', { name: spot.name }))
+    }
+  } catch (error: any) {
+    console.error('Failed to fetch price:', error)
+    alert(t('admin.priceFetchFailed', { name: spot.name }))
+  } finally {
+    fetchingPriceId.value = null
+  }
+}
+
+// 批量抓取所有景点价格
+const batchFetchPrices = async () => {
+  if (!confirm(t('admin.confirmBatchFetch'))) return
+  batchFetching.value = true
+  try {
+    const response = await api.post(endpoints.prices.batchUpdate + '?force=true')
+    const data = response.data
+    alert(t('admin.batchFetchDone', { updated: data.successCount || 0, failed: data.failCount || 0 }))
+    await fetchSpots()
+  } catch (error: any) {
+    console.error('Failed to batch fetch prices:', error)
+    alert(t('admin.batchFetchFailed'))
+  } finally {
+    batchFetching.value = false
+  }
+}
+
 const updateRole = async (userId: number, newRole: string) => {
   if (!confirm(t('admin.confirmRoleChange', { role: getRoleLabel(newRole) }))) return
 
@@ -1266,6 +1362,19 @@ const deleteUser = async (user: any) => {
   } catch (error: any) {
     console.error('Failed to delete user:', error)
     alert(error.response?.data?.error || t('admin.deleteFailed'))
+  }
+}
+
+const unlockUser = async (user: any) => {
+  if (!confirm(t('admin.confirmUnlock', { name: user.username }))) return
+
+  try {
+    await api.post(endpoints.admin.unlockUser(user.id))
+    alert(t('admin.unlockSuccess', { name: user.username }))
+    await fetchUsers()
+  } catch (error: any) {
+    console.error('Failed to unlock user:', error)
+    alert(error.response?.data?.error || t('admin.operationFailed'))
   }
 }
 
@@ -1320,7 +1429,7 @@ const deleteHotelOrder = async (orderId: number) => {
 const fetchNews = async () => {
   loadingNews.value = true
   try {
-    if (!auth.hasValidSession()) {
+    if (!(await auth.ensureSession())) {
       alert(t('admin.notLoggedIn'))
       await router.push('/login')
       return
@@ -1500,8 +1609,8 @@ const isSuperAdmin = computed(() => {
 })
 
 // 加载当前用户信息
-const loadCurrentUser = () => {
-  auth.restoreFromStorage()
+const loadCurrentUser = async () => {
+  await auth.ensureSession()
   currentUser.value = auth.user
 }
 
@@ -1751,7 +1860,7 @@ const deleteRoomTypeInline = async (roomTypeId: number, hotelId: number) => {
 }
 
 onMounted(async () => {
-  loadCurrentUser()
+  await loadCurrentUser()
   if (!auth.hasValidSession()) {
     await router.push('/login')
     return

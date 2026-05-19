@@ -32,6 +32,7 @@ public class PriceController {
      * 获取景点价格信息（不更新数据库，仅查询）
      */
     @GetMapping("/fetch/{spotId}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> fetchPrice(@PathVariable Long spotId) {
         try {
             ScenicSpot spot = scenicSpotRepository.findById(Long.valueOf(spotId))
@@ -87,4 +88,3 @@ public class PriceController {
         }
     }
 }
-

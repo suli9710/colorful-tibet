@@ -31,6 +31,10 @@ desktop.ini
 .env
 .env.local
 .env.production
+backend/.env
+backend/.env.local
+frontend/.env
+frontend/.env.local
 
 # Logs
 *.log

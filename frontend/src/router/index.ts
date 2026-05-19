@@ -103,6 +103,12 @@ const router = createRouter({
             meta: { requiresAuth: true }
         },
         {
+            path: '/orders',
+            name: 'orders',
+            component: () => import('../views/OrderCenter.vue'),
+            meta: { requiresAuth: true }
+        },
+        {
             path: '/hotel-orders',
             name: 'hotel-orders',
             component: () => import('../views/HotelOrders.vue'),
@@ -111,9 +117,14 @@ const router = createRouter({
     ]
 })
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
     const auth = useAuthStore()
-    const isAuthenticated = auth.hasValidSession()
+    const requiresAuth = Boolean(to.meta.requiresAuth) || to.path.startsWith('/admin')
+    const isAuthenticated = requiresAuth ? await auth.ensureSession() : auth.hasValidSession()
+
+    if (to.path.startsWith('/admin') && !isAuthenticated) {
+        return '/login'
+    }
 
     if (to.path.startsWith('/admin') && !auth.isAdmin) {
         return '/'

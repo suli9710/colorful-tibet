@@ -9,7 +9,8 @@ import java.time.LocalDateTime;
 @Table(name = "hotel_bookings", indexes = {
     @Index(name = "idx_hb_user_created", columnList = "user_id, created_at"),
     @Index(name = "idx_hb_hotel_created", columnList = "hotel_id, created_at"),
-    @Index(name = "idx_hb_status_created", columnList = "status, created_at")
+    @Index(name = "idx_hb_status_created", columnList = "status, created_at"),
+    @Index(name = "idx_hb_room_dates", columnList = "room_type_id, check_in_date, check_out_date, status, deleted_at")
 })
 public class HotelBooking {
     @Id
@@ -25,6 +26,8 @@ public class HotelBooking {
     private Hotel hotel;
 
     private String roomName;
+    @Column(name = "room_type_id")
+    private Long roomTypeId;
     private BigDecimal roomPrice;
     private Integer nights;
     private LocalDate checkInDate;
@@ -44,6 +47,9 @@ public class HotelBooking {
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
 
     @PrePersist
     protected void onCreate() {
@@ -68,6 +74,9 @@ public class HotelBooking {
 
     public String getRoomName() { return roomName; }
     public void setRoomName(String roomName) { this.roomName = roomName; }
+
+    public Long getRoomTypeId() { return roomTypeId; }
+    public void setRoomTypeId(Long roomTypeId) { this.roomTypeId = roomTypeId; }
 
     public BigDecimal getRoomPrice() { return roomPrice; }
     public void setRoomPrice(BigDecimal roomPrice) { this.roomPrice = roomPrice; }
@@ -110,4 +119,7 @@ public class HotelBooking {
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public LocalDateTime getDeletedAt() { return deletedAt; }
+    public void setDeletedAt(LocalDateTime deletedAt) { this.deletedAt = deletedAt; }
 }

@@ -1,9 +1,11 @@
 package com.tibet.tourism.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tibet.tourism.dto.PriceInfo;
 import com.tibet.tourism.entity.ScenicSpot;
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.slf4j.Logger;
@@ -12,6 +14,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.math.BigDecimal;
+import java.net.IDN;
+import java.net.InetAddress;
+import java.net.URI;
 import java.time.Duration;
 import java.util.*;
 import java.util.regex.Matcher;
@@ -39,11 +44,116 @@ public class PriceFetchService {
     @Value("${doubao.api.model:}")
     private String aiModel;
 
+    @Value("${scrapling.service.url:}")
+    private String scraplingServiceUrl;
+
+    @Value("${scrapling.service.timeout-seconds:30}")
+    private int scraplingTimeoutSeconds;
+
+    private static final Set<String> ALLOWED_LOCAL_SERVICE_HOSTS = Set.of("localhost", "127.0.0.1", "::1", "scrapling");
+
+    private Duration scraplingTimeout;
+
+    @PostConstruct
+    void initScraplingTimeout() {
+        scraplingTimeout = Duration.ofSeconds(scraplingTimeoutSeconds);
+        validateExternalUrl("ark.api.url", aiApiUrl);
+        validateExternalUrl("doubao.api.url", aiApiUrl);
+        validateServiceUrl(scraplingServiceUrl);
+    }
+
+    private void validateExternalUrl(String name, String url) {
+        if (url != null && !url.isEmpty()) {
+            URI uri = parseConfiguredUri(name, url);
+            if (!"https".equalsIgnoreCase(uri.getScheme())) {
+                throw new IllegalStateException(name + " must use HTTPS");
+            }
+            String host = requireAsciiHost(name, uri);
+            rejectUnsafeResolvedAddresses(name, host);
+        }
+    }
+
+    private void validateServiceUrl(String url) {
+        if (url != null && !url.isEmpty()) {
+            URI uri = parseConfiguredUri("scrapling.service.url", url);
+            if (!"http".equalsIgnoreCase(uri.getScheme()) && !"https".equalsIgnoreCase(uri.getScheme())) {
+                throw new IllegalStateException("scrapling.service.url must use HTTP or HTTPS");
+            }
+            String host = requireAsciiHost("scrapling.service.url", uri);
+            if (!ALLOWED_LOCAL_SERVICE_HOSTS.contains(host.toLowerCase(Locale.ROOT))) {
+                rejectUnsafeResolvedAddresses("scrapling.service.url", host);
+            }
+        }
+    }
+
+    private URI parseConfiguredUri(String name, String url) {
+        try {
+            URI uri = URI.create(url.trim());
+            if (uri.getRawUserInfo() != null || uri.getHost() == null || uri.getScheme() == null) {
+                throw new IllegalStateException(name + " is not a valid service URL");
+            }
+            return uri;
+        } catch (IllegalArgumentException e) {
+            throw new IllegalStateException(name + " is not a valid service URL", e);
+        }
+    }
+
+    private String requireAsciiHost(String name, URI uri) {
+        String host = uri.getHost();
+        if (host == null || host.isBlank()) {
+            throw new IllegalStateException(name + " must include a host");
+        }
+        String asciiHost = IDN.toASCII(host, IDN.USE_STD3_ASCII_RULES);
+        boolean asciiOnly = host.chars().allMatch(ch -> ch < 128);
+        if (!asciiOnly || !asciiHost.equals(host)) {
+            throw new IllegalStateException(name + " host must be ASCII");
+        }
+        return host;
+    }
+
+    private void rejectUnsafeResolvedAddresses(String name, String host) {
+        try {
+            for (InetAddress address : InetAddress.getAllByName(host)) {
+                if (isBlockedAddress(address)) {
+                    throw new IllegalStateException(name + " resolves to a blocked network address");
+                }
+            }
+        } catch (IllegalStateException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new IllegalStateException(name + " host could not be resolved safely", e);
+        }
+    }
+
+    private boolean isBlockedAddress(InetAddress address) {
+        if (address.isAnyLocalAddress()
+                || address.isLoopbackAddress()
+                || address.isLinkLocalAddress()
+                || address.isSiteLocalAddress()
+                || address.isMulticastAddress()) {
+            return true;
+        }
+        byte[] bytes = address.getAddress();
+        if (bytes.length == 4) {
+            int first = bytes[0] & 0xff;
+            int second = bytes[1] & 0xff;
+            return first == 0
+                    || first == 10
+                    || first == 127
+                    || (first == 100 && second >= 64 && second <= 127)
+                    || (first == 169 && second == 254)
+                    || (first == 172 && second >= 16 && second <= 31)
+                    || (first == 192 && second == 168);
+        }
+        return bytes.length == 16 && (bytes[0] & 0xfe) == 0xfc;
+    }
+
     /**
      * 智能获取景点价格（自动选择最佳策略）
      */
     public PriceInfo fetchPrice(ScenicSpot spot) {
         List<PriceFetchStrategy> strategies = Arrays.asList(
+            new ScraplingServiceStrategy(webClientBuilder, scraplingServiceUrl, scraplingTimeout),
             new AiExtractStrategy(webClientBuilder, aiApiUrl, aiApiKey, aiModel),
             new WebScrapingStrategy(webClientBuilder),
             new ThirdPartyApiStrategy(webClientBuilder)
@@ -75,7 +185,93 @@ public class PriceFetchService {
     }
 
     /**
-     * 策略1：AI提取价格（从网页内容中智能提取）
+     * 策略1：Scrapling 微服务（Python 反反爬虫引擎）
+     */
+    static class ScraplingServiceStrategy implements PriceFetchStrategy {
+        private final WebClient.Builder webClientBuilder;
+        private final String serviceUrl;
+        private final Duration timeout;
+
+        public ScraplingServiceStrategy(WebClient.Builder webClientBuilder, String serviceUrl, Duration timeout) {
+            this.webClientBuilder = webClientBuilder;
+            this.serviceUrl = serviceUrl;
+            this.timeout = timeout;
+        }
+
+        @Override
+        public PriceInfo fetch(ScenicSpot spot) {
+            if (serviceUrl == null || serviceUrl.isEmpty()) {
+                return null;
+            }
+
+            try {
+                Map<String, Object> requestBody = new LinkedHashMap<>();
+                requestBody.put("spotName", spot.getName());
+                if (spot.getLocation() != null && !spot.getLocation().isEmpty()) {
+                    requestBody.put("location", spot.getLocation());
+                }
+
+                @SuppressWarnings("unchecked")
+                Map<String, Object> response = webClientBuilder.build()
+                    .post()
+                    .uri(serviceUrl + "/scrape/price")
+                    .header("Content-Type", "application/json")
+                    .bodyValue(requestBody)
+                    .retrieve()
+                    .bodyToMono(Map.class)
+                    .timeout(timeout)
+                    .block();
+
+                if (response == null) {
+                    return null;
+                }
+
+                Object basePriceObj = response.get("basePrice");
+                if (basePriceObj == null) {
+                    return null;
+                }
+
+                BigDecimal basePrice;
+                if (basePriceObj instanceof Number num) {
+                    basePrice = BigDecimal.valueOf(num.doubleValue());
+                } else {
+                    return null;
+                }
+
+                if (basePrice.compareTo(BigDecimal.ZERO) <= 0) {
+                    return null;
+                }
+
+                String source = response.getOrDefault("source", "Scrapling").toString();
+                PriceInfo info = new PriceInfo(basePrice, source);
+
+                Object confidenceObj = response.get("confidence");
+                if (confidenceObj instanceof Number confNum) {
+                    info.setConfidence(confNum.doubleValue());
+                }
+
+                Object peakObj = response.get("peakSeasonPrice");
+                if (peakObj instanceof Number peakNum) {
+                    info.setPeakSeasonPrice(BigDecimal.valueOf(peakNum.doubleValue()));
+                }
+
+                Object offObj = response.get("offSeasonPrice");
+                if (offObj instanceof Number offNum) {
+                    info.setOffSeasonPrice(BigDecimal.valueOf(offNum.doubleValue()));
+                }
+
+                return info;
+
+            } catch (Exception e) {
+                logger.warn("Scrapling service strategy failed. spotId={}, cause={}", spot.getId(), e.getMessage());
+                logger.debug("Scrapling service strategy failure details", e);
+                return null;
+            }
+        }
+    }
+
+    /**
+     * 策略2：AI提取价格（从网页内容中智能提取）
      */
     static class AiExtractStrategy implements PriceFetchStrategy {
         private final WebClient.Builder webClientBuilder;
@@ -220,7 +416,7 @@ public class PriceFetchService {
     }
 
     /**
-     * 策略2：网页爬虫提取价格
+     * 策略3：网页爬虫提取价格
      * 使用正则表达式从网页HTML中提取价格信息
      */
     static class WebScrapingStrategy implements PriceFetchStrategy {
@@ -439,7 +635,7 @@ public class PriceFetchService {
     }
 
     /**
-     * 策略3：第三方API（携程、去哪儿等）
+     * 策略4：第三方API（携程、去哪儿等）
      * 注意：需要申请API密钥
      */
     static class ThirdPartyApiStrategy implements PriceFetchStrategy {

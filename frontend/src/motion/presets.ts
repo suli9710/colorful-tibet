@@ -7,6 +7,14 @@ export const staggerDelay = (
   maxIndex = 8
 ) => baseDelay + Math.min(index, maxIndex) * step
 
+/** 紧凑交错 — 卡片网格等密集排列场景，步长 25ms */
+export const tightStagger = (index = 0, baseDelay = 0, maxIndex = 12) =>
+  baseDelay + Math.min(index, maxIndex) * 0.025
+
+/** 宽松交错 — 表单、大区块等需要逐项感知的场景，步长 60ms */
+export const looseStagger = (index = 0, baseDelay = 0, maxIndex = 6) =>
+  baseDelay + Math.min(index, maxIndex) * 0.06
+
 export const inViewOnce = {
   once: true,
   margin: '0px 0px -80px 0px' as const,
@@ -60,7 +68,7 @@ export const softSpring = {
 
 export const pageInitial = {
   opacity: 0,
-  y: 12
+  y: 18
 }
 
 export const pageAnimate = {
@@ -70,11 +78,11 @@ export const pageAnimate = {
 
 export const pageExit = {
   opacity: 0,
-  y: -8
+  y: -12
 }
 
 export const pageTransition = {
-  duration: 0.24,
+  duration: 0.35,
   ease: motionEase
 }
 

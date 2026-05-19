@@ -12,11 +12,12 @@
         :animate="{ opacity: 1, scale: 1 }"
         :transition="{ duration: 0.5, ease: motionEase }"
       >
-        <img v-if="spot.imageUrl" 
-             :src="spot.imageUrl" 
+        <img v-if="hasSpotImage"
+             :src="spot.imageUrl"
              :alt="spot.name"
              loading="eager"
-             class="w-full h-full object-cover img-fade-in">
+             class="w-full h-full object-cover img-fade-in"
+             @error="handleSpotImageError">
         <div v-else class="w-full h-full flex items-center justify-center" :class="getGradientClass(spot)">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-40 w-40 text-white opacity-30 animate-pulse-slow" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path v-if="spot.category === 'NATURAL'" stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -42,7 +43,7 @@
                 </span>
               </div>
             </div>
-            <h1 class="text-5xl md:text-6xl font-bold mb-4 tracking-tight tibetan-font">{{ spot.name }}</h1>
+            <h1 class="text-5xl md:text-6xl font-bold mb-4 tibetan-font">{{ spot.name }}</h1>
             <div class="flex items-center text-white/80 space-x-6">
               <span class="flex items-center tibetan-font">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -350,6 +351,7 @@ const router = useRouter()
 const spot = ref<any>(null)
 const loading = ref(true)
 const submitting = ref(false)
+const spotImageFailed = ref(false)
 const mapContainer = ref<HTMLElement | null>(null)
 const mapReady = ref(false)
 const mapLoading = ref(true)
@@ -429,6 +431,12 @@ const totalPrice = computed(() => {
   return unitPrice.value * bookingForm.value.ticketCount
 })
 
+const hasSpotImage = computed(() => Boolean(spot.value?.imageUrl) && !spotImageFailed.value)
+
+const handleSpotImageError = () => {
+  spotImageFailed.value = true
+}
+
 const hasValidLocation = computed(() => {
   if (!spot.value) return false
   const lat = Number(spot.value.latitude)
@@ -439,6 +447,7 @@ const hasValidLocation = computed(() => {
 const fetchSpotDetail = async () => {
   try {
     const response = await api.get(endpoints.spots.detail(Number(route.params.id)))
+    spotImageFailed.value = false
     spot.value = response.data
     loading.value = false
     await nextTick()
@@ -532,7 +541,7 @@ const initOrUpdateMap = async () => {
       mapLoading.value = true
     })
     tileLayer.on('tileerror', () => {
-      // 单个瓦片失败不阻塞
+      mapLoading.value = false
     })
     tileLayer.addTo(map)
 

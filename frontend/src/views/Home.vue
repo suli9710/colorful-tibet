@@ -1,7 +1,7 @@
 <template>
   <div class="min-h-screen tibet-page-shell">
     <!-- Hero Section: Multi-layer Parallax -->
-    <div class="relative h-[calc(100vh-5rem)] md:h-[calc(100vh-6rem)] flex items-center justify-center overflow-hidden -mt-20 md:-mt-24">
+    <div class="relative flex h-[calc(100svh-5rem)] min-h-[600px] items-center justify-center overflow-hidden -mt-20 sm:min-h-[680px] md:h-[calc(100vh-6rem)] md:-mt-24">
       <!-- Layer 0: Sky gradient base -->
       <div class="absolute inset-0 z-0 bg-gradient-to-b from-tibet-dark via-tibet-brown/60 to-tibet-dark/40"></div>
 
@@ -39,106 +39,76 @@
       <div class="hero-mist z-6"></div>
 
       <!-- Layer 8: Content overlay -->
-      <motion.div class="relative z-10 text-center px-4 max-w-5xl mx-auto">
-        <AnimatePresence mode="wait">
-          <motion.div
-            :key="`hero-content-${currentSlide}`"
-            :initial="heroContentInitial"
-            :animate="heroContentAnimate"
-            :exit="heroContentExit"
-            :transition="heroContentTransition"
-          >
-            <motion.div
-              class="mb-6 inline-flex items-center gap-2 rounded-full bg-tibet-red/25 px-4 py-2 text-sm text-tibet-yellow backdrop-blur-md border border-tibet-gold/30 will-change-transform"
-              :initial="heroItemInitial"
-              :animate="heroItemAnimate"
-              :transition="heroTransition(0.08)"
+      <div class="relative z-10 text-center px-4 max-w-5xl mx-auto">
+        <div :key="`hero-content-${currentSlide}`" class="hero-content-fade">
+            <div
+              class="mb-5 inline-flex items-center gap-2 rounded-full bg-tibet-red/25 px-3.5 py-2 text-xs text-tibet-yellow backdrop-blur-md border border-tibet-gold/30 sm:mb-6 sm:px-4 sm:text-sm"
             >
               <span class="h-2 w-2 rounded-full bg-tibet-yellow animate-pulse-slow"></span>
               {{ heroSlides[currentSlide].tag }}
-            </motion.div>
-            <motion.h1
-              class="text-5xl md:text-7xl font-bold text-white mb-6 tracking-tight will-change-transform font-display"
+            </div>
+            <h1
+              class="mb-5 text-4xl font-bold text-white sm:text-5xl md:mb-6 md:text-7xl font-display"
               style="text-shadow: 0 2px 24px rgba(0,0,0,0.3);"
-              :initial="heroItemInitial"
-              :animate="heroItemAnimate"
-              :transition="heroTransition(0.18)"
             >
               {{ heroSlides[currentSlide].title }}
-            </motion.h1>
-            <motion.p
-              class="text-xl md:text-2xl text-white/85 mb-10 font-light max-w-2xl mx-auto will-change-transform"
+            </h1>
+            <p
+              class="mx-auto mb-8 max-w-2xl text-base font-light leading-relaxed text-white/85 sm:text-xl md:mb-10 md:text-2xl"
               style="text-shadow: 0 1px 12px rgba(0,0,0,0.2);"
-              :initial="heroItemInitial"
-              :animate="heroItemAnimate"
-              :transition="heroTransition(0.32)"
             >
               {{ heroSlides[currentSlide].subtitle }}
-            </motion.p>
-            <motion.div
-              class="flex flex-col sm:flex-row justify-center gap-4 will-change-transform"
-              :initial="heroItemInitial"
-              :animate="heroItemAnimate"
-              :transition="heroTransition(0.48)"
+            </p>
+            <div
+              class="flex flex-col justify-center gap-3 sm:flex-row sm:gap-4"
             >
-              <motion.div :whileHover="primaryActionHover" :whilePress="primaryActionPress">
-                <router-link to="/spots" class="tibet-btn text-lg px-8 py-4 shadow-xl will-change-transform">
-                  {{ t('home.startExploring') }}
-                </router-link>
-              </motion.div>
-              <motion.button
+              <router-link to="/spots" class="tibet-btn w-full px-6 py-3.5 text-base shadow-xl will-change-transform hover:-translate-y-1 hover:scale-[1.03] active:scale-95 sm:w-auto sm:px-8 sm:py-4 sm:text-lg">
+                {{ t('home.startExploring') }}
+              </router-link>
+              <button
                       @click="scrollToHeatmap"
-                      :whileHover="primaryActionHover"
-                      :whilePress="primaryActionPress"
-                      class="tibet-btn-ghost text-white border-white/30 hover:bg-white/10 hover:border-white/50 hover:text-white text-lg px-8 py-4 will-change-transform">
+                      class="tibet-btn-ghost w-full border-white/30 px-6 py-3.5 text-base text-white will-change-transform hover:-translate-y-1 hover:scale-[1.03] hover:border-white/50 hover:bg-white/10 hover:text-white active:scale-95 sm:w-auto sm:px-8 sm:py-4 sm:text-lg">
                 {{ t('home.viewHeatmap') }}
-              </motion.button>
-            </motion.div>
-          </motion.div>
-        </AnimatePresence>
+              </button>
+            </div>
+        </div>
 
         <!-- Bead-style carousel dots -->
-        <div class="mt-10 flex items-center justify-center gap-2.5">
-          <motion.button v-for="(slide, index) in heroSlides" :key="`${slide.image}-${index}`" @click="goToSlide(index)"
+        <div class="mt-8 flex items-center justify-center gap-2.5 sm:mt-10">
+          <button v-for="(slide, index) in heroSlides" :key="`${slide.image}-${index}`" @click="goToSlide(index)"
                   class="tibet-carousel-dot"
-                  layout
-                  :animate="{ width: currentSlide === index ? 28 : 8, opacity: currentSlide === index ? 1 : 0.68 }"
-                  :whileHover="{ scale: 1.18 }"
-                  :whilePress="{ scale: 0.85 }"
-                  :transition="{ type: 'spring', stiffness: 420, damping: 28 }"
+                  :style="{ width: currentSlide === index ? '28px' : '8px', opacity: currentSlide === index ? 1 : 0.68 }"
                   :class="{ active: currentSlide === index }"
-                  :aria-label="t('home.carouselDot', { index: index + 1 })"></motion.button>
+                  :aria-label="t('home.carouselDot', { index: index + 1 })"></button>
         </div>
-      </motion.div>
+      </div>
 
-      <motion.div
+      <div
         v-if="!prefersReducedMotion"
         class="absolute bottom-12 left-1/2 z-10 hidden -translate-x-1/2 flex-col items-center gap-2 text-xs text-white/70 md:flex"
-        :animate="{ y: [0, 8, 0], opacity: [0.55, 1, 0.55] }"
-        :transition="{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }"
       >
         <span class="h-10 w-px bg-gradient-to-b from-white/70 to-transparent"></span>
-      </motion.div>
+      </div>
     </div>
 
     <!-- Mountain divider -->
     <div class="tibet-mountain-divider -mt-8 relative z-10"></div>
 
     <!-- Heatmap Section -->
-    <div id="heatmap" class="py-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+    <div id="heatmap" class="mx-auto max-w-7xl px-4 py-14 sm:px-6 sm:py-20 lg:px-8 lg:py-24">
       <motion.div
-        class="text-center mb-16"
+        class="mb-10 text-center sm:mb-16"
         :initial="revealInitial"
         :whileInView="revealInView"
         :inViewOptions="inViewOnce"
         :transition="revealTransition"
       >
-        <h2 class="tibet-heading text-4xl font-bold text-tibet-dark mb-4 tibetan-font">{{ t('home.hotSpotsDistribution') }}</h2>
-        <p class="text-lg text-tibet-brown/70 tibetan-font">{{ t('home.hotSpotsDescription') }}</p>
+        <h2 class="tibet-heading mb-3 text-3xl font-bold text-tibet-dark sm:mb-4 sm:text-4xl tibetan-font">{{ t('home.hotSpotsDistribution') }}</h2>
+        <p class="text-base text-tibet-brown/70 sm:text-lg tibetan-font">{{ t('home.hotSpotsDescription') }}</p>
       </motion.div>
       
       <motion.div
-        class="rounded-3xl p-6 shadow-2xl tibet-panel"
+        class="rounded-2xl p-3 shadow-2xl sm:rounded-3xl sm:p-6 tibet-panel"
         :initial="cardInitial"
         :whileInView="cardInView"
         :whileHover="{ y: -4, boxShadow: '0 22px 60px rgba(92, 61, 46, 0.14)' }"
@@ -147,25 +117,25 @@
         @viewportEnter="heatmapMounted = true"
       >
         <HeatMap v-if="heatmapMounted" />
-        <div v-else class="flex h-[600px] items-center justify-center rounded-2xl bg-white/70">
+        <div v-else class="flex h-[420px] items-center justify-center rounded-2xl bg-white/70 sm:h-[600px]">
           <div class="tibet-spinner"></div>
         </div>
       </motion.div>
     </div>
 
     <!-- Recommendations Section -->
-    <div class="py-24 tibet-section-band">
+    <div class="py-14 sm:py-20 lg:py-24 tibet-section-band">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <motion.div
-          class="flex justify-between items-end mb-12"
+          class="mb-10 flex flex-col gap-4 sm:mb-12 sm:flex-row sm:items-end sm:justify-between"
           :initial="revealInitial"
           :whileInView="revealInView"
           :inViewOptions="inViewOnce"
           :transition="revealTransition"
         >
           <div>
-            <h2 class="tibet-heading text-4xl font-bold text-tibet-dark mb-2 tibetan-font">{{ t('home.recommendations') }}</h2>
-            <p class="text-lg text-tibet-brown/70 tibetan-font">{{ t('home.recommendationsDescription') }}</p>
+            <h2 class="tibet-heading mb-2 text-3xl font-bold text-tibet-dark sm:text-4xl tibetan-font">{{ t('home.recommendations') }}</h2>
+            <p class="text-base text-tibet-brown/70 sm:text-lg tibetan-font">{{ t('home.recommendationsDescription') }}</p>
           </div>
           <router-link to="/spots" class="hidden md:flex items-center text-tibet-red hover:text-tibet-red/80 font-medium transition-colors tibetan-font">
             {{ t('common.viewAll') }}
@@ -200,7 +170,7 @@
                :transition="cardTransition(index)"
                :whileHover="{ y: -4, scale: 1.01 }"
                :whilePress="{ scale: 0.998 }">
-            <div class="relative h-72 overflow-hidden">
+            <div class="relative h-56 overflow-hidden sm:h-72">
               <motion.img :src="spot.imageUrl" :alt="spot.name"
                    class="w-full h-full object-cover tibet-image-hover img-fade-in will-change-transform"
                    loading="lazy"
@@ -222,18 +192,18 @@
               </motion.div>
             </div>
 
-              <div class="p-8">
-              <div class="flex justify-between items-start mb-4">
-                <h3 class="text-2xl font-bold text-tibet-dark group-hover:text-tibet-red transition-colors duration-300 ease-out-expo font-display">{{ spot.name }}</h3>
-                <span class="text-lg font-semibold text-tibet-red transform group-hover:scale-105 transition-transform duration-300 ease-out-expo will-change-transform">¥{{ spot.ticketPrice }}</span>
+              <div class="p-5 sm:p-8">
+              <div class="mb-4 flex items-start justify-between gap-3">
+                <h3 class="min-w-0 text-xl font-bold text-tibet-dark transition-colors duration-300 ease-out-expo group-hover:text-tibet-red sm:text-2xl font-display">{{ spot.name }}</h3>
+                <span class="shrink-0 text-base font-semibold text-tibet-red transform transition-transform duration-300 ease-out-expo group-hover:scale-105 sm:text-lg will-change-transform">¥{{ spot.ticketPrice }}</span>
               </div>
               <p v-if="getRecommendationReason(spot.id)" class="text-xs text-tibet-gold mb-3 font-medium tibetan-font">
                 💡 {{ getRecommendationReason(spot.id) }}
               </p>
               <p class="text-tibet-brown/70 mb-6 line-clamp-2 leading-relaxed tibetan-font">{{ spot.description }}</p>
 
-              <div class="flex items-center justify-between pt-6 border-t border-tibet-gold/20">
-                <div class="flex space-x-2">
+              <div class="flex flex-wrap items-center justify-between gap-3 border-t border-tibet-gold/20 pt-5 sm:pt-6">
+                <div class="flex flex-wrap gap-2">
                   <motion.span v-for="(tag, tagIndex) in spot.tags?.slice(0, 2)" :key="tag.id"
                         class="tibet-tag tibetan-font">
                     {{ tag.tag }}
@@ -269,24 +239,14 @@ import {
   cardInitial,
   cardInView,
   cardTransition,
-  heroContentAnimate,
-  heroContentExit,
-  heroContentInitial,
-  heroContentTransition,
-  heroItemAnimate,
-  heroItemInitial,
-  heroItemTransition,
   inViewOnce,
   motionEase,
-  primaryActionHover,
-  primaryActionPress,
   revealInitial,
   revealInView,
   revealTransition
 } from '../motion/presets'
 
 const HeatMap = defineAsyncComponent(() => import('../components/HeatMap.vue'))
-const heroTransition = heroItemTransition
 
 const router = useRouter()
 const { t, locale } = useI18n()
@@ -296,9 +256,30 @@ const recommendationReasons = ref<Map<number, string>>(new Map())
 const loading = ref(true)
 const heatmapMounted = ref(false)
 const currentSlide = ref(0)
-const heroSlides = ref<Array<{ image: string; title: string; subtitle: string; tag: string; linkUrl?: string }>>([
-  { image: '/heritage/布达拉宫3.jpg', title: '', subtitle: '', tag: '' }
-])
+const createDefaultHeroSlides = () => [
+  {
+    image: '/heritage/布达拉宫3.jpg',
+    title: t('home.carousel1Title'),
+    subtitle: t('home.carousel1Sub'),
+    tag: t('home.carousel1Tag'),
+    linkUrl: '/spots'
+  },
+  {
+    image: '/heritage/纳木错.jpg',
+    title: t('home.carousel2Title'),
+    subtitle: t('home.carousel2Sub'),
+    tag: t('home.carousel2Tag'),
+    linkUrl: '/spots'
+  },
+  {
+    image: '/heritage/藏戏.jpg',
+    title: t('home.carousel3Title'),
+    subtitle: t('home.carousel3Sub'),
+    tag: t('home.carousel3Tag'),
+    linkUrl: '/heritage'
+  }
+]
+const heroSlides = ref<Array<{ image: string; title: string; subtitle: string; tag: string; linkUrl?: string }>>(createDefaultHeroSlides())
 const fallbackRecommendedSpots = [
   {
     id: 1,
@@ -350,9 +331,11 @@ const fetchCarousels = async () => {
         tag: c.tag || '',
         linkUrl: c.linkUrl || ''
       }))
+    } else {
+      heroSlides.value = createDefaultHeroSlides()
     }
   } catch (e) {
-    // Fall back to defaults
+    heroSlides.value = createDefaultHeroSlides()
   }
 }
 
@@ -456,7 +439,9 @@ const fetchRecommendations = async () => {
 
 // 监听语言变化，重新获取数据
 watch(locale, () => {
+  heroSlides.value = createDefaultHeroSlides()
   fetchRecommendations()
+  fetchCarousels()
 })
 
 watch(prefersReducedMotion, () => {
@@ -475,3 +460,26 @@ onUnmounted(() => {
   stopCarousel()
 })
 </script>
+
+<style scoped>
+.hero-content-fade {
+  animation: heroContentFade 320ms ease-out both;
+}
+
+@keyframes heroContentFade {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.tibet-carousel-dot {
+  transition: width 220ms ease, opacity 220ms ease, transform 160ms ease;
+}
+
+.tibet-carousel-dot:hover {
+  transform: scale(1.18);
+}
+
+.tibet-carousel-dot:active {
+  transform: scale(0.85);
+}
+</style>

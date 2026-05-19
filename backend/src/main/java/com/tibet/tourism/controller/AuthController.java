@@ -6,13 +6,16 @@ import com.tibet.tourism.dto.RegisterRequest;
 import com.tibet.tourism.entity.User;
 import com.tibet.tourism.repository.*;
 import com.tibet.tourism.security.CookieAuthConstants;
+import com.tibet.tourism.security.CsrfTokenService;
 import com.tibet.tourism.security.InputSanitizer;
 import com.tibet.tourism.security.JwtAuthSupport;
 import com.tibet.tourism.security.JwtUtils;
+import com.tibet.tourism.security.LoginAttemptService;
 import com.tibet.tourism.service.FileStorageService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
@@ -25,14 +28,15 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.net.InetAddress;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -41,8 +45,11 @@ public class AuthController {
     private static final Logger logger = LoggerFactory.getLogger(AuthController.class);
     private static final Duration AUTH_COOKIE_MAX_AGE = Duration.ofDays(1);
 
-    @org.springframework.beans.factory.annotation.Value("${app.security.cookie-secure:false}")
+    @org.springframework.beans.factory.annotation.Value("${app.security.cookie-secure:true}")
     private boolean secureCookies;
+
+    @org.springframework.beans.factory.annotation.Value("${app.super-admin-username:lzh}")
+    private String superAdminUsername;
 
     @Autowired
     AuthenticationManager authenticationManager;
@@ -55,6 +62,9 @@ public class AuthController {
 
     @Autowired
     JwtAuthSupport jwtAuthSupport;
+
+    @Autowired
+    CsrfTokenService csrfTokenService;
 
     @Autowired
     PasswordEncoder passwordEncoder;
@@ -80,6 +90,9 @@ public class AuthController {
     @Autowired
     com.tibet.tourism.service.IpLocationService ipLocationService;
 
+    @Autowired
+    LoginAttemptService loginAttemptService;
+
     private Long getCurrentUserId(HttpServletRequest request) {
         return jwtAuthSupport.resolveCurrentUserId(request);
     }
@@ -104,6 +117,7 @@ public class AuthController {
             response.put("phone", user.getPhone());
             response.put("role", user.getRole());
             response.put("createdAt", user.getCreatedAt());
+            response.put("mustChangePassword", Boolean.TRUE.equals(user.getMustChangePassword()));
 
             return ResponseEntity.ok(response);
         } catch (Exception e) {
@@ -185,23 +199,28 @@ public class AuthController {
 
     // 更新昵称
     @PutMapping("/me/nickname")
+    @Transactional
     public ResponseEntity<?> updateNickname(@RequestBody Map<String, String> payload, HttpServletRequest request) {
         try {
             Long userId = getCurrentUserId(request);
             String nickname = InputSanitizer.requiredPlainText(payload.get("nickname"), 32, "昵称");
-            
+
             // 检查昵称是否已被其他用户使用
-            User existingUser = userRepository.findByNickname(nickname).orElse(null);
-            if (existingUser != null && !existingUser.getId().equals(userId)) {
-                return ResponseEntity.badRequest().body(Map.of("error", "该昵称已被使用，请选择其他昵称"));
+            if (userRepository.existsByNickname(nickname)) {
+                User existingNicknameUser = userRepository.findByNickname(nickname).orElse(null);
+                if (existingNicknameUser != null && !existingNicknameUser.getId().equals(userId)) {
+                    return ResponseEntity.badRequest().body(Map.of("error", "昵称更新失败，请检查输入后重试"));
+                }
             }
-            
+
             User user = userRepository.findById(userId)
                     .orElseThrow(() -> new RuntimeException("User not found"));
             user.setNickname(nickname);
-            userRepository.save(user);
-            
+            userRepository.saveAndFlush(user);
+
             return ResponseEntity.ok(Map.of("message", "昵称更新成功", "nickname", nickname));
+        } catch (DataIntegrityViolationException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "昵称更新失败，请检查输入后重试"));
         } catch (Exception e) {
             return errorResponse(e);
         }
@@ -227,18 +246,41 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<?> authenticateUser(@Valid @RequestBody LoginRequest loginRequest, HttpServletRequest request) {
+        String username = loginRequest.getUsername().trim();
+
+        long remainingLock = loginAttemptService.remainingLockSeconds(username);
+        if (remainingLock > 0) {
+            logger.warn("Blocked login attempt for locked account: username={}, remainingLock={}s", username, remainingLock);
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                    .body(Map.of("error", "请求过于频繁，请稍后重试"));
+        }
+
         Authentication authentication;
         try {
             authentication = authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(loginRequest.getUsername().trim(), loginRequest.getPassword()));
+                    new UsernamePasswordAuthenticationToken(username, loginRequest.getPassword()));
         } catch (AuthenticationException e) {
-            logger.warn("Login failed for username={}", loginRequest.getUsername());
+            logger.warn("Login failed for username={}", username);
+            long lockSeconds = loginAttemptService.recordFailure(username);
+            if (lockSeconds > 0) {
+                return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                        .body(Map.of("error", "请求过于频繁，请稍后重试"));
+            }
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "用户名或密码错误"));
+        }
+
+        loginAttemptService.reset(username);
+
+        // 超管账户仅允许本地登录
+        if (superAdminUsername.equals(username) && !isLocalRequest(request)) {
+            logger.warn("Rejected remote super-admin login attempt: username={}, ip={}", username, request.getRemoteAddr());
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "用户名或密码错误"));
         }
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
         String jwt = jwtUtils.generateJwtToken(authentication);
-        
+
         UserDetails userDetails = (UserDetails) authentication.getPrincipal();
         User user = userRepository.findByUsername(userDetails.getUsername()).orElseThrow();
 
@@ -248,7 +290,7 @@ public class AuthController {
             String city = ipLocationService.getCityByIp(ipAddress);
             
             // 更新用户IP和城市信息
-            user.setIpAddress(ipAddress);
+            user.setIpAddress(InputSanitizer.sha256HexForStorage(ipAddress));
             user.setCity(city);
             user.setLastLoginAt(java.time.LocalDateTime.now());
             userRepository.save(user);
@@ -257,12 +299,13 @@ public class AuthController {
             logger.debug("Failed to update user IP location", e);
         }
 
-        String csrfToken = UUID.randomUUID().toString();
+        String csrfToken = csrfTokenService.generateToken(jwt);
         Map<String, Object> response = new HashMap<>();
         response.put("id", user.getId());
         response.put("username", user.getUsername());
         response.put("nickname", user.getNickname());
         response.put("role", user.getRole());
+        response.put("mustChangePassword", Boolean.TRUE.equals(user.getMustChangePassword()));
 
         return ResponseEntity.ok()
                 .header(org.springframework.http.HttpHeaders.SET_COOKIE, authCookie(jwt, AUTH_COOKIE_MAX_AGE).toString())
@@ -287,10 +330,16 @@ public class AuthController {
         logger.debug("Register payload received. username={}, nickname={}, passwordEmpty={}",
                 username, nickname, !StringUtils.hasText(plainPassword));
 
+        try {
+            InputSanitizer.validatePassword(plainPassword);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+
         if (userRepository.existsByUsernameIgnoreCase(username)) {
             return ResponseEntity
                     .badRequest()
-                    .body(Map.of("message", "用户名已存在，请换一个用户名"));
+                    .body(Map.of("message", "注册失败，请检查输入后重试"));
         }
 
         User user = new User();
@@ -322,5 +371,27 @@ public class AuthController {
                 .path("/")
                 .maxAge(maxAge)
                 .build();
+    }
+
+    private boolean isLocalRequest(HttpServletRequest request) {
+        try {
+            InetAddress addr = InetAddress.getByName(request.getRemoteAddr());
+            if (addr.isLoopbackAddress() || addr.isAnyLocalAddress()) {
+                return true;
+            }
+
+            // In local Docker Compose, nginx reaches the backend over a private bridge
+            // address while the browser still uses http://localhost.
+            return addr.isSiteLocalAddress() && isLocalServerName(request.getServerName());
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private boolean isLocalServerName(String serverName) {
+        return "localhost".equalsIgnoreCase(serverName)
+                || "127.0.0.1".equals(serverName)
+                || "::1".equals(serverName)
+                || "0:0:0:0:0:0:0:1".equals(serverName);
     }
 }

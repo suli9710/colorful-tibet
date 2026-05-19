@@ -14,7 +14,7 @@
           :transition="{ duration: 0.5, delay: 0.08, ease: motionEase }"
         >
           <span class="inline-flex items-center px-4 py-1.5 rounded-full bg-white/15 backdrop-blur-md border border-white/20 text-sm font-medium mb-6">{{ t('hotel.badge') }}</span>
-          <h1 class="text-4xl md:text-5xl font-bold tracking-tight mb-4">{{ t('hotel.bookingTitle') }}</h1>
+          <h1 class="text-4xl md:text-5xl font-bold mb-4">{{ t('hotel.bookingTitle') }}</h1>
           <p class="text-lg md:text-xl text-white/80">{{ t('hotel.bookingSubtitle') }}</p>
         </motion.div>
       </div>

@@ -14,7 +14,7 @@
           <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
           {{ t('routePlanner.aiGeneratorLabel') }}
         </div>
-        <h1 class="tibet-heading inline-flex justify-center text-4xl md:text-5xl lg:text-6xl font-bold text-tibet-dark tracking-tight leading-tight">
+        <h1 class="tibet-heading inline-flex justify-center text-4xl md:text-5xl lg:text-6xl font-bold text-tibet-dark leading-tight">
           {{ t('routePlanner.title') }}
         </h1>
         <p class="mt-4 text-lg text-tibet-brown/70 max-w-2xl mx-auto leading-relaxed">
@@ -238,11 +238,42 @@
                   <span v-if="charCount > 0" class="ml-auto text-xs text-tibet-blue/70 font-mono">{{ charCount }} {{ t('routePlanner.charCountUnit') }}</span>
                 </div>
                 <div class="h-1.5 rounded-full bg-tibet-gold/15 overflow-hidden">
-                  <div class="h-full rounded-full bg-gradient-to-r from-tibet-blue via-tibet-turquoise to-tibet-gold animate-shimmer-stream" :class="{ 'w-full': !streaming, 'animate-pulse': streaming }"></div>
+                  <div class="h-full rounded-full bg-gradient-to-r from-tibet-blue via-tibet-turquoise to-tibet-gold relative overflow-hidden animate-shimmer-stream" :class="{ 'w-full': !streaming, 'animate-pulse': streaming }"></div>
                 </div>
                 <p class="mt-2 text-xs text-tibet-brown/60">{{ t('routePlanner.waitingTime') }}</p>
               </motion.div>
             </AnimatePresence>
+
+            <motion.div
+              class="glass-card rounded-2xl border border-white/50 p-5 shadow-lg shadow-slate-900/3"
+              :initial="cardInitial"
+              :animate="cardInView"
+              :transition="cardTransition(0, 0.1)"
+            >
+              <div class="mb-4 flex items-center gap-3">
+                <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-tibet-blue/10 text-tibet-blue">
+                  <Sparkles class="h-4 w-4" />
+                </span>
+                <div>
+                  <h3 class="text-sm font-bold text-tibet-dark">当前方案</h3>
+                  <p class="text-xs text-tibet-brown/50">{{ result ? '已生成路线摘要' : '待生成路线参数' }}</p>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-3 gap-2">
+                <div v-for="stat in plannerSnapshotStats" :key="stat.label" class="rounded-xl border border-tibet-gold/15 bg-white/70 px-3 py-2">
+                  <p class="text-[11px] font-semibold text-tibet-brown/45">{{ stat.label }}</p>
+                  <p class="mt-1 truncate text-sm font-bold text-tibet-dark">{{ stat.value }}</p>
+                </div>
+              </div>
+
+              <div class="mt-4 space-y-2">
+                <div v-for="item in planningPulseItems" :key="item" class="flex gap-2 rounded-xl border border-tibet-gold/10 bg-white/65 px-3 py-2">
+                  <span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-tibet-gold"></span>
+                  <p class="text-xs leading-relaxed text-tibet-brown/65">{{ item }}</p>
+                </div>
+              </div>
+            </motion.div>
           </div>
         </div>
 
@@ -298,7 +329,15 @@
                     <p class="text-xs text-tibet-brown/50">{{ t('routePlanner.routeGeneratedDesc') }}</p>
                   </div>
                 </div>
-                <div class="flex gap-1.5">
+                <div class="flex flex-wrap gap-1.5">
+                  <motion.button v-if="resultShouldCollapse" @click="resultExpanded = !resultExpanded"
+                          :whileHover="{ y: -1, scale: 1.02 }"
+                          :whileTap="{ scale: 0.96 }"
+                          class="inline-flex items-center gap-1.5 rounded-xl border border-tibet-blue/20 bg-white/80 px-3.5 py-2 text-xs font-medium text-tibet-blue transition-all hover:bg-sky-50">
+                    <ChevronUp v-if="resultExpanded" class="h-4 w-4" />
+                    <ChevronDown v-else class="h-4 w-4" />
+                    {{ resultExpanded ? '收起全文' : '展开全文' }}
+                  </motion.button>
                   <motion.button @click="copyResult" :disabled="copying"
                           :whileHover="{ y: -1, scale: 1.02 }"
                           :whileTap="{ scale: 0.96 }"
@@ -311,9 +350,77 @@
                 </div>
               </div>
 
+              <!-- Compact summary -->
+              <div class="space-y-5 border-b border-white/60 bg-gradient-to-br from-white/70 via-amber-50/45 to-sky-50/40 p-5 md:p-6">
+                <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <div v-for="stat in resultStats" :key="stat.label" class="rounded-xl border border-white/70 bg-white/70 px-3 py-2.5 shadow-sm">
+                    <p class="text-[11px] font-semibold text-tibet-brown/45">{{ stat.label }}</p>
+                    <p class="mt-1 text-sm font-bold text-tibet-dark">{{ stat.value }}</p>
+                  </div>
+                </div>
+
+                <div v-if="routeOverviewText" class="rounded-2xl border border-tibet-gold/15 bg-white/75 px-4 py-3">
+                  <div class="mb-2 flex items-center gap-2 text-tibet-dark">
+                    <Sparkles class="h-4 w-4 text-tibet-gold" />
+                    <h3 class="text-sm font-bold">路线摘要</h3>
+                  </div>
+                  <p class="text-sm leading-relaxed text-tibet-brown/70 line-clamp-3">{{ routeOverviewText }}</p>
+                </div>
+
+                <div v-if="routeHighlightItems.length" class="grid gap-2 sm:grid-cols-2">
+                  <div v-for="item in routeHighlightItems" :key="item" class="flex gap-2 rounded-xl border border-tibet-gold/10 bg-white/70 px-3 py-2">
+                    <span class="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-tibet-gold"></span>
+                    <p class="text-xs leading-relaxed text-tibet-brown/70">{{ item }}</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Day outline -->
+              <div v-if="visibleRouteDaySections.length" class="border-b border-white/60 bg-white/45 px-5 py-5 md:px-6">
+                <div class="mb-3 flex items-center justify-between gap-3">
+                  <div class="flex items-center gap-2 text-tibet-dark">
+                    <ListChecks class="h-4 w-4 text-tibet-blue" />
+                    <h3 class="text-sm font-bold">每日安排速览</h3>
+                  </div>
+                  <span v-if="hiddenDayCount > 0" class="text-xs font-medium text-tibet-brown/50">还有 {{ hiddenDayCount }} 天在全文中</span>
+                </div>
+                <div class="grid gap-3 sm:grid-cols-2">
+                  <section
+                    v-for="day in visibleRouteDaySections"
+                    :key="day.day"
+                    class="rounded-2xl border border-tibet-gold/15 bg-white/80 px-4 py-3"
+                  >
+                    <p class="text-xs font-bold text-tibet-blue">{{ day.day }}</p>
+                    <h4 class="mt-1 line-clamp-1 text-sm font-bold text-tibet-dark">{{ day.title }}</h4>
+                    <p class="mt-1.5 line-clamp-2 text-xs leading-relaxed text-tibet-brown/60">{{ day.summary }}</p>
+                  </section>
+                </div>
+              </div>
+
               <!-- Markdown content -->
-              <div class="p-6 md:p-8 lg:p-10">
-                <div class="prose prose-slate max-w-none prose-headings:text-tibet-dark prose-p:text-tibet-brown/80 prose-p:leading-relaxed prose-a:text-tibet-blue prose-strong:text-tibet-dark/90 prose-li:text-tibet-brown/80 prose-h2:border-b prose-h2:border-tibet-gold/20 prose-h2:pb-2 prose-h2:mt-8 prose-h2:mb-4 prose-img:rounded-2xl prose-img:shadow-md" v-html="renderedResult"></div>
+              <div class="px-6 pb-6 pt-5 md:px-8 md:pb-8 lg:px-10">
+                <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p class="text-sm font-bold text-tibet-dark">完整路线</p>
+                    <p class="text-xs text-tibet-brown/50">默认收起长内容，展开后可查看全部细节。</p>
+                  </div>
+                  <motion.button v-if="resultShouldCollapse" @click="resultExpanded = !resultExpanded"
+                          :whileHover="{ y: -1, scale: 1.02 }"
+                          :whileTap="{ scale: 0.96 }"
+                          class="inline-flex items-center gap-1.5 rounded-xl border border-tibet-blue/20 bg-white/80 px-3.5 py-2 text-xs font-medium text-tibet-blue transition-all hover:bg-sky-50">
+                    <ChevronUp v-if="resultExpanded" class="h-4 w-4" />
+                    <ChevronDown v-else class="h-4 w-4" />
+                    {{ resultExpanded ? '收起全文' : '展开全文' }}
+                  </motion.button>
+                </div>
+                <div class="relative">
+                  <div
+                    class="prose prose-slate route-result-prose max-w-none prose-headings:text-tibet-dark prose-p:text-tibet-brown/80 prose-p:leading-relaxed prose-a:text-tibet-blue prose-strong:text-tibet-dark/90 prose-li:text-tibet-brown/80 prose-h2:border-b prose-h2:border-tibet-gold/20 prose-h2:pb-2 prose-h2:mt-8 prose-h2:mb-4 prose-img:rounded-2xl prose-img:shadow-md"
+                    :class="{ 'max-h-[420px] overflow-hidden': resultShouldCollapse && !resultExpanded }"
+                    v-html="renderedResult"
+                  ></div>
+                  <div v-if="resultShouldCollapse && !resultExpanded" class="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-white via-white/95 to-transparent"></div>
+                </div>
               </div>
 
               <!-- Result actions -->
@@ -350,6 +457,295 @@
           </AnimatePresence>
         </div>
       </div>
+
+      <div
+        v-if="bookableItinerary || itineraryLoading || tibetTravelKit || tibetTravelKitLoading"
+        class="mt-8 grid items-start gap-6 xl:grid-cols-2"
+      >
+          <motion.div
+            v-if="bookableItinerary || itineraryLoading"
+            class="glass-card rounded-3xl border border-white/50 shadow-xl shadow-slate-900/3 overflow-hidden"
+            :class="{ 'xl:col-span-2': !tibetTravelKit && !tibetTravelKitLoading }"
+            :initial="{ opacity: 0, y: 18, scale: 0.98 }"
+            :animate="{ opacity: 1, y: 0, scale: 1 }"
+            :transition="revealTransition"
+          >
+            <div class="px-6 py-5 border-b border-white/60 bg-white/40 flex flex-wrap items-center justify-between gap-3">
+              <div class="flex items-center gap-3">
+                <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-tibet-gold/15 text-tibet-gold">
+                  <ReceiptText class="h-5 w-5" />
+                </span>
+                <div>
+                  <p class="text-sm font-bold text-tibet-dark">{{ bookableItinerary?.title || '正在生成可预订行程' }}</p>
+                  <p class="text-xs text-tibet-brown/50">
+                    {{ bookableItinerary ? `${bookableItinerary.versionLabel} · ${bookableItinerary.days}天 · ${formatCurrency(itineraryQuote?.totalEstimatedCost || bookableItinerary.totalEstimatedCost)}` : '正在匹配景点、酒店、门票和预算' }}
+                  </p>
+                </div>
+              </div>
+              <div v-if="bookableItinerary" class="flex flex-wrap gap-1.5">
+                <router-link
+                  to="/orders"
+                  class="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50/80 px-3 py-2 text-xs font-semibold text-emerald-700 transition-all hover:bg-emerald-100"
+                >
+                  <ReceiptText class="h-3.5 w-3.5" />
+                  订单中心
+                </router-link>
+                <motion.button
+                  v-for="option in itineraryVersionOptions"
+                  :key="option.value"
+                  @click="generateBookableItinerary(option.value)"
+                  :disabled="!!itineraryVersionLoading"
+                  :whileHover="{ y: -1, scale: 1.02 }"
+                  :whileTap="{ scale: 0.96 }"
+                  class="inline-flex items-center gap-1.5 rounded-xl border border-tibet-gold/25 bg-white/80 px-3 py-2 text-xs font-medium text-gray-600 transition-all hover:bg-amber-50 disabled:opacity-50"
+                >
+                  <Shuffle class="h-3.5 w-3.5" />
+                  {{ itineraryVersionLoading === option.value ? '生成中' : option.label }}
+                </motion.button>
+              </div>
+            </div>
+
+            <div v-if="itineraryLoading" class="p-8 text-center text-tibet-brown/60">
+              <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-tibet-gold mx-auto mb-3"></div>
+              <p class="text-sm font-medium">正在把 AI 灵感转成可报价行程</p>
+            </div>
+
+            <div v-else-if="bookableItinerary" class="p-5 md:p-6 space-y-5">
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div class="rounded-2xl border border-tibet-gold/20 bg-white/70 px-4 py-3">
+                  <p class="text-xs text-tibet-brown/50">总预估</p>
+                  <p class="mt-1 text-xl font-bold text-tibet-dark">{{ formatCurrency(itineraryQuote?.totalEstimatedCost || bookableItinerary.totalEstimatedCost) }}</p>
+                </div>
+                <div class="rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3">
+                  <p class="text-xs text-emerald-700/70">可直接预订</p>
+                  <p class="mt-1 text-xl font-bold text-emerald-700">{{ formatCurrency(itineraryQuote?.bookableTotal) }}</p>
+                </div>
+                <div class="rounded-2xl border border-sky-200 bg-sky-50/70 px-4 py-3">
+                  <p class="text-xs text-sky-700/70">交通餐饮预估</p>
+                  <p class="mt-1 text-xl font-bold text-sky-700">{{ formatCurrency(itineraryQuote?.informationalTotal) }}</p>
+                </div>
+              </div>
+
+              <div class="space-y-4">
+                <section
+                  v-for="day in bookableItinerary.itineraryDays"
+                  :key="day.id"
+                  class="rounded-2xl border border-tibet-gold/15 bg-white/75 overflow-hidden"
+                >
+                  <div class="px-4 py-3 border-b border-tibet-gold/10 flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <h3 class="text-sm font-bold text-tibet-dark">{{ day.title }}</h3>
+                      <p class="mt-0.5 text-xs text-tibet-brown/50">{{ day.travelDate }} · {{ day.region }}</p>
+                    </div>
+                    <span class="inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold" :class="riskClass(day.altitudeRisk)">
+                      {{ riskLabel(day.altitudeRisk) }}
+                    </span>
+                  </div>
+
+                  <div class="divide-y divide-tibet-gold/10">
+                    <div
+                      v-for="item in day.items"
+                      :key="item.id"
+                      class="px-4 py-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between"
+                    >
+                      <div class="flex gap-3 min-w-0">
+                        <span class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-tibet-gold/10 text-tibet-gold">
+                          <component :is="itemIcon(item.itemType)" class="h-4 w-4" />
+                        </span>
+                        <div class="min-w-0">
+                          <div class="flex flex-wrap items-center gap-2">
+                            <p class="text-sm font-semibold text-tibet-dark">{{ item.startTime }} · {{ item.title }}</p>
+                            <span class="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-600">{{ itemTypeLabel(item.itemType) }}</span>
+                            <span v-if="item.bookingStatus === 'BOOKED'" class="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">已预订</span>
+                          </div>
+                          <p class="mt-1 text-xs leading-relaxed text-tibet-brown/60 line-clamp-2">{{ item.description }}</p>
+                          <p v-if="item.alternatives" class="mt-1 text-[11px] text-tibet-blue/70">可替换：{{ item.alternatives }}</p>
+                        </div>
+                      </div>
+                      <div class="flex shrink-0 items-center justify-between gap-3 md:justify-end">
+                        <span class="text-sm font-bold text-tibet-dark">{{ formatCurrency(item.estimatedCost) }}</span>
+                        <motion.button
+                          v-if="isBookableItem(item)"
+                          @click="bookItineraryItem(item)"
+                          :disabled="itineraryBookingItemId === item.id"
+                          :whileHover="{ y: -1, scale: 1.02 }"
+                          :whileTap="{ scale: 0.96 }"
+                          class="inline-flex items-center gap-1.5 rounded-xl bg-tibet-red px-3.5 py-2 text-xs font-semibold text-tibet-yellow shadow-md shadow-tibet-red/20 disabled:opacity-50"
+                        >
+                          <CalendarCheck class="h-3.5 w-3.5" />
+                          {{ itineraryBookingItemId === item.id ? '预订中' : '立即预订' }}
+                        </motion.button>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+              </div>
+            </div>
+          </motion.div>
+
+          <motion.div
+            v-if="tibetTravelKit || tibetTravelKitLoading"
+            class="glass-card rounded-3xl border border-white/50 shadow-xl shadow-slate-900/3 overflow-hidden"
+            :class="{ 'xl:col-span-2': !bookableItinerary && !itineraryLoading }"
+            :initial="{ opacity: 0, y: 18, scale: 0.98 }"
+            :animate="{ opacity: 1, y: 0, scale: 1 }"
+            :transition="revealTransition"
+          >
+            <div class="px-6 py-5 border-b border-white/60 bg-white/40 flex flex-wrap items-center justify-between gap-3">
+              <div class="flex items-center gap-3">
+                <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
+                  <Mountain class="h-5 w-5" />
+                </span>
+                <div>
+                  <p class="text-sm font-bold text-tibet-dark">西藏深度旅行包</p>
+                  <p class="text-xs text-tibet-brown/50">
+                    {{ tibetTravelKit ? `${tibetTravelKit.highlandAssessment.riskLabel} · 最高海拔 ${tibetTravelKit.highlandAssessment.maxAltitudeMeters}m · ${tibetTravelKit.offlinePackage.mapPins.length} 个离线点位` : '正在生成高原、礼仪、短语和提醒' }}
+                  </p>
+                </div>
+              </div>
+              <motion.button
+                v-if="tibetTravelKit"
+                @click="downloadOfflinePackage"
+                :whileHover="{ y: -1, scale: 1.02 }"
+                :whileTap="{ scale: 0.96 }"
+                class="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-white/80 px-3.5 py-2 text-xs font-semibold text-emerald-700 transition-all hover:bg-emerald-50"
+              >
+                <Download class="h-3.5 w-3.5" />
+                离线包
+              </motion.button>
+            </div>
+
+            <div v-if="tibetTravelKitLoading" class="p-8 text-center text-tibet-brown/60">
+              <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-500 mx-auto mb-3"></div>
+              <p class="text-sm font-medium">正在生成西藏目的地服务</p>
+            </div>
+
+            <div v-else-if="tibetTravelKit" class="p-5 md:p-6 space-y-5">
+              <div class="grid gap-3 md:grid-cols-3">
+                <div class="rounded-2xl border px-4 py-3" :class="riskClass(tibetTravelKit.highlandAssessment.riskLevel)">
+                  <div class="flex items-center gap-2">
+                    <HeartPulse class="h-4 w-4" />
+                    <p class="text-xs font-semibold">高原适应</p>
+                  </div>
+                  <p class="mt-2 text-2xl font-bold">{{ tibetTravelKit.highlandAssessment.riskScore }}</p>
+                  <p class="mt-1 text-xs leading-relaxed">{{ tibetTravelKit.highlandAssessment.summary }}</p>
+                </div>
+                <div class="rounded-2xl border border-sky-200 bg-sky-50/70 px-4 py-3 text-sky-800">
+                  <div class="flex items-center gap-2">
+                    <MapPin class="h-4 w-4" />
+                    <p class="text-xs font-semibold">离线旅行包</p>
+                  </div>
+                  <p class="mt-2 text-2xl font-bold">{{ tibetTravelKit.offlinePackage.mapPins.length }}</p>
+                  <p class="mt-1 text-xs leading-relaxed">点位、紧急电话、凭证提示和离线清单已打包。</p>
+                </div>
+                <div class="rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-emerald-800">
+                  <div class="flex items-center gap-2">
+                    <Leaf class="h-4 w-4" />
+                    <p class="text-xs font-semibold">可持续旅行</p>
+                  </div>
+                  <p class="mt-2 text-2xl font-bold">{{ tibetTravelKit.sustainableOptions.length }}</p>
+                  <p class="mt-1 text-xs leading-relaxed">本地向导、顺路合并、生态零遗留建议。</p>
+                </div>
+              </div>
+
+              <div class="grid gap-4 xl:grid-cols-2">
+                <section class="rounded-2xl border border-tibet-gold/15 bg-white/75 p-4">
+                  <div class="flex items-center gap-2 text-tibet-dark">
+                    <HeartPulse class="h-4 w-4 text-rose-600" />
+                    <h3 class="text-sm font-bold">每日高原节奏</h3>
+                  </div>
+                  <div class="mt-3 space-y-3">
+                    <div
+                      v-for="advice in tibetTravelKit.highlandAssessment.dailyAdvice.slice(0, 3)"
+                      :key="advice.dayNumber"
+                      class="rounded-xl border border-tibet-gold/10 bg-white/80 px-3 py-2"
+                    >
+                      <div class="flex items-center justify-between gap-2">
+                        <p class="text-xs font-semibold text-tibet-dark">D{{ advice.dayNumber }} · {{ advice.maxAltitudeMeters }}m</p>
+                        <span class="rounded-full border px-2 py-0.5 text-[11px] font-semibold" :class="riskClass(advice.riskLevel)">{{ riskLabel(advice.riskLevel) }}</span>
+                      </div>
+                      <p class="mt-1 text-xs leading-relaxed text-tibet-brown/60">{{ advice.paceAdvice }}</p>
+                    </div>
+                  </div>
+                </section>
+
+                <section class="rounded-2xl border border-tibet-gold/15 bg-white/75 p-4">
+                  <div class="flex items-center gap-2 text-tibet-dark">
+                    <Bell class="h-4 w-4 text-amber-600" />
+                    <h3 class="text-sm font-bold">实时提醒</h3>
+                  </div>
+                  <div class="mt-3 space-y-2">
+                    <div
+                      v-for="alert in tibetTravelKit.realtimeAlerts.slice(0, 3)"
+                      :key="`${alert.type}-${alert.title}`"
+                      class="rounded-xl border px-3 py-2"
+                      :class="alertClass(alert.level)"
+                    >
+                      <div class="flex items-center justify-between gap-2">
+                        <p class="text-xs font-semibold">{{ alert.title }}</p>
+                        <span class="rounded-full bg-white/70 px-2 py-0.5 text-[11px]">{{ alertLabel(alert.level) }}</span>
+                      </div>
+                      <p class="mt-1 text-xs leading-relaxed opacity-80">{{ alert.action }}</p>
+                    </div>
+                  </div>
+                </section>
+
+                <section class="rounded-2xl border border-tibet-gold/15 bg-white/75 p-4">
+                  <div class="flex items-center gap-2 text-tibet-dark">
+                    <Landmark class="h-4 w-4 text-tibet-gold" />
+                    <h3 class="text-sm font-bold">文化礼仪助手</h3>
+                  </div>
+                  <div class="mt-3 space-y-3">
+                    <div v-for="tip in tibetTravelKit.culturalTips.slice(0, 2)" :key="tip.scene" class="rounded-xl bg-amber-50/60 px-3 py-2">
+                      <p class="text-xs font-semibold text-tibet-dark">{{ tip.title }}</p>
+                      <p class="mt-1 text-xs leading-relaxed text-tibet-brown/60">{{ tip.doTips[0] }}</p>
+                      <p class="mt-1 text-[11px] text-rose-700/80">避免：{{ tip.avoidTips[0] }}</p>
+                    </div>
+                  </div>
+                </section>
+
+                <section class="rounded-2xl border border-tibet-gold/15 bg-white/75 p-4">
+                  <div class="flex items-center gap-2 text-tibet-dark">
+                    <Languages class="h-4 w-4 text-sky-600" />
+                    <h3 class="text-sm font-bold">藏汉英导览短语</h3>
+                  </div>
+                  <div class="mt-3 grid gap-2 sm:grid-cols-2">
+                    <div v-for="phrase in tibetTravelKit.phrasebook.slice(0, 4)" :key="`${phrase.category}-${phrase.chinese}`" class="rounded-xl border border-sky-100 bg-sky-50/60 px-3 py-2">
+                      <p class="text-xs font-semibold text-tibet-dark">{{ phrase.chinese }}</p>
+                      <p class="mt-1 text-sm text-sky-900 tibetan-font">{{ phrase.tibetan }}</p>
+                      <p class="mt-0.5 text-[11px] text-sky-700/70">{{ phrase.pronunciation }} · {{ phrase.english }}</p>
+                    </div>
+                  </div>
+                </section>
+              </div>
+
+              <section class="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4">
+                <div class="flex items-center gap-2 text-emerald-900">
+                  <ShieldAlert class="h-4 w-4" />
+                  <h3 class="text-sm font-bold">离线和可持续清单</h3>
+                </div>
+                <div class="mt-3 grid gap-3 md:grid-cols-2">
+                  <div>
+                    <p class="text-xs font-semibold text-emerald-900/80">离线准备</p>
+                    <ul class="mt-2 space-y-1">
+                      <li v-for="item in tibetTravelKit.offlinePackage.offlineChecklist.slice(0, 4)" :key="item" class="text-xs leading-relaxed text-emerald-900/70">
+                        {{ item }}
+                      </li>
+                    </ul>
+                  </div>
+                  <div>
+                    <p class="text-xs font-semibold text-emerald-900/80">低影响旅行</p>
+                    <ul class="mt-2 space-y-1">
+                      <li v-for="option in tibetTravelKit.sustainableOptions.slice(0, 3)" :key="option.title" class="text-xs leading-relaxed text-emerald-900/70">
+                        {{ option.title }}：{{ option.localBenefit }}
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </motion.div>
+      </div>
     </div>
   </div>
 </template>
@@ -359,10 +755,31 @@ import { ref, computed, shallowRef, onBeforeUnmount, onMounted, watch } from 'vu
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { AnimatePresence, motion } from 'motion-v'
+import {
+  Bell,
+  CalendarCheck,
+  ChevronDown,
+  ChevronUp,
+  Download,
+  HeartPulse,
+  Hotel,
+  Landmark,
+  Languages,
+  Leaf,
+  ListChecks,
+  MapPin,
+  Mountain,
+  ReceiptText,
+  ShieldAlert,
+  Shuffle,
+  Sparkles,
+  Ticket
+} from 'lucide-vue-next'
 import DOMPurify from 'dompurify'
 import { generateRouteStream } from '../api/stream'
-import api from '../api'
+import api, { endpoints } from '../api'
 import { useAuthStore } from '../stores/auth'
+import { useRouteGenerationStore } from '../stores/routeGeneration'
 import {
   cardInitial,
   cardInView,
@@ -377,6 +794,7 @@ import {
 const { t } = useI18n()
 const router = useRouter()
 const auth = useAuthStore()
+const generationStore = useRouteGenerationStore()
 
 const routePlannerDraftStorageKey = 'colorful-tibet:route-planner:draft'
 const routePlannerDraftVersion = 1
@@ -395,6 +813,167 @@ interface RoutePlannerDraft {
   errorMessage: string
   completed: boolean
   updatedAt: number
+}
+
+interface RouteSummarySection {
+  day: string
+  title: string
+  summary: string
+}
+
+interface ItineraryItem {
+  id: number
+  itemType: string
+  title: string
+  description?: string
+  startTime?: string
+  durationMinutes?: number
+  estimatedCost?: number
+  altitudeMeters?: number
+  riskLevel?: string
+  alternatives?: string
+  bookingAction?: string
+  bookingStatus?: string
+  bookingReferenceType?: string
+  bookingReferenceId?: number
+  scenicSpotId?: number
+  scenicSpotName?: string
+  hotelId?: number
+  hotelName?: string
+  roomTypeId?: number
+  roomTypeName?: string
+}
+
+interface ItineraryDay {
+  id: number
+  dayNumber: number
+  travelDate?: string
+  title: string
+  region?: string
+  summary?: string
+  estimatedCost?: number
+  altitudeRisk?: string
+  items: ItineraryItem[]
+}
+
+interface BookableItinerary {
+  id: number
+  title: string
+  days: number
+  startDate?: string
+  budget: string
+  preference: string
+  versionType: string
+  versionLabel: string
+  totalEstimatedCost?: number
+  itineraryDays: ItineraryDay[]
+}
+
+interface ItineraryQuote {
+  itineraryId: number
+  totalEstimatedCost: number
+  bookableTotal: number
+  informationalTotal: number
+  currency: string
+}
+
+interface HighlandDayAdvice {
+  dayNumber: number
+  title: string
+  maxAltitudeMeters: number
+  riskLevel: string
+  paceAdvice: string
+  hydrationAdvice: string
+  activityLimit: string
+  warning: string
+}
+
+interface HighlandAssessment {
+  riskScore: number
+  riskLevel: string
+  riskLabel: string
+  maxAltitudeMeters: number
+  highAltitudeDays: number
+  summary: string
+  dailyAdvice: HighlandDayAdvice[]
+  adaptationChecklist: string[]
+  warningSigns: string[]
+  goSlowRules: string[]
+}
+
+interface CulturalTip {
+  scene: string
+  title: string
+  context: string
+  doTips: string[]
+  avoidTips: string[]
+}
+
+interface PhraseGuideItem {
+  category: string
+  chinese: string
+  tibetan: string
+  english: string
+  pronunciation: string
+  usage: string
+}
+
+interface EmergencyContact {
+  name: string
+  phone: string
+  description: string
+}
+
+interface OfflineMapPin {
+  type: string
+  name: string
+  latitude?: number
+  longitude?: number
+  altitudeMeters?: number
+  note?: string
+}
+
+interface OfflinePackage {
+  itineraryId: number
+  title: string
+  generatedAt: string
+  validUntil: string
+  includedSections: string[]
+  emergencyContacts: EmergencyContact[]
+  mapPins: OfflineMapPin[]
+  offlineChecklist: string[]
+  voucherHints: string[]
+  backupNotes: string[]
+}
+
+interface TravelAlert {
+  level: string
+  type: string
+  title: string
+  message: string
+  action: string
+  relatedDay?: number
+  expiresAt?: string
+}
+
+interface SustainableOption {
+  category: string
+  title: string
+  impact: string
+  actions: string[]
+  localBenefit: string
+  carbonHint: string
+}
+
+interface TibetTravelKit {
+  itineraryId: number
+  title: string
+  highlandAssessment: HighlandAssessment
+  culturalTips: CulturalTip[]
+  phrasebook: PhraseGuideItem[]
+  offlinePackage: OfflinePackage
+  realtimeAlerts: TravelAlert[]
+  sustainableOptions: SustainableOption[]
 }
 
 const defaultForm: RoutePlannerFormState = {
@@ -431,6 +1010,13 @@ const preferenceOptions = computed(() => [
   { value: 'relaxation', label: t('routePlanner.preferenceOptions.relaxation'), desc: t('routePlanner.preferenceDesc.relaxation'), icon: '🌿' }
 ])
 
+const itineraryVersionOptions = [
+  { value: 'cheaper', label: '更省钱' },
+  { value: 'relaxed', label: '更轻松' },
+  { value: 'hidden', label: '更小众' },
+  { value: 'family', label: '老人小孩' }
+]
+
 const getBudgetShort = (key: string) => {
   if (key === 'economy') return t('routePlanner.budgetShort.economy')
   if (key === 'comfort') return t('routePlanner.budgetShort.comfort')
@@ -438,15 +1024,76 @@ const getBudgetShort = (key: string) => {
   return key
 }
 
+const formatCurrency = (value?: number | string | null) => {
+  const amount = Number(value || 0)
+  return amount.toLocaleString('zh-CN', { style: 'currency', currency: 'CNY', maximumFractionDigits: 0 })
+}
+
+const riskLabel = (risk?: string) => {
+  if (risk === 'EXTREME') return '极高风险'
+  if (risk === 'HIGH') return '高海拔'
+  if (risk === 'MEDIUM') return '中海拔'
+  return '低海拔'
+}
+
+const riskClass = (risk?: string) => {
+  if (risk === 'HIGH') return 'bg-rose-50 text-rose-700 border-rose-200'
+  if (risk === 'EXTREME') return 'bg-red-50 text-red-800 border-red-200'
+  if (risk === 'MEDIUM') return 'bg-amber-50 text-amber-700 border-amber-200'
+  return 'bg-emerald-50 text-emerald-700 border-emerald-200'
+}
+
+const alertClass = (level?: string) => {
+  if (level === 'HIGH') return 'border-rose-200 bg-rose-50 text-rose-800'
+  if (level === 'MEDIUM') return 'border-amber-200 bg-amber-50 text-amber-800'
+  return 'border-sky-200 bg-sky-50 text-sky-800'
+}
+
+const alertLabel = (level?: string) => {
+  if (level === 'HIGH') return '重要'
+  if (level === 'MEDIUM') return '提醒'
+  return '提示'
+}
+
+const itemTypeLabel = (type: string) => {
+  const labels: Record<string, string> = {
+    SCENIC_SPOT: '景点',
+    HOTEL: '酒店',
+    TRANSPORT: '交通',
+    MEAL: '餐饮',
+    EXPERIENCE: '体验',
+    NOTE: '提示'
+  }
+  return labels[type] || type
+}
+
+const itemIcon = (type: string) => {
+  if (type === 'HOTEL') return Hotel
+  if (type === 'SCENIC_SPOT') return Ticket
+  if (type === 'TRANSPORT') return CalendarCheck
+  return Sparkles
+}
+
+const isBookableItem = (item: ItineraryItem) =>
+  (item.bookingAction === 'BOOK_SPOT' || item.bookingAction === 'BOOK_HOTEL') && item.bookingStatus !== 'BOOKED'
+
 const loading = ref(false)
 const saving = ref(false)
 const sharing = ref(false)
 const copying = ref(false)
+const itineraryLoading = ref(false)
+const itineraryVersionLoading = ref<string | null>(null)
+const itineraryBookingItemId = ref<number | null>(null)
+const tibetTravelKitLoading = ref(false)
 const streaming = ref(false)
 const charCount = ref(0)
 const streamAbortController = ref<AbortController | null>(null)
 const result = shallowRef('')
 const renderedResult = shallowRef('')
+const resultExpanded = ref(false)
+const bookableItinerary = ref<BookableItinerary | null>(null)
+const itineraryQuote = ref<ItineraryQuote | null>(null)
+const tibetTravelKit = ref<TibetTravelKit | null>(null)
 const statusMessage = ref('')
 const errorMessage = ref('')
 const markdownRenderDebounceMs = 120
@@ -455,6 +1102,146 @@ let markdownRenderTimer: number | null = null
 let latestRenderJobId = 0
 let latestAppliedRenderId = 0
 let latestMarkdownSnapshot = ''
+
+const cleanMarkdownLine = (value: string) =>
+  value
+    .replace(/!\[[^\]]*]\([^)]+\)/g, '')
+    .replace(/\[([^\]]+)]\([^)]+\)/g, '$1')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/^[-*+]\s+/, '')
+    .replace(/^#{1,6}\s*/, '')
+    .replace(/^>\s*/, '')
+    .replace(/<[^>]+>/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+const stripMarkdown = (markdown: string) =>
+  markdown
+    .split(/\r?\n/)
+    .map(cleanMarkdownLine)
+    .filter(Boolean)
+    .join(' ')
+
+const getMarkdownSectionLines = (markdown: string, keywords: string[]) => {
+  const lines = markdown.split(/\r?\n/)
+  const startIndex = lines.findIndex(line => {
+    const clean = cleanMarkdownLine(line)
+    return /^#{1,3}\s+/.test(line.trim()) && keywords.some(keyword => clean.includes(keyword))
+  })
+  if (startIndex < 0) return []
+
+  const endIndex = lines.findIndex((line, index) => index > startIndex && /^##\s+/.test(line.trim()))
+  return lines.slice(startIndex + 1, endIndex > startIndex ? endIndex : lines.length)
+}
+
+const routeOverviewText = computed(() => {
+  const section = getMarkdownSectionLines(result.value, ['路线概览', 'Overview'])
+    .map(cleanMarkdownLine)
+    .filter(Boolean)
+    .join(' ')
+
+  if (section) return section
+  return stripMarkdown(result.value).slice(0, 160)
+})
+
+const routeHighlightItems = computed(() => {
+  const section = getMarkdownSectionLines(result.value, ['行程亮点', '亮点', 'Highlights'])
+  const items = section
+    .filter(line => /^[-*+]\s+/.test(line.trim()))
+    .map(cleanMarkdownLine)
+    .filter(Boolean)
+
+  if (items.length > 0) return items.slice(0, 4)
+
+  return stripMarkdown(result.value)
+    .split(/[。！？.!?]/)
+    .map(item => item.trim())
+    .filter(item => item.length > 10)
+    .slice(0, 3)
+})
+
+const routeDaySections = computed<RouteSummarySection[]>(() => {
+  const lines = result.value.split(/\r?\n/)
+  const sections: RouteSummarySection[] = []
+  const dayHeadingPattern = /^#{1,4}\s*(第[一二三四五六七八九十0-9]+天|Day\s*\d+)[：:\s-]*(.*)$/i
+
+  let current: { day: string; title: string; lines: string[] } | null = null
+
+  const flushCurrent = () => {
+    if (!current) return
+
+    const summary = current.lines
+      .map(cleanMarkdownLine)
+      .filter(Boolean)
+      .filter(line => !/^第[一二三四五六七八九十0-9]+天/.test(line))
+      .slice(0, 2)
+      .join('；')
+
+    sections.push({
+      day: current.day,
+      title: current.title || '当日行程',
+      summary: summary || '查看完整路线了解当天细节。'
+    })
+  }
+
+  for (const line of lines) {
+    const match = line.trim().match(dayHeadingPattern)
+    if (match) {
+      flushCurrent()
+      current = {
+        day: match[1].replace(/\s+/g, ' '),
+        title: cleanMarkdownLine(match[2] || ''),
+        lines: []
+      }
+      continue
+    }
+
+    if (current) {
+      if (/^##\s+/.test(line.trim()) && !dayHeadingPattern.test(line.trim())) {
+        flushCurrent()
+        current = null
+      } else {
+        current.lines.push(line)
+      }
+    }
+  }
+
+  flushCurrent()
+  return sections
+})
+
+const visibleRouteDaySections = computed(() => routeDaySections.value.slice(0, 6))
+const hiddenDayCount = computed(() => Math.max(routeDaySections.value.length - visibleRouteDaySections.value.length, 0))
+const resultShouldCollapse = computed(() => result.value.length > 1200 || routeDaySections.value.length > 4)
+const resultStats = computed(() => [
+  { label: '天数', value: `${form.value.days} 天` },
+  { label: '预算', value: getBudgetShort(form.value.budget) },
+  { label: '偏好', value: getPreferenceText(form.value.preference) },
+  { label: '篇幅', value: `${charCount.value || result.value.length} 字` }
+])
+const plannerSnapshotStats = computed(() => [
+  { label: '天数', value: `${form.value.days}天` },
+  { label: '预算', value: getBudgetShort(form.value.budget) },
+  { label: '偏好', value: getPreferenceText(form.value.preference) }
+])
+const planningPulseItems = computed(() => {
+  if (result.value) {
+    const dayCount = routeDaySections.value.length
+    const highlightItems = routeHighlightItems.value.slice(0, 3)
+
+    return [
+      dayCount > 0 ? `已整理 ${dayCount} 个每日安排节点。` : '路线正文已生成，可在右侧查看完整内容。',
+      ...highlightItems
+    ].slice(0, 4)
+  }
+
+  return [
+    `${form.value.days}天行程，偏向${getPreferenceText(form.value.preference)}。`,
+    `预算档位为${getBudgetShort(form.value.budget)}，会优先匹配相应住宿与体验强度。`,
+    '生成后可继续查看可预订行程、报价与高原旅行包。'
+  ]
+})
 
 const normalizeDraftForm = (draftForm?: Partial<RoutePlannerFormState>): RoutePlannerFormState => {
   const days = Number(draftForm?.days)
@@ -502,6 +1289,7 @@ const restoreRouteDraft = () => {
 
     result.value = draft.result
     charCount.value = draft.result.length
+    resultExpanded.value = false
     errorMessage.value = draft.errorMessage || ''
     statusMessage.value = draft.statusMessage || t('routePlanner.routeGenComplete', { chars: draft.result.trim().length })
     scheduleMarkdownRender(draft.result, true)
@@ -579,8 +1367,74 @@ const applyPreset = (preset: { label: string; days: number; budget: string; pref
   }
 }
 
+const fetchItineraryQuote = async (itineraryId: number) => {
+  const { data } = await api.get(endpoints.itineraries.quote(itineraryId))
+  itineraryQuote.value = data
+}
+
+const fetchTibetTravelKit = async (itineraryId: number) => {
+  tibetTravelKitLoading.value = true
+  try {
+    const { data } = await api.get(endpoints.tibetSpecialty.travelKit(itineraryId))
+    tibetTravelKit.value = data
+  } catch (error: any) {
+    console.error('Failed to fetch Tibet travel kit:', error)
+    tibetTravelKit.value = null
+  } finally {
+    tibetTravelKitLoading.value = false
+  }
+}
+
+const refreshBookableItinerary = async () => {
+  if (!bookableItinerary.value) return
+  const { data } = await api.get(endpoints.itineraries.detail(bookableItinerary.value.id))
+  bookableItinerary.value = data
+}
+
+const generateBookableItinerary = async (versionType = 'default') => {
+  if (!(await auth.ensureSession())) {
+    if (confirm(t('routePlanner.loginRequired'))) {
+      router.push('/login')
+    }
+    return
+  }
+
+  const isVersion = versionType !== 'default' && !!bookableItinerary.value
+  if (isVersion) {
+    itineraryVersionLoading.value = versionType
+  } else {
+    itineraryLoading.value = true
+  }
+
+  try {
+    const locale = localStorage.getItem('locale') || 'zh'
+    const response = isVersion
+      ? await api.post(endpoints.itineraries.createVersion(bookableItinerary.value!.id), { versionType })
+      : await api.post(endpoints.itineraries.generate, {
+          days: form.value.days,
+          budget: form.value.budget,
+          preference: form.value.preference,
+          versionType,
+          travelers: 2,
+          locale
+        })
+
+    bookableItinerary.value = response.data
+    await fetchItineraryQuote(response.data.id)
+    await fetchTibetTravelKit(response.data.id)
+    statusMessage.value = `已生成${response.data.versionLabel || '可预订'}行程，可查看报价并预订节点。`
+    errorMessage.value = ''
+  } catch (error: any) {
+    console.error('Failed to generate bookable itinerary:', error)
+    errorMessage.value = error.response?.data?.error || '可预订行程生成失败'
+  } finally {
+    itineraryLoading.value = false
+    itineraryVersionLoading.value = null
+  }
+}
+
 const generateRoute = async () => {
-  if (!auth.hasValidSession()) {
+  if (!(await auth.ensureSession())) {
     if (confirm(t('routePlanner.loginRequired'))) {
       router.push('/login')
     }
@@ -591,12 +1445,17 @@ const generateRoute = async () => {
   streaming.value = true
   result.value = ''
   renderedResult.value = ''
+  resultExpanded.value = false
+  bookableItinerary.value = null
+  itineraryQuote.value = null
+  tibetTravelKit.value = null
   charCount.value = 0
   copying.value = false
   errorMessage.value = ''
   statusMessage.value = t('routePlanner.aiWritingHint')
   scheduleMarkdownRender('', true)
   persistRouteDraft()
+  generationStore.startGeneration()
 
   const controller = new AbortController()
   streamAbortController.value = controller
@@ -625,9 +1484,12 @@ const generateRoute = async () => {
           loading.value = false
           if (fullText && fullText.trim().length > 0) {
             statusMessage.value = t('routePlanner.routeGenComplete', { chars: fullText.trim().length })
+            generationStore.completeGeneration()
+            void generateBookableItinerary()
           } else {
             errorMessage.value = t('routePlanner.aiEmptyResult')
             statusMessage.value = t('routePlanner.routeGenFailedStatus')
+            generationStore.cancelGeneration()
           }
           persistRouteDraft()
         },
@@ -636,6 +1498,7 @@ const generateRoute = async () => {
           statusMessage.value = t('routePlanner.finalFailure')
           streaming.value = false
           loading.value = false
+          generationStore.cancelGeneration()
           persistRouteDraft()
         },
       },
@@ -651,6 +1514,7 @@ const generateRoute = async () => {
     }
     errorMessage.value = message
     statusMessage.value = t('routePlanner.routeGenFailedStatus')
+    generationStore.cancelGeneration()
     persistRouteDraft()
   } finally {
     loading.value = false
@@ -695,7 +1559,7 @@ const getPreferenceText = (key: string) => {
 const shareRoute = async () => {
   if (!result.value) return
 
-  if (!auth.hasValidSession()) {
+  if (!(await auth.ensureSession())) {
     if (confirm(t('routePlanner.loginRequired'))) {
       router.push('/login')
     }
@@ -727,10 +1591,64 @@ const shareRoute = async () => {
   }
 }
 
+const bookItineraryItem = async (item: ItineraryItem) => {
+  if (!bookableItinerary.value || !isBookableItem(item)) return
+
+  if (!(await auth.ensureSession())) {
+    if (confirm(t('routePlanner.loginRequired'))) {
+      router.push('/login')
+    }
+    return
+  }
+
+  const user = auth.user || {}
+  const guestName = String(user.nickname || user.username || '')
+  let phone = typeof user.phone === 'string' ? user.phone : ''
+
+  if (item.bookingAction === 'BOOK_HOTEL' && !phone) {
+    phone = window.prompt('请输入手机号用于酒店预订') || ''
+    if (!phone.trim()) return
+  }
+
+  itineraryBookingItemId.value = item.id
+  try {
+    const { data } = await api.post(endpoints.itineraries.bookItem(bookableItinerary.value.id, item.id), {
+      travelers: 2,
+      guestName,
+      phone
+    })
+    statusMessage.value = `${data.message || '预订成功'}，可在订单中心查看。`
+    errorMessage.value = ''
+    await refreshBookableItinerary()
+    await fetchItineraryQuote(bookableItinerary.value.id)
+    await fetchTibetTravelKit(bookableItinerary.value.id)
+  } catch (error: any) {
+    console.error('Failed to book itinerary item:', error)
+    errorMessage.value = error.response?.data?.error || '预订失败'
+  } finally {
+    itineraryBookingItemId.value = null
+  }
+}
+
+const downloadOfflinePackage = () => {
+  if (!tibetTravelKit.value) return
+  const payload = JSON.stringify(tibetTravelKit.value, null, 2)
+  const blob = new Blob([payload], { type: 'application/json;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `tibet-travel-kit-${tibetTravelKit.value.itineraryId}.json`
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}
+
 watch(form, () => persistRouteDraft(), { deep: true })
 
 onMounted(() => {
   restoreRouteDraft()
+  generationStore.acknowledgeResult()
 })
 
 onBeforeUnmount(() => {
@@ -740,6 +1658,7 @@ onBeforeUnmount(() => {
     streaming.value = false
     errorMessage.value = ''
     statusMessage.value = result.value ? t('routePlanner.generationCancelled') : ''
+    generationStore.cancelGeneration()
   }
 
   persistRouteDraft()
@@ -752,14 +1671,24 @@ onBeforeUnmount(() => {
 
 <style scoped>
 /* ===== Animations ===== */
-@keyframes shimmerStream {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+.animate-shimmer-stream::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.45) 50%,
+    transparent 100%
+  );
+  animation: shimmerStream 2s linear infinite;
+  will-change: transform;
 }
 
-.animate-shimmer-stream {
-  background-size: 200% 100%;
-  animation: shimmerStream 2s linear infinite;
+@keyframes shimmerStream {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
 }
 
 /* ===== Glass Card ===== */
@@ -778,6 +1707,44 @@ onBeforeUnmount(() => {
   --tw-prose-headings: #121212;
   --tw-prose-links: #2D5F8A;
   --tw-prose-bold: #1d1d1f;
+}
+
+.route-result-prose {
+  transition: max-height 0.28s ease;
+}
+
+.route-result-prose :deep(h1) {
+  font-size: 1.45rem;
+  line-height: 1.25;
+  margin-bottom: 0.8rem;
+}
+
+.route-result-prose :deep(h2) {
+  font-size: 1.05rem;
+  line-height: 1.35;
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.route-result-prose :deep(h3) {
+  font-size: 0.98rem;
+  line-height: 1.4;
+  margin-top: 1.15rem;
+  margin-bottom: 0.45rem;
+}
+
+.route-result-prose :deep(p),
+.route-result-prose :deep(li) {
+  font-size: 0.92rem;
+  line-height: 1.72;
+  margin-top: 0.28rem;
+  margin-bottom: 0.28rem;
+}
+
+.route-result-prose :deep(ul),
+.route-result-prose :deep(ol) {
+  margin-top: 0.45rem;
+  margin-bottom: 0.85rem;
 }
 
 /* ===== Responsive ===== */

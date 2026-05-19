@@ -1,0 +1,207 @@
+:root {
+  color-scheme: light;
+  --ink: #27211a;
+  --muted: #766956;
+  --panel: rgba(255, 255, 255, 0.78);
+  --line: rgba(92, 72, 42, 0.18);
+  --gold: #f7b235;
+  --mint: #cbe890;
+  --warm: #fff2d6;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  color: var(--ink);
+  font-family:
+    Inter,
+    "PingFang SC",
+    "Microsoft YaHei",
+    system-ui,
+    sans-serif;
+  background:
+    radial-gradient(circle at 30% 24%, rgba(255, 217, 120, 0.85), transparent 31rem),
+    radial-gradient(circle at 77% 74%, rgba(203, 232, 144, 0.72), transparent 28rem),
+    linear-gradient(135deg, #fff8e8 0%, #f6ead4 48%, #fffaf0 100%);
+  overflow: hidden;
+}
+
+.app-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 24px;
+  width: min(1180px, calc(100vw - 40px));
+  height: min(760px, calc(100vh - 40px));
+  margin: 20px auto;
+}
+
+.stage-panel,
+.control-panel {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  box-shadow: 0 24px 70px rgba(108, 77, 31, 0.18);
+  backdrop-filter: blur(18px);
+}
+
+.stage-panel {
+  position: relative;
+  min-height: 0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.stage-panel::before {
+  position: absolute;
+  inset: 0;
+  content: "";
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.1)),
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.16) 0,
+      rgba(255, 255, 255, 0.16) 1px,
+      transparent 1px,
+      transparent 52px
+    );
+  pointer-events: none;
+}
+
+#yakmo-stage {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.control-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  min-width: 0;
+  padding: 24px;
+  border-radius: 8px;
+}
+
+.identity {
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.kicker {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+h1 {
+  margin: 6px 0 0;
+  font-size: 42px;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.motion-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+button {
+  min-width: 0;
+  min-height: 42px;
+  border: 1px solid rgba(85, 65, 35, 0.2);
+  border-radius: 8px;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.66);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    transform 160ms ease,
+    background 160ms ease,
+    border-color 160ms ease;
+}
+
+button:hover {
+  transform: translateY(-1px);
+  border-color: rgba(247, 178, 53, 0.72);
+}
+
+button.active {
+  border-color: rgba(247, 178, 53, 0.9);
+  background: linear-gradient(180deg, #ffe09a, #f7b235);
+}
+
+.meta-list {
+  display: grid;
+  gap: 10px;
+  margin-top: auto;
+}
+
+.meta-list div {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.46);
+}
+
+.meta-list span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.meta-list strong {
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+@media (max-width: 820px) {
+  body {
+    overflow: auto;
+  }
+
+  .app-shell {
+    grid-template-columns: 1fr;
+    width: min(100vw - 24px, 560px);
+    height: auto;
+    margin: 12px auto;
+  }
+
+  .stage-panel {
+    height: min(72vh, 560px);
+  }
+
+  .control-panel {
+    padding: 18px;
+  }
+}
+
+@media (max-width: 620px) {
+  .app-shell {
+    width: min(calc(100vw - 24px), 366px);
+    margin-inline: 12px;
+  }
+
+  .motion-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  h1 {
+    font-size: 36px;
+  }
+}
