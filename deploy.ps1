@@ -66,7 +66,15 @@ function Invoke-Native {
 
     Push-Location $WorkingDirectory
     try {
-        & $FilePath @Arguments
+        # Temporarily relax error handling so that native tools writing to stderr
+        # (e.g. npm warnings) do not abort the deployment. We still check exit codes.
+        $previousPreference = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        try {
+            & $FilePath @Arguments 2>&1 | ForEach-Object { Write-Host $_ }
+        } finally {
+            $ErrorActionPreference = $previousPreference
+        }
         if ($LASTEXITCODE -ne 0) {
             throw "Command failed with exit code ${LASTEXITCODE}: $FilePath $($Arguments -join ' ')"
         }
