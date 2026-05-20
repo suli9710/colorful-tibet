@@ -76,6 +76,9 @@ scrapling:
   service:
     url: ${SCRAPLING_SERVICE_URL:http://localhost:8000}
     timeout-seconds: ${SCRAPLING_SERVICE_TIMEOUT:30}
+    max-sources: ${SCRAPLING_MAX_SOURCES:4}
+    mode: ${SCRAPLING_MODE:basic}
+    health-enabled: ${SCRAPLING_HEALTH_ENABLED:false}
 
 # 价格定时更新配置
 price:
@@ -112,6 +115,8 @@ app:
       register:
         requests: ${RATE_LIMIT_REGISTER_REQUESTS:5}
         window-seconds: ${RATE_LIMIT_REGISTER_WINDOW_SECONDS:3600}
+  payments:
+    mock-callback-secret: ${PAYMENT_CALLBACK_SECRET:dev-payment-callback-secret}
   super-admin-username: ${SUPER_ADMIN_USERNAME:lzh}
   seed:
     content:

@@ -34,7 +34,7 @@
                 <img :src="resolveHotelBookingImage(order)" class="w-full h-full object-cover" :alt="order.hotelName" @error="applyHotelImageFallback">
               </div>
               <div class="min-w-0">
-                <h2 class="text-lg font-semibold text-gray-900 truncate">{{ order.hotelName }} · {{ order.roomName }}</h2>
+                <h2 class="text-lg font-semibold text-gray-900 truncate">{{ displayHotelName(order) }} · {{ order.roomName || '-' }}</h2>
                 <p class="text-sm text-gray-500 mt-1">{{ order.checkInDate }} {{ t('hotel.dateConnector') }} {{ order.checkOutDate }} · {{ order.guests }}{{ t('hotel.guests') }}</p>
                 <p class="text-sm text-gray-500 mt-1">{{ t('hotel.booker') }}：{{ order.guestName }} · {{ order.phone }}</p>
               </div>
@@ -93,17 +93,17 @@ const loadOrders = async () => {
   loading.value = true
   try {
     const response = await api.get(endpoints.hotelBookings.my)
+    localStorage.removeItem('hotel-orders')
     orders.value = Array.isArray(response.data?.content) ? response.data.content : (Array.isArray(response.data) ? response.data : [])
   } catch {
-    try {
-      orders.value = JSON.parse(localStorage.getItem('hotel-orders') || '[]') as HotelOrder[]
-    } catch {
-      orders.value = []
-    }
+    localStorage.removeItem('hotel-orders')
+    orders.value = []
   } finally {
     loading.value = false
   }
 }
+
+const displayHotelName = (order: HotelOrder) => order.hotel?.name || order.hotelName || '-'
 
 const handleOrdersUpdate = () => {
   loadOrders()

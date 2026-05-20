@@ -1,6 +1,7 @@
 FROM python:3.11-slim
 
 WORKDIR /app
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
 RUN apt-get update && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/*
@@ -8,10 +9,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl \
 RUN addgroup --system app && adduser --system --group app
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt \
+    && scrapling install
 
 COPY . .
-RUN chown -R app:app /app
+RUN chown -R app:app /app /ms-playwright
 
 USER app
 

@@ -387,44 +387,17 @@ const handlePaymentConfirmed = async () => {
       return
     }
 
-    const order = {
-      id: Date.now().toString(),
-      hotelId: hotelId.value,
-      roomId: roomId.value,
-      hotelName: hotel.value?.name || '',
-      roomName: selectedRoom.value?.name || '',
-      checkInDate: form.value.checkInDate,
-      checkOutDate: form.value.checkOutDate,
-      guests: form.value.guests,
-      guestName: form.value.guestName,
-      phone: form.value.phone,
-      note: form.value.note,
-      nights: nights.value,
-      subtotal: (selectedRoom.value?.price || 0) * nights.value,
-      serviceFee: serviceFee.value,
-      discount: 0,
-      totalPrice: totalPrice.value,
-      status: 'PENDING',
-      createdAt: new Date().toISOString(),
-    }
-    const existing = safeReadHotelOrders()
-    localStorage.setItem('hotel-orders', JSON.stringify([order, ...existing]))
+    localStorage.removeItem('hotel-orders')
+    submitError.value = t('hotel.bookingFailed')
+    return
   } finally {
     submitting.value = false
     resetBehavior()
   }
 
+  localStorage.removeItem('hotel-orders')
   window.dispatchEvent(new CustomEvent('hotel-orders-updated'))
   window.dispatchEvent(new CustomEvent('bookings-updated'))
   router.push('/hotel-orders')
-}
-
-const safeReadHotelOrders = () => {
-  try {
-    const orders = JSON.parse(localStorage.getItem('hotel-orders') || '[]')
-    return Array.isArray(orders) ? orders : []
-  } catch {
-    return []
-  }
 }
 </script>

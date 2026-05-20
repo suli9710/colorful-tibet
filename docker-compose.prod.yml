@@ -27,6 +27,7 @@ services:
       - ADMIN_ENCRYPTION_KEY=${ADMIN_ENCRYPTION_KEY}
       - CSRF_SIGNING_SECRET=${CSRF_SIGNING_SECRET}
       - PII_ENCRYPTION_KEY=${PII_ENCRYPTION_KEY}
+      - PAYMENT_CALLBACK_SECRET=${PAYMENT_CALLBACK_SECRET:?PAYMENT_CALLBACK_SECRET is required in production}
       - REQUIRE_STRONG_SECRETS=${REQUIRE_STRONG_SECRETS:-true}
       - PUBLIC_DOCS_ENABLED=${PUBLIC_DOCS_ENABLED:-false}
       - SEED_CONTENT_ENABLED=${SEED_CONTENT_ENABLED:-false}
@@ -41,7 +42,7 @@ services:
       - DB_HOST=${DB_HOST:-mysql}
       - DB_PORT=${DB_PORT:-3306}
       - DB_NAME=${DB_NAME:-tibet_tourism}
-      - DB_SSL_MODE=${DB_SSL_MODE:-DISABLED}
+      - DB_SSL_MODE=${DB_SSL_MODE:-VERIFY_IDENTITY}
       - DB_ALLOW_PUBLIC_KEY_RETRIEVAL=${DB_ALLOW_PUBLIC_KEY_RETRIEVAL:-false}
       - REDIS_HOST=${REDIS_HOST:-redis}
       - REDIS_PORT=${REDIS_PORT:-6379}
@@ -51,6 +52,10 @@ services:
       - ZIPKIN_ENDPOINT=${ZIPKIN_ENDPOINT:-http://zipkin:9411/api/v2/spans}
       - TRACING_SAMPLING_PROBABILITY=${TRACING_SAMPLING_PROBABILITY:-0.1}
       - SCRAPLING_SERVICE_URL=${SCRAPLING_SERVICE_URL:-http://scrapling:8000}
+      - SCRAPLING_SERVICE_TIMEOUT=${SCRAPLING_SERVICE_TIMEOUT:-30}
+      - SCRAPLING_MAX_SOURCES=${SCRAPLING_MAX_SOURCES:-4}
+      - SCRAPLING_MODE=${SCRAPLING_MODE:-stealth}
+      - SCRAPLING_HEALTH_ENABLED=${SCRAPLING_HEALTH_ENABLED:-true}
       - ANTIBOT_ENABLED=${ANTIBOT_ENABLED:-true}
       - RECAPTCHA_ENABLED=${RECAPTCHA_ENABLED:-true}
       - RECAPTCHA_SITE_KEY=${RECAPTCHA_SITE_KEY}
@@ -90,7 +95,7 @@ services:
     image: redis:7-alpine
     container_name: colorful-tibet-redis
     command: >
-      redis-server --appendonly yes --requirepass "$${REDIS_PASSWORD}"
+      sh -c 'exec redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"'
     environment:
       - REDIS_PASSWORD=${REDIS_PASSWORD:?REDIS_PASSWORD is required in production}
     volumes:
@@ -142,6 +147,12 @@ services:
     environment:
       - SCRAPLING_MODE=${SCRAPLING_MODE:-stealth}
       - SCRAPLING_TIMEOUT_SECONDS=${SCRAPLING_TIMEOUT_SECONDS:-30}
+      - SCRAPLING_RETRIES=${SCRAPLING_RETRIES:-2}
+      - SCRAPLING_MAX_SOURCES=${SCRAPLING_MAX_SOURCES:-4}
+      - SCRAPLING_SEARCH_PROVIDERS=${SCRAPLING_SEARCH_PROVIDERS:-baidu,bing}
+      - SCRAPLING_ALLOWED_DOMAINS=${SCRAPLING_ALLOWED_DOMAINS:-}
+      - SCRAPLING_PROXY_URL=${SCRAPLING_PROXY_URL:-}
+      - SCRAPLING_SOLVE_CLOUDFLARE=${SCRAPLING_SOLVE_CLOUDFLARE:-false}
     restart: unless-stopped
     networks:
       - tibet-network

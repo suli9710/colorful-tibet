@@ -115,6 +115,9 @@ scrapling:
   service:
     url: ${SCRAPLING_SERVICE_URL:http://scrapling:8000}
     timeout-seconds: ${SCRAPLING_SERVICE_TIMEOUT:30}
+    max-sources: ${SCRAPLING_MAX_SOURCES:4}
+    mode: ${SCRAPLING_MODE:stealth}
+    health-enabled: ${SCRAPLING_HEALTH_ENABLED:true}
 
 # 价格定时更新配置
 price:
@@ -157,6 +160,8 @@ app:
         requests: ${RATE_LIMIT_REGISTER_REQUESTS:5}
         window-seconds: ${RATE_LIMIT_REGISTER_WINDOW_SECONDS:3600}
     cookie-secure: ${COOKIE_SECURE:true}
+  payments:
+    mock-callback-secret: ${PAYMENT_CALLBACK_SECRET}
   super-admin-username: ${SUPER_ADMIN_USERNAME}
   seed:
     content:
@@ -166,8 +171,6 @@ app:
       admin-password: ${SEED_DEMO_ADMIN_PASSWORD:}
       super-admin-password: ${SEED_DEMO_SUPER_ADMIN_PASSWORD:}
       user-password: ${SEED_DEMO_USER_PASSWORD:}
-
-
 
 
 
