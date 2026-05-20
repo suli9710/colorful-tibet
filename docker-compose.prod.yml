@@ -1,5 +1,3 @@
-version: '3.8'
-
 # 生产环境 Docker Compose 配置
 # 使用方法: docker-compose -f docker-compose.prod.yml up -d
 
@@ -62,6 +60,7 @@ services:
       - RATE_LIMIT_AI_REQUESTS=${RATE_LIMIT_AI_REQUESTS:-6}
       - RATE_LIMIT_AI_WINDOW_SECONDS=${RATE_LIMIT_AI_WINDOW_SECONDS:-600}
       - AI_DAILY_QUOTA_PER_USER=${AI_DAILY_QUOTA_PER_USER:-20}
+      - IP_LOCATION_URL_TEMPLATE=${IP_LOCATION_URL_TEMPLATE:-https://ipapi.co/{ip}/json/}
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
@@ -165,6 +164,11 @@ services:
       args:
         - VITE_API_BASE_URL=${VITE_API_BASE_URL:-/api}
         - VITE_RECAPTCHA_SITE_KEY=${VITE_RECAPTCHA_SITE_KEY:-}
+        - VITE_AMAP_KEY=${VITE_AMAP_KEY:?VITE_AMAP_KEY is required for production map features}
+        - VITE_AMAP_SECURITY_CODE=${VITE_AMAP_SECURITY_CODE:?VITE_AMAP_SECURITY_CODE is required for production map features}
+    environment:
+      - NGINX_SERVER_NAME=${NGINX_SERVER_NAME:?NGINX_SERVER_NAME is required in production}
+      - NGINX_CERT_DOMAIN=${NGINX_CERT_DOMAIN:?NGINX_CERT_DOMAIN is required in production}
     container_name: colorful-tibet-frontend
     ports:
       - "80:80"
@@ -173,8 +177,15 @@ services:
       - /etc/letsencrypt:/etc/letsencrypt:ro
       - /var/www/certbot:/var/www/certbot:ro
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/health >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     deploy:
       resources:
         limits:
@@ -210,12 +221,42 @@ services:
   alertmanager:
     image: prom/alertmanager:v0.27.0
     container_name: colorful-tibet-alertmanager
+    entrypoint:
+      - /bin/sh
+      - -ec
     command:
-      - --config.file=/etc/alertmanager/alertmanager.yml
+      - |
+        if [ -n "$${ALERTMANAGER_WEBHOOK_URL:-}" ]; then
+          cat > /tmp/alertmanager.yml <<EOF
+        route:
+          receiver: webhook
+          group_by:
+            - alertname
+            - severity
+          group_wait: 30s
+          group_interval: 5m
+          repeat_interval: 2h
+
+        receivers:
+          - name: webhook
+            webhook_configs:
+              - url: "$${ALERTMANAGER_WEBHOOK_URL}"
+                send_resolved: true
+        EOF
+        else
+          cat > /tmp/alertmanager.yml <<EOF
+        route:
+          receiver: noop
+
+        receivers:
+          - name: noop
+        EOF
+        fi
+        /bin/alertmanager --config.file=/tmp/alertmanager.yml
+    environment:
+      - ALERTMANAGER_WEBHOOK_URL=${ALERTMANAGER_WEBHOOK_URL:-}
     ports:
       - "127.0.0.1:9093:9093"
-    volumes:
-      - ./monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
     restart: unless-stopped
     deploy:
       resources:
@@ -262,28 +303,6 @@ services:
     networks:
       - tibet-network
 
-  # MySQL 数据库（可选，如果使用 MySQL）
-  # mysql:
-  #   image: mysql:8.0
-  #   container_name: colorful-tibet-mysql
-  #   environment:
-  #     - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
-  #     - MYSQL_DATABASE=tibet_tourism
-  #     - MYSQL_USER=tibet_user
-  #     - MYSQL_PASSWORD=${DB_PASSWORD}
-  #   volumes:
-  #     - mysql_data:/var/lib/mysql
-  #   ports:
-  #     - "3306:3306"
-  #   restart: unless-stopped
-  #   networks:
-  #     - tibet-network
-  #   healthcheck:
-  #     test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-  #     interval: 10s
-  #     timeout: 5s
-  #     retries: 5
-
 networks:
   tibet-network:
     driver: bridge
@@ -293,9 +312,3 @@ volumes:
   mysql_data:
   prometheus_data:
   grafana_data:
-
-
-
-
-
-

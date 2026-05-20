@@ -352,6 +352,7 @@ import api, { endpoints } from '../api'
 import PaymentModal from '../components/PaymentModal.vue'
 import { useBehaviorTracker } from '../composables/useBehaviorTracker'
 import { getRecaptchaToken } from '../utils/recaptcha'
+import { useAuthStore } from '../stores/auth'
 import type * as Leaflet from 'leaflet'
 
 const { t, locale } = useI18n()
@@ -360,6 +361,7 @@ const { encodeBehaviorData, reset: resetBehavior } = useBehaviorTracker()
 
 const route = useRoute()
 const router = useRouter()
+const auth = useAuthStore()
 const spot = ref<any>(null)
 const loading = ref(true)
 const submitting = ref(false)
@@ -601,9 +603,8 @@ onBeforeUnmount(() => {
 
 const showPaymentModal = ref(false)
 
-const handleBooking = () => {
-  const userStr = localStorage.getItem('user')
-  if (!userStr) {
+const handleBooking = async () => {
+  if (!(await auth.ensureSession())) {
     router.push('/login')
     return
   }
@@ -642,7 +643,7 @@ const handlePaymentConfirmed = async () => {
   }
 }
 
-const user = ref(JSON.parse(localStorage.getItem('user') || 'null'))
+const user = computed(() => auth.user)
 const comments = ref<any[]>([])
 const submittingComment = ref(false)
 const commentForm = ref({
@@ -739,7 +740,7 @@ async function handleCommentImageChange(event: Event) {
 const submitComment = async () => {
   if (!commentForm.value.content.trim()) return
 
-  if (!user.value) {
+  if (!(await auth.ensureSession())) {
     router.push('/login')
     return
   }
@@ -789,7 +790,7 @@ const deleteComment = async (comment: any) => {
 }
 
 const toggleLike = async (comment: any) => {
-  if (!user.value) {
+  if (!(await auth.ensureSession())) {
     router.push('/login')
     return
   }
@@ -841,29 +842,9 @@ watch(locale, () => {
   fetchSpotDetail()
 })
 
-const updateUser = () => {
-  user.value = JSON.parse(localStorage.getItem('user') || 'null')
-}
-
-const handleStorageChange = (e: StorageEvent) => {
-  if (e.key === 'user') {
-    updateUser()
-  }
-}
-
-const handleUserUpdate = () => {
-  updateUser()
-}
-
-onMounted(() => {
+onMounted(async () => {
   fetchSpotDetail()
+  await auth.refreshSession()
   fetchComments()
-  window.addEventListener('storage', handleStorageChange)
-  window.addEventListener('user-updated', handleUserUpdate)
-})
-
-onBeforeUnmount(() => {
-  window.removeEventListener('storage', handleStorageChange)
-  window.removeEventListener('user-updated', handleUserUpdate)
 })
 </script>

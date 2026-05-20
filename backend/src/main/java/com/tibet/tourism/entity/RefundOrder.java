@@ -42,6 +42,10 @@ public class RefundOrder {
     @Column(name = "processed_at")
     private LocalDateTime processedAt;
 
+    @Version
+    @Column(name = "version")
+    private Long version = 0L;
+
     @PrePersist
     protected void onCreate() {
         if (requestedAt == null) {
@@ -75,6 +79,9 @@ public class RefundOrder {
 
     public LocalDateTime getProcessedAt() { return processedAt; }
     public void setProcessedAt(LocalDateTime processedAt) { this.processedAt = processedAt; }
+
+    public Long getVersion() { return version; }
+    public void setVersion(Long version) { this.version = version; }
 
     public enum Status {
         REQUESTED, APPROVED, REJECTED, COMPLETED

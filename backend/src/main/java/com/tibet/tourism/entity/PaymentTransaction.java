@@ -47,6 +47,10 @@ public class PaymentTransaction {
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
+    @Version
+    @Column(name = "version")
+    private Long version = 0L;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
@@ -84,6 +88,9 @@ public class PaymentTransaction {
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public Long getVersion() { return version; }
+    public void setVersion(Long version) { this.version = version; }
 
     public enum Status {
         PENDING, SUCCESS, FAILED, REFUNDED

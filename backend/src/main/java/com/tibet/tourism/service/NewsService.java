@@ -2,12 +2,15 @@ package com.tibet.tourism.service;
 
 import com.tibet.tourism.config.CacheConfig;
 import com.tibet.tourism.entity.News;
+import com.tibet.tourism.exception.ResourceNotFoundException;
 import com.tibet.tourism.repository.NewsRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,7 +24,7 @@ public class NewsService {
     private NewsRepository newsRepository;
 
     public List<News> getAllNews() {
-        return newsRepository.findAll();
+        return newsRepository.findAll(PageRequest.of(0, 500, Sort.by(Sort.Direction.DESC, "createdAt"))).getContent();
     }
 
     @Cacheable(
@@ -45,7 +48,7 @@ public class NewsService {
     @CacheEvict(value = CacheConfig.NEWS_CACHE, allEntries = true)
     public News updateNews(@NonNull Long id, @NonNull News updatedNews) {
         News news = newsRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("News not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("News not found with id: " + id));
         
         if (updatedNews.getTitle() != null) {
             news.setTitle(updatedNews.getTitle());
@@ -70,7 +73,7 @@ public class NewsService {
     @CacheEvict(value = CacheConfig.NEWS_CACHE, allEntries = true)
     public void deleteNews(@NonNull Long id) {
         if (!newsRepository.existsById(id)) {
-            throw new RuntimeException("News not found with id: " + id);
+            throw new ResourceNotFoundException("News not found with id: " + id);
         }
         newsRepository.deleteById(id);
     }

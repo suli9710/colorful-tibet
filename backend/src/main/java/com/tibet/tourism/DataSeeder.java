@@ -6,6 +6,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.core.env.Environment;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
@@ -23,6 +25,8 @@ public class DataSeeder implements CommandLineRunner {
     private static final Logger logger = LoggerFactory.getLogger(DataSeeder.class);
     private static final String SPOT_IMAGE_BASE = "/images/spots/";
     private static final String[] AUDIT_USERNAMES = {"admin", "lzh"};
+    private static final int SEED_HISTORY_SPOT_LIMIT = 2000;
+    private static final int SEED_HISTORY_USER_LIMIT = 1000;
 
     @Autowired
     private UserRepository userRepository;
@@ -713,10 +717,11 @@ public class DataSeeder implements CommandLineRunner {
 
     private void seedHistory() {
         logger.info("开始生成用户访问历史数据（目标：1000+条记录）...");
-        List<ScenicSpot> spots = spotRepository.findAll();
+        List<ScenicSpot> spots = spotRepository.findAllWithoutTags(PageRequest.of(0, SEED_HISTORY_SPOT_LIMIT,
+                Sort.by(Sort.Direction.DESC, "visitCount").and(Sort.by("id")))).getContent();
         if (spots.isEmpty()) return;
 
-        List<User> users = userRepository.findAll();
+        List<User> users = userRepository.findAll(PageRequest.of(0, SEED_HISTORY_USER_LIMIT, Sort.by("id"))).getContent();
         if (users.size() < 2) return;
 
         // 已有4条手动记录，补充至1000+条
@@ -920,9 +925,7 @@ public class DataSeeder implements CommandLineRunner {
             return;
         }
         User officialAuthor = getOrCreateOfficialRouteAuthor();
-        travelRouteRepository.findAll().stream()
-                .sorted(Comparator.comparing(TravelRoute::getId))
-                .limit(4)
+        travelRouteRepository.findAll(PageRequest.of(0, 4, Sort.by("id"))).stream()
                 .forEach(route -> syncRouteToCommunity(route, officialAuthor));
     }
 

@@ -113,6 +113,11 @@ const router = createRouter({
             name: 'hotel-orders',
             component: () => import('../views/HotelOrders.vue'),
             meta: { requiresAuth: true }
+        },
+        {
+            path: '/:pathMatch(.*)*',
+            name: 'not-found',
+            component: () => import('../views/NotFound.vue')
         }
     ]
 })

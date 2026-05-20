@@ -3,7 +3,7 @@ import vue from '@vitejs/plugin-vue'
 import path from 'path'
 
 // https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   plugins: [vue()],
   resolve: {
     alias: {
@@ -58,7 +58,12 @@ export default defineConfig({
       },
     },
   },
+  esbuild: command === 'build'
+    ? {
+        drop: ['console', 'debugger'],
+      }
+    : undefined,
   css: {
     postcss: './postcss.config.js',
   },
-})
+}))

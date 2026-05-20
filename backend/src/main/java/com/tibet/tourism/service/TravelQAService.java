@@ -1,6 +1,9 @@
 package com.tibet.tourism.service;
 
 import com.tibet.tourism.entity.*;
+import com.tibet.tourism.exception.BusinessException;
+import com.tibet.tourism.exception.ResourceNotFoundException;
+import com.tibet.tourism.exception.UnauthorizedActionException;
 import com.tibet.tourism.repository.*;
 import com.tibet.tourism.security.InputSanitizer;
 import jakarta.persistence.criteria.Predicate;
@@ -32,7 +35,7 @@ public class TravelQAService {
     @Transactional
     public TravelQuestion askQuestion(Long userId, String title, String content, String tags) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         TravelQuestion question = new TravelQuestion();
         question.setAuthor(user);
@@ -71,7 +74,7 @@ public class TravelQAService {
     @Transactional
     public TravelQuestion getQuestion(Long id) {
         TravelQuestion question = questionRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Question not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Question not found"));
         question.incrementViewCount();
         return questionRepository.save(question);
     }
@@ -79,10 +82,10 @@ public class TravelQAService {
     @Transactional
     public void deleteQuestion(Long questionId, Long userId) {
         TravelQuestion question = questionRepository.findById(questionId)
-                .orElseThrow(() -> new RuntimeException("Question not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Question not found"));
 
         if (!question.getAuthor().getId().equals(userId)) {
-            throw new RuntimeException("Unauthorized: You can only delete your own questions");
+            throw new UnauthorizedActionException("Unauthorized: You can only delete your own questions");
         }
 
         likeRepository.deleteByQuestion(question);
@@ -93,10 +96,10 @@ public class TravelQAService {
     @Transactional
     public TravelAnswer answerQuestion(Long questionId, Long userId, String content) {
         TravelQuestion question = questionRepository.findById(questionId)
-                .orElseThrow(() -> new RuntimeException("Question not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Question not found"));
 
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         TravelAnswer answer = new TravelAnswer();
         answer.setQuestion(question);
@@ -114,17 +117,17 @@ public class TravelQAService {
     @Transactional
     public TravelAnswer acceptAnswer(Long questionId, Long answerId, Long userId) {
         TravelQuestion question = questionRepository.findById(questionId)
-                .orElseThrow(() -> new RuntimeException("Question not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Question not found"));
 
         if (!question.getAuthor().getId().equals(userId)) {
-            throw new RuntimeException("Only the question author can accept an answer");
+            throw new UnauthorizedActionException("Only the question author can accept an answer");
         }
 
         TravelAnswer answer = answerRepository.findById(answerId)
-                .orElseThrow(() -> new RuntimeException("Answer not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Answer not found"));
 
         if (!answer.getQuestion().getId().equals(questionId)) {
-            throw new RuntimeException("Answer does not belong to this question");
+            throw new BusinessException("Answer does not belong to this question");
         }
 
         answer.setIsAccepted(true);
@@ -137,10 +140,10 @@ public class TravelQAService {
     @Transactional
     public boolean likeQuestion(Long questionId, Long userId) {
         TravelQuestion question = questionRepository.findById(questionId)
-                .orElseThrow(() -> new RuntimeException("Question not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Question not found"));
 
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         if (likeRepository.existsByQuestionAndUser(question, user)) {
             return false;
@@ -159,10 +162,10 @@ public class TravelQAService {
     @Transactional
     public boolean unlikeQuestion(Long questionId, Long userId) {
         TravelQuestion question = questionRepository.findById(questionId)
-                .orElseThrow(() -> new RuntimeException("Question not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Question not found"));
 
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         Optional<QuestionLike> like = likeRepository.findByQuestionAndUser(question, user);
         if (like.isEmpty()) {
@@ -177,21 +180,21 @@ public class TravelQAService {
 
     public boolean isLikedByUser(Long questionId, Long userId) {
         TravelQuestion question = questionRepository.findById(questionId)
-                .orElseThrow(() -> new RuntimeException("Question not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Question not found"));
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         return likeRepository.existsByQuestionAndUser(question, user);
     }
 
     public List<TravelAnswer> getAnswers(Long questionId) {
         TravelQuestion question = questionRepository.findById(questionId)
-                .orElseThrow(() -> new RuntimeException("Question not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Question not found"));
         return answerRepository.findByQuestionOrderByIsAcceptedDescLikeCountDescCreatedAtAsc(question);
     }
 
     public List<TravelQuestion> getQuestionsByAuthor(Long userId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         return questionRepository.findByAuthorOrderByCreatedAtDesc(user);
     }
 }

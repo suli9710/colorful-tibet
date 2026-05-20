@@ -12,6 +12,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -75,7 +76,7 @@ class ColdStartOptimizationServiceTest {
     @Test
     void testRecommendForNewUserByAttributes() {
         when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
-        when(spotRepository.findAll()).thenReturn(allSpots);
+        mockSpotCache(allSpots);
 
         List<ScenicSpot> result = coldStartService.recommendForNewUserByAttributes(1L);
 
@@ -97,10 +98,10 @@ class ColdStartOptimizationServiceTest {
     @Test
     void testRecommendForNewUserByPreferences() {
         // 模拟标签匹配
-        when(spotRepository.findAll()).thenReturn(allSpots);
+        mockSpotCache(allSpots);
         // 类别匹配
-        when(spotRepository.findByCategory(ScenicSpot.Category.CULTURAL))
-                .thenReturn(Arrays.asList(spot1, spot2, spot5));
+        when(spotRepository.findByCategory(eq(ScenicSpot.Category.CULTURAL), any()))
+                .thenReturn(new PageImpl<>(Arrays.asList(spot1, spot2, spot5)));
 
         List<String> preferredTags = Arrays.asList("佛教", "宫殿");
         List<ScenicSpot> result = coldStartService.recommendForNewUserByPreferences(
@@ -108,12 +109,12 @@ class ColdStartOptimizationServiceTest {
 
         assertNotNull(result);
         assertFalse(result.isEmpty());
-        verify(spotRepository, times(1)).findByCategory(ScenicSpot.Category.CULTURAL);
+        verify(spotRepository, times(1)).findByCategory(eq(ScenicSpot.Category.CULTURAL), any());
     }
 
     @Test
     void testRecommendForNewUserByLocation() {
-        when(spotRepository.findAll()).thenReturn(allSpots);
+        mockSpotCache(allSpots);
 
         // 查询拉萨附近的景点（拉萨坐标: 29.65, 91.13）
         List<ScenicSpot> result = coldStartService.recommendForNewUserByLocation(
@@ -133,9 +134,9 @@ class ColdStartOptimizationServiceTest {
     @Test
     void testHybridColdStartRecommendation() {
         when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
-        when(spotRepository.findAll()).thenReturn(allSpots);
-        when(spotRepository.findByCategory(ScenicSpot.Category.CULTURAL))
-                .thenReturn(Arrays.asList(spot1, spot2, spot5));
+        mockSpotCache(allSpots);
+        when(spotRepository.findByCategory(eq(ScenicSpot.Category.CULTURAL), any()))
+                .thenReturn(new PageImpl<>(Arrays.asList(spot1, spot2, spot5)));
         when(spotRepository.findAllById(anyList())).thenAnswer(inv -> {
             List<Long> ids = inv.getArgument(0);
             return allSpots.stream().filter(s -> ids.contains(s.getId())).toList();
@@ -151,7 +152,7 @@ class ColdStartOptimizationServiceTest {
     @Test
     void testHybridColdStartFallbackToPopular() {
         when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
-        when(spotRepository.findAll()).thenReturn(allSpots);
+        mockSpotCache(allSpots);
         when(spotRepository.findAllById(anyList())).thenAnswer(inv -> {
             List<Long> ids = inv.getArgument(0);
             return allSpots.stream().filter(s -> ids.contains(s.getId())).toList();
@@ -166,6 +167,14 @@ class ColdStartOptimizationServiceTest {
     }
 
     // --- helpers ---
+
+    private void mockSpotCache(List<ScenicSpot> spots) {
+        when(spotRepository.findAllWithoutTags(any())).thenReturn(new PageImpl<>(spots));
+        when(spotRepository.findByIdInWithTags(anyList())).thenAnswer(inv -> {
+            List<Long> ids = inv.getArgument(0);
+            return spots.stream().filter(s -> ids.contains(s.getId())).toList();
+        });
+    }
 
     private ScenicSpot createSpot(Long id, String name, ScenicSpot.Category category, String location, int visitCount) {
         ScenicSpot spot = new ScenicSpot();

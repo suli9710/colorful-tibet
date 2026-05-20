@@ -9,8 +9,10 @@ import com.tibet.tourism.repository.HotelBookingRepository;
 import com.tibet.tourism.repository.HotelRepository;
 import com.tibet.tourism.repository.RoomTypeRepository;
 import com.tibet.tourism.security.InputSanitizer;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -54,7 +56,7 @@ public class HotelBookingService {
 
     @Transactional(readOnly = true)
     public List<Hotel> getAllHotels() {
-        return hotelRepository.findAll();
+        return hotelRepository.findAll(PageRequest.of(0, 200, Sort.by("id"))).getContent();
     }
 
     @Transactional(readOnly = true)

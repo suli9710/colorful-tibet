@@ -148,6 +148,7 @@ app:
     csrf-signing-secret: ${CSRF_SIGNING_SECRET}
     pii-encryption-key: ${PII_ENCRYPTION_KEY}
     trust-proxy-headers: ${TRUST_PROXY_HEADERS:false}
+    super-admin-bind-on-first-login: ${SUPER_ADMIN_BIND_ON_FIRST_LOGIN:true}
     rate-limit:
       enabled: ${RATE_LIMIT_ENABLED:true}
       redis-enabled: ${RATE_LIMIT_REDIS_ENABLED:true}
@@ -165,7 +166,6 @@ app:
       admin-password: ${SEED_DEMO_ADMIN_PASSWORD:}
       super-admin-password: ${SEED_DEMO_SUPER_ADMIN_PASSWORD:}
       user-password: ${SEED_DEMO_USER_PASSWORD:}
-
 
 
 

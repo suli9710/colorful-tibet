@@ -161,6 +161,7 @@ app:
     pii-encryption-key: ${PII_ENCRYPTION_KEY:}
     cookie-secure: ${COOKIE_SECURE:true}
     trust-proxy-headers: ${TRUST_PROXY_HEADERS:false}
+    super-admin-bind-on-first-login: ${SUPER_ADMIN_BIND_ON_FIRST_LOGIN:true}
     rate-limit:
       enabled: ${RATE_LIMIT_ENABLED:true}
       redis-enabled: ${RATE_LIMIT_REDIS_ENABLED:true}

@@ -5,6 +5,7 @@ import com.tibet.tourism.entity.Comment;
 import com.tibet.tourism.entity.CommentLike;
 import com.tibet.tourism.entity.ScenicSpot;
 import com.tibet.tourism.entity.User;
+import com.tibet.tourism.exception.ResourceNotFoundException;
 import com.tibet.tourism.repository.CommentLikeRepository;
 import com.tibet.tourism.repository.CommentRepository;
 import com.tibet.tourism.repository.ScenicSpotRepository;
@@ -68,7 +69,7 @@ public class CommentController {
         }
 
         ScenicSpot spot = spotRepository.findById(spotId)
-                .orElseThrow(() -> new RuntimeException("Spot not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Spot not found"));
 
         Comment comment = new Comment();
         comment.setUser(user);
@@ -89,7 +90,7 @@ public class CommentController {
         long userId = user.getId();
 
         Comment comment = commentRepository.findById(commentId)
-                .orElseThrow(() -> new RuntimeException("Comment not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
         
         boolean exists = commentLikeRepository.existsByUserIdAndCommentId(userId, commentId);
         
@@ -129,7 +130,7 @@ public class CommentController {
     public ResponseEntity<?> deleteComment(@PathVariable long commentId, HttpServletRequest request) {
         User user = jwtAuthSupport.resolveCurrentUser(request);
         Comment comment = commentRepository.findById(commentId)
-                .orElseThrow(() -> new RuntimeException("Comment not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
 
         if (comment.getUser() == null || !comment.getUser().getId().equals(user.getId())) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)

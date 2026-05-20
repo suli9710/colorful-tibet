@@ -120,11 +120,13 @@ import DOMPurify from 'dompurify'
 import { motion } from 'motion-v'
 import { revealInitial, revealInView, revealTransition } from '../motion/presets'
 import api, { endpoints } from '../api'
+import { useAuthStore } from '../stores/auth'
 
 const { t } = useI18n()
 
 const currentRoute = useRoute()
 const router = useRouter()
+const auth = useAuthStore()
 const routeId = currentRoute.params.id
 
 const loading = ref(true)
@@ -133,7 +135,7 @@ const comments = ref<any[]>([])
 const isLiked = ref(false)
 const newComment = ref('')
 const submitting = ref(false)
-const currentUser = ref<any>(JSON.parse(localStorage.getItem('user') || 'null'))
+const currentUser = computed(() => auth.user)
 
 const renderedContent = computed(() => {
   return routeData.value ? DOMPurify.sanitize(marked(routeData.value.content) as string) : ''
@@ -159,6 +161,12 @@ const loadRouteDetail = async () => {
 }
 
 const toggleLike = async () => {
+  if (!(await auth.ensureSession())) {
+    alert(t('routeDetail.loginRequiredLike'))
+    router.push('/login')
+    return
+  }
+
   try {
     if (isLiked.value) {
       await api.delete(`/routes/shared/${routeId}/like`)
@@ -181,6 +189,11 @@ const toggleLike = async () => {
 
 const submitComment = async () => {
   if (!newComment.value.trim()) return
+  if (!(await auth.ensureSession())) {
+    alert(t('routeDetail.loginRequiredComment'))
+    router.push('/login')
+    return
+  }
   
   submitting.value = true
   try {
@@ -235,7 +248,8 @@ const formatDate = (dateStr: string) => {
   return new Date(dateStr).toLocaleString(locale === 'bo' ? 'bo-CN' : 'zh-CN')
 }
 
-onMounted(() => {
+onMounted(async () => {
+  await auth.refreshSession()
   loadRouteDetail()
 })
 </script>

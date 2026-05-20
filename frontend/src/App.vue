@@ -1,10 +1,13 @@
+
 <script setup lang="ts">
 import NavBar from './components/NavBar.vue'
 import Footer from './components/Footer.vue'
 import AiRouteFloatingBall from './components/AiRouteFloatingBall.vue'
+import ToastHost from './components/ToastHost.vue'
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { AnimatePresence, MotionConfig, motion } from 'motion-v'
+import { installAlertToastBridge, showToast } from './composables/useToast'
 import {
   motionEase,
   pageAnimate,
@@ -35,6 +38,8 @@ const finishNavigation = () => {
   }, 160)
 }
 
+installAlertToastBridge()
+
 onMounted(() => {
   removeBeforeEach = router.beforeEach(() => {
     if (finishTimer) window.clearTimeout(finishTimer)
@@ -42,7 +47,10 @@ onMounted(() => {
     return true
   })
   removeAfterEach = router.afterEach(finishNavigation)
-  removeOnError = router.onError(finishNavigation)
+  removeOnError = router.onError(() => {
+    showToast('页面加载失败，请刷新后重试', 'error')
+    finishNavigation()
+  })
   window.addEventListener('beforeunload', handleBeforeUnload)
 })
 
@@ -101,6 +109,7 @@ onBeforeUnmount(() => {
     </main>
     <Footer />
     <AiRouteFloatingBall />
+    <ToastHost />
   </div>
   </MotionConfig>
 </template>

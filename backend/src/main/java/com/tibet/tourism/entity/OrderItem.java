@@ -65,6 +65,10 @@ public class OrderItem {
     @Column(name = "sort_order")
     private Integer sortOrder = 0;
 
+    @Version
+    @Column(name = "version")
+    private Long version = 0L;
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -115,6 +119,9 @@ public class OrderItem {
 
     public Integer getSortOrder() { return sortOrder; }
     public void setSortOrder(Integer sortOrder) { this.sortOrder = sortOrder; }
+
+    public Long getVersion() { return version; }
+    public void setVersion(Long version) { this.version = version; }
 
     public enum ProductType {
         SCENIC_SPOT, HOTEL_ROOM, EXPERIENCE, CAR, GUIDE, ITINERARY

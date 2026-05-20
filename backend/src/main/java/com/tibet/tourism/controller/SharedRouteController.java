@@ -3,6 +3,10 @@ package com.tibet.tourism.controller;
 import com.tibet.tourism.entity.RouteComment;
 import com.tibet.tourism.entity.SharedRoute;
 import com.tibet.tourism.entity.User;
+import com.tibet.tourism.exception.AuthenticationRequiredException;
+import com.tibet.tourism.exception.BusinessException;
+import com.tibet.tourism.exception.ResourceNotFoundException;
+import com.tibet.tourism.exception.UnauthorizedActionException;
 import com.tibet.tourism.repository.UserRepository;
 import com.tibet.tourism.security.CookieAuthConstants;
 import com.tibet.tourism.security.InputSanitizer;
@@ -50,10 +54,10 @@ public class SharedRouteController {
         if (jwt != null && jwtUtils.validateJwtToken(jwt)) {
             String username = jwtUtils.getUserNameFromJwtToken(jwt);
             User user = userRepository.findByUsername(username)
-                    .orElseThrow(() -> new RuntimeException("User not found"));
+                    .orElseThrow(() -> new ResourceNotFoundException("User not found"));
             return user.getId();
         }
-        throw new RuntimeException("User not authenticated");
+        throw new AuthenticationRequiredException("User not authenticated");
     }
 
     private String parseJwt(HttpServletRequest request) {
@@ -67,6 +71,18 @@ public class SharedRouteController {
 
     private ResponseEntity<Map<String, String>> safeBadRequest(Exception e) {
         logger.warn("Shared route request failed: {}", e.getMessage());
+        if (e instanceof AuthenticationRequiredException) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", e.getMessage()));
+        }
+        if (e instanceof UnauthorizedActionException || e instanceof SecurityException) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", e.getMessage()));
+        }
+        if (e instanceof ResourceNotFoundException) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));
+        }
+        if (e instanceof BusinessException || e instanceof IllegalArgumentException) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
         return ResponseEntity.badRequest().body(Map.of("error", "请求处理失败，请检查输入后重试"));
     }
 
@@ -212,7 +228,7 @@ public class SharedRouteController {
     public ResponseEntity<?> getMyRoutes(HttpServletRequest request) {
         try {
             User user = userRepository.findById(getCurrentUserId(request))
-                    .orElseThrow(() -> new RuntimeException("User not found"));
+                    .orElseThrow(() -> new ResourceNotFoundException("User not found"));
             List<SharedRoute> routes = routeService.getRoutesByAuthor(user);
             return ResponseEntity.ok(routes);
         } catch (Exception e) {

@@ -1,6 +1,7 @@
 package com.tibet.tourism.repository;
 
 import com.tibet.tourism.entity.TibetanDictionary;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -26,18 +27,26 @@ public interface TibetanDictionaryRepository extends JpaRepository<TibetanDictio
      * 根据类型查找
      */
     List<TibetanDictionary> findByType(TibetanDictionary.Type type);
+
+    List<TibetanDictionary> findByType(TibetanDictionary.Type type, Pageable pageable);
     
     /**
      * 模糊搜索中文文本
      */
     @Query("SELECT d FROM TibetanDictionary d WHERE d.chineseText LIKE %:keyword% ORDER BY d.usageCount DESC")
     List<TibetanDictionary> searchByChineseText(@Param("keyword") String keyword);
+
+    @Query("SELECT d FROM TibetanDictionary d WHERE d.chineseText LIKE %:keyword% ORDER BY d.usageCount DESC")
+    List<TibetanDictionary> searchByChineseText(@Param("keyword") String keyword, Pageable pageable);
     
     /**
      * 模糊搜索藏语文本
      */
     @Query("SELECT d FROM TibetanDictionary d WHERE d.tibetanText LIKE %:keyword% ORDER BY d.usageCount DESC")
     List<TibetanDictionary> searchByTibetanText(@Param("keyword") String keyword);
+
+    @Query("SELECT d FROM TibetanDictionary d WHERE d.tibetanText LIKE %:keyword% ORDER BY d.usageCount DESC")
+    List<TibetanDictionary> searchByTibetanText(@Param("keyword") String keyword, Pageable pageable);
     
     /**
      * 获取使用频率最高的词条

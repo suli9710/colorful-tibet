@@ -31,6 +31,10 @@ public class Booking {
     @Enumerated(EnumType.STRING)
     private Status status;
 
+    @Version
+    @Column(name = "version")
+    private Long version = 0L;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
@@ -103,6 +107,9 @@ public class Booking {
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
     }
+
+    public Long getVersion() { return version; }
+    public void setVersion(Long version) { this.version = version; }
 
     public enum Status {
         PENDING, CONFIRMED, CANCELLED

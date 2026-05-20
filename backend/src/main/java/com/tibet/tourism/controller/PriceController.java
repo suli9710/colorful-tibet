@@ -2,6 +2,7 @@ package com.tibet.tourism.controller;
 
 import com.tibet.tourism.dto.PriceInfo;
 import com.tibet.tourism.entity.ScenicSpot;
+import com.tibet.tourism.exception.ResourceNotFoundException;
 import com.tibet.tourism.repository.ScenicSpotRepository;
 import com.tibet.tourism.service.PriceFetchService;
 import com.tibet.tourism.service.PriceUpdateService;
@@ -36,7 +37,7 @@ public class PriceController {
     public ResponseEntity<?> fetchPrice(@PathVariable Long spotId) {
         try {
             ScenicSpot spot = scenicSpotRepository.findById(Long.valueOf(spotId))
-                .orElseThrow(() -> new RuntimeException("景点不存在"));
+                .orElseThrow(() -> new ResourceNotFoundException("景点不存在"));
             
             PriceInfo priceInfo = priceFetchService.fetchPrice(spot);
             
@@ -52,6 +53,8 @@ public class PriceController {
                 "priceInfo", priceInfo,
                 "currentPrice", spot.getTicketPrice()
             ));
+        } catch (ResourceNotFoundException e) {
+            return ResponseEntity.status(404).body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", "价格查询失败，请稍后重试"));
         }
@@ -68,6 +71,8 @@ public class PriceController {
         try {
             PriceUpdateService.PriceUpdateResult result = priceUpdateService.updateSpotPrice(spotId, force);
             return ResponseEntity.ok(result);
+        } catch (ResourceNotFoundException e) {
+            return ResponseEntity.status(404).body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", "价格查询失败，请稍后重试"));
         }
