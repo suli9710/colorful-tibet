@@ -13,6 +13,8 @@ import com.tibet.tourism.modules.auth.web.dto.RegisterRequest;
 import com.tibet.tourism.modules.user.domain.User;
 import com.tibet.tourism.modules.user.infra.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
@@ -47,7 +49,7 @@ public class AuthApplicationService {
     private final IpLocationService ipLocationService;
     private final LoginAttemptService loginAttemptService;
     private final String superAdminUsername;
-    private final boolean superAdminBindOnFirstLogin;
+    private final String superAdminSecondaryPassword;
 
     public AuthApplicationService(
             AuthenticationManager authenticationManager,
@@ -58,7 +60,7 @@ public class AuthApplicationService {
             IpLocationService ipLocationService,
             LoginAttemptService loginAttemptService,
             @Value("${app.super-admin-username:lzh}") String superAdminUsername,
-            @Value("${app.security.super-admin-bind-on-first-login:true}") boolean superAdminBindOnFirstLogin) {
+            @Value("${app.security.super-admin-secondary-password:}") String superAdminSecondaryPassword) {
         this.authenticationManager = authenticationManager;
         this.userRepository = userRepository;
         this.jwtUtils = jwtUtils;
@@ -67,7 +69,7 @@ public class AuthApplicationService {
         this.ipLocationService = ipLocationService;
         this.loginAttemptService = loginAttemptService;
         this.superAdminUsername = superAdminUsername;
-        this.superAdminBindOnFirstLogin = superAdminBindOnFirstLogin;
+        this.superAdminSecondaryPassword = superAdminSecondaryPassword;
     }
 
     public LoginResult login(LoginRequest loginRequest, HttpServletRequest request) {
@@ -95,7 +97,7 @@ public class AuthApplicationService {
         UserDetails userDetails = (UserDetails) authentication.getPrincipal();
         User user = userRepository.findByUsername(userDetails.getUsername()).orElseThrow();
 
-        enforceSuperAdminMachineBinding(user, request);
+        enforceSuperAdminSecondPassword(user, loginRequest);
 
         loginAttemptService.reset(username);
         SecurityContextHolder.getContext().setAuthentication(authentication);
@@ -157,34 +159,35 @@ public class AuthApplicationService {
         }
     }
 
-    private void enforceSuperAdminMachineBinding(User user, HttpServletRequest request) {
-        if (!superAdminUsername.equals(user.getUsername())) {
+    private void enforceSuperAdminSecondPassword(User user, LoginRequest loginRequest) {
+        if (!superAdminUsername.equalsIgnoreCase(user.getUsername())) {
             return;
         }
 
-        String fingerprint = request.getHeader("X-Device-Fingerprint");
-        if (!StringUtils.hasText(fingerprint) || !fingerprint.matches("^[A-Za-z0-9_-]{8,128}$")) {
-            logger.warn("Rejected super-admin login without a valid device fingerprint: username={}", user.getUsername());
+        if (!StringUtils.hasText(superAdminSecondaryPassword)) {
+            logger.error("Super-admin secondary password is not configured: username={}", user.getUsername());
             throw new AuthForbiddenException(GENERIC_LOGIN_ERROR);
         }
 
-        String fingerprintHash = InputSanitizer.sha256HexForStorage(fingerprint);
-        String allowedHash = user.getAllowedLoginFingerprintHash();
-        if (!StringUtils.hasText(allowedHash)) {
-            if (!superAdminBindOnFirstLogin) {
-                logger.warn("Rejected unbound super-admin login: username={}", user.getUsername());
-                throw new AuthForbiddenException(GENERIC_LOGIN_ERROR);
+        String provided = loginRequest.getSecondaryPassword();
+        if (!StringUtils.hasText(provided) || !matchesSecondaryPassword(provided)) {
+            logger.warn("Rejected super-admin login with invalid secondary password: username={}", user.getUsername());
+            long lockSeconds = loginAttemptService.recordFailure(user.getUsername());
+            if (lockSeconds > 0) {
+                throw new AuthRateLimitException(RATE_LIMIT_ERROR);
             }
-
-            user.setAllowedLoginFingerprintHash(fingerprintHash);
-            userRepository.save(user);
-            logger.warn("Bound super-admin login device fingerprint: username={}", user.getUsername());
-            return;
-        }
-
-        if (!allowedHash.equals(fingerprintHash)) {
-            logger.warn("Rejected super-admin login from unbound device: username={}", user.getUsername());
             throw new AuthForbiddenException(GENERIC_LOGIN_ERROR);
         }
+    }
+
+    private boolean matchesSecondaryPassword(String provided) {
+        if (superAdminSecondaryPassword.startsWith("$2a$")
+                || superAdminSecondaryPassword.startsWith("$2b$")
+                || superAdminSecondaryPassword.startsWith("$2y$")) {
+            return passwordEncoder.matches(provided, superAdminSecondaryPassword);
+        }
+        return MessageDigest.isEqual(
+                provided.getBytes(StandardCharsets.UTF_8),
+                superAdminSecondaryPassword.getBytes(StandardCharsets.UTF_8));
     }
 }

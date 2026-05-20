@@ -108,6 +108,7 @@ app:
     pii-encryption-key: ${PII_ENCRYPTION_KEY:}
     cookie-secure: ${COOKIE_SECURE:false}
     trust-proxy-headers: ${TRUST_PROXY_HEADERS:false}
+    super-admin-secondary-password: ${SUPER_ADMIN_SECONDARY_PASSWORD:lzh031224}
     rate-limit:
       enabled: ${RATE_LIMIT_ENABLED:true}
       redis-enabled: ${RATE_LIMIT_REDIS_ENABLED:true}
@@ -124,7 +125,7 @@ app:
     demo-users:
       enabled: ${SEED_DEMO_USERS:false}
       admin-password: ${SEED_DEMO_ADMIN_PASSWORD:}
-      super-admin-password: ${SEED_DEMO_SUPER_ADMIN_PASSWORD:}
+      super-admin-password: ${SEED_DEMO_SUPER_ADMIN_PASSWORD:031224}
       user-password: ${SEED_DEMO_USER_PASSWORD:}
 
 recommendation:
