@@ -1,4 +1,5 @@
 package com.tibet.tourism.modules.ai.web;
+
 import com.tibet.tourism.common.security.JwtAuthSupport;
 import com.tibet.tourism.modules.ai.application.AiQuotaService;
 import com.tibet.tourism.modules.ai.application.AiRouteService;
@@ -14,7 +15,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @RestController
@@ -44,8 +48,7 @@ public class AiRouteController {
             if (aiQuotaService.isQuotaExceeded(currentUser.getId())) {
                 int remaining = aiQuotaService.getRemainingQuota(currentUser.getId());
                 return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
-                        .body(Map.of("error", "今日 AI 路线生成次数已用完，请明天再试",
-                                     "remaining", remaining));
+                        .body(Map.of("error", "今日 AI 路线生成次数已用完，请明天再试", "remaining", remaining));
             }
 
             int days = safeRequest.getDays() == null ? 5 : safeRequest.getDays();
@@ -78,7 +81,7 @@ public class AiRouteController {
     }
 
     @PostMapping(value = "/generate/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public ResponseEntity<?> generateRouteStream(
+    public ResponseEntity<SseEmitter> generateRouteStream(
             @Valid @RequestBody(required = false) AiRouteGenerateRequest request,
             HttpServletRequest httpServletRequest) {
 
@@ -87,8 +90,8 @@ public class AiRouteController {
 
         if (aiQuotaService.isQuotaExceeded(currentUser.getId())) {
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
-                    .body(Map.of("error", "今日 AI 路线生成次数已用完，请明天再试",
-                                 "remaining", 0));
+                    .contentType(MediaType.TEXT_EVENT_STREAM)
+                    .body(completedErrorEmitter("今日 AI 路线生成次数已用完，请明天再试"));
         }
 
         aiQuotaService.incrementQuota(currentUser.getId());
@@ -107,6 +110,17 @@ public class AiRouteController {
         return ResponseEntity.ok()
                 .contentType(MediaType.TEXT_EVENT_STREAM)
                 .body(emitter);
+    }
+
+    private SseEmitter completedErrorEmitter(String message) {
+        SseEmitter emitter = new SseEmitter(10_000L);
+        try {
+            emitter.send(SseEmitter.event().data("{\"type\":\"error\",\"message\":\"" + message + "\"}"));
+        } catch (Exception e) {
+            logger.warn("Failed to write AI route SSE error event: {}", e.getMessage());
+        }
+        emitter.complete();
+        return emitter;
     }
 
     private String resolveLocale(String requestLocale, HttpServletRequest request) {
