@@ -2,11 +2,15 @@ package com.tibet.tourism.service;
 
 import com.tibet.tourism.dto.PriceInfo;
 import com.tibet.tourism.entity.ScenicSpot;
+import com.tibet.tourism.exception.ResourceNotFoundException;
 import com.tibet.tourism.repository.ScenicSpotRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +30,9 @@ public class PriceUpdateService {
     private static final Logger logger = LoggerFactory.getLogger(PriceUpdateService.class);
     private static final int BATCH_SIZE = 10;
 
+    @Value("${app.price-update.max-batch-spots:1000}")
+    private int maxBatchSpots;
+
     @Autowired
     private ScenicSpotRepository scenicSpotRepository;
 
@@ -42,7 +49,7 @@ public class PriceUpdateService {
     @Transactional
     public PriceUpdateResult updateSpotPrice(Long spotId, boolean forceUpdate) {
         ScenicSpot spot = scenicSpotRepository.findById(Long.valueOf(spotId))
-            .orElseThrow(() -> new RuntimeException("景点不存在"));
+            .orElseThrow(() -> new ResourceNotFoundException("景点不存在"));
 
         if (!forceUpdate && spot.getTicketPrice() != null &&
             spot.getTicketPrice().compareTo(BigDecimal.ZERO) > 0) {
@@ -78,7 +85,8 @@ public class PriceUpdateService {
      */
     @Transactional
     public BatchUpdateResult batchUpdatePrices(boolean forceUpdate) {
-        List<ScenicSpot> spots = scenicSpotRepository.findAll();
+        List<ScenicSpot> spots = scenicSpotRepository.findAllWithoutTags(
+                PageRequest.of(0, Math.max(1, maxBatchSpots), Sort.by("id"))).getContent();
         int total = spots.size();
         AtomicInteger successCount = new AtomicInteger(0);
         AtomicInteger failCount = new AtomicInteger(0);
@@ -177,4 +185,3 @@ public class PriceUpdateService {
         }
     }
 }
-

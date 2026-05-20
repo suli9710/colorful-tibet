@@ -8,6 +8,8 @@ import com.tibet.tourism.repository.UserVisitHistoryRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -21,6 +23,8 @@ public class RecommendationEvaluationService {
     private static final int DEFAULT_K = 10;
     private static final int MAX_K = 50;
     private static final int MAX_USER_LIMIT = 1000;
+    private static final int MAX_EVALUATION_HISTORIES = 50000;
+    private static final int MAX_EVALUATION_SPOTS = 5000;
 
     @Autowired
     private UserVisitHistoryRepository historyRepository;
@@ -33,8 +37,10 @@ public class RecommendationEvaluationService {
         int userLimit = Math.max(1, Math.min(requestedUserLimit <= 0 ? MAX_USER_LIMIT : requestedUserLimit, MAX_USER_LIMIT));
         long startTime = System.currentTimeMillis();
 
-        List<UserVisitHistory> histories = historyRepository.findAll();
-        List<ScenicSpot> spots = spotRepository.findAll();
+        List<UserVisitHistory> histories = historyRepository.findAll(
+                PageRequest.of(0, MAX_EVALUATION_HISTORIES, Sort.by(Sort.Direction.DESC, "visitDate"))).getContent();
+        List<ScenicSpot> spots = spotRepository.findAllWithoutTags(
+                PageRequest.of(0, MAX_EVALUATION_SPOTS, Sort.by("id"))).getContent();
         Map<Long, ScenicSpot> spotsById = spots.stream()
                 .filter(spot -> spot.getId() != null)
                 .collect(Collectors.toMap(ScenicSpot::getId, spot -> spot, (left, right) -> left));

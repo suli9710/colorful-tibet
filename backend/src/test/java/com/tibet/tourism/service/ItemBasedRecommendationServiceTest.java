@@ -11,6 +11,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -48,7 +50,7 @@ class ItemBasedRecommendationServiceTest {
 
     @Test
     void testPrecomputeItemSimilarityMatrix() {
-        when(spotRepository.findAll()).thenReturn(allSpots);
+        when(spotRepository.findAllWithoutTags(any(Pageable.class))).thenReturn(new PageImpl<>(allSpots));
 
         // user1: spot1(5), spot2(4)
         // user2: spot1(5), spot3(5)
@@ -61,7 +63,7 @@ class ItemBasedRecommendationServiceTest {
                 createHistory(user3, spot2, 4, 1, 60, LocalDateTime.now().minusDays(30)),
                 createHistory(user3, spot4, 4, 2, 120, LocalDateTime.now().minusDays(25))
         );
-        when(historyRepository.findAll()).thenReturn(allHistories);
+        when(historyRepository.findAll(any(Pageable.class))).thenReturn(new PageImpl<>(allHistories));
 
         itemBasedService.precomputeItemSimilarityMatrix();
 
@@ -73,7 +75,7 @@ class ItemBasedRecommendationServiceTest {
     @Test
     void testRecommendByItemCFExcludesVisitedSpots() {
         // 手动预计算
-        when(spotRepository.findAll()).thenReturn(allSpots);
+        when(spotRepository.findAllWithoutTags(any(Pageable.class))).thenReturn(new PageImpl<>(allSpots));
         List<UserVisitHistory> allHistories = Arrays.asList(
                 createHistory(user1, spot1, 5, 3, 200, LocalDateTime.now().minusDays(10)),
                 createHistory(user1, spot2, 4, 2, 100, LocalDateTime.now().minusDays(20)),
@@ -82,7 +84,7 @@ class ItemBasedRecommendationServiceTest {
                 createHistory(user3, spot2, 4, 1, 60, LocalDateTime.now().minusDays(30)),
                 createHistory(user3, spot4, 4, 2, 120, LocalDateTime.now().minusDays(25))
         );
-        when(historyRepository.findAll()).thenReturn(allHistories);
+        when(historyRepository.findAll(any(Pageable.class))).thenReturn(new PageImpl<>(allHistories));
         itemBasedService.precomputeItemSimilarityMatrix();
 
         // 请求用户1的推荐，用户1已经访问了spot1和spot2
@@ -123,7 +125,7 @@ class ItemBasedRecommendationServiceTest {
 
     @Test
     void testPrecomputeWithEmptySpots() {
-        when(spotRepository.findAll()).thenReturn(Collections.emptyList());
+        when(spotRepository.findAllWithoutTags(any(Pageable.class))).thenReturn(new PageImpl<>(Collections.emptyList()));
         itemBasedService.precomputeItemSimilarityMatrix();
         assertTrue(itemBasedService.isSimilarityMatrixStale());
     }

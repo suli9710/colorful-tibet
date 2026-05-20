@@ -1,6 +1,9 @@
 package com.tibet.tourism.service;
 
 import com.tibet.tourism.entity.*;
+import com.tibet.tourism.exception.BusinessException;
+import com.tibet.tourism.exception.ResourceNotFoundException;
+import com.tibet.tourism.exception.UnauthorizedActionException;
 import com.tibet.tourism.repository.*;
 import com.tibet.tourism.security.InputSanitizer;
 import jakarta.persistence.criteria.Predicate;
@@ -39,7 +42,7 @@ public class SharedRouteService {
     @Transactional
     public SharedRoute shareRoute(Long userId, String title, String content, Integer days, String budget, String preference) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         SharedRoute route = new SharedRoute();
         route.setAuthor(user);
@@ -77,7 +80,7 @@ public class SharedRouteService {
     @Transactional
     public SharedRoute getRoute(Long id) {
         SharedRoute route = routeRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Route not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Route not found"));
         
         // 增加浏览量
         route.incrementViewCount();
@@ -88,10 +91,10 @@ public class SharedRouteService {
     @Transactional
     public void deleteRoute(Long routeId, Long userId) {
         SharedRoute route = routeRepository.findById(routeId)
-                .orElseThrow(() -> new RuntimeException("Route not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Route not found"));
 
         if (route.getAuthor() == null || !route.getAuthor().getId().equals(userId)) {
-            throw new RuntimeException("Unauthorized: You can only delete your own routes");
+            throw new UnauthorizedActionException("Unauthorized: You can only delete your own routes");
         }
 
         routeRepository.delete(route);
@@ -101,10 +104,10 @@ public class SharedRouteService {
     @Transactional
     public boolean likeRoute(Long routeId, Long userId) {
         SharedRoute route = routeRepository.findById(routeId)
-                .orElseThrow(() -> new RuntimeException("Route not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Route not found"));
         
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         if (likeRepository.existsByRouteAndUser(route, user)) {
             return false; // 已经点赞过
@@ -124,10 +127,10 @@ public class SharedRouteService {
     @Transactional
     public boolean unlikeRoute(Long routeId, Long userId) {
         SharedRoute route = routeRepository.findById(routeId)
-                .orElseThrow(() -> new RuntimeException("Route not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Route not found"));
         
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         Optional<RouteLike> like = likeRepository.findByRouteAndUser(route, user);
         if (like.isEmpty()) {
@@ -144,9 +147,9 @@ public class SharedRouteService {
     // 检查用户是否点赞
     public boolean isLikedByUser(Long routeId, Long userId) {
         SharedRoute route = routeRepository.findById(routeId)
-                .orElseThrow(() -> new RuntimeException("Route not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Route not found"));
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
                 
         return likeRepository.existsByRouteAndUser(route, user);
     }
@@ -155,10 +158,10 @@ public class SharedRouteService {
     @Transactional
     public RouteComment addComment(Long routeId, Long userId, String content) {
         SharedRoute route = routeRepository.findById(routeId)
-                .orElseThrow(() -> new RuntimeException("Route not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Route not found"));
         
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         RouteComment comment = new RouteComment();
         comment.setRoute(route);
@@ -176,17 +179,17 @@ public class SharedRouteService {
     // 获取评论列表
     public List<RouteComment> getComments(Long routeId) {
         SharedRoute route = routeRepository.findById(routeId)
-                .orElseThrow(() -> new RuntimeException("Route not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Route not found"));
         return commentRepository.findByRouteOrderByCreatedAtDesc(route);
     }
 
     @Transactional
     public void deleteComment(Long routeId, Long commentId, Long userId) {
         RouteComment comment = commentRepository.findById(commentId)
-                .orElseThrow(() -> new RuntimeException("Comment not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
 
         if (comment.getRoute() == null || !comment.getRoute().getId().equals(routeId)) {
-            throw new RuntimeException("Comment does not belong to this route");
+            throw new BusinessException("Comment does not belong to this route");
         }
 
         if (comment.getUser() == null || !comment.getUser().getId().equals(userId)) {

@@ -17,21 +17,11 @@ export interface AuthUser {
 }
 
 const USER_STORAGE_KEY = 'user'
-const COOKIE_SESSION_TOKEN = 'cookie-session'
 const apiBaseURL = import.meta.env.VITE_API_BASE_URL || '/api'
 
 const hasStorage = () => typeof window !== 'undefined' && typeof window.localStorage !== 'undefined'
 
 const normalizedApiBaseURL = () => String(apiBaseURL).replace(/\/+$/, '')
-
-const resolveToken = (userData: AuthUser | null, explicitToken?: string | null) =>
-  explicitToken ||
-  userData?.token ||
-  userData?.accessToken ||
-  userData?.jwt ||
-  userData?.data?.token ||
-  userData?.data?.accessToken ||
-  COOKIE_SESSION_TOKEN
 
 const stripAuthTokens = (userData: AuthUser): AuthUser => {
   const { token: _token, accessToken: _accessToken, jwt: _jwt, data: _data, ...userWithoutToken } = userData
@@ -64,29 +54,6 @@ export const clearStoredAuth = () => {
   localStorage.removeItem('token')
 }
 
-const decodeJwtPayload = (authToken: string): { exp?: number } | null => {
-  const payload = authToken.split('.')[1]
-  if (!payload) return null
-
-  try {
-    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/')
-    const padded = normalized.padEnd(normalized.length + (4 - normalized.length % 4) % 4, '=')
-    return JSON.parse(atob(padded))
-  } catch {
-    return null
-  }
-}
-
-const tokenHasExpired = (authToken: string | null) => {
-  if (!authToken) return true
-  if (authToken === COOKIE_SESSION_TOKEN) return false
-
-  const payload = decodeJwtPayload(authToken)
-  if (!payload?.exp) return false
-
-  return payload.exp * 1000 < Date.now()
-}
-
 const fetchCurrentUser = async (): Promise<AuthUser> => {
   const locale = hasStorage() ? localStorage.getItem('locale') || 'zh' : 'zh'
   const response = await fetch(`${normalizedApiBaseURL()}/auth/me`, {
@@ -106,36 +73,27 @@ const fetchCurrentUser = async (): Promise<AuthUser> => {
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<AuthUser | null>(null)
-  const token = ref<string | null>(null)
   const sessionChecked = ref(false)
   const sessionLoading = ref(false)
   let sessionRefreshPromise: Promise<boolean> | null = null
 
-  const isLoggedIn = computed(() => !!user.value && !!token.value && !tokenHasExpired(token.value))
+  const isLoggedIn = computed(() => !!user.value)
   const isAdmin = computed(() => isLoggedIn.value && user.value?.role === 'ADMIN')
 
-  function applySession(userData: AuthUser, authToken = COOKIE_SESSION_TOKEN) {
-    const resolvedToken = resolveToken(userData, authToken)
-    if (!resolvedToken || tokenHasExpired(resolvedToken)) {
-      logout()
-      return false
-    }
-
+  function applySession(userData: AuthUser) {
     const nextUser = stripAuthTokens(userData)
     user.value = nextUser
-    token.value = resolvedToken
     sessionChecked.value = true
     persistUser(nextUser)
     return true
   }
 
-  function login(userData: AuthUser, authToken?: string | null) {
-    return applySession(userData, resolveToken(userData, authToken))
+  function login(userData: AuthUser, _authToken?: string | null) {
+    return applySession(userData)
   }
 
   function logout() {
     user.value = null
-    token.value = null
     sessionChecked.value = true
     clearStoredAuth()
   }
@@ -149,7 +107,7 @@ export const useAuthStore = defineStore('auth', () => {
     sessionRefreshPromise = (async () => {
       try {
         const currentUser = await fetchCurrentUser()
-        return applySession(currentUser, COOKIE_SESSION_TOKEN)
+        return applySession(currentUser)
       } catch {
         logout()
         return false
@@ -180,7 +138,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   function updateUser(patch: Partial<AuthUser>) {
     if (!user.value) return
-    applySession({ ...user.value, ...patch }, token.value || COOKIE_SESSION_TOKEN)
+    applySession({ ...user.value, ...patch })
   }
 
   if (typeof window !== 'undefined') {
@@ -198,7 +156,6 @@ export const useAuthStore = defineStore('auth', () => {
 
   return {
     user,
-    token,
     sessionChecked,
     sessionLoading,
     isLoggedIn,

@@ -1,6 +1,8 @@
 package com.tibet.tourism.service;
 
 import com.tibet.tourism.entity.User;
+import com.tibet.tourism.exception.BusinessException;
+import com.tibet.tourism.exception.ResourceNotFoundException;
 import com.tibet.tourism.repository.UserRepository;
 import com.tibet.tourism.security.InputSanitizer;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,7 +21,7 @@ public class UserService {
 
     public User register(User user) {
         if (userRepository.existsByUsername(user.getUsername())) {
-            throw new RuntimeException("Username already exists");
+            throw new BusinessException("Username already exists");
         }
         String plainPassword = user.getPassword();
         validatePassword(plainPassword);
@@ -32,20 +34,20 @@ public class UserService {
         if (user.isPresent() && passwordEncoder.matches(password, user.get().getPassword())) {
             return user.get();
         }
-        throw new RuntimeException("Invalid username or password");
+        throw new BusinessException("Invalid username or password");
     }
 
     public User getUserById(Long id) {
-        return userRepository.findById(id).orElseThrow(() -> new RuntimeException("User not found"));
+        return userRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("User not found"));
     }
 
     public void changePassword(Long userId, String oldPassword, String newPassword) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         
         // 验证旧密码
         if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
-            throw new RuntimeException("Old password is incorrect");
+            throw new BusinessException("Old password is incorrect");
         }
         
         validatePassword(newPassword);

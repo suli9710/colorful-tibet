@@ -1,5 +1,5 @@
-const AMAP_KEY = '329d4cce7166c0e9644f064f96cad55c'
-const AMAP_SECURITY_CODE = '745455a6d68cc4c31928c7a60fd11d0c'
+const AMAP_KEY = import.meta.env.VITE_AMAP_KEY
+const AMAP_SECURITY_CODE = import.meta.env.VITE_AMAP_SECURITY_CODE
 
 let amapLoader: Promise<any> | null = null
 
@@ -14,8 +14,14 @@ export const loadAmap = () => {
 
   if (amapLoader) return amapLoader
 
-  ;(window as any)._AMapSecurityConfig = {
-    securityJsCode: AMAP_SECURITY_CODE
+  if (!AMAP_KEY) {
+    return Promise.reject(new Error('AMap key is not configured. Set VITE_AMAP_KEY before building the frontend.'))
+  }
+
+  if (AMAP_SECURITY_CODE) {
+    ;(window as any)._AMapSecurityConfig = {
+      securityJsCode: AMAP_SECURITY_CODE
+    }
   }
 
   amapLoader = new Promise((resolve, reject) => {

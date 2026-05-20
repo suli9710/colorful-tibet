@@ -94,6 +94,10 @@ public class PlatformOrder {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    @Version
+    @Column(name = "version")
+    private Long version = 0L;
+
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("sortOrder ASC")
     private List<OrderItem> items = new ArrayList<>();
@@ -249,6 +253,9 @@ public class PlatformOrder {
 
     public List<OrderAuditLog> getAuditLogs() { return auditLogs; }
     public void setAuditLogs(List<OrderAuditLog> auditLogs) { this.auditLogs = auditLogs; }
+
+    public Long getVersion() { return version; }
+    public void setVersion(Long version) { this.version = version; }
 
     public enum Status {
         PENDING_PAYMENT, PAID, CONFIRMED, CANCELLED, REFUND_PENDING, REFUNDED, EXPIRED

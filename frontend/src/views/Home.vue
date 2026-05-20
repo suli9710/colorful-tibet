@@ -234,6 +234,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion-v'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import api, { endpoints } from '../api'
+import { useAuthStore } from '../stores/auth'
 import {
   cardExit,
   cardInitial,
@@ -250,6 +251,7 @@ const HeatMap = defineAsyncComponent(() => import('../components/HeatMap.vue'))
 
 const router = useRouter()
 const { t, locale } = useI18n()
+const auth = useAuthStore()
 const prefersReducedMotion = useReducedMotion()
 const recommendedSpots = ref<any[]>([])
 const recommendationReasons = ref<Map<number, string>>(new Map())
@@ -392,10 +394,9 @@ const goToSpot = (spot: any) => {
 
 const fetchRecommendations = async () => {
   try {
-    const userStr = localStorage.getItem('user')
-    if (userStr) {
-      const user = JSON.parse(userStr)
-      const recommendationRes = await api.get(`${endpoints.spots.recommendations}?userId=${user.id}`)
+    const user = auth.user
+    if (user?.id != null) {
+      const recommendationRes = await api.get(`${endpoints.spots.recommendations}?userId=${encodeURIComponent(String(user.id))}`)
 
       recommendedSpots.value = Array.isArray(recommendationRes.data) ? recommendationRes.data : []
 
@@ -449,6 +450,7 @@ watch(prefersReducedMotion, () => {
 })
 
 onMounted(async () => {
+  await auth.refreshSession()
   await Promise.allSettled([
     fetchCarousels(),
     fetchRecommendations()

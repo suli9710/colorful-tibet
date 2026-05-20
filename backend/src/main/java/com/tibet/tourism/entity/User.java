@@ -31,6 +31,9 @@ public class User {
     private LocalDateTime lastLoginAt; // 最后登录时间
     private Boolean mustChangePassword = false;
 
+    @Column(length = 64)
+    private String allowedLoginFingerprintHash;
+
     @Enumerated(EnumType.STRING)
     private Role role = Role.USER;
 
@@ -121,6 +124,14 @@ public class User {
 
     public void setIpAddress(String ipAddress) {
         this.ipAddress = ipAddress;
+    }
+
+    public String getAllowedLoginFingerprintHash() {
+        return allowedLoginFingerprintHash;
+    }
+
+    public void setAllowedLoginFingerprintHash(String allowedLoginFingerprintHash) {
+        this.allowedLoginFingerprintHash = allowedLoginFingerprintHash;
     }
 
     public LocalDateTime getLastLoginAt() {

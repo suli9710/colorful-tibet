@@ -9,6 +9,8 @@ import com.tibet.tourism.repository.UserVisitHistoryRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -23,6 +25,7 @@ import java.util.stream.Collectors;
 public class ColdStartOptimizationService {
     
     private static final Logger logger = LoggerFactory.getLogger(ColdStartOptimizationService.class);
+    private static final int MAX_CACHED_SPOTS = 500;
     
     // 冷启动阈值
     private static final int NEW_USER_THRESHOLD = 3; // 访问记录少于3条视为新用户
@@ -132,7 +135,8 @@ public class ColdStartOptimizationService {
         if (preferredCategory != null) {
             try {
                 ScenicSpot.Category category = ScenicSpot.Category.valueOf(preferredCategory.toUpperCase());
-                List<ScenicSpot> categorySpots = spotRepository.findByCategory(category);
+                List<ScenicSpot> categorySpots = spotRepository.findByCategory(category,
+                        PageRequest.of(0, MAX_CACHED_SPOTS, Sort.by("id"))).getContent();
                 candidates.addAll(categorySpots);
             } catch (IllegalArgumentException e) {
                 logger.warn("无效的类别: {}", preferredCategory);
@@ -324,7 +328,24 @@ public class ColdStartOptimizationService {
             return popularSpotsCache.get(cacheKey);
         }
         
-        List<ScenicSpot> spots = spotRepository.findAll();
+        List<ScenicSpot> limitedSpots = spotRepository.findAllWithoutTags(PageRequest.of(0, MAX_CACHED_SPOTS,
+                Sort.by(Sort.Direction.DESC, "visitCount").and(Sort.by("id")))).getContent();
+        List<Long> spotIds = limitedSpots.stream()
+                .map(ScenicSpot::getId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+        if (spotIds.isEmpty()) {
+            popularSpotsCache.put(cacheKey, Collections.emptyList());
+            popularSpotsCacheTime = now;
+            return Collections.emptyList();
+        }
+
+        Map<Long, ScenicSpot> spotsById = spotRepository.findByIdInWithTags(spotIds).stream()
+                .collect(Collectors.toMap(ScenicSpot::getId, spot -> spot, (left, right) -> left));
+        List<ScenicSpot> spots = spotIds.stream()
+                .map(spotsById::get)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
         popularSpotsCache.put(cacheKey, spots);
         popularSpotsCacheTime = now;
         return spots;

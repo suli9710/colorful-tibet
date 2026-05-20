@@ -4,6 +4,10 @@ import com.tibet.tourism.dto.ChangePasswordRequest;
 import com.tibet.tourism.dto.LoginRequest;
 import com.tibet.tourism.dto.RegisterRequest;
 import com.tibet.tourism.entity.User;
+import com.tibet.tourism.exception.AuthenticationRequiredException;
+import com.tibet.tourism.exception.BusinessException;
+import com.tibet.tourism.exception.ResourceNotFoundException;
+import com.tibet.tourism.exception.UnauthorizedActionException;
 import com.tibet.tourism.repository.*;
 import com.tibet.tourism.security.CookieAuthConstants;
 import com.tibet.tourism.security.CsrfTokenService;
@@ -33,7 +37,6 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.net.InetAddress;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
@@ -50,6 +53,9 @@ public class AuthController {
 
     @org.springframework.beans.factory.annotation.Value("${app.super-admin-username:lzh}")
     private String superAdminUsername;
+
+    @org.springframework.beans.factory.annotation.Value("${app.security.super-admin-bind-on-first-login:true}")
+    private boolean superAdminBindOnFirstLogin;
 
     @Autowired
     AuthenticationManager authenticationManager;
@@ -99,6 +105,18 @@ public class AuthController {
 
     private ResponseEntity<?> errorResponse(Exception e) {
         logger.warn("Authenticated user request failed: {}", e.getMessage());
+        if (e instanceof AuthenticationRequiredException) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", e.getMessage()));
+        }
+        if (e instanceof UnauthorizedActionException || e instanceof SecurityException) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", e.getMessage()));
+        }
+        if (e instanceof ResourceNotFoundException) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));
+        }
+        if (e instanceof BusinessException || e instanceof IllegalArgumentException) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
         return ResponseEntity.badRequest().body(Map.of("error", "请求处理失败，请检查输入后重试"));
     }
 
@@ -107,7 +125,7 @@ public class AuthController {
     public ResponseEntity<?> getCurrentUser(HttpServletRequest request) {
         try {
             User user = userRepository.findById(getCurrentUserId(request))
-                    .orElseThrow(() -> new RuntimeException("User not found"));
+                    .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
             Map<String, Object> response = new HashMap<>();
             response.put("id", user.getId());
@@ -131,7 +149,7 @@ public class AuthController {
         try {
             Long userId = getCurrentUserId(request);
             User user = userRepository.findById(userId)
-                    .orElseThrow(() -> new RuntimeException("User not found"));
+                    .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
             Map<String, Object> stats = new HashMap<>();
             stats.put("routeCount", sharedRouteRepository.findByAuthorOrderByCreatedAtDesc(user).size());
@@ -162,7 +180,7 @@ public class AuthController {
         try {
             Long userId = getCurrentUserId(request);
             User user = userRepository.findById(userId)
-                    .orElseThrow(() -> new RuntimeException("User not found"));
+                    .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
             Map<String, Object> comments = new HashMap<>();
             // 景点评论
@@ -184,7 +202,7 @@ public class AuthController {
             String avatarUrl = fileStorageService.storeAvatar(file);
             
             User user = userRepository.findById(userId)
-                    .orElseThrow(() -> new RuntimeException("User not found"));
+                    .orElseThrow(() -> new ResourceNotFoundException("User not found"));
             user.setAvatar(avatarUrl);
             userRepository.save(user);
             
@@ -214,7 +232,7 @@ public class AuthController {
             }
 
             User user = userRepository.findById(userId)
-                    .orElseThrow(() -> new RuntimeException("User not found"));
+                    .orElseThrow(() -> new ResourceNotFoundException("User not found"));
             user.setNickname(nickname);
             userRepository.saveAndFlush(user);
 
@@ -234,7 +252,7 @@ public class AuthController {
             String avatarUrl = InputSanitizer.optionalPublicImageUrl(payload.get("avatarUrl"), "头像地址");
             
             User user = userRepository.findById(userId)
-                    .orElseThrow(() -> new RuntimeException("User not found"));
+                    .orElseThrow(() -> new ResourceNotFoundException("User not found"));
             user.setAvatar(avatarUrl);
             userRepository.save(user);
             
@@ -269,20 +287,18 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "用户名或密码错误"));
         }
 
-        loginAttemptService.reset(username);
+        UserDetails userDetails = (UserDetails) authentication.getPrincipal();
+        User user = userRepository.findByUsername(userDetails.getUsername()).orElseThrow();
 
-        // 超管账户仅允许本地登录
-        if (superAdminUsername.equals(username) && !isLocalRequest(request)) {
-            logger.warn("Rejected remote super-admin login attempt: username={}, ip={}", username, request.getRemoteAddr());
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(Map.of("error", "用户名或密码错误"));
+        ResponseEntity<?> machineBindingFailure = enforceSuperAdminMachineBinding(user, request);
+        if (machineBindingFailure != null) {
+            return machineBindingFailure;
         }
+
+        loginAttemptService.reset(username);
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
         String jwt = jwtUtils.generateJwtToken(authentication);
-
-        UserDetails userDetails = (UserDetails) authentication.getPrincipal();
-        User user = userRepository.findByUsername(userDetails.getUsername()).orElseThrow();
 
         // 获取IP地址并解析城市
         try {
@@ -373,25 +389,40 @@ public class AuthController {
                 .build();
     }
 
-    private boolean isLocalRequest(HttpServletRequest request) {
-        try {
-            InetAddress addr = InetAddress.getByName(request.getRemoteAddr());
-            if (addr.isLoopbackAddress() || addr.isAnyLocalAddress()) {
-                return true;
+    private ResponseEntity<?> enforceSuperAdminMachineBinding(User user, HttpServletRequest request) {
+        if (!superAdminUsername.equals(user.getUsername())) {
+            return null;
+        }
+
+        String fingerprint = request.getHeader("X-Device-Fingerprint");
+        if (!StringUtils.hasText(fingerprint) || !fingerprint.matches("^[A-Za-z0-9_-]{8,128}$")) {
+            logger.warn("Rejected super-admin login without a valid device fingerprint: username={}", user.getUsername());
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "用户名或密码错误"));
+        }
+
+        String fingerprintHash = InputSanitizer.sha256HexForStorage(fingerprint);
+        String allowedHash = user.getAllowedLoginFingerprintHash();
+        if (!StringUtils.hasText(allowedHash)) {
+            if (!superAdminBindOnFirstLogin) {
+                logger.warn("Rejected unbound super-admin login: username={}", user.getUsername());
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("error", "用户名或密码错误"));
             }
 
-            // In local Docker Compose, nginx reaches the backend over a private bridge
-            // address while the browser still uses http://localhost.
-            return addr.isSiteLocalAddress() && isLocalServerName(request.getServerName());
-        } catch (Exception e) {
-            return false;
+            user.setAllowedLoginFingerprintHash(fingerprintHash);
+            userRepository.save(user);
+            logger.warn("Bound super-admin login device fingerprint: username={}", user.getUsername());
+            return null;
         }
+
+        if (!allowedHash.equals(fingerprintHash)) {
+            logger.warn("Rejected super-admin login from unbound device: username={}", user.getUsername());
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "用户名或密码错误"));
+        }
+
+        return null;
     }
 
-    private boolean isLocalServerName(String serverName) {
-        return "localhost".equalsIgnoreCase(serverName)
-                || "127.0.0.1".equals(serverName)
-                || "::1".equals(serverName)
-                || "0:0:0:0:0:0:0:1".equals(serverName);
-    }
 }

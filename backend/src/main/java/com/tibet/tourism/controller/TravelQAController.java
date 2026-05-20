@@ -3,6 +3,10 @@ package com.tibet.tourism.controller;
 import com.tibet.tourism.entity.TravelAnswer;
 import com.tibet.tourism.entity.TravelQuestion;
 import com.tibet.tourism.entity.User;
+import com.tibet.tourism.exception.AuthenticationRequiredException;
+import com.tibet.tourism.exception.BusinessException;
+import com.tibet.tourism.exception.ResourceNotFoundException;
+import com.tibet.tourism.exception.UnauthorizedActionException;
 import com.tibet.tourism.repository.UserRepository;
 import com.tibet.tourism.security.CookieAuthConstants;
 import com.tibet.tourism.security.InputSanitizer;
@@ -16,6 +20,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
@@ -44,10 +49,10 @@ public class TravelQAController {
         if (jwt != null && jwtUtils.validateJwtToken(jwt)) {
             String username = jwtUtils.getUserNameFromJwtToken(jwt);
             User user = userRepository.findByUsername(username)
-                    .orElseThrow(() -> new RuntimeException("User not found"));
+                    .orElseThrow(() -> new ResourceNotFoundException("User not found"));
             return user.getId();
         }
-        throw new RuntimeException("User not authenticated");
+        throw new AuthenticationRequiredException("User not authenticated");
     }
 
     private String parseJwt(HttpServletRequest request) {
@@ -61,6 +66,18 @@ public class TravelQAController {
 
     private ResponseEntity<Map<String, String>> safeBadRequest(Exception e) {
         logger.warn("Community question request failed: {}", e.getMessage());
+        if (e instanceof AuthenticationRequiredException) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", e.getMessage()));
+        }
+        if (e instanceof UnauthorizedActionException || e instanceof SecurityException) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", e.getMessage()));
+        }
+        if (e instanceof ResourceNotFoundException) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));
+        }
+        if (e instanceof BusinessException || e instanceof IllegalArgumentException) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
         return ResponseEntity.badRequest().body(Map.of("error", "请求处理失败，请检查输入后重试"));
     }
 

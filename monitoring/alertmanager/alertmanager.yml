@@ -1,5 +1,5 @@
 route:
-  receiver: noop
+  receiver: webhook
   group_by:
     - alertname
     - severity
@@ -8,4 +8,7 @@ route:
   repeat_interval: 2h
 
 receivers:
-  - name: noop
+  - name: webhook
+    webhook_configs:
+      - url: http://127.0.0.1:9099/alerts
+        send_resolved: true

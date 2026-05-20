@@ -4,6 +4,8 @@ import com.tibet.tourism.entity.TibetanDictionary;
 import com.tibet.tourism.repository.TibetanDictionaryRepository;
 import com.tibet.tourism.service.TibetanTranslationService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -19,6 +21,8 @@ import java.util.Optional;
 @RestController
 @RequestMapping("/api/admin/tibetan-dictionary")
 public class TibetanDictionaryController {
+
+    private static final int DICTIONARY_RESULT_LIMIT = 1000;
 
     @Autowired
     private TibetanDictionaryRepository dictionaryRepository;
@@ -36,11 +40,11 @@ public class TibetanDictionaryController {
             @RequestParam(required = false) String keyword) {
         List<TibetanDictionary> entries;
         if (keyword != null && !keyword.trim().isEmpty()) {
-            entries = dictionaryRepository.searchByChineseText(keyword);
+            entries = dictionaryRepository.searchByChineseText(keyword, dictionaryPage());
         } else if (type != null) {
-            entries = dictionaryRepository.findByType(type);
+            entries = dictionaryRepository.findByType(type, dictionaryPage());
         } else {
-            entries = dictionaryRepository.findAll();
+            entries = dictionaryRepository.findAll(dictionaryPage()).getContent();
         }
         return ResponseEntity.ok(entries);
     }
@@ -201,11 +205,15 @@ public class TibetanDictionaryController {
             @RequestParam(required = false, defaultValue = "chinese") String searchType) {
         List<TibetanDictionary> results;
         if ("tibetan".equals(searchType)) {
-            results = dictionaryRepository.searchByTibetanText(keyword);
+            results = dictionaryRepository.searchByTibetanText(keyword, dictionaryPage());
         } else {
-            results = dictionaryRepository.searchByChineseText(keyword);
+            results = dictionaryRepository.searchByChineseText(keyword, dictionaryPage());
         }
         return ResponseEntity.ok(results);
     }
-}
 
+    private PageRequest dictionaryPage() {
+        return PageRequest.of(0, DICTIONARY_RESULT_LIMIT,
+                Sort.by(Sort.Direction.DESC, "usageCount").and(Sort.by("id")));
+    }
+}

@@ -3,6 +3,8 @@ package com.tibet.tourism.service;
 import com.tibet.tourism.entity.TibetanDictionary;
 import com.tibet.tourism.repository.TibetanDictionaryRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,6 +17,8 @@ import java.util.stream.Collectors;
  */
 @Service
 public class TibetanTranslationService {
+
+    private static final int DICTIONARY_MATCH_LIMIT = 2000;
 
     @Autowired
     private TibetanDictionaryRepository dictionaryRepository;
@@ -38,7 +42,7 @@ public class TibetanTranslationService {
 
         // 尝试短语匹配
         List<TibetanDictionary> phraseMatches = dictionaryRepository
-                .findByType(TibetanDictionary.Type.PHRASE);
+                .findByType(TibetanDictionary.Type.PHRASE, dictionaryPage());
         String result = matchPhrases(chineseText, phraseMatches);
         if (result != null) {
             return result;
@@ -46,7 +50,7 @@ public class TibetanTranslationService {
 
         // 尝试单词匹配（分词翻译）
         List<TibetanDictionary> wordMatches = dictionaryRepository
-                .findByType(TibetanDictionary.Type.WORD);
+                .findByType(TibetanDictionary.Type.WORD, dictionaryPage());
         result = translateByWords(chineseText, wordMatches);
         
         return result;
@@ -116,7 +120,7 @@ public class TibetanTranslationService {
         }
 
         // 如果完整句子无法匹配，尝试分段翻译
-        List<TibetanDictionary> allEntries = dictionaryRepository.findAll();
+        List<TibetanDictionary> allEntries = dictionaryRepository.findAll(dictionaryPage()).getContent();
         return translateBySegments(chineseDescription, allEntries);
     }
 
@@ -218,6 +222,11 @@ public class TibetanTranslationService {
         }
 
         return result.length() > 0 ? result.toString().trim() : null;
+    }
+
+    private PageRequest dictionaryPage() {
+        return PageRequest.of(0, DICTIONARY_MATCH_LIMIT,
+                Sort.by(Sort.Direction.DESC, "usageCount").and(Sort.by("id")));
     }
 
     /**

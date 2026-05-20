@@ -122,10 +122,12 @@ import { useI18n } from 'vue-i18n'
 import { motion } from 'motion-v'
 import { revealInitial, revealInView, revealTransition } from '../motion/presets'
 import api from '../api'
+import { useAuthStore } from '../stores/auth'
 
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
+const auth = useAuthStore()
 
 const question = ref<any>(null)
 const answers = ref<any[]>([])
@@ -135,12 +137,10 @@ const newAnswer = ref('')
 const isLiked = ref(false)
 
 const currentUserId = computed(() => {
-  const userStr = localStorage.getItem('user')
-  if (!userStr) return null
-  try {
-    const user = JSON.parse(userStr)
-    return user?.id || user?.data?.id || null
-  } catch { return null }
+  const id = auth.user?.id
+  if (id == null) return null
+  const numericId = Number(id)
+  return Number.isFinite(numericId) ? numericId : null
 })
 
 const isAuthor = computed(() => currentUserId.value && question.value?.author?.id === currentUserId.value)
@@ -192,6 +192,11 @@ const loadQuestion = async () => {
 
 const submitAnswer = async () => {
   if (!newAnswer.value.trim() || answering.value) return
+  if (!(await auth.ensureSession())) {
+    if (confirm(t('routePlanner.loginRequired'))) router.push('/login')
+    return
+  }
+
   answering.value = true
   try {
     await api.post(`/community/questions/${question.value.id}/answers`, { content: newAnswer.value })
@@ -259,5 +264,8 @@ const formatDate = (dateStr: string) => {
   return new Date(dateStr).toLocaleDateString(locale === 'bo' ? 'bo-CN' : 'zh-CN')
 }
 
-onMounted(() => { loadQuestion() })
+onMounted(async () => {
+  await auth.refreshSession()
+  loadQuestion()
+})
 </script>

@@ -786,6 +786,7 @@ import DOMPurify from 'dompurify'
 import { generateRouteStream } from '../api/stream'
 import api, { endpoints } from '../api'
 import PaymentModal from '../components/PaymentModal.vue'
+import { useRoutePlannerDraft, type RoutePlannerFormState } from '../composables/useRoutePlannerDraft'
 import { useBehaviorTracker } from '../composables/useBehaviorTracker'
 import { getRecaptchaToken } from '../utils/recaptcha'
 import { useAuthStore } from '../stores/auth'
@@ -806,25 +807,6 @@ const router = useRouter()
 const auth = useAuthStore()
 const generationStore = useRouteGenerationStore()
 const { encodeBehaviorData, reset: resetBehavior } = useBehaviorTracker()
-
-const routePlannerDraftStorageKey = 'colorful-tibet:route-planner:draft'
-const routePlannerDraftVersion = 1
-
-interface RoutePlannerFormState {
-  days: number
-  budget: string
-  preference: string
-}
-
-interface RoutePlannerDraft {
-  version: number
-  form: RoutePlannerFormState
-  result: string
-  statusMessage: string
-  errorMessage: string
-  completed: boolean
-  updatedAt: number
-}
 
 interface RouteSummarySection {
   day: string
@@ -992,8 +974,6 @@ const defaultForm: RoutePlannerFormState = {
   budget: 'comfort',
   preference: 'natural'
 }
-
-const hasBrowserStorage = () => typeof window !== 'undefined' && typeof window.localStorage !== 'undefined'
 
 window.addEventListener('auth-expired', () => {
   if (window.location.pathname !== '/login') alert(t('routePlanner.authFailed'))
@@ -1254,61 +1234,27 @@ const planningPulseItems = computed(() => {
   ]
 })
 
-const normalizeDraftForm = (draftForm?: Partial<RoutePlannerFormState>): RoutePlannerFormState => {
-  const days = Number(draftForm?.days)
-  return {
-    days: Number.isFinite(days) ? Math.min(30, Math.max(1, Math.round(days))) : defaultForm.days,
-    budget: draftForm?.budget || defaultForm.budget,
-    preference: draftForm?.preference || defaultForm.preference
+const { persistRouteDraft, restoreRouteDraft } = useRoutePlannerDraft(
+  {
+    form,
+    result,
+    statusMessage,
+    errorMessage,
+    loading,
+    streaming
+  },
+  {
+    defaultForm,
+    getRestoredStatusMessage: draft => t('routePlanner.routeGenComplete', { chars: draft.result.trim().length }),
+    onRestoreResult: restoredResult => {
+      charCount.value = restoredResult.length
+      resultExpanded.value = false
+      scheduleMarkdownRender(restoredResult, true)
+    },
+    onPersistError: error => console.warn('Failed to persist route planner draft:', error),
+    onRestoreError: error => console.warn('Failed to restore route planner draft:', error)
   }
-}
-
-const persistRouteDraft = (overrides: Partial<RoutePlannerDraft> = {}) => {
-  if (!hasBrowserStorage()) return
-
-  const payload: RoutePlannerDraft = {
-    version: routePlannerDraftVersion,
-    form: { ...form.value },
-    result: result.value,
-    statusMessage: statusMessage.value,
-    errorMessage: errorMessage.value,
-    completed: !loading.value && !streaming.value && !!result.value && !errorMessage.value,
-    updatedAt: Date.now(),
-    ...overrides
-  }
-
-  try {
-    localStorage.setItem(routePlannerDraftStorageKey, JSON.stringify(payload))
-  } catch (error) {
-    console.warn('Failed to persist route planner draft:', error)
-  }
-}
-
-const restoreRouteDraft = () => {
-  if (!hasBrowserStorage()) return
-
-  const rawDraft = localStorage.getItem(routePlannerDraftStorageKey)
-  if (!rawDraft) return
-
-  try {
-    const draft = JSON.parse(rawDraft) as Partial<RoutePlannerDraft>
-    if (draft.version !== routePlannerDraftVersion) return
-
-    form.value = normalizeDraftForm(draft.form)
-
-    if (!draft.result) return
-
-    result.value = draft.result
-    charCount.value = draft.result.length
-    resultExpanded.value = false
-    errorMessage.value = draft.errorMessage || ''
-    statusMessage.value = draft.statusMessage || t('routePlanner.routeGenComplete', { chars: draft.result.trim().length })
-    scheduleMarkdownRender(draft.result, true)
-  } catch (error) {
-    console.warn('Failed to restore route planner draft:', error)
-    localStorage.removeItem(routePlannerDraftStorageKey)
-  }
-}
+)
 
 const renderMarkdownSync = (markdown: string) => {
   renderedResult.value = DOMPurify.sanitize(markdown ? markdown.replace(/\n/g, '<br/>') : '')

@@ -45,6 +45,10 @@ public class HotelBooking {
     @Enumerated(EnumType.STRING)
     private Status status;
 
+    @Version
+    @Column(name = "version")
+    private Long version = 0L;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
@@ -122,4 +126,7 @@ public class HotelBooking {
 
     public LocalDateTime getDeletedAt() { return deletedAt; }
     public void setDeletedAt(LocalDateTime deletedAt) { this.deletedAt = deletedAt; }
+
+    public Long getVersion() { return version; }
+    public void setVersion(Long version) { this.version = version; }
 }

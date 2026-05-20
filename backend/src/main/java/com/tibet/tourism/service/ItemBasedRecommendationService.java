@@ -7,6 +7,9 @@ import com.tibet.tourism.repository.UserVisitHistoryRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -37,6 +40,12 @@ public class ItemBasedRecommendationService {
     private static final String REDIS_MATRIX_KEY = "recommend:item-similarity:matrix";
     private static final long REDIS_MATRIX_TTL_HOURS = 48;
 
+    @Value("${app.recommendation.item-similarity.max-spots:2000}")
+    private int maxSpotsForPrecompute;
+
+    @Value("${app.recommendation.item-similarity.max-histories:50000}")
+    private int maxHistoriesForPrecompute;
+
     @Autowired
     private ScenicSpotRepository spotRepository;
 
@@ -65,14 +74,24 @@ public class ItemBasedRecommendationService {
 
             long startTime = System.currentTimeMillis();
 
-            List<ScenicSpot> allSpots = spotRepository.findAll();
+            List<ScenicSpot> allSpots = spotRepository.findAllWithoutTags(
+                    PageRequest.of(0, Math.max(1, maxSpotsForPrecompute), Sort.by("id"))).getContent();
             Set<Long> allSpotIds = allSpots.stream()
                     .map(ScenicSpot::getId)
                     .filter(Objects::nonNull)
                     .collect(Collectors.toCollection(LinkedHashSet::new));
             logger.info("📊 景点总数: {}", allSpots.size());
 
-            List<UserVisitHistory> allHistories = historyRepository.findAll();
+            if (allSpotIds.isEmpty()) {
+                itemSimilarityMatrix = new ConcurrentHashMap<>();
+                itemSimilarityMatrixUpdatedAt = 0L;
+                logger.info("No scenic spots found, skipping item similarity precompute");
+                return true;
+            }
+
+            List<UserVisitHistory> allHistories = historyRepository.findAll(
+                    PageRequest.of(0, Math.max(1, maxHistoriesForPrecompute), Sort.by(Sort.Direction.DESC, "visitDate")))
+                    .getContent();
             Map<Long, Map<Long, Double>> userItemMatrix = buildUserItemMatrix(allHistories);
             logger.info("📊 用户-景点矩阵: {} 用户 × {} 景点",
                     userItemMatrix.size(),

@@ -180,10 +180,12 @@ import { useI18n } from 'vue-i18n'
 import api from '../api'
 import MotionBlock from '../components/motion/MotionBlock.vue'
 import { motionEase } from '../motion/presets'
+import { useAuthStore } from '../stores/auth'
 
 const { t } = useI18n()
 
 const router = useRouter()
+const auth = useAuthStore()
 
 const form = ref({
   title: '',
@@ -209,8 +211,7 @@ const preferenceOptions = computed(() => [
 ])
 
 const submitRoute = async () => {
-  const userStr = localStorage.getItem('user')
-  if (!userStr) {
+  if (!(await auth.ensureSession())) {
     if (confirm(t('createRoute.loginRequired'))) {
       router.push('/login')
     }
@@ -243,9 +244,8 @@ const submitRoute = async () => {
   }
 }
 
-onMounted(() => {
-  const userStr = localStorage.getItem('user')
-  if (!userStr) {
+onMounted(async () => {
+  if (!(await auth.ensureSession())) {
     if (confirm(t('createRoute.loginRequired'))) {
       router.push('/login')
     }

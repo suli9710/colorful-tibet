@@ -5,6 +5,8 @@ import com.tibet.tourism.dto.itinerary.*;
 import com.tibet.tourism.entity.*;
 import com.tibet.tourism.repository.*;
 import com.tibet.tourism.security.InputSanitizer;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -22,6 +24,8 @@ public class ItineraryService {
 
     private static final BigDecimal ZERO = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
     private static final Pattern ALTITUDE_PATTERN = Pattern.compile("(\\d{3,5})");
+    private static final int ITINERARY_SPOT_LIMIT = 500;
+    private static final int ITINERARY_HOTEL_LIMIT = 200;
 
     private final ItineraryRepository itineraryRepository;
     private final ItineraryItemRepository itineraryItemRepository;
@@ -155,8 +159,12 @@ public class ItineraryService {
                                      String preference,
                                      String versionType,
                                      int travelers) {
-        List<ScenicSpot> spots = prioritizeSpots(scenicSpotRepository.findAllWithoutTags(), preference, versionType);
-        List<Hotel> hotels = hotelRepository.findAll();
+        List<ScenicSpot> spots = prioritizeSpots(
+                scenicSpotRepository.findAllWithoutTags(PageRequest.of(0, ITINERARY_SPOT_LIMIT,
+                        Sort.by(Sort.Direction.DESC, "visitCount").and(Sort.by("id")))).getContent(),
+                preference,
+                versionType);
+        List<Hotel> hotels = hotelRepository.findAll(PageRequest.of(0, ITINERARY_HOTEL_LIMIT, Sort.by("id"))).getContent();
 
         Itinerary itinerary = new Itinerary();
         itinerary.setUser(user);
