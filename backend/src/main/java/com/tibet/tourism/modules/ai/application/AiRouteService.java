@@ -64,11 +64,11 @@ public class AiRouteService {
     private final ObjectMapper objectMapper;
 
     public AiRouteService(WebClient.Builder webClientBuilder,
-                          @Value("${ark.api.url:${doubao.api.url:}}") String apiUrl,
-                          @Value("${ark.api.key:${doubao.api.key:}}") String apiKey,
-                          @Value("${ark.api.model:${doubao.api.model:}}") String model,
+                          @Value("#{T(org.springframework.util.StringUtils).hasText(environment.getProperty('ark.api.url')) ? environment.getProperty('ark.api.url') : environment.getProperty('doubao.api.url', '')}") String apiUrl,
+                          @Value("#{T(org.springframework.util.StringUtils).hasText(environment.getProperty('ark.api.key')) ? environment.getProperty('ark.api.key') : environment.getProperty('doubao.api.key', '')}") String apiKey,
+                          @Value("#{T(org.springframework.util.StringUtils).hasText(environment.getProperty('ark.api.model')) ? environment.getProperty('ark.api.model') : environment.getProperty('doubao.api.model', '')}") String model,
                           @Value("${ai.route.timeout-seconds:180}") long timeoutSeconds,
-                          @Value("${ark.api.stream-url:${doubao.api.stream-url:}}") String streamApiUrl,
+                          @Value("#{T(org.springframework.util.StringUtils).hasText(environment.getProperty('ark.api.stream-url')) ? environment.getProperty('ark.api.stream-url') : environment.getProperty('doubao.api.stream-url', '')}") String streamApiUrl,
                           @Value("${ai.route.stream-timeout-seconds:180}") long streamTimeoutSeconds) {
         this.webClient = webClientBuilder.build();
         this.apiUrl = apiUrl;
