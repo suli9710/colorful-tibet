@@ -132,6 +132,9 @@ scrapling:
   service:
     url: ${SCRAPLING_SERVICE_URL:}
     timeout-seconds: ${SCRAPLING_SERVICE_TIMEOUT:30}
+    max-sources: ${SCRAPLING_MAX_SOURCES:4}
+    mode: ${SCRAPLING_MODE:}
+    health-enabled: ${SCRAPLING_HEALTH_ENABLED:false}
 
 # 价格定时更新配置
 price:
@@ -216,6 +219,8 @@ app:
         fingerprint-weight: 0.3
         challenge-threshold: 60
         block-threshold: 85
+  payments:
+    mock-callback-secret: ${PAYMENT_CALLBACK_SECRET:dev-payment-callback-secret}
   super-admin-username: ${SUPER_ADMIN_USERNAME:lzh}
   seed:
     content:
