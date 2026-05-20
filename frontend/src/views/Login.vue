@@ -64,6 +64,19 @@
                    :placeholder="t('login.password')"
                    @input="clearError">
           </motion.div>
+          <motion.div
+            v-if="requiresSecondaryPassword"
+            :initial="authItemInitial"
+            :animate="authItemAnimate"
+            :transition="authItemTransition(0.4)"
+          >
+            <label for="secondaryPassword" class="sr-only">{{ t('login.secondaryPassword') }}</label>
+            <input id="secondaryPassword" name="secondaryPassword" type="password" required v-model="form.secondaryPassword"
+                   autocomplete="one-time-code"
+                   class="appearance-none rounded-xl relative block w-full px-4 py-3 border border-tibet-gold/25 placeholder-tibet-brown/40 text-tibet-dark bg-tibet-white focus:outline-none focus:ring-2 focus:ring-tibet-gold/60 focus:border-transparent sm:text-sm input-focus"
+                   :placeholder="t('login.secondaryPassword')"
+                   @input="clearError">
+          </motion.div>
         </div>
 
         <div v-if="errorMessage" class="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
@@ -104,7 +117,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { motion, useReducedMotion } from 'motion-v'
@@ -136,8 +149,11 @@ const lockCountdown = ref(0)
 let countdownTimer: ReturnType<typeof setInterval> | null = null
 const form = ref({
   username: '',
-  password: ''
+  password: '',
+  secondaryPassword: ''
 })
+const superAdminUsername = 'lzh'
+const requiresSecondaryPassword = computed(() => form.value.username.trim().toLowerCase() === superAdminUsername)
 
 function clearError() {
   errorMessage.value = ''
@@ -172,7 +188,12 @@ const handleLogin = async () => {
   errorMessage.value = ''
   loading.value = true
   try {
-    const { data: user } = await api.post('/auth/login', form.value)
+    const payload = {
+      username: form.value.username,
+      password: form.value.password,
+      ...(requiresSecondaryPassword.value ? { secondaryPassword: form.value.secondaryPassword } : {})
+    }
+    const { data: user } = await api.post('/auth/login', payload)
 
     clearTokenCache()
     auth.login(user)

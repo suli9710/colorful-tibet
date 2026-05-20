@@ -1,4 +1,5 @@
 package com.tibet.tourism.modules.auth.web.dto;
+
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
@@ -11,6 +12,9 @@ public class LoginRequest {
     @NotBlank(message = "密码不能为空")
     @Size(max = 128, message = "密码长度不能超过128个字符")
     private String password;
+
+    @Size(max = 128, message = "二级密码长度不能超过128个字符")
+    private String secondaryPassword;
 
     public String getUsername() {
         return username;
@@ -26,5 +30,13 @@ public class LoginRequest {
 
     public void setPassword(String password) {
         this.password = password;
+    }
+
+    public String getSecondaryPassword() {
+        return secondaryPassword;
+    }
+
+    public void setSecondaryPassword(String secondaryPassword) {
+        this.secondaryPassword = secondaryPassword;
     }
 }
