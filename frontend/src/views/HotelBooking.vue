@@ -1,24 +1,56 @@
 <template>
   <div class="min-h-screen bg-tibet-white">
-    <section class="relative overflow-hidden bg-gradient-to-br from-tibet-dark via-tibet-brown to-tibet-red text-white">
+    <motion.section
+      class="relative overflow-hidden bg-gradient-to-br from-tibet-dark via-tibet-brown to-tibet-red text-white"
+      :initial="{ opacity: 0 }"
+      :animate="{ opacity: 1 }"
+      :transition="{ duration: 0.45, ease: motionEase }"
+    >
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 relative z-10">
-        <div class="max-w-3xl">
+        <motion.div
+          class="max-w-3xl"
+          :initial="{ opacity: 0, y: 22 }"
+          :animate="{ opacity: 1, y: 0 }"
+          :transition="{ duration: 0.5, delay: 0.08, ease: motionEase }"
+        >
           <span class="inline-flex items-center px-4 py-1.5 rounded-full bg-white/15 backdrop-blur-md border border-white/20 text-sm font-medium mb-6">{{ t('hotel.badge') }}</span>
-          <h1 class="text-4xl md:text-5xl font-bold tracking-tight mb-4">{{ t('hotel.bookingTitle') }}</h1>
+          <h1 class="text-4xl md:text-5xl font-bold mb-4">{{ t('hotel.bookingTitle') }}</h1>
           <p class="text-lg md:text-xl text-white/80">{{ t('hotel.bookingSubtitle') }}</p>
-        </div>
+        </motion.div>
       </div>
-    </section>
+    </motion.section>
 
-    <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 -mt-10 relative z-10">
-      <div v-if="!hotel" class="bg-white/90 backdrop-blur-xl rounded-3xl shadow-xl p-10 text-center">
+    <motion.section
+      class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 -mt-10 relative z-10"
+      :initial="cardInitial"
+      :animate="cardInView"
+      :transition="cardTransition(0, 0.08)"
+    >
+      <motion.div
+        v-if="!hotel"
+        class="bg-white/90 backdrop-blur-xl rounded-3xl shadow-xl p-10 text-center"
+        :initial="{ opacity: 0, y: 18 }"
+        :animate="{ opacity: 1, y: 0 }"
+        :transition="revealTransition"
+      >
         <p class="text-gray-500">{{ t('hotel.noResults') }}</p>
         <router-link to="/hotels" class="mt-4 inline-block text-blue-600 hover:underline">{{ t('hotel.viewDetails') }}</router-link>
-      </div>
+      </motion.div>
 
-      <div v-else class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <motion.div
+        v-else
+        class="grid grid-cols-1 lg:grid-cols-3 gap-8"
+        :initial="{ opacity: 0, y: 20 }"
+        :animate="{ opacity: 1, y: 0 }"
+        :transition="{ duration: 0.38, ease: motionEase }"
+      >
         <div class="lg:col-span-2 space-y-6">
-          <div class="bg-white rounded-3xl p-7 border border-tibet-gold/20 shadow-sm">
+          <motion.div
+            class="bg-white rounded-3xl p-7 border border-tibet-gold/20 shadow-sm"
+            :initial="cardInitial"
+            :animate="cardInView"
+            :transition="cardTransition(0, 0.16)"
+          >
             <h2 class="text-xl font-bold text-gray-900 mb-6">{{ t('hotel.checkIn') }} / {{ t('hotel.checkOut') }}</h2>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
@@ -36,9 +68,14 @@
                 <option v-for="n in 6" :key="n" :value="n">{{ n }}{{ t('hotel.guests') }}</option>
               </select>
             </div>
-          </div>
+          </motion.div>
 
-          <div class="bg-white rounded-3xl p-7 border border-tibet-gold/20 shadow-sm">
+          <motion.div
+            class="bg-white rounded-3xl p-7 border border-tibet-gold/20 shadow-sm"
+            :initial="cardInitial"
+            :animate="cardInView"
+            :transition="cardTransition(1, 0.16)"
+          >
             <h2 class="text-xl font-bold text-gray-900 mb-6">{{ t('hotel.booker') }}</h2>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
@@ -46,78 +83,224 @@
                 <input v-model="form.guestName" type="text" :placeholder="t('contact.namePlaceholder')" class="w-full px-4 py-3 rounded-2xl border border-tibet-gold/25 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all" />
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">{{ t('hotel.phone') || '电话' }}</label>
-                <input v-model="form.phone" type="tel" :placeholder="t('hotel.phonePlaceholder') || '请输入联系电话'" class="w-full px-4 py-3 rounded-2xl border border-tibet-gold/25 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all" />
+                <label class="block text-sm font-medium text-gray-700 mb-2">{{ t('hotel.phone') }}</label>
+                <input v-model="form.phone" type="tel" :placeholder="t('hotel.phonePlaceholder')" class="w-full px-4 py-3 rounded-2xl border border-tibet-gold/25 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all" />
               </div>
             </div>
             <div class="mt-4">
-              <label class="block text-sm font-medium text-gray-700 mb-2">{{ t('hotel.noteLabel') || '备注（选填）' }}</label>
-              <textarea v-model="form.note" rows="3" :placeholder="t('hotel.notePlaceholder') || '如有特殊需求请在此说明...'" class="w-full px-4 py-3 rounded-2xl border border-tibet-gold/25 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all resize-none"></textarea>
+              <label class="block text-sm font-medium text-gray-700 mb-2">{{ t('hotel.noteLabel') }}</label>
+              <textarea v-model="form.note" rows="3" :placeholder="t('hotel.notePlaceholder')" class="w-full px-4 py-3 rounded-2xl border border-tibet-gold/25 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all resize-none"></textarea>
             </div>
-          </div>
+          </motion.div>
 
-          <div v-if="submitError" class="bg-red-50 border border-red-200 rounded-2xl p-4 text-red-700 text-sm">{{ submitError }}</div>
+          <AnimatePresence>
+            <motion.div
+              v-if="submitError"
+              key="hotel-booking-error"
+              class="bg-red-50 border border-red-200 rounded-2xl p-4 text-red-700 text-sm"
+              :initial="{ opacity: 0, y: -10, scale: 0.98 }"
+              :animate="{ opacity: 1, y: 0, scale: 1 }"
+              :exit="{ opacity: 0, y: -8, scale: 0.98 }"
+              :transition="{ duration: 0.24, ease: motionEase }"
+            >
+              {{ submitError }}
+            </motion.div>
+          </AnimatePresence>
 
-          <button @click="submitBooking" :disabled="submitting" class="w-full py-4 rounded-full bg-tibet-red text-tibet-yellow font-bold text-lg hover:bg-tibet-red/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-            {{ submitting ? t('common.submitting') : t('common.confirmBook') }}
-          </button>
+          <motion.button
+            @click="submitBooking"
+            :disabled="submitting"
+            class="w-full py-4 rounded-full bg-tibet-red text-tibet-yellow font-bold text-lg hover:bg-tibet-red/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            :initial="cardInitial"
+            :animate="cardInView"
+            :transition="cardTransition(2, 0.16)"
+            :whileHover="submitting ? {} : { y: -2, scale: 1.005 }"
+            :whileTap="submitting ? {} : { scale: 0.985 }"
+          >
+            <AnimatePresence mode="wait">
+              <motion.span
+                v-if="submitting"
+                key="booking-submitting"
+                :initial="{ opacity: 0, y: 6 }"
+                :animate="{ opacity: 1, y: 0 }"
+                :exit="{ opacity: 0, y: -6 }"
+                :transition="{ duration: 0.18, ease: motionEase }"
+              >
+                {{ t('common.submitting') }}
+              </motion.span>
+              <motion.span
+                v-else
+                key="booking-confirm"
+                :initial="{ opacity: 0, y: 6 }"
+                :animate="{ opacity: 1, y: 0 }"
+                :exit="{ opacity: 0, y: -6 }"
+                :transition="{ duration: 0.18, ease: motionEase }"
+              >
+                {{ t('common.confirmBook') }}
+              </motion.span>
+            </AnimatePresence>
+          </motion.button>
         </div>
 
         <div>
-          <div class="sticky top-24 bg-white rounded-3xl p-7 border border-tibet-gold/20 shadow-lg">
+          <motion.div
+            class="sticky top-24 bg-white rounded-3xl p-7 border border-tibet-gold/20 shadow-lg"
+            :initial="cardInitial"
+            :animate="cardInView"
+            :transition="cardTransition(3, 0.12)"
+          >
             <div class="h-40 rounded-2xl overflow-hidden mb-4 bg-gray-100">
-              <img :src="hotel.coverImage" :alt="hotel.name" class="w-full h-full object-cover" />
+              <motion.img
+                :src="bookingCoverImage"
+                :alt="hotel.name"
+                class="w-full h-full object-cover"
+                :initial="{ opacity: 0, scale: 1.04 }"
+                :animate="{ opacity: 1, scale: 1 }"
+                :transition="{ duration: 0.42, ease: motionEase }"
+                @error="applyHotelImageFallback"
+              />
             </div>
             <h3 class="text-xl font-bold text-gray-900">{{ hotel.name }}</h3>
             <p class="text-sm text-gray-500 mt-1">{{ hotel.city }} · {{ hotel.address }}</p>
 
-            <div v-if="selectedRoom" class="mt-4 pt-4 border-t border-tibet-gold/20 space-y-2 text-sm">
-              <div class="flex justify-between"><span class="text-gray-500">房型</span><span class="font-medium">{{ selectedRoom.name }}</span></div>
+            <AnimatePresence>
+              <motion.div
+                v-if="selectedRoom"
+                key="booking-room-summary"
+                class="mt-4 pt-4 border-t border-tibet-gold/20 space-y-2 text-sm"
+                :initial="{ opacity: 0, y: 12 }"
+                :animate="{ opacity: 1, y: 0 }"
+                :exit="{ opacity: 0, y: 8 }"
+                :transition="{ duration: 0.28, ease: motionEase }"
+              >
+              <div class="flex justify-between"><span class="text-gray-500">{{ t('hotel.roomType') }}</span><span class="font-medium">{{ selectedRoom.name }}</span></div>
               <div class="flex justify-between"><span class="text-gray-500">{{ t('hotel.perNight') }}</span><span class="font-medium">¥{{ selectedRoom.price }}</span></div>
-              <div class="flex justify-between"><span class="text-gray-500">晚数</span><span class="font-medium">{{ nights }} 晚</span></div>
-              <div class="flex justify-between"><span class="text-gray-500">入住</span><span class="font-medium">{{ form.checkInDate || '-' }}</span></div>
-              <div class="flex justify-between"><span class="text-gray-500">离店</span><span class="font-medium">{{ form.checkOutDate || '-' }}</span></div>
-              <div class="flex justify-between border-t border-tibet-gold/20 pt-2 mt-2"><span class="font-semibold">合计</span><span class="text-xl font-bold text-blue-600">¥{{ totalPrice }}</span></div>
-            </div>
-          </div>
+              <div class="flex justify-between"><span class="text-gray-500">{{ t('hotel.nights') }}</span><span class="font-medium">{{ nights }}{{ t('common.nightsUnit') }}</span></div>
+              <div class="flex justify-between"><span class="text-gray-500">{{ t('hotel.checkIn') }}</span><span class="font-medium">{{ form.checkInDate || '-' }}</span></div>
+              <div class="flex justify-between"><span class="text-gray-500">{{ t('hotel.checkOut') }}</span><span class="font-medium">{{ form.checkOutDate || '-' }}</span></div>
+              <div class="flex justify-between border-t border-tibet-gold/20 pt-2 mt-2">
+                <span class="font-semibold">{{ t('hotel.total') }}</span>
+                <motion.span
+                  :key="totalPrice"
+                  class="text-xl font-bold text-blue-600"
+                  :initial="{ opacity: 0, y: -6 }"
+                  :animate="{ opacity: 1, y: 0 }"
+                  :transition="{ duration: 0.2, ease: motionEase }"
+                >
+                  ¥{{ totalPrice }}
+                </motion.span>
+              </div>
+              </motion.div>
+            </AnimatePresence>
+          </motion.div>
         </div>
-      </div>
-    </section>
+      </motion.div>
+    </motion.section>
   </div>
+
+  <PaymentModal
+    :show="showPaymentModal"
+    :amount="totalPrice"
+    recaptcha-action="hotel_booking"
+    @close="showPaymentModal = false"
+    @paid="handlePaymentConfirmed"
+  />
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { AnimatePresence, motion } from 'motion-v'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { getHotelById, getRoomById } from '../data/hotels'
+import { getHotelById, getRoomById, hotels } from '../data/hotels'
+import { applyHotelImageFallback, resolveHotelCoverImage } from '../data/hotelImages'
+import { getCanonicalRegion, localizeApiRoom, localizeHotel } from '../data/hotelTranslations'
 import api, { endpoints } from '../api'
+import PaymentModal from '../components/PaymentModal.vue'
+import { useBehaviorTracker } from '../composables/useBehaviorTracker'
+import {
+  cardInitial,
+  cardInView,
+  cardTransition,
+  motionEase,
+  revealTransition
+} from '../motion/presets'
 
-const { t } = useI18n()
+const { encodeBehaviorData, reset: resetBehavior } = useBehaviorTracker()
+
+const { t, locale } = useI18n()
 const route = useRoute()
 const router = useRouter()
 
-const hotelId = Number(route.params.id || 1)
-const roomId = Number(route.query.roomId || 1)
+const hotelId = computed(() => Number(route.params.id || 1))
+const roomId = computed(() => Number(route.query.roomId || 1))
 const apiHotel = ref<any>(null)
 const apiRoomTypes = ref<any[]>([])
 
-;(async () => {
+const loadBookingData = async () => {
+  apiHotel.value = null
+  apiRoomTypes.value = []
   try {
     const [hotelRes, roomRes] = await Promise.all([
-      api.get(endpoints.hotels.detail(hotelId)),
-      api.get(endpoints.hotels.roomTypes(hotelId))
+      api.get(endpoints.hotels.detail(hotelId.value)),
+      api.get(endpoints.hotels.roomTypes(hotelId.value))
     ])
     apiHotel.value = hotelRes.data
     apiRoomTypes.value = Array.isArray(roomRes.data) ? roomRes.data : []
   } catch (e) { /* fallback */ }
-})()
+}
 
-const hotel = computed(() => apiHotel.value || getHotelById(hotelId))
+watch(
+  () => [route.params.id, route.query.roomId],
+  () => {
+    void loadBookingData()
+  },
+  { immediate: true }
+)
+
+const matchingStaticHotel = computed(() => {
+  if (!apiHotel.value) return getHotelById(hotelId.value)
+  return hotels.find(item => item.name === apiHotel.value.name) || getHotelById(hotelId.value)
+})
+
+const mappedApiHotel = computed(() => {
+  if (!apiHotel.value) return null
+  const staticHotel = matchingStaticHotel.value
+  const region = getCanonicalRegion(apiHotel.value.location || '')
+  const amenities = apiHotel.value.facilities
+    ? apiHotel.value.facilities.split(',').map((f: string) => f.trim()).filter(Boolean)
+    : []
+  return {
+    ...(staticHotel || {}),
+    ...apiHotel.value,
+    id: apiHotel.value.id,
+    coverImage: resolveHotelCoverImage(staticHotel?.coverImage || apiHotel.value.imageUrl),
+    city: region,
+    address: apiHotel.value.location || staticHotel?.address || '',
+    tags: amenities.length ? amenities.slice(0, 4) : (staticHotel?.tags || []),
+    amenities: amenities.length ? amenities : (staticHotel?.amenities || []),
+    reviewCount: staticHotel?.reviewCount || 0,
+    stars: Math.min(5, Math.max(3, Math.round(Number(apiHotel.value.rating) || staticHotel?.rating || 4))),
+    lng: staticHotel?.lng || 91.0,
+    lat: staticHotel?.lat || 29.6
+  }
+})
+
+const hotel = computed(() => {
+  const rawHotel = mappedApiHotel.value || getHotelById(hotelId.value)
+  return rawHotel ? localizeHotel(rawHotel, locale.value) : null
+})
+
+const bookingCoverImage = computed(() => {
+  const coverImage = hotel.value?.coverImage || ''
+  return resolveHotelCoverImage(coverImage)
+})
+
 const selectedRoom = computed(() => {
-  const apiRoom = apiRoomTypes.value.find((r: any) => r.id === roomId)
-  if (apiRoom) return { ...apiRoom, price: apiRoom.price, desc: apiRoom.amenities }
-  return getRoomById(hotelId, roomId)
+  const apiRoom = apiRoomTypes.value.find((r: any) => r.id === roomId.value)
+  if (apiRoom) return localizeApiRoom({ ...apiRoom, price: apiRoom.price, desc: apiRoom.amenities }, locale.value)
+  const staticRoom = matchingStaticHotel.value?.rooms?.find(room => room.id === roomId.value) || getRoomById(hotelId.value, roomId.value)
+  return staticRoom ? localizeApiRoom(staticRoom, locale.value) : null
 })
 
 const form = ref({
@@ -155,26 +338,34 @@ const totalPrice = computed(() => {
 const submitting = ref(false)
 const submitError = ref('')
 
-const submitBooking = async () => {
+const showPaymentModal = ref(false)
+
+const submitBooking = () => {
   submitError.value = ''
   if (!form.value.checkInDate || !form.value.checkOutDate) {
-    submitError.value = '请选择入住和离店日期'
+    submitError.value = t('hotel.checkInRequired')
     return
   }
   if (!form.value.guestName.trim()) {
-    submitError.value = '请填写预订人姓名'
+    submitError.value = t('hotel.guestNameRequired')
     return
   }
   if (!form.value.phone.trim()) {
-    submitError.value = '请填写联系电话'
+    submitError.value = t('hotel.phoneRequired')
     return
   }
+  showPaymentModal.value = true
+}
 
+const handlePaymentConfirmed = async (recaptchaToken = '') => {
+  showPaymentModal.value = false
   submitting.value = true
+  submitError.value = ''
   try {
+    const behaviorData = encodeBehaviorData()
     await api.post(endpoints.hotelBookings.create, {
-      hotelId,
-      roomId,
+      hotelId: hotelId.value,
+      roomId: roomId.value,
       roomName: selectedRoom.value?.name || '',
       roomPrice: selectedRoom.value?.price || 0,
       nights: nights.value,
@@ -184,34 +375,31 @@ const submitBooking = async () => {
       guestName: form.value.guestName,
       phone: form.value.phone,
       note: form.value.note,
+    }, {
+      headers: {
+        ...(recaptchaToken ? { 'X-Recaptcha-Token': recaptchaToken } : {}),
+        ...(behaviorData ? { 'X-Behavior-Data': behaviorData } : {}),
+      }
     })
-  } catch {
-    const order = {
-      id: Date.now().toString(),
-      hotelId,
-      roomId,
-      hotelName: hotel.value?.name || '',
-      roomName: selectedRoom.value?.name || '',
-      checkInDate: form.value.checkInDate,
-      checkOutDate: form.value.checkOutDate,
-      guests: form.value.guests,
-      guestName: form.value.guestName,
-      phone: form.value.phone,
-      note: form.value.note,
-      nights: nights.value,
-      subtotal: (selectedRoom.value?.price || 0) * nights.value,
-      serviceFee: serviceFee.value,
-      discount: 0,
-      totalPrice: totalPrice.value,
-      status: 'PENDING',
-      createdAt: new Date().toISOString(),
+  } catch (error: any) {
+    if (error.response) {
+      if (String(error.response?.data?.code || '').startsWith('ANTIBOT_')) {
+        submitError.value = t('hotel.securityVerificationFailed')
+        return
+      }
+      submitError.value = error.response?.data?.message || error.response?.data?.error || t('hotel.bookingFailed')
+      return
     }
-    const existing = JSON.parse(localStorage.getItem('hotel-orders') || '[]')
-    localStorage.setItem('hotel-orders', JSON.stringify([order, ...existing]))
+
+    localStorage.removeItem('hotel-orders')
+    submitError.value = t('hotel.bookingFailed')
+    return
   } finally {
     submitting.value = false
+    resetBehavior()
   }
 
+  localStorage.removeItem('hotel-orders')
   window.dispatchEvent(new CustomEvent('hotel-orders-updated'))
   window.dispatchEvent(new CustomEvent('bookings-updated'))
   router.push('/hotel-orders')

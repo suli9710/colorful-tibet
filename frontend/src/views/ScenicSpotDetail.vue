@@ -6,12 +6,18 @@
 
     <div v-else-if="spot" class="relative">
       <!-- Immersive Header Image -->
-      <div class="relative h-[60vh] w-full overflow-hidden bg-gray-200 animate-scale-in">
-        <img v-if="spot.imageUrl" 
-             :src="spot.imageUrl" 
+      <motion.div
+        class="relative h-[60vh] w-full overflow-hidden bg-gray-200"
+        :initial="{ opacity: 0, scale: 1.02 }"
+        :animate="{ opacity: 1, scale: 1 }"
+        :transition="{ duration: 0.5, ease: motionEase }"
+      >
+        <img v-if="hasSpotImage"
+             :src="spot.imageUrl"
              :alt="spot.name"
              loading="eager"
-             class="w-full h-full object-cover img-fade-in">
+             class="w-full h-full object-cover img-fade-in"
+             @error="handleSpotImageError">
         <div v-else class="w-full h-full flex items-center justify-center" :class="getGradientClass(spot)">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-40 w-40 text-white opacity-30 animate-pulse-slow" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path v-if="spot.category === 'NATURAL'" stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -20,7 +26,12 @@
         </div>
         <div class="absolute inset-0 bg-gradient-to-t from-tibet-dark/80 via-transparent to-transparent"></div>
         
-        <div class="absolute bottom-0 left-0 w-full p-8 md:p-16 text-white animate-slide-up">
+        <motion.div
+          class="absolute bottom-0 left-0 w-full p-8 md:p-16 text-white"
+          :initial="{ opacity: 0, y: 24 }"
+          :animate="{ opacity: 1, y: 0 }"
+          :transition="{ duration: 0.6, delay: 0.2, ease: motionEase }"
+        >
           <div class="max-w-7xl mx-auto">
             <div class="flex items-center space-x-4 mb-4">
               <span class="px-4 py-1.5 bg-white/20 backdrop-blur-md rounded-full text-sm font-bold border border-white/30 tibetan-font">
@@ -32,7 +43,7 @@
                 </span>
               </div>
             </div>
-            <h1 class="text-5xl md:text-6xl font-bold mb-4 tracking-tight tibetan-font">{{ spot.name }}</h1>
+            <h1 class="text-5xl md:text-6xl font-bold mb-4 tibetan-font">{{ spot.name }}</h1>
             <div class="flex items-center text-white/80 space-x-6">
               <span class="flex items-center tibetan-font">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -44,14 +55,20 @@
               <span class="text-2xl font-bold text-tibet-gold">¥{{ unitPrice }}</span>
             </div>
           </div>
-        </div>
-      </div>
+        </motion.div>
+      </motion.div>
 
       <!-- Content Section -->
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 -mt-20 relative z-10">
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-12">
           <!-- Left Column: Description -->
-          <div class="lg:col-span-2 space-y-8 animate-slide-up" style="animation-delay: 0.2s">
+          <motion.div
+            class="lg:col-span-2 space-y-8"
+            :initial="revealInitial"
+            :whileInView="revealInView"
+            :inViewOptions="inViewOnce"
+            :transition="{ duration: 0.5, delay: 0.1, ease: motionEase }"
+          >
             <div class="bg-white rounded-3xl p-8 shadow-xl border border-tibet-gold/20">
               <h2 class="text-2xl font-bold text-tibet-dark mb-6 tibetan-font">{{ t('spotDetail.introduction') }}</h2>
               <p class="text-tibet-brown/80 leading-loose text-lg whitespace-pre-line tibetan-font">
@@ -141,15 +158,24 @@
                   <div class="flex items-center justify-between mb-2">
                     <div class="flex items-center space-x-3">
                       <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold">
-                        {{ comment.user?.nickname?.charAt(0) || comment.user?.username?.charAt(0) }}
+                        {{ getCommentAuthor(comment).charAt(0) }}
                       </div>
                       <div>
-                        <p class="font-bold text-gray-900">{{ comment.user?.nickname || comment.user?.username }}</p>
+                        <p class="font-bold text-gray-900">{{ getCommentAuthor(comment) }}</p>
                         <p class="text-xs text-gray-500">{{ formatDate(comment.createdAt) }}</p>
                       </div>
                     </div>
-                    <div class="flex text-yellow-400">
-                      <span v-for="n in 5" :key="n">{{ n <= comment.rating ? '★' : '☆' }}</span>
+                    <div class="flex items-center gap-3">
+                      <button
+                        v-if="isOwnComment(comment)"
+                        @click="deleteComment(comment)"
+                        class="text-xs font-medium text-red-500 hover:text-red-700 transition-colors tibetan-font"
+                      >
+                        {{ t('common.delete') }}
+                      </button>
+                      <div class="flex text-yellow-400">
+                        <span v-for="n in 5" :key="n">{{ n <= comment.rating ? '★' : '☆' }}</span>
+                      </div>
                     </div>
                   </div>
                   <p class="text-gray-600 leading-relaxed pl-13 mb-3">{{ comment.content }}</p>
@@ -252,10 +278,16 @@
                 </div>
               </div>
             </div>
-          </div>
+          </motion.div>
 
           <!-- Right Column: Booking Form -->
-          <div class="lg:col-span-1 animate-slide-up" style="animation-delay: 0.4s">
+          <motion.div
+            class="lg:col-span-1"
+            :initial="revealInitial"
+            :whileInView="revealInView"
+            :inViewOptions="inViewOnce"
+            :transition="{ duration: 0.5, delay: 0.25, ease: motionEase }"
+          >
               <div class="sticky top-20">
               <div class="glass-card rounded-3xl p-8 border border-white/50">
                 <h2 class="text-2xl font-bold text-tibet-dark mb-6 tibetan-font">{{ t('spotDetail.bookNow') }}</h2>
@@ -296,33 +328,61 @@
                 </form>
               </div>
             </div>
-          </div>
+          </motion.div>
         </div>
       </div>
     </div>
   </div>
+
+  <PaymentModal
+    :show="showPaymentModal"
+    :amount="totalPrice"
+    recaptcha-action="booking"
+    @close="showPaymentModal = false"
+    @paid="handlePaymentConfirmed"
+  />
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { motion } from 'motion-v'
+import { motionEase, revealInitial, revealInView, inViewOnce } from '../motion/presets'
 import api, { endpoints } from '../api'
-import L from 'leaflet'
-import 'leaflet/dist/leaflet.css'
+import PaymentModal from '../components/PaymentModal.vue'
+import { useBehaviorTracker } from '../composables/useBehaviorTracker'
+import { useAuthStore } from '../stores/auth'
+import type * as Leaflet from 'leaflet'
 
 const { t, locale } = useI18n()
 
+const { encodeBehaviorData, reset: resetBehavior } = useBehaviorTracker()
+
 const route = useRoute()
 const router = useRouter()
+const auth = useAuthStore()
 const spot = ref<any>(null)
 const loading = ref(true)
 const submitting = ref(false)
+const spotImageFailed = ref(false)
 const mapContainer = ref<HTMLElement | null>(null)
 const mapReady = ref(false)
 const mapLoading = ref(true)
-let map: L.Map | null = null
-let marker: L.CircleMarker | null = null
+let map: Leaflet.Map | null = null
+let marker: Leaflet.CircleMarker | null = null
+let leafletLoader: Promise<typeof Leaflet> | null = null
+
+const loadLeaflet = async () => {
+  if (!leafletLoader) {
+    leafletLoader = Promise.all([
+      import('leaflet'),
+      import('leaflet/dist/leaflet.css')
+    ]).then(([leaflet]) => leaflet)
+  }
+
+  return leafletLoader
+}
 
 const bookingForm = ref({
   visitDate: '',
@@ -385,6 +445,12 @@ const totalPrice = computed(() => {
   return unitPrice.value * bookingForm.value.ticketCount
 })
 
+const hasSpotImage = computed(() => Boolean(spot.value?.imageUrl) && !spotImageFailed.value)
+
+const handleSpotImageError = () => {
+  spotImageFailed.value = true
+}
+
 const hasValidLocation = computed(() => {
   if (!spot.value) return false
   const lat = Number(spot.value.latitude)
@@ -395,6 +461,7 @@ const hasValidLocation = computed(() => {
 const fetchSpotDetail = async () => {
   try {
     const response = await api.get(endpoints.spots.detail(Number(route.params.id)))
+    spotImageFailed.value = false
     spot.value = response.data
     loading.value = false
     await nextTick()
@@ -463,6 +530,7 @@ const initOrUpdateMap = async () => {
   const [lng, lat] = wgs84ToGcj02(wgsLng, wgsLat)
 
   await nextTick()
+  const L = await loadLeaflet()
 
   if (!map) {
     mapLoading.value = true
@@ -487,7 +555,7 @@ const initOrUpdateMap = async () => {
       mapLoading.value = true
     })
     tileLayer.on('tileerror', () => {
-      // 单个瓦片失败不阻塞
+      mapLoading.value = false
     })
     tileLayer.addTo(map)
 
@@ -533,22 +601,35 @@ onBeforeUnmount(() => {
   clearCommentImagePreview()
 })
 
+const showPaymentModal = ref(false)
+
 const handleBooking = async () => {
-  const userStr = localStorage.getItem('user')
-  if (!userStr) {
+  if (!(await auth.ensureSession())) {
     router.push('/login')
     return
   }
+  if (!bookingForm.value.visitDate) {
+    alert(t('spotDetail.pleaseSelectDate'))
+    return
+  }
+  showPaymentModal.value = true
+}
 
-  const user = JSON.parse(userStr)
+const handlePaymentConfirmed = async (recaptchaToken = '') => {
+  showPaymentModal.value = false
   submitting.value = true
+  const behaviorData = encodeBehaviorData()
 
   try {
     await api.post('/bookings', {
-      userId: user.id,
       spotId: spot.value.id,
       visitDate: bookingForm.value.visitDate,
       ticketCount: bookingForm.value.ticketCount
+    }, {
+      headers: {
+        ...(recaptchaToken ? { 'X-Recaptcha-Token': recaptchaToken } : {}),
+        ...(behaviorData ? { 'X-Behavior-Data': behaviorData } : {}),
+      }
     })
     alert(t('spotDetail.bookingSuccess'))
     router.push('/profile')
@@ -557,10 +638,11 @@ const handleBooking = async () => {
     alert(t('spotDetail.bookingFailed'))
   } finally {
     submitting.value = false
+    resetBehavior()
   }
 }
 
-const user = ref(JSON.parse(localStorage.getItem('user') || 'null'))
+const user = computed(() => auth.user)
 const comments = ref<any[]>([])
 const submittingComment = ref(false)
 const commentForm = ref({
@@ -582,7 +664,7 @@ const fetchComments = async () => {
     if (user.value) {
       for (const comment of comments.value) {
         try {
-          const likedResponse = await api.get(`/comments/${comment.id}/liked?userId=${user.value.id}`)
+          const likedResponse = await api.get(`/comments/${comment.id}/liked`)
           comment.liked = likedResponse.data.liked
         } catch (error) {
           console.error('Failed to check liked status:', error)
@@ -657,7 +739,7 @@ async function handleCommentImageChange(event: Event) {
 const submitComment = async () => {
   if (!commentForm.value.content.trim()) return
 
-  if (!user.value) {
+  if (!(await auth.ensureSession())) {
     router.push('/login')
     return
   }
@@ -665,7 +747,6 @@ const submitComment = async () => {
   submittingComment.value = true
   try {
     await api.post(endpoints.comments.create, {
-      userId: user.value.id,
       spotId: spot.value.id,
       content: commentForm.value.content,
       rating: commentForm.value.rating,
@@ -686,16 +767,35 @@ const submitComment = async () => {
   }
 }
 
+const getCommentAuthor = (comment: any) => {
+  return comment.user?.nickname || comment.user?.username || comment.nickname || comment.username || t('routeDetail.anonymous')
+}
+
+const isOwnComment = (comment: any) => {
+  if (!user.value) return false
+  return Number(comment.user?.id || comment.userId) === Number(user.value.id) || comment.username === user.value.username
+}
+
+const deleteComment = async (comment: any) => {
+  if (!confirm(t('spotDetail.confirmDeleteComment'))) return
+
+  try {
+    await api.delete(endpoints.comments.delete(comment.id))
+    comments.value = comments.value.filter(item => item.id !== comment.id)
+  } catch (error) {
+    console.error('Failed to delete comment:', error)
+    alert(t('spotDetail.deleteCommentFailed'))
+  }
+}
+
 const toggleLike = async (comment: any) => {
-  if (!user.value) {
+  if (!(await auth.ensureSession())) {
     router.push('/login')
     return
   }
   
   try {
-    const response = await api.post(`/comments/${comment.id}/like`, {
-      userId: user.value.id
-    })
+    const response = await api.post(`/comments/${comment.id}/like`)
     
     comment.liked = response.data.liked
     comment.likeCount = response.data.likeCount
@@ -741,29 +841,9 @@ watch(locale, () => {
   fetchSpotDetail()
 })
 
-const updateUser = () => {
-  user.value = JSON.parse(localStorage.getItem('user') || 'null')
-}
-
-const handleStorageChange = (e: StorageEvent) => {
-  if (e.key === 'user') {
-    updateUser()
-  }
-}
-
-const handleUserUpdate = () => {
-  updateUser()
-}
-
-onMounted(() => {
+onMounted(async () => {
   fetchSpotDetail()
+  await auth.refreshSession()
   fetchComments()
-  window.addEventListener('storage', handleStorageChange)
-  window.addEventListener('user-updated', handleUserUpdate)
-})
-
-onBeforeUnmount(() => {
-  window.removeEventListener('storage', handleStorageChange)
-  window.removeEventListener('user-updated', handleUserUpdate)
 })
 </script>

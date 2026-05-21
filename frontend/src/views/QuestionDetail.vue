@@ -5,11 +5,15 @@
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-tibet-red mx-auto"></div>
       </div>
 
-      <div v-else-if="question" class="animate-fade-in">
+      <motion.div v-else-if="question"
+        :initial="revealInitial"
+        :animate="revealInView"
+        :transition="revealTransition"
+      >
         <!-- Back -->
         <button @click="router.back()" class="text-gray-500 hover:text-gray-900 mb-6 flex items-center gap-1 text-sm">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-          返回社区
+          {{ t('questionDetail.backToCommunity') }}
         </button>
 
         <!-- Question Header -->
@@ -28,11 +32,11 @@
               </div>
               <h1 class="text-2xl font-bold text-gray-900 mb-3">{{ question.title }}</h1>
               <div class="flex items-center gap-3 text-sm text-gray-400">
-                <span>{{ question.author?.username || '匿名用户' }}</span>
+                <span>{{ question.author?.username || t('questionDetail.anonymousUser') }}</span>
                 <span>·</span>
                 <span>{{ formatDate(question.createdAt) }}</span>
                 <span>·</span>
-                <span>{{ question.viewCount }} 次浏览</span>
+                <span>{{ t('questionDetail.viewCount', { count: question.viewCount }) }}</span>
               </div>
             </div>
           </div>
@@ -46,7 +50,7 @@
               <span>{{ question.likeCount }}</span>
             </button>
             <button v-if="isAuthor" @click="deleteQuestion" class="ml-auto px-4 py-2 rounded-xl bg-gray-50 text-gray-400 hover:bg-red-50 hover:text-red-500 transition-colors text-sm">
-              删除问题
+              {{ t('questionDetail.deleteQuestion') }}
             </button>
           </div>
         </div>
@@ -67,7 +71,7 @@
                  :class="answer.isAccepted ? 'border-2 border-emerald-300 bg-emerald-50/40' : 'border border-white/20'">
               <div class="flex items-start justify-between gap-4 mb-3">
                 <div class="flex items-center gap-2">
-                  <span class="font-semibold text-gray-900 text-sm">{{ answer.user?.username || '匿名用户' }}</span>
+                  <span class="font-semibold text-gray-900 text-sm">{{ answer.user?.username || t('questionDetail.anonymousUser') }}</span>
                   <span v-if="answer.isAccepted" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-600 text-xs font-medium">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                     {{ t('community.accepted') }}
@@ -104,9 +108,9 @@
             </button>
           </div>
         </div>
-      </div>
+      </motion.div>
 
-      <div v-else class="text-center py-12 text-gray-500">问题不存在</div>
+      <div v-else class="text-center py-12 text-gray-500">{{ t('questionDetail.questionNotFound') }}</div>
     </div>
   </div>
 </template>
@@ -115,11 +119,15 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { motion } from 'motion-v'
+import { revealInitial, revealInView, revealTransition } from '../motion/presets'
 import api from '../api'
+import { useAuthStore } from '../stores/auth'
 
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
+const auth = useAuthStore()
 
 const question = ref<any>(null)
 const answers = ref<any[]>([])
@@ -129,12 +137,10 @@ const newAnswer = ref('')
 const isLiked = ref(false)
 
 const currentUserId = computed(() => {
-  const userStr = localStorage.getItem('user')
-  if (!userStr) return null
-  try {
-    const user = JSON.parse(userStr)
-    return user?.id || user?.data?.id || null
-  } catch { return null }
+  const id = auth.user?.id
+  if (id == null) return null
+  const numericId = Number(id)
+  return Number.isFinite(numericId) ? numericId : null
 })
 
 const isAuthor = computed(() => currentUserId.value && question.value?.author?.id === currentUserId.value)
@@ -186,6 +192,11 @@ const loadQuestion = async () => {
 
 const submitAnswer = async () => {
   if (!newAnswer.value.trim() || answering.value) return
+  if (!(await auth.ensureSession())) {
+    if (confirm(t('routePlanner.loginRequired'))) router.push('/login')
+    return
+  }
+
   answering.value = true
   try {
     await api.post(`/community/questions/${question.value.id}/answers`, { content: newAnswer.value })
@@ -199,7 +210,7 @@ const submitAnswer = async () => {
     if (error.response?.status === 401) {
       if (confirm(t('routePlanner.loginRequired'))) router.push('/login')
     } else {
-      alert('回答失败，请稍后重试')
+      alert(t('questionDetail.answerFailed'))
     }
   } finally {
     answering.value = false
@@ -234,17 +245,17 @@ const acceptAnswer = async (answerId: number) => {
     question.value.isResolved = true
     loadQuestion()
   } catch (error: any) {
-    alert('采纳失败')
+    alert(t('questionDetail.acceptFailed'))
   }
 }
 
 const deleteQuestion = async () => {
-  if (!confirm('确定要删除这个问题吗？')) return
+  if (!confirm(t('questionDetail.confirmDelete'))) return
   try {
     await api.delete(`/community/questions/${question.value.id}`)
     router.push('/community')
   } catch (error: any) {
-    alert('删除失败')
+    alert(t('questionDetail.deleteFailed'))
   }
 }
 
@@ -253,5 +264,8 @@ const formatDate = (dateStr: string) => {
   return new Date(dateStr).toLocaleDateString(locale === 'bo' ? 'bo-CN' : 'zh-CN')
 }
 
-onMounted(() => { loadQuestion() })
+onMounted(async () => {
+  await auth.refreshSession()
+  loadQuestion()
+})
 </script>

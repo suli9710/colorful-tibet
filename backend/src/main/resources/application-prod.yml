@@ -3,6 +3,7 @@
 
 server:
   port: 8080
+  forward-headers-strategy: ${SERVER_FORWARD_HEADERS_STRATEGY:none}
   compression:
     enabled: true
     mime-types: application/json,application/xml,text/html,text/xml,text/plain,text/css,text/javascript,application/javascript
@@ -15,9 +16,9 @@ spring:
     async:
       request-timeout: 120000
   datasource:
-    url: jdbc:mysql://localhost:3306/tibet_tourism?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:tibet_tourism}?useUnicode=true&characterEncoding=utf8&sslMode=${DB_SSL_MODE:VERIFY_IDENTITY}&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=${DB_ALLOW_PUBLIC_KEY_RETRIEVAL:false}
     username: ${DB_USERNAME:tibet_user}
-    password: ${DB_PASSWORD:your_strong_password}
+    password: ${DB_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
       maximum-pool-size: 20
@@ -28,7 +29,7 @@ spring:
   jpa:
     database-platform: org.hibernate.dialect.MySQL8Dialect
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     show-sql: false
     properties:
       hibernate:
@@ -37,32 +38,86 @@ spring:
           batch_size: 20
         order_inserts: true
         order_updates: true
-  h2:
-    console:
-      enabled: false
+        session:
+          events:
+            log:
+              LOG_QUERIES_SLOWER_THAN_MS: ${HIBERNATE_SLOW_QUERY_MS:1000}
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    locations: classpath:db/migration
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DATABASE:0}
+      timeout: 5000ms
+      lettuce:
+        pool:
+          max-active: 20
+          max-idle: 10
+          min-idle: 5
+          max-wait: 3000ms
 
 # 日志配置
 logging:
   level:
     root: INFO
     com.tibet.tourism: INFO
+    org.hibernate.SQL_SLOW: WARN
   file:
-    name: /opt/colorful-tibet/logs/backend.log
-  pattern:
-    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
-    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    name: /app/logs/backend.log
 
-# 豆包API配置
+management:
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLING_PROBABILITY:0.1}
+  zipkin:
+    tracing:
+      endpoint: ${ZIPKIN_ENDPOINT:http://zipkin:9411/api/v2/spans}
+
+# AI API 配置，ARK_* 优先，兼容旧的 DOUBAO_* 环境变量
+ark:
+  api:
+    url: ${ARK_API_URL:${DOUBAO_API_URL:https://ark.cn-beijing.volces.com/api/v3/responses}}
+    key: ${ARK_API_KEY:${DOUBAO_API_KEY:}}
+    model: ${AI_MODEL:${ARK_MODEL:${DOUBAO_MODEL:ep-20260516173036-4dpgm}}}
+    stream-url: ${ARK_STREAM_API_URL:${DOUBAO_STREAM_API_URL:}}  # 流式端点，为空时从url自动推导
+
 doubao:
   api:
-    url: ${DOUBAO_API_URL:https://ark.cn-beijing.volces.com/api/v3/chat/completions}
-    key: ${DOUBAO_API_KEY:your-doubao-api-key}
-    model: ${AI_MODEL:doubao-seed-2-0-pro}
-    stream-url: ${DOUBAO_STREAM_API_URL:}  # 流式端点，为空时使用url本身
+    url: ${DOUBAO_API_URL:https://ark.cn-beijing.volces.com/api/v3/responses}
+    key: ${DOUBAO_API_KEY:${ARK_API_KEY:}}
+    model: ${DOUBAO_MODEL:${AI_MODEL:ep-20260516173036-4dpgm}}
+    stream-url: ${DOUBAO_STREAM_API_URL:}
 
 ai:
   route:
     stream-timeout-seconds: ${AI_STREAM_TIMEOUT:180}
+
+# Scrapling 爬虫微服务配置
+scrapling:
+  service:
+    url: ${SCRAPLING_SERVICE_URL:http://scrapling:8000}
+    timeout-seconds: ${SCRAPLING_SERVICE_TIMEOUT:30}
+    max-sources: ${SCRAPLING_MAX_SOURCES:4}
+    mode: ${SCRAPLING_MODE:stealth}
+    health-enabled: ${SCRAPLING_HEALTH_ENABLED:true}
 
 # 价格定时更新配置
 price:
@@ -75,22 +130,47 @@ price:
     hourly:
       cron: "0 0 * * * ?"
 
+recommendation:
+  item-similarity:
+    enabled: ${RECOMMENDATION_ITEM_SIMILARITY_ENABLED:true}
+    preload-on-startup: ${RECOMMENDATION_ITEM_SIMILARITY_PRELOAD_ON_STARTUP:false}
+    cron: "0 30 3 * * ?"
+
 # JWT配置（如果需要）
 jwt:
-  secret: ${JWT_SECRET:your-jwt-secret-key-change-in-production}
+  secret: ${JWT_SECRET}
   expiration: 86400000  # 24小时
 
-# 密码加密配置（仅管理员可解密）
 app:
-  encryption:
-    key: ${ADMIN_ENCRYPTION_KEY:tibetTourismSecretKey12345678901234567890}  # 生产环境请使用环境变量设置，建议使用32字符以上的随机字符串
-
-
-
-
-
-
-
-
-
-
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:}
+  security:
+    public-docs-enabled: ${PUBLIC_DOCS_ENABLED:false}
+    public-metrics-enabled: ${PUBLIC_METRICS_ENABLED:false}
+    require-strong-secrets: ${REQUIRE_STRONG_SECRETS:true}
+    csrf-signing-secret: ${CSRF_SIGNING_SECRET}
+    pii-encryption-key: ${PII_ENCRYPTION_KEY}
+    trust-proxy-headers: ${TRUST_PROXY_HEADERS:false}
+    trusted-proxy-cidrs: ${TRUSTED_PROXY_CIDRS:}
+    super-admin-totp-secret: ${SUPER_ADMIN_TOTP_SECRET}
+    rate-limit:
+      enabled: ${RATE_LIMIT_ENABLED:true}
+      redis-enabled: ${RATE_LIMIT_REDIS_ENABLED:true}
+      trust-proxy-headers: ${TRUST_PROXY_HEADERS:false}
+      trusted-proxy-cidrs: ${RATE_LIMIT_TRUSTED_PROXY_CIDRS:${TRUSTED_PROXY_CIDRS:}}
+      register:
+        requests: ${RATE_LIMIT_REGISTER_REQUESTS:5}
+        window-seconds: ${RATE_LIMIT_REGISTER_WINDOW_SECONDS:3600}
+    cookie-secure: ${COOKIE_SECURE:true}
+  payments:
+    mock-callback-enabled: ${PAYMENT_MOCK_CALLBACK_ENABLED:false}
+    mock-callback-secret: ${PAYMENT_CALLBACK_SECRET}
+  super-admin-username: ${SUPER_ADMIN_USERNAME}
+  seed:
+    content:
+      enabled: ${SEED_CONTENT_ENABLED:false}
+    demo-users:
+      enabled: ${SEED_DEMO_USERS:false}
+      admin-password: ${SEED_DEMO_ADMIN_PASSWORD:}
+      super-admin-password: ${SEED_DEMO_SUPER_ADMIN_PASSWORD:}
+      user-password: ${SEED_DEMO_USER_PASSWORD:}

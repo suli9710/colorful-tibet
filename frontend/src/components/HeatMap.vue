@@ -1,16 +1,48 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { useReducedMotion } from 'motion-v'
 import { useI18n } from 'vue-i18n'
-import * as echarts from 'echarts'
-import api from '@/api'
+import { useRouter } from 'vue-router'
+import type { ECharts } from '@/lib/echarts'
+import api, { endpoints } from '@/api'
 
 const { locale, t } = useI18n()
+const router = useRouter()
+const prefersReducedMotion = useReducedMotion()
 const chartRef = ref<HTMLElement | null>(null)
-let chart: echarts.ECharts | null = null
+const chartError = ref(false)
+
+let chart: ECharts | null = null
 const zoomLevel = ref(1.0)
 let mapLoaded = false
-let spotsData: any[] = []
-let fluctuationTimer: ReturnType<typeof setInterval> | null = null
+let resizeObserver: ResizeObserver | null = null
+type EChartsKit = ReturnType<typeof import('@/lib/echarts').ensureECharts>
+let echartsLoader: Promise<EChartsKit> | null = null
+
+const loadECharts = async () => {
+  if (!echartsLoader) {
+    echartsLoader = import('@/lib/echarts').then(module => module.ensureECharts())
+  }
+
+  return echartsLoader
+}
+
+interface HeatmapChartPoint {
+  id?: number | string
+  name: string
+  value: [number, number, number]
+}
+
+const fallbackHeatmapData: HeatmapChartPoint[] = [
+  { id: 1, name: '布达拉宫', value: [91.1167, 29.653, 19850] },
+  { id: 2, name: '纳木错', value: [90.6, 30.75, 18780] },
+  { id: 3, name: '羊卓雍措', value: [90.65, 28.95, 18140] },
+  { id: 4, name: '珠穆朗玛峰', value: [86.925, 27.988, 17620] },
+  { id: 5, name: '雅鲁藏布大峡谷', value: [94.85, 29.6, 17100] },
+  { id: 6, name: '扎什伦布寺', value: [88.887, 29.267, 16640] },
+  { id: 7, name: '巴松措', value: [93.95, 30.0, 16260] },
+  { id: 8, name: '古格王国遗址', value: [79.67, 31.48, 15720] }
+]
 
 const getHeatLevel = (heat: number): string => {
   if (heat >= 19000) return t('heatmap.heatLevel.superHot')
@@ -21,230 +53,261 @@ const getHeatLevel = (heat: number): string => {
   return t('heatmap.heatLevel.spot')
 }
 
-const applyFluctuation = (spots: any[]): any[] => {
-  const t0 = Date.now() / 4000
-  return spots.map((spot, i) => {
-    const factor = 1 + Math.sin(t0 + i * 0.7) * 0.06
-    return {
-      ...spot,
-      value: [spot.value[0], spot.value[1], Math.round(spot.value[2] * factor)]
-    }
-  })
+interface HeatmapPoint {
+  id?: number | string
+  name: string
+  longitude: number
+  latitude: number
+  visitCount: number
 }
 
-const updateChartData = () => {
-  if (!chart || !spotsData.length) return
+const getHeatmapData = async (): Promise<HeatmapChartPoint[]> => {
+  try {
+    const response = await api.get(endpoints.spots.heatmap, { params: { limit: 100 } })
+    const points = Array.isArray(response.data) ? response.data as HeatmapPoint[] : []
 
-  const fluctuated = applyFluctuation(spotsData)
+    const data = points
+      .map((point): HeatmapChartPoint | null => {
+        const longitude = Number(point.longitude)
+        const latitude = Number(point.latitude)
+        const visitCount = Number(point.visitCount) || 1
 
-  const scatterData = fluctuated
-  const effectData = fluctuated
-    .filter((item: any) => item.value[2] >= 100)
-    .sort((a: any, b: any) => b.value[2] - a.value[2])
-    .slice(0, 10)
+        if (!Number.isFinite(longitude) || !Number.isFinite(latitude)) return null
 
-  chart.setOption({
-    series: [
-      { data: scatterData },
-      { data: effectData }
-    ]
-  })
+        return {
+          id: point.id,
+          name: point.name,
+          value: [longitude, latitude, visitCount]
+        }
+      })
+      .filter((point): point is HeatmapChartPoint => point !== null)
+
+    if (data.length) return data
+    console.warn('Using fallback heatmap data because the heatmap response was empty.')
+  } catch (error) {
+    console.warn('Using fallback heatmap data after request failed:', error)
+  }
+
+  return fallbackHeatmapData
+}
+
+const getEffectData = (data: HeatmapChartPoint[]) => data
+  .filter((item) => item.value[2] >= 100)
+  .sort((a, b) => b.value[2] - a.value[2])
+  .slice(0, 10)
+
+const goToSpot = (spotId?: number | string) => {
+  if (spotId === undefined || spotId === null || spotId === '') return
+
+  router.push(`/spots/${encodeURIComponent(String(spotId))}`)
+}
+
+const handleChartClick = (params: any) => {
+  if (params?.componentType !== 'series') return
+
+  goToSpot(params.data?.id)
+}
+
+const loadTibetMapJson = async () => {
+  const localResponse = await fetch('/geo/540000_full.json')
+  if (localResponse.ok) return localResponse.json()
+
+  const remoteResponse = await fetch('https://geo.datav.aliyun.com/areas_v3/bound/540000_full.json')
+  if (remoteResponse.ok) return remoteResponse.json()
+
+  return null
 }
 
 const loadChartData = async () => {
   if (!chartRef.value || !chart) return
-  
-  try {
-    const response = await api.get('/spots', { params: { size: 100 } })
-    const spots = Array.isArray(response.data) ? response.data : (response.data.content || [])
-    
-    const data = spots
-      .filter((spot: any) => spot.longitude != null && spot.latitude != null)
-      .map((spot: any) => ({
-        name: spot.name,
-        value: [spot.longitude, spot.latitude, spot.visitCount || 1]
-      }))
 
-    spotsData = data
+  const data = await getHeatmapData()
 
-    if (fluctuationTimer) clearInterval(fluctuationTimer)
-    fluctuationTimer = setInterval(updateChartData, 2500)
-
-    const option: any = {
-      title: {
-        text: t('heatmap.title'),
-        left: 'center',
-        top: 20,
-        textStyle: {
-          color: '#1f2937',
-          fontSize: 20,
-          fontWeight: 'bold'
-        }
+  const option: any = {
+    animation: !prefersReducedMotion.value,
+    animationDuration: 300,
+    title: {
+      text: t('heatmap.title'),
+      left: 'center',
+      top: 20,
+      textStyle: {
+        color: '#1f2937',
+        fontSize: 20,
+        fontWeight: 'bold'
+      }
+    },
+    tooltip: {
+      trigger: 'item',
+      formatter: function (params: any) {
+        const heat = params.value[2]
+        const level = getHeatLevel(heat)
+        const clickHint = params.data?.id
+          ? `<br/><span style="color: #fde68a">${t('heatmap.clickToView')}</span>`
+          : ''
+        return `<strong style="font-size: 14px">${params.name}</strong><br/>${t('heatmap.accessHeat')}: ${heat}<br/>${t('heatmap.heatLevelLabel')}: ${level}${clickHint}`
       },
-      tooltip: {
-        trigger: 'item',
-        formatter: function (params: any) {
-          const heat = params.value[2]
-          const level = getHeatLevel(heat)
-          return `<strong style="font-size: 14px">${params.name}</strong><br/>${t('heatmap.accessHeat')}: ${heat}<br/>${t('heatmap.heatLevelLabel')}: ${level}`
-        },
-        backgroundColor: 'rgba(0, 0, 0, 0.85)',
-        borderColor: '#fbbf24',
-        borderWidth: 1,
-        textStyle: {
-          color: '#fff',
-          fontSize: 13
-        },
-        padding: [10, 15]
+      backgroundColor: 'rgba(0, 0, 0, 0.85)',
+      borderColor: '#fbbf24',
+      borderWidth: 1,
+      textStyle: {
+        color: '#fff',
+        fontSize: 13
       },
-      series: [
-        {
-          name: '景点',
-          type: 'scatter',
-          coordinateSystem: mapLoaded ? 'geo' : undefined,
-          data: data,
-          symbolSize: function (val: any) {
-            const size = val[2] > 0 ? Math.max(Math.min(val[2] / 100, 25), 6) : 6;
-            return size;
-          },
-          label: {
-            formatter: '{b}',
-            position: 'right',
-            show: false,
-            color: '#1f2937',
-            fontSize: 11
-          },
-          itemStyle: {
-            color: '#f59e0b',
-            shadowBlur: 8,
-            shadowColor: 'rgba(245, 158, 11, 0.5)'
-          },
-          emphasis: {
-            label: {
-              show: true
-            },
-            itemStyle: {
-              color: '#dc2626',
-              shadowBlur: 15
-            }
-          }
-        },
-        {
-          name: '热门景点',
-          type: 'effectScatter',
-          coordinateSystem: mapLoaded ? 'geo' : undefined,
-          data: data
-            .filter((item: any) => item.value[2] >= 100)
-            .sort((a: any, b: any) => b.value[2] - a.value[2])
-            .slice(0, 10),
-          symbolSize: function (val: any) {
-            return Math.max(Math.min(val[2] / 80, 30), 18);
-          },
-          showEffectOn: 'render',
-          rippleEffect: {
-            brushType: 'stroke',
-            scale: 3,
-            period: 4
-          },
-          label: {
-            formatter: '{b}',
-            position: 'right',
-            show: true,
-            color: '#1e40af',
-            fontSize: 12,
-            fontWeight: 'bold',
-            backgroundColor: 'rgba(255, 255, 255, 0.8)',
-            padding: [4, 8],
-            borderRadius: 4
-          },
-          itemStyle: {
-            color: '#ef4444',
-            shadowBlur: 15,
-            shadowColor: 'rgba(239, 68, 68, 0.6)'
-          },
-          zlevel: 1
-        }
-      ]
-    }
-
-    if (mapLoaded) {
-      option.geo = {
-        map: 'tibet',
-        roam: 'move',
-        center: [90.0, 30.5],
-        zoom: zoomLevel.value,
-        scaleLimit: {
-          min: 0.5,
-          max: 5
+      padding: [10, 15]
+    },
+    series: [
+      {
+        name: t('heatmap.heatLevel.spot'),
+        type: 'scatter',
+        coordinateSystem: mapLoaded ? 'geo' : undefined,
+        data,
+        cursor: 'pointer',
+        symbolSize: function (val: any) {
+          const size = val[2] > 0 ? Math.max(Math.min(val[2] / 100, 25), 6) : 6
+          return size
         },
         label: {
-          show: true,
-          color: '#4b5563',
+          formatter: '{b}',
+          position: 'right',
+          show: false,
+          color: '#1f2937',
           fontSize: 11
         },
         itemStyle: {
-          areaColor: '#e0f2fe',
-          borderColor: '#0ea5e9',
-          borderWidth: 1.5
+          color: '#f59e0b',
+          shadowBlur: 8,
+          shadowColor: 'rgba(245, 158, 11, 0.5)'
         },
         emphasis: {
           label: {
-            color: '#1e40af'
+            show: true
           },
           itemStyle: {
-            areaColor: '#bfdbfe'
+            color: '#dc2626',
+            shadowBlur: 15
           }
         }
-      }
-    } else {
-      option.geo = {
-        roam: 'move',
-        center: [90.0, 30.5],
-        zoom: zoomLevel.value,
-        scaleLimit: {
-          min: 0.5,
-          max: 5
+      },
+      {
+        name: t('home.hotSpotsDistribution'),
+        type: 'effectScatter',
+        coordinateSystem: mapLoaded ? 'geo' : undefined,
+        data: getEffectData(data),
+        cursor: 'pointer',
+        symbolSize: function (val: any) {
+          return Math.max(Math.min(val[2] / 80, 30), 18)
         },
-        map: undefined,
+        showEffectOn: prefersReducedMotion.value ? 'emphasis' : 'render',
+        rippleEffect: {
+          brushType: 'stroke',
+          scale: prefersReducedMotion.value ? 1.2 : 3,
+          period: prefersReducedMotion.value ? 8 : 4
+        },
+        label: {
+          formatter: '{b}',
+          position: 'right',
+          show: true,
+          color: '#1e40af',
+          fontSize: 12,
+          fontWeight: 'bold',
+          backgroundColor: 'rgba(255, 255, 255, 0.8)',
+          padding: [4, 8],
+          borderRadius: 4
+        },
         itemStyle: {
-          areaColor: 'transparent',
-          borderColor: 'transparent'
+          color: '#ef4444',
+          shadowBlur: 15,
+          shadowColor: 'rgba(239, 68, 68, 0.6)'
+        },
+        zlevel: 1
+      }
+    ]
+  }
+
+  if (mapLoaded) {
+    option.geo = {
+      map: 'tibet',
+      roam: 'move',
+      center: [90.0, 30.5],
+      zoom: zoomLevel.value,
+      scaleLimit: {
+        min: 0.5,
+        max: 5
+      },
+      label: {
+        show: true,
+        color: '#4b5563',
+        fontSize: 11
+      },
+      itemStyle: {
+        areaColor: '#e0f2fe',
+        borderColor: '#0ea5e9',
+        borderWidth: 1.5
+      },
+      emphasis: {
+        label: {
+          color: '#1e40af'
+        },
+        itemStyle: {
+          areaColor: '#bfdbfe'
         }
       }
-      option.series[0].coordinateSystem = 'geo'
-      option.series[1].coordinateSystem = 'geo'
     }
-    
-    chart.setOption(option)
-  } catch (error) {
-    console.error('Failed to load heatmap data', error)
+  } else {
+    option.geo = {
+      roam: 'move',
+      center: [90.0, 30.5],
+      zoom: zoomLevel.value,
+      scaleLimit: {
+        min: 0.5,
+        max: 5
+      },
+      map: undefined,
+      itemStyle: {
+        areaColor: 'transparent',
+        borderColor: 'transparent'
+      }
+    }
+    option.series[0].coordinateSystem = 'geo'
+    option.series[1].coordinateSystem = 'geo'
   }
+
+  chart.setOption(option)
 }
 
 onMounted(async () => {
-  if (chartRef.value) {
-    chart = echarts.init(chartRef.value)
-    
-    try {
-      const mapResponse = await fetch('https://geo.datav.aliyun.com/areas_v3/bound/540000_full.json')
-      if (mapResponse.ok) {
-        const contentType = mapResponse.headers.get('content-type')
-        if (contentType && contentType.includes('application/json')) {
-          const mapJson = await mapResponse.json()
-          if (mapJson && typeof mapJson === 'object') {
-            echarts.registerMap('tibet', mapJson)
-            mapLoaded = true
-          }
-        }
-      }
-    } catch (e) {
-      console.warn('Failed to load Tibet map data, falling back to simple scatter plot', e)
-    }
+  try {
+    chartError.value = false
 
-    await loadChartData()
+    if (chartRef.value) {
+      const { init, registerMap } = await loadECharts()
+      chart = init(chartRef.value)
+      chart.off('click', handleChartClick)
+      chart.on('click', handleChartClick)
+
+      try {
+        const mapJson = await loadTibetMapJson()
+        if (mapJson && typeof mapJson === 'object') {
+          registerMap('tibet', mapJson)
+          mapLoaded = true
+        }
+      } catch (e) {
+        console.warn('Failed to load Tibet map data, falling back to simple scatter plot', e)
+      }
+
+      await loadChartData()
+    }
+  } catch (error) {
+    chartError.value = true
+    console.warn('Failed to initialize heatmap chart:', error)
   }
 
-  window.addEventListener('resize', handleResize)
+  if (chartRef.value && typeof ResizeObserver !== 'undefined') {
+    resizeObserver = new ResizeObserver(handleResize)
+    resizeObserver.observe(chartRef.value)
+  } else {
+    window.addEventListener('resize', handleResize)
+  }
 })
 
 watch(zoomLevel, (newZoom) => {
@@ -261,6 +324,10 @@ watch(locale, () => {
   loadChartData()
 })
 
+watch(prefersReducedMotion, () => {
+  loadChartData()
+})
+
 const handleResize = () => {
   chart?.resize()
 }
@@ -271,8 +338,13 @@ const handleZoomChange = (event: Event) => {
 }
 
 onUnmounted(() => {
-  window.removeEventListener('resize', handleResize)
-  if (fluctuationTimer) clearInterval(fluctuationTimer)
+  if (resizeObserver) {
+    resizeObserver.disconnect()
+    resizeObserver = null
+  } else {
+    window.removeEventListener('resize', handleResize)
+  }
+  chart?.off('click', handleChartClick)
   chart?.dispose()
 })
 </script>
@@ -280,6 +352,14 @@ onUnmounted(() => {
 <template>
   <div class="relative w-full h-[600px] bg-white rounded-2xl shadow-lg border border-tibet-gold/25">
     <div ref="chartRef" class="w-full h-full"></div>
+    <div
+      v-if="chartError"
+      class="absolute inset-4 flex items-center justify-center rounded-xl border border-tibet-gold/20 bg-tibet-cream/80 text-center text-tibet-brown"
+    >
+      <div>
+        <p class="text-lg font-semibold">{{ t('spotDetail.mapLoadFailed') }}</p>
+      </div>
+    </div>
     <div class="absolute left-4 bottom-4 bg-white/90 backdrop-blur-sm rounded-lg shadow-lg border border-tibet-gold/25 p-4 min-w-[200px]">
       <div class="flex items-center justify-between mb-2">
         <span class="text-sm font-medium text-gray-700">{{ t('heatmap.zoomLevel') }}</span>

@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { useAuthStore } from '../stores/auth'
 
 const router = createRouter({
     history: createWebHistory(),
@@ -102,20 +103,39 @@ const router = createRouter({
             meta: { requiresAuth: true }
         },
         {
+            path: '/orders',
+            name: 'orders',
+            component: () => import('../views/OrderCenter.vue'),
+            meta: { requiresAuth: true }
+        },
+        {
             path: '/hotel-orders',
             name: 'hotel-orders',
             component: () => import('../views/HotelOrders.vue'),
             meta: { requiresAuth: true }
+        },
+        {
+            path: '/:pathMatch(.*)*',
+            name: 'not-found',
+            component: () => import('../views/NotFound.vue')
         }
     ]
 })
 
-router.beforeEach((to) => {
-    const userStr = localStorage.getItem('user')
-    const user = userStr ? JSON.parse(userStr) : null
-    const isAuthenticated = !!user
+router.beforeEach(async (to) => {
+    const auth = useAuthStore()
+    const requiresAuth = Boolean(to.meta.requiresAuth) || to.path.startsWith('/admin')
+    const isAuthenticated = requiresAuth ? await auth.ensureSession() : auth.hasValidSession()
 
-    if (to.path.startsWith('/admin') && (!user || user.role !== 'ADMIN')) {
+    if (to.path.startsWith('/admin') && !isAuthenticated) {
+        return '/login'
+    }
+
+    if (isAuthenticated && auth.user?.mustChangePassword && to.path !== '/profile') {
+        return { path: '/profile', query: { changePassword: '1' } }
+    }
+
+    if (to.path.startsWith('/admin') && !auth.isAdmin) {
         return '/'
     }
 

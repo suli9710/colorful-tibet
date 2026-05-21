@@ -2,24 +2,29 @@
 FROM maven:3.9-eclipse-temurin-17 AS builder
 WORKDIR /app
 COPY pom.xml .
+RUN mvn -B -DskipTests dependency:go-offline
 COPY src ./src
-RUN mvn clean package -DskipTests
+RUN mvn -B clean package -DskipTests
 
 FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
 
 # 创建必要的目录并安装运行期依赖
 RUN apk add --no-cache curl \
-    && mkdir -p /app/data /app/logs
+    && addgroup -S app \
+    && adduser -S app -G app \
+    && mkdir -p /app/data /app/logs \
+    && chown -R app:app /app
 
 # 复制构建好的jar文件
-COPY --from=builder /app/target/tourism-0.0.1-SNAPSHOT.jar app.jar
+COPY --from=builder --chown=app:app /app/target/tourism-0.0.1-SNAPSHOT.jar app.jar
+
+ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75.0 -XX:+UseG1GC"
+USER app
 
 # 暴露端口
 EXPOSE 8080
 
-# 启动应用
-ENTRYPOINT ["java", "-jar", "app.jar", "--spring.profiles.active=local"]
-
-
+# 启动应用，运行环境通过 SPRING_PROFILES_ACTIVE 控制
+ENTRYPOINT ["java", "-jar", "app.jar"]
 
