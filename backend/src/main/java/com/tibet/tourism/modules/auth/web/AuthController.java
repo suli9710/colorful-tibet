@@ -53,7 +53,11 @@ public class AuthController {
                     .header(HttpHeaders.SET_COOKIE, csrfCookie(result.csrfToken(), AUTH_COOKIE_MAX_AGE).toString())
                     .body(result.user());
         } catch (AuthRateLimitException exception) {
-            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(Map.of("error", exception.getMessage()));
+            ResponseEntity.BodyBuilder builder = ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS);
+            if (exception.getRetryAfterSeconds() > 0) {
+                builder.header(HttpHeaders.RETRY_AFTER, String.valueOf(exception.getRetryAfterSeconds()));
+            }
+            return builder.body(Map.of("error", exception.getMessage()));
         } catch (AuthForbiddenException exception) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", exception.getMessage()));
         } catch (AuthFailureException exception) {

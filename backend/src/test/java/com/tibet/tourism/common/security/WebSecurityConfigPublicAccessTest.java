@@ -29,6 +29,7 @@ import org.springframework.web.bind.annotation.RestController;
         WebSecurityConfig.class,
         AuthEntryPointJwt.class,
         CsrfCookieFilter.class,
+        TrustedProxyIpResolver.class,
         WebSecurityConfigPublicAccessTest.ProbeController.class
 })
 class WebSecurityConfigPublicAccessTest {
@@ -106,7 +107,8 @@ class WebSecurityConfigPublicAccessTest {
         return Stream.of(
                 post("/api/auth/login"),
                 post("/api/auth/logout"),
-                post("/api/auth/register"));
+                post("/api/auth/register"),
+                post("/api/guide/chat"));
     }
 
     private static Stream<MockHttpServletRequestBuilder> protectedRequestsInsidePublicNamespaces() {
@@ -164,6 +166,7 @@ class WebSecurityConfigPublicAccessTest {
                 "/api/auth/login",
                 "/api/auth/logout",
                 "/api/auth/register",
+                "/api/guide/chat",
                 "/api/payments/callbacks/mock",
                 "/api/news",
                 "/api/heritage",

@@ -160,15 +160,17 @@ app:
     public-docs-enabled: ${PUBLIC_DOCS_ENABLED:false}
     public-metrics-enabled: ${PUBLIC_METRICS_ENABLED:false}
     require-strong-secrets: ${REQUIRE_STRONG_SECRETS:true}
-    csrf-signing-secret: ${CSRF_SIGNING_SECRET:dev-only-csrf-signing-secret-change-me-before-shared-deployment-2026-05-colorful-tibet}
+    csrf-signing-secret: ${CSRF_SIGNING_SECRET:}
     pii-encryption-key: ${PII_ENCRYPTION_KEY:}
     cookie-secure: ${COOKIE_SECURE:true}
     trust-proxy-headers: ${TRUST_PROXY_HEADERS:false}
+    trusted-proxy-cidrs: ${TRUSTED_PROXY_CIDRS:}
     super-admin-totp-secret: ${SUPER_ADMIN_TOTP_SECRET:}
     rate-limit:
       enabled: ${RATE_LIMIT_ENABLED:true}
       redis-enabled: ${RATE_LIMIT_REDIS_ENABLED:true}
       trust-proxy-headers: ${TRUST_PROXY_HEADERS:false}
+      trusted-proxy-cidrs: ${RATE_LIMIT_TRUSTED_PROXY_CIDRS:${TRUSTED_PROXY_CIDRS:}}
       default:
         requests: ${RATE_LIMIT_DEFAULT_REQUESTS:300}
         window-seconds: ${RATE_LIMIT_DEFAULT_WINDOW_SECONDS:60}
@@ -193,6 +195,10 @@ app:
     brute-force:
       enabled: ${BRUTE_FORCE_ENABLED:true}
       max-attempts: ${BRUTE_FORCE_MAX_ATTEMPTS:5}
+      account-step-up-at: ${BRUTE_FORCE_ACCOUNT_STEP_UP_AT:${BRUTE_FORCE_MAX_ATTEMPTS:5}}
+      pair-max-attempts: ${BRUTE_FORCE_PAIR_MAX_ATTEMPTS:${BRUTE_FORCE_MAX_ATTEMPTS:5}}
+      ip-max-attempts: ${BRUTE_FORCE_IP_MAX_ATTEMPTS:30}
+      network-max-attempts: ${BRUTE_FORCE_NETWORK_MAX_ATTEMPTS:120}
       redis-enabled: ${BRUTE_FORCE_REDIS_ENABLED:true}
       exempt-usernames: ${BRUTE_FORCE_EXEMPT_USERNAMES:}
     antibot:

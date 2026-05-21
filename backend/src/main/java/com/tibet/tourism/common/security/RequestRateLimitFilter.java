@@ -1,5 +1,4 @@
 package com.tibet.tourism.common.security;
-import com.tibet.tourism.modules.user.domain.User;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -47,10 +46,13 @@ public class RequestRateLimitFilter extends OncePerRequestFilter {
 
     private final Map<String, RateWindow> windows = new ConcurrentHashMap<>();
     private final RedisTemplate<String, Object> redisTemplate;
+    private final TrustedProxyIpResolver trustedProxyIpResolver;
     private final AtomicLong lastCleanupAt = new AtomicLong(0);
 
-    public RequestRateLimitFilter(ObjectProvider<RedisTemplate<String, Object>> redisTemplateProvider) {
+    public RequestRateLimitFilter(ObjectProvider<RedisTemplate<String, Object>> redisTemplateProvider,
+                                  TrustedProxyIpResolver trustedProxyIpResolver) {
         this.redisTemplate = redisTemplateProvider.getIfAvailable();
+        this.trustedProxyIpResolver = trustedProxyIpResolver;
     }
 
     @Value("${app.security.rate-limit.enabled:true}")
@@ -83,6 +85,12 @@ public class RequestRateLimitFilter extends OncePerRequestFilter {
     @Value("${app.security.rate-limit.ai.window-seconds:600}")
     private long aiWindowSeconds;
 
+    @Value("${app.security.rate-limit.guide-chat.requests:8}")
+    private int guideChatRequests;
+
+    @Value("${app.security.rate-limit.guide-chat.window-seconds:300}")
+    private long guideChatWindowSeconds;
+
     @Value("${app.security.rate-limit.upload.requests:30}")
     private int uploadRequests;
 
@@ -97,6 +105,9 @@ public class RequestRateLimitFilter extends OncePerRequestFilter {
 
     @Value("${app.security.rate-limit.trust-proxy-headers:false}")
     private boolean trustProxyHeaders;
+
+    @Value("${app.security.rate-limit.trusted-proxy-cidrs:${app.security.trusted-proxy-cidrs:}}")
+    private String trustedProxyCidrs;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
@@ -186,6 +197,9 @@ public class RequestRateLimitFilter extends OncePerRequestFilter {
         if (normalized.startsWith("/api/routes/generate")) {
             return new LimitRule("ai", aiRequests, Duration.ofSeconds(aiWindowSeconds).toMillis());
         }
+        if (normalized.startsWith("/api/guide/chat")) {
+            return new LimitRule("guide-chat", guideChatRequests, Duration.ofSeconds(guideChatWindowSeconds).toMillis());
+        }
         if (normalized.contains("/upload-image") || normalized.endsWith("/upload-avatar")) {
             return new LimitRule("upload", uploadRequests, Duration.ofSeconds(uploadWindowSeconds).toMillis());
         }
@@ -196,20 +210,7 @@ public class RequestRateLimitFilter extends OncePerRequestFilter {
     }
 
     private String clientIp(HttpServletRequest request) {
-        if (trustProxyHeaders) {
-            String forwardedFor = request.getHeader("X-Forwarded-For");
-            if (hasUsableIp(forwardedFor)) {
-                return forwardedFor.split(",")[0].trim();
-            }
-
-            String realIp = request.getHeader("X-Real-IP");
-            if (hasUsableIp(realIp)) {
-                return realIp.trim();
-            }
-        }
-
-        String remoteAddr = request.getRemoteAddr();
-        return remoteAddr == null || remoteAddr.isBlank() ? "unknown" : remoteAddr;
+        return trustedProxyIpResolver.resolveClientIp(request, trustProxyHeaders, trustedProxyCidrs);
     }
 
     private String redisKey(HttpServletRequest request, LimitRule rule) {
@@ -250,10 +251,6 @@ public class RequestRateLimitFilter extends OncePerRequestFilter {
         } catch (Exception e) {
             return "unknown";
         }
-    }
-
-    private boolean hasUsableIp(String value) {
-        return value != null && !value.isBlank() && value.length() <= 128 && !"unknown".equalsIgnoreCase(value.trim());
     }
 
     private record LimitRule(String name, int maxRequests, long windowMillis) {

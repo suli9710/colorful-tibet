@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -12,13 +13,17 @@ import com.tibet.tourism.common.logging.IpLocationService;
 import com.tibet.tourism.common.security.CsrfTokenService;
 import com.tibet.tourism.common.security.JwtUtils;
 import com.tibet.tourism.common.security.LoginAttemptService;
+import com.tibet.tourism.common.security.antibot.AntibotProperties;
+import com.tibet.tourism.common.security.antibot.RecaptchaService;
 import com.tibet.tourism.modules.auth.domain.AuthForbiddenException;
+import com.tibet.tourism.modules.auth.domain.AuthRateLimitException;
 import com.tibet.tourism.modules.auth.web.dto.LoginRequest;
 import com.tibet.tourism.modules.auth.web.dto.RegisterRequest;
 import com.tibet.tourism.modules.user.domain.User;
 import com.tibet.tourism.modules.user.infra.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Instant;
+import java.util.OptionalDouble;
 import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,6 +48,8 @@ class AuthApplicationServiceTest {
     private IpLocationService ipLocationService;
     private LoginAttemptService loginAttemptService;
     private TotpService totpService;
+    private RecaptchaService recaptchaService;
+    private AntibotProperties antibotProperties;
     private HttpServletRequest httpRequest;
     private AuthApplicationService service;
 
@@ -56,10 +63,15 @@ class AuthApplicationServiceTest {
         ipLocationService = mock(IpLocationService.class);
         loginAttemptService = mock(LoginAttemptService.class);
         totpService = new TotpService();
+        recaptchaService = mock(RecaptchaService.class);
+        antibotProperties = new AntibotProperties();
         httpRequest = mock(HttpServletRequest.class);
         service = serviceWithTotpSecret(TOTP_SECRET);
 
-        when(loginAttemptService.remainingLockSeconds(anyString())).thenReturn(0L);
+        when(loginAttemptService.evaluate(anyString(), anyString()))
+                .thenReturn(new LoginAttemptService.LoginAttemptDecision(true, false, "", 0, 0));
+        when(loginAttemptService.recordFailure(anyString(), anyString()))
+                .thenReturn(new LoginAttemptService.LoginAttemptDecision(true, false, "", 0, 1));
         when(jwtUtils.generateJwtToken(any(Authentication.class))).thenReturn("jwt-token");
         when(csrfTokenService.generateToken("jwt-token")).thenReturn("csrf-token");
         when(ipLocationService.getClientIpAddress(any(HttpServletRequest.class))).thenReturn("127.0.0.1");
@@ -80,7 +92,7 @@ class AuthApplicationServiceTest {
         assertThatThrownBy(() -> service.login(loginRequest("lzh", "031224", ""), httpRequest))
                 .isInstanceOf(AuthForbiddenException.class);
 
-        verify(loginAttemptService).recordFailure("lzh");
+        verify(loginAttemptService).recordFailure("lzh", "127.0.0.1");
         assertThat(superAdmin.getAllowedLoginFingerprintHash()).isNull();
     }
 
@@ -134,6 +146,52 @@ class AuthApplicationServiceTest {
 
         assertThat(result.jwt()).isEqualTo("jwt-token");
         assertThat(result.user()).containsEntry("username", "admin");
+    }
+
+    @Test
+    void loginRateLimitsByIpOrPairBeforePasswordCheck() {
+        when(loginAttemptService.evaluate("admin", "127.0.0.1"))
+                .thenReturn(new LoginAttemptService.LoginAttemptDecision(false, false, "ip", 45, 0));
+
+        assertThatThrownBy(() -> service.login(loginRequest("admin", "bad-pass", ""), httpRequest))
+                .isInstanceOf(AuthRateLimitException.class)
+                .extracting("retryAfterSeconds")
+                .isEqualTo(45L);
+    }
+
+    @Test
+    void accountStepUpUsesRecaptchaInsteadOfHardAccountLock() {
+        User admin = user("admin", User.Role.ADMIN);
+        stubAuthenticatedUser("admin", admin);
+        antibotProperties.setEnabled(true);
+        antibotProperties.getRecaptcha().setEnabled(true);
+        antibotProperties.getRecaptcha().setSecretKey("secret");
+        antibotProperties.getRecaptcha().setMinScore(0.5);
+        when(httpRequest.getHeader("X-Recaptcha-Token")).thenReturn("valid-token");
+        when(loginAttemptService.evaluate("admin", "127.0.0.1"))
+                .thenReturn(new LoginAttemptService.LoginAttemptDecision(true, true, "", 0, 8));
+        when(recaptchaService.verify("valid-token", "127.0.0.1")).thenReturn(OptionalDouble.of(0.9));
+
+        LoginResult result = service.login(loginRequest("admin", "admin-pass", ""), httpRequest);
+
+        assertThat(result.jwt()).isEqualTo("jwt-token");
+        verify(loginAttemptService).reset("admin", "127.0.0.1");
+    }
+
+    @Test
+    void accountStepUpRejectsMissingRecaptchaWhenConfigured() {
+        User admin = user("admin", User.Role.ADMIN);
+        stubAuthenticatedUser("admin", admin);
+        antibotProperties.setEnabled(true);
+        antibotProperties.getRecaptcha().setEnabled(true);
+        antibotProperties.getRecaptcha().setSecretKey("secret");
+        when(loginAttemptService.evaluate("admin", "127.0.0.1"))
+                .thenReturn(new LoginAttemptService.LoginAttemptDecision(true, true, "", 0, 8));
+        when(recaptchaService.verify(null, "127.0.0.1")).thenReturn(OptionalDouble.empty());
+
+        assertThatThrownBy(() -> service.login(loginRequest("admin", "admin-pass", ""), httpRequest))
+                .isInstanceOf(AuthForbiddenException.class)
+                .hasMessageContaining("Additional verification required");
     }
 
     @Test
@@ -198,6 +256,8 @@ class AuthApplicationServiceTest {
                 ipLocationService,
                 loginAttemptService,
                 totpService,
+                recaptchaService,
+                antibotProperties,
                 "lzh",
                 totpSecret,
                 requireStrongSecrets,

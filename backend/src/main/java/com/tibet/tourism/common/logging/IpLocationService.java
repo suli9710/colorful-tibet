@@ -1,6 +1,7 @@
 package com.tibet.tourism.common.logging;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.tibet.tourism.common.security.TrustedProxyIpResolver;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
@@ -22,14 +23,13 @@ public class IpLocationService {
 
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
-
-    @Value("${app.security.trust-proxy-headers:false}")
-    private boolean trustProxyHeaders;
+    private final TrustedProxyIpResolver trustedProxyIpResolver;
 
     @Value("${app.integrations.ip-location-url-template:${IP_LOCATION_URL_TEMPLATE:https://ipapi.co/{ip}/json/}}")
     private String ipLocationUrlTemplate;
 
-    public IpLocationService() {
+    public IpLocationService(TrustedProxyIpResolver trustedProxyIpResolver) {
+        this.trustedProxyIpResolver = trustedProxyIpResolver;
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(CONNECT_TIMEOUT);
         requestFactory.setReadTimeout(READ_TIMEOUT);
@@ -38,39 +38,7 @@ public class IpLocationService {
     }
 
     public String getClientIpAddress(jakarta.servlet.http.HttpServletRequest request) {
-        String ip = null;
-        if (trustProxyHeaders) {
-            ip = request.getHeader("X-Forwarded-For");
-            if (!hasUsableIp(ip)) {
-                ip = request.getHeader("Proxy-Client-IP");
-            }
-            if (!hasUsableIp(ip)) {
-                ip = request.getHeader("WL-Proxy-Client-IP");
-            }
-            if (!hasUsableIp(ip)) {
-                ip = request.getHeader("HTTP_CLIENT_IP");
-            }
-            if (!hasUsableIp(ip)) {
-                ip = request.getHeader("HTTP_X_FORWARDED_FOR");
-            }
-        }
-        if (!hasUsableIp(ip)) {
-            ip = request.getRemoteAddr();
-        }
-
-        if (ip != null && ip.contains(",")) {
-            ip = ip.split(",")[0].trim();
-        }
-
-        if ("0:0:0:0:0:0:0:1".equals(ip) || "127.0.0.1".equals(ip)) {
-            ip = "127.0.0.1";
-        }
-
-        return ip;
-    }
-
-    private boolean hasUsableIp(String value) {
-        return value != null && !value.isBlank() && value.length() <= 128 && !"unknown".equalsIgnoreCase(value.trim());
+        return trustedProxyIpResolver.resolveClientIp(request);
     }
 
     @Cacheable(value = "ipLocationCache", key = "#ipAddress", unless = "#result == '未知' || #result == '本地网络'")

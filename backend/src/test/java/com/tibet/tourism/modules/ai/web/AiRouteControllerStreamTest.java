@@ -14,6 +14,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.tibet.tourism.common.security.CsrfTokenService;
 import com.tibet.tourism.common.security.JwtAuthSupport;
+import com.tibet.tourism.common.security.TrustedProxyIpResolver;
 import com.tibet.tourism.modules.ai.application.AiQuotaService;
 import com.tibet.tourism.modules.ai.application.AiRouteService;
 import com.tibet.tourism.modules.user.domain.User;
@@ -46,6 +47,9 @@ class AiRouteControllerStreamTest {
 
     @MockBean
     private CsrfTokenService csrfTokenService;
+
+    @MockBean
+    private TrustedProxyIpResolver trustedProxyIpResolver;
 
     @Test
     void streamEndpointReturnsSseEmitterWithoutMessageConverterFailure() throws Exception {

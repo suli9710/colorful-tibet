@@ -48,6 +48,7 @@ services:
       - DOUBAO_STREAM_API_URL
       - DOUBAO_MODEL=${DOUBAO_MODEL:-ep-20260516173036-4dpgm}
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required; generate a private 64+ character value}
+      - CSRF_SIGNING_SECRET=${CSRF_SIGNING_SECRET:?CSRF_SIGNING_SECRET is required; generate a private 64+ character value}
       - ADMIN_ENCRYPTION_KEY=${ADMIN_ENCRYPTION_KEY:-dev-only-admin-key-change-me-before-any-shared-deployment-2026}
       - SUPER_ADMIN_TOTP_SECRET=${SUPER_ADMIN_TOTP_SECRET:-JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP}
       - REQUIRE_STRONG_SECRETS=${REQUIRE_STRONG_SECRETS:-false}

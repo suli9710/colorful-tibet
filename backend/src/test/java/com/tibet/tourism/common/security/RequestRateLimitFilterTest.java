@@ -39,7 +39,7 @@ class RequestRateLimitFilterTest {
                 return null;
             }
         };
-        filter = new RequestRateLimitFilter(provider);
+        filter = new RequestRateLimitFilter(provider, new TrustedProxyIpResolver());
         setField("enabled", true);
         setField("redisEnabled", false);
         setField("defaultRequests", 10);
@@ -48,11 +48,14 @@ class RequestRateLimitFilterTest {
         setField("authWindowSeconds", 60L);
         setField("aiRequests", 2);
         setField("aiWindowSeconds", 600L);
+        setField("guideChatRequests", 2);
+        setField("guideChatWindowSeconds", 300L);
         setField("uploadRequests", 5);
         setField("uploadWindowSeconds", 60L);
         setField("adminRequests", 8);
         setField("adminWindowSeconds", 60L);
         setField("trustProxyHeaders", false);
+        setField("trustedProxyCidrs", "");
     }
 
     private void setField(String name, Object value) throws Exception {
@@ -110,6 +113,18 @@ class RequestRateLimitFilterTest {
             assertThat(response.getHeader("X-RateLimit-Limit")).isEqualTo("2");
         }
         MockHttpServletResponse blocked = doFilter(apiRequest("POST", "/api/routes/generate"));
+        assertThat(blocked.getStatus()).isEqualTo(429);
+    }
+
+    @Test
+    @DisplayName("AI guide chat uses stricter limit")
+    void aiGuideChatUsesStricterLimit() throws Exception {
+        for (int i = 0; i < 2; i++) {
+            MockHttpServletResponse response = doFilter(apiRequest("POST", "/api/guide/chat"));
+            assertThat(response.getStatus()).isEqualTo(200);
+            assertThat(response.getHeader("X-RateLimit-Limit")).isEqualTo("2");
+        }
+        MockHttpServletResponse blocked = doFilter(apiRequest("POST", "/api/guide/chat"));
         assertThat(blocked.getStatus()).isEqualTo(429);
     }
 
@@ -199,6 +214,43 @@ class RequestRateLimitFilterTest {
 
         // Client B should still be fine
         assertThat(doFilter(apiRequestFromIp("GET", "/api/spots", "10.0.0.2")).getStatus()).isEqualTo(200);
+    }
+
+    @Test
+    @DisplayName("spoofed forwarded headers are ignored when remote address is not a trusted proxy")
+    void spoofedForwardedHeadersDoNotBypassDirectBackendRateLimit() throws Exception {
+        setField("trustProxyHeaders", true);
+        setField("trustedProxyCidrs", "172.18.0.0/16");
+
+        for (int i = 0; i < 10; i++) {
+            MockHttpServletRequest request = apiRequestFromIp("GET", "/api/spots", "203.0.113.10");
+            request.addHeader("X-Forwarded-For", "198.51.100." + i);
+            assertThat(doFilter(request).getStatus()).isEqualTo(200);
+        }
+
+        MockHttpServletRequest blockedRequest = apiRequestFromIp("GET", "/api/spots", "203.0.113.10");
+        blockedRequest.addHeader("X-Forwarded-For", "198.51.100.200");
+        assertThat(doFilter(blockedRequest).getStatus()).isEqualTo(429);
+    }
+
+    @Test
+    @DisplayName("trusted proxies can forward distinct client identities")
+    void trustedProxyForwardedClientIdentityIsUsed() throws Exception {
+        setField("defaultRequests", 1);
+        setField("trustProxyHeaders", true);
+        setField("trustedProxyCidrs", "172.18.0.0/16");
+
+        MockHttpServletRequest clientA = apiRequestFromIp("GET", "/api/spots", "172.18.0.20");
+        clientA.addHeader("X-Forwarded-For", "198.51.100.20");
+        assertThat(doFilter(clientA).getStatus()).isEqualTo(200);
+
+        MockHttpServletRequest clientABlocked = apiRequestFromIp("GET", "/api/spots", "172.18.0.20");
+        clientABlocked.addHeader("X-Forwarded-For", "198.51.100.20");
+        assertThat(doFilter(clientABlocked).getStatus()).isEqualTo(429);
+
+        MockHttpServletRequest clientB = apiRequestFromIp("GET", "/api/spots", "172.18.0.20");
+        clientB.addHeader("X-Forwarded-For", "198.51.100.21");
+        assertThat(doFilter(clientB).getStatus()).isEqualTo(200);
     }
 
     @Test

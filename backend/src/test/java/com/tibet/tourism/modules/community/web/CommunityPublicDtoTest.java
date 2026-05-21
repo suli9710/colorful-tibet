@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.tibet.tourism.common.security.JwtUtils;
 import com.tibet.tourism.common.security.CsrfTokenService;
+import com.tibet.tourism.common.security.TrustedProxyIpResolver;
 import com.tibet.tourism.modules.community.application.SharedRouteService;
 import com.tibet.tourism.modules.community.application.TravelQAService;
 import com.tibet.tourism.modules.community.domain.RouteComment;
@@ -49,6 +50,9 @@ class CommunityPublicDtoTest {
 
     @MockBean
     private CsrfTokenService csrfTokenService;
+
+    @MockBean
+    private TrustedProxyIpResolver trustedProxyIpResolver;
 
     @Test
     void sharedRouteListReturnsPublicAuthorOnly() throws Exception {

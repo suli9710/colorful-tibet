@@ -3,6 +3,8 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.util.Base64;
+import java.util.List;
+import java.util.Locale;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import org.springframework.beans.factory.annotation.Value;
@@ -15,6 +17,14 @@ public class CsrfTokenService {
     private static final String HMAC_ALGORITHM = "HmacSHA256";
     private static final int NONCE_BYTES = 32;
     private static final int MIN_SECRET_LENGTH = 64;
+    private static final List<String> FORBIDDEN_SECRET_MARKERS = List.of(
+            "dev-only",
+            "change-me",
+            "changeme",
+            "default",
+            "example",
+            "placeholder",
+            "replace-with");
     private static final byte[] HKDF_SALT = "colorful-tibet-csrf-salt-v1".getBytes(StandardCharsets.UTF_8);
     private static final byte[] HKDF_INFO = "csrf-cookie-signing-key".getBytes(StandardCharsets.UTF_8);
 
@@ -22,6 +32,12 @@ public class CsrfTokenService {
     private final SecureRandom secureRandom = new SecureRandom();
 
     public CsrfTokenService(@Value("${app.security.csrf-signing-secret}") String signingSecret) {
+        validateCsrfSecret(signingSecret);
+        String normalizedSecret = signingSecret.trim();
+        this.signingKey = hkdfSha256(normalizedSecret.getBytes(StandardCharsets.UTF_8), 32);
+    }
+
+    private void validateCsrfSecret(String signingSecret) {
         if (!StringUtils.hasText(signingSecret)) {
             throw new IllegalStateException("CSRF signing secret must be configured");
         }
@@ -30,7 +46,10 @@ public class CsrfTokenService {
             throw new IllegalStateException("CSRF signing secret must be at least "
                     + MIN_SECRET_LENGTH + " characters");
         }
-        this.signingKey = hkdfSha256(normalizedSecret.getBytes(StandardCharsets.UTF_8), 32);
+        String lowered = normalizedSecret.toLowerCase(Locale.ROOT);
+        if (FORBIDDEN_SECRET_MARKERS.stream().anyMatch(lowered::contains)) {
+            throw new IllegalStateException("CSRF signing secret must not be a development placeholder");
+        }
     }
 
     public String generateToken(String sessionToken) {
