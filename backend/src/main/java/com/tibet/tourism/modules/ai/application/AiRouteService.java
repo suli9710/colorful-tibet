@@ -835,7 +835,7 @@ public class AiRouteService {
         StringBuilder builder = new StringBuilder();
         builder.append("# 西藏").append(days).append("天经典").append(preferenceLabel).append("之旅\n\n");
         builder.append("## 路线概览\n");
-        builder.append("本条路线以").append(preferenceLabel).append("为核心，兼顾高原适应、顺路游览和预算可控。AI服务暂时不可用，以下为紧凑版基准路线。\n\n");
+        builder.append("本条路线以").append(preferenceLabel).append("为核心，兼顾高原适应、顺路游览和预算可控。以下为结合经典线路、海拔节奏和预算约束生成的基准路线。\n\n");
         builder.append("## 行程亮点\n");
         builder.append("- 拉萨市区深度游览，感受藏文化心脏\n");
         builder.append("- 探访西藏经典自然与人文景观\n");

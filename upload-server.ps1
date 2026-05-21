@@ -136,6 +136,10 @@ if [ ! -f "$PROJECT_DIR/.env" ]; then
   exit 1
 fi
 
+if ! grep -Eq '^(DOUBAO_API_KEY|ARK_API_KEY)=[^[:space:]]+' "$PROJECT_DIR/.env"; then
+  echo "WARNING: DOUBAO_API_KEY/ARK_API_KEY is empty; AI route generation will use local fallback routes." >&2
+fi
+
 echo "Prebuilding release before stopping current containers..."
 tar -xzf "$ARCHIVE" -C "$RELEASE_DIR"
 cp "$PROJECT_DIR/.env" "$RELEASE_DIR/.env"

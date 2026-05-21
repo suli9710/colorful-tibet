@@ -39,7 +39,8 @@ class AiRouteServiceTest {
 
         assertFalse(upstreamCalled.get());
         assertEquals(3, response.getDays());
-        assertTrue(response.getContent().contains("AI服务暂时不可用"));
+        assertFalse(response.getContent().contains("AI服务暂时不可用"));
+        assertTrue(response.getContent().contains("基准路线"));
         assertTrue(response.getContent().contains("## 每日行程"));
     }
 
@@ -62,7 +63,8 @@ class AiRouteServiceTest {
         AiRouteGenerateResponse response = service.generateRoute(5, "economy", "cultural", null, "zh");
 
         assertEquals(5, response.getDays());
-        assertTrue(response.getContent().contains("AI服务暂时不可用"));
+        assertFalse(response.getContent().contains("AI服务暂时不可用"));
+        assertTrue(response.getContent().contains("基准路线"));
         assertTrue(response.getContent().contains("经济型"));
     }
 
@@ -88,7 +90,7 @@ class AiRouteServiceTest {
         assertTrue(emitter.awaitCompletion());
         assertFalse(upstreamCalled.get());
         assertTrue(emitter.payloads().stream().anyMatch(payload ->
-                payload.contains("\"type\":\"delta\"") && payload.contains("AI服务暂时不可用")));
+                payload.contains("\"type\":\"delta\"") && payload.contains("基准路线")));
         assertTrue(emitter.payloads().stream().anyMatch(payload -> payload.contains("\"type\":\"done\"")));
         assertFalse(emitter.payloads().stream().anyMatch(payload -> payload.contains("\"type\":\"error\"")));
     }
