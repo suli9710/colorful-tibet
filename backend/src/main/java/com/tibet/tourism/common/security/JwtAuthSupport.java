@@ -2,6 +2,7 @@ package com.tibet.tourism.common.security;
 import com.tibet.tourism.modules.user.domain.User;
 import com.tibet.tourism.modules.user.infra.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.Optional;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -41,6 +42,21 @@ public class JwtAuthSupport {
 
     public Long resolveCurrentUserId(HttpServletRequest request) {
         return resolveCurrentUser(request).getId();
+    }
+
+    public Optional<User> resolveOptionalCurrentUser(HttpServletRequest request) {
+        String token = resolveToken(request);
+        if (!StringUtils.hasText(token)) {
+            return Optional.empty();
+        }
+        if (!jwtUtils.validateJwtToken(token)) {
+            return Optional.empty();
+        }
+        if (tokenRevocationService.isRevoked(token)) {
+            return Optional.empty();
+        }
+        String username = jwtUtils.getUserNameFromJwtToken(token);
+        return userRepository.findByUsername(username);
     }
 
     public String resolveToken(HttpServletRequest request) {

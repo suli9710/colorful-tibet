@@ -3,8 +3,7 @@ import com.tibet.tourism.common.error.AuthenticationRequiredException;
 import com.tibet.tourism.common.error.BusinessException;
 import com.tibet.tourism.common.error.ResourceNotFoundException;
 import com.tibet.tourism.common.error.UnauthorizedActionException;
-import com.tibet.tourism.common.security.CookieAuthConstants;
-import com.tibet.tourism.common.security.JwtUtils;
+import com.tibet.tourism.common.security.JwtAuthSupport;
 import com.tibet.tourism.common.validation.InputSanitizer;
 import com.tibet.tourism.modules.community.application.SharedRouteService;
 import com.tibet.tourism.modules.community.domain.RouteComment;
@@ -16,6 +15,7 @@ import com.tibet.tourism.modules.user.infra.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,9 +27,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.util.StringUtils;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.util.WebUtils;
 
 @RestController
 @RequestMapping("/api/routes")
@@ -47,27 +46,17 @@ public class SharedRouteController {
     private UserRepository userRepository;
 
     @Autowired
-    private JwtUtils jwtUtils;
+    private JwtAuthSupport jwtAuthSupport;
 
     // 辅助方法：从请求中获取当前用户ID
     private long getCurrentUserId(HttpServletRequest request) {
-        String jwt = parseJwt(request);
-        if (jwt != null && jwtUtils.validateJwtToken(jwt)) {
-            String username = jwtUtils.getUserNameFromJwtToken(jwt);
-            User user = userRepository.findByUsername(username)
-                    .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-            return user.getId();
+        try {
+            return jwtAuthSupport.resolveCurrentUserId(request);
+        } catch (UsernameNotFoundException e) {
+            throw new ResourceNotFoundException("User not found");
+        } catch (IllegalStateException e) {
+            throw new AuthenticationRequiredException("User not authenticated");
         }
-        throw new AuthenticationRequiredException("User not authenticated");
-    }
-
-    private String parseJwt(HttpServletRequest request) {
-        String headerAuth = request.getHeader("Authorization");
-        if (StringUtils.hasText(headerAuth) && headerAuth.startsWith("Bearer ")) {
-            return headerAuth.substring(7);
-        }
-        var authCookie = WebUtils.getCookie(request, CookieAuthConstants.AUTH_COOKIE_NAME);
-        return authCookie == null ? null : authCookie.getValue();
     }
 
     private ResponseEntity<Map<String, String>> safeBadRequest(Exception e) {
@@ -185,8 +174,10 @@ public class SharedRouteController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<?> checkLikeStatus(@PathVariable Long id, HttpServletRequest request) {
         try {
-            Long userId = getCurrentUserId(request);
-            boolean isLiked = routeService.isLikedByUser(id, userId);
+            Optional<User> currentUser = jwtAuthSupport.resolveOptionalCurrentUser(request);
+            boolean isLiked = currentUser
+                    .map(user -> routeService.isLikedByUser(id, user.getId()))
+                    .orElse(false);
             return ResponseEntity.ok(Map.of("liked", isLiked));
         } catch (Exception e) {
             return ResponseEntity.ok(Map.of("liked", false));

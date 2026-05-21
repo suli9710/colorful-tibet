@@ -3,8 +3,7 @@ import com.tibet.tourism.common.error.AuthenticationRequiredException;
 import com.tibet.tourism.common.error.BusinessException;
 import com.tibet.tourism.common.error.ResourceNotFoundException;
 import com.tibet.tourism.common.error.UnauthorizedActionException;
-import com.tibet.tourism.common.security.CookieAuthConstants;
-import com.tibet.tourism.common.security.JwtUtils;
+import com.tibet.tourism.common.security.JwtAuthSupport;
 import com.tibet.tourism.common.validation.InputSanitizer;
 import com.tibet.tourism.modules.community.application.TravelQAService;
 import com.tibet.tourism.modules.community.domain.TravelAnswer;
@@ -12,10 +11,10 @@ import com.tibet.tourism.modules.community.domain.TravelQuestion;
 import com.tibet.tourism.modules.community.web.dto.TravelAnswerResponse;
 import com.tibet.tourism.modules.community.web.dto.TravelQuestionResponse;
 import com.tibet.tourism.modules.user.domain.User;
-import com.tibet.tourism.modules.user.infra.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,9 +25,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.util.StringUtils;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.util.WebUtils;
 
 @RestController
 @RequestMapping("/api/community/questions")
@@ -40,29 +38,16 @@ public class TravelQAController {
     private TravelQAService qaService;
 
     @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private JwtUtils jwtUtils;
+    private JwtAuthSupport jwtAuthSupport;
 
     private long getCurrentUserId(HttpServletRequest request) {
-        String jwt = parseJwt(request);
-        if (jwt != null && jwtUtils.validateJwtToken(jwt)) {
-            String username = jwtUtils.getUserNameFromJwtToken(jwt);
-            User user = userRepository.findByUsername(username)
-                    .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-            return user.getId();
+        try {
+            return jwtAuthSupport.resolveCurrentUserId(request);
+        } catch (UsernameNotFoundException e) {
+            throw new ResourceNotFoundException("User not found");
+        } catch (IllegalStateException e) {
+            throw new AuthenticationRequiredException("User not authenticated");
         }
-        throw new AuthenticationRequiredException("User not authenticated");
-    }
-
-    private String parseJwt(HttpServletRequest request) {
-        String headerAuth = request.getHeader("Authorization");
-        if (StringUtils.hasText(headerAuth) && headerAuth.startsWith("Bearer ")) {
-            return headerAuth.substring(7);
-        }
-        var authCookie = WebUtils.getCookie(request, CookieAuthConstants.AUTH_COOKIE_NAME);
-        return authCookie == null ? null : authCookie.getValue();
     }
 
     private ResponseEntity<Map<String, String>> safeBadRequest(Exception e) {
@@ -220,7 +205,10 @@ public class TravelQAController {
     @GetMapping("/{id}/like-status")
     public ResponseEntity<?> checkLikeStatus(@PathVariable Long id, HttpServletRequest request) {
         try {
-            boolean isLiked = qaService.isLikedByUser(id, getCurrentUserId(request));
+            Optional<User> currentUser = jwtAuthSupport.resolveOptionalCurrentUser(request);
+            boolean isLiked = currentUser
+                    .map(user -> qaService.isLikedByUser(id, user.getId()))
+                    .orElse(false);
             return ResponseEntity.ok(Map.of("liked", isLiked));
         } catch (Exception e) {
             return ResponseEntity.ok(Map.of("liked", false));
