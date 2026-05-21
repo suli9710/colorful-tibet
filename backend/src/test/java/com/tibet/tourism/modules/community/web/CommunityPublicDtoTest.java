@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.tibet.tourism.common.security.JwtAuthSupport;
 import com.tibet.tourism.common.security.JwtUtils;
 import com.tibet.tourism.common.security.CsrfTokenService;
 import com.tibet.tourism.common.security.TrustedProxyIpResolver;
@@ -47,6 +48,9 @@ class CommunityPublicDtoTest {
 
     @MockBean
     private JwtUtils jwtUtils;
+
+    @MockBean
+    private JwtAuthSupport jwtAuthSupport;
 
     @MockBean
     private CsrfTokenService csrfTokenService;
