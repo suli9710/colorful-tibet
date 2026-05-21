@@ -112,14 +112,14 @@ ark:
   api:
     url: ${ARK_API_URL:${DOUBAO_API_URL:https://ark.cn-beijing.volces.com/api/v3/responses}}
     key: ${ARK_API_KEY:${DOUBAO_API_KEY:}}
-    model: ${AI_MODEL:${ARK_MODEL:${DOUBAO_MODEL:doubao-seed-2-0-pro-260215}}}
+    model: ${AI_MODEL:${ARK_MODEL:${DOUBAO_MODEL:doubao-seed-2-0-mini-260428}}}
     stream-url: ${ARK_STREAM_API_URL:${DOUBAO_STREAM_API_URL:}}  # 流式端点，为空时从url自动推导
 
 doubao:
   api:
     url: ${DOUBAO_API_URL:https://ark.cn-beijing.volces.com/api/v3/chat/completions}
     key: ${DOUBAO_API_KEY:${ARK_API_KEY:}}
-    model: ${DOUBAO_MODEL:${AI_MODEL:doubao-seed-2-0-pro-260215}}
+    model: ${DOUBAO_MODEL:${AI_MODEL:doubao-seed-2-0-mini-260428}}
     stream-url: ${DOUBAO_STREAM_API_URL:}
 
 ai:

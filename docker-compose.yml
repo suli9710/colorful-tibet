@@ -46,7 +46,7 @@ services:
       - DOUBAO_API_KEY=${DOUBAO_API_KEY:-}
       - DOUBAO_API_URL=${DOUBAO_API_URL:-https://ark.cn-beijing.volces.com/api/v3/chat/completions}
       - DOUBAO_STREAM_API_URL
-      - DOUBAO_MODEL=${DOUBAO_MODEL:-doubao-seed-2-0-pro-260215}
+      - DOUBAO_MODEL=${DOUBAO_MODEL:-doubao-seed-2-0-mini-260428}
       - JWT_SECRET=${JWT_SECRET:-dev-only-jwt-secret-change-me-before-any-shared-deployment-2026}
       - ADMIN_ENCRYPTION_KEY=${ADMIN_ENCRYPTION_KEY:-dev-only-admin-key-change-me-before-any-shared-deployment-2026}
       - REQUIRE_STRONG_SECRETS=${REQUIRE_STRONG_SECRETS:-false}
