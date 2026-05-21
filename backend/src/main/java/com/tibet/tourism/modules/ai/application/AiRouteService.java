@@ -443,9 +443,10 @@ public class AiRouteService {
 
         if (isChatCompletionsEndpoint(endpointUrl)) {
             requestBody.put("messages", List.of(Map.of("role", "user", "content", prompt)));
+            requestBody.put("thinking", Map.of("type", "disabled"));
             requestBody.put("temperature", 0.6);
             requestBody.put("top_p", 0.9);
-            requestBody.put("max_tokens", 6000);
+            requestBody.put("max_tokens", 2400);
             requestBody.put("stream", stream);
             return requestBody;
         }
@@ -465,7 +466,7 @@ public class AiRouteService {
         requestBody.put("thinking", Map.of("type", "disabled"));
         requestBody.put("temperature", 0.6);
         requestBody.put("top_p", 0.9);
-        requestBody.put("max_output_tokens", 6000);
+        requestBody.put("max_output_tokens", 2400);
         requestBody.put("stream", stream);
         return requestBody;
     }

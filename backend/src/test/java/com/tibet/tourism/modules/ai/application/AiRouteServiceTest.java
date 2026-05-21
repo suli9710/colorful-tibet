@@ -117,6 +117,8 @@ class AiRouteServiceTest {
         assertNotNull(body);
         assertTrue(body.containsKey("messages"));
         assertFalse(body.containsKey("input"));
+        assertEquals(Map.of("type", "disabled"), body.get("thinking"));
+        assertEquals(2400, body.get("max_tokens"));
         assertEquals(Boolean.TRUE, body.get("stream"));
     }
 
