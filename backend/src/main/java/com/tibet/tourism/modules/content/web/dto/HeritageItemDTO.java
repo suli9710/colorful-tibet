@@ -11,6 +11,11 @@ public class HeritageItemDTO {
     private String originStory;
     private String significance;
     private String baikeUrl;
+    private String region;
+    private String protectionLevel;
+    private Integer viewCount;
+    private Integer likeCount;
+    private Integer commentCount;
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -30,6 +35,16 @@ public class HeritageItemDTO {
     public void setSignificance(String significance) { this.significance = significance; }
     public String getBaikeUrl() { return baikeUrl; }
     public void setBaikeUrl(String baikeUrl) { this.baikeUrl = baikeUrl; }
+    public String getRegion() { return region; }
+    public void setRegion(String region) { this.region = region; }
+    public String getProtectionLevel() { return protectionLevel; }
+    public void setProtectionLevel(String protectionLevel) { this.protectionLevel = protectionLevel; }
+    public Integer getViewCount() { return viewCount; }
+    public void setViewCount(Integer viewCount) { this.viewCount = viewCount; }
+    public Integer getLikeCount() { return likeCount; }
+    public void setLikeCount(Integer likeCount) { this.likeCount = likeCount; }
+    public Integer getCommentCount() { return commentCount; }
+    public void setCommentCount(Integer commentCount) { this.commentCount = commentCount; }
 
     public static HeritageItemDTO fromEntity(HeritageItem item, String locale) {
         if (item == null) throw new IllegalArgumentException("HeritageItem cannot be null");
@@ -45,6 +60,11 @@ public class HeritageItemDTO {
         dto.setOriginStory(item.getOriginStory());
         dto.setSignificance(item.getSignificance());
         dto.setBaikeUrl(item.getBaikeUrl());
+        dto.setRegion(item.getRegion());
+        dto.setProtectionLevel(item.getProtectionLevel());
+        dto.setViewCount(item.getViewCount());
+        dto.setLikeCount(item.getLikeCount());
+        dto.setCommentCount(item.getCommentCount());
         return dto;
     }
 }

@@ -176,6 +176,67 @@ export interface AiRouteGenerateResponse {
   prompt: string
 }
 
+export interface HeritageItem {
+  id: number
+  name: string
+  nameTibetan?: string
+  description?: string
+  descriptionTibetan?: string
+  category?: string
+  imageUrl?: string
+  videoUrl?: string
+  originStory?: string
+  significance?: string
+  baikeUrl?: string
+  region?: string
+  protectionLevel?: string
+  viewCount?: number
+  likeCount?: number
+  commentCount?: number
+  createdAt?: string
+}
+
+export interface HeritageCommentItem {
+  id: number
+  content: string
+  imageUrl?: string
+  rating?: number
+  userId: number
+  username: string
+  nickname?: string
+  avatar?: string
+  createdAt: string
+}
+
+export interface HeritageInheritorItem {
+  id: number
+  name: string
+  nameTibetan?: string
+  avatarUrl?: string
+  level?: string
+  bio?: string
+  bioTibetan?: string
+  story?: string
+  region?: string
+  heritageItemId: number
+  createdAt?: string
+}
+
+export interface HeritageEventItem {
+  id: number
+  title: string
+  titleTibetan?: string
+  description?: string
+  descriptionTibetan?: string
+  eventDate?: string
+  endDate?: string
+  location?: string
+  imageUrl?: string
+  contactInfo?: string
+  heritageItemId?: number
+  createdAt?: string
+}
+
 export const endpoints = {
   auth: {
     login: '/auth/login',
@@ -234,7 +295,26 @@ export const endpoints = {
   },
   heritage: {
     list: '/heritage',
-    detail: (id: number) => `/heritage/${id}`
+    detail: (id: number) => `/heritage/${id}`,
+    like: (id: number) => `/heritage/${id}/like`,
+    likeStatus: (id: number) => `/heritage/${id}/like-status`,
+    comments: (id: number) => `/heritage/${id}/comments`,
+    deleteComment: (heritageId: number, commentId: number) => `/heritage/${heritageId}/comments/${commentId}`,
+    inheritors: (id: number) => `/heritage/${id}/inheritors`,
+    events: (id: number) => `/heritage/${id}/events`,
+    upcomingEvents: '/heritage/events/upcoming'
+  },
+  adminHeritage: {
+    list: '/admin/heritage',
+    create: '/admin/heritage',
+    update: (id: number) => `/admin/heritage/${id}`,
+    delete: (id: number) => `/admin/heritage/${id}`,
+    inheritors: (itemId: number) => `/admin/heritage/${itemId}/inheritors`,
+    updateInheritor: (id: number) => `/admin/heritage/inheritors/${id}`,
+    deleteInheritor: (id: number) => `/admin/heritage/inheritors/${id}`,
+    events: (itemId: number) => `/admin/heritage/${itemId}/events`,
+    updateEvent: (id: number) => `/admin/heritage/events/${id}`,
+    deleteEvent: (id: number) => `/admin/heritage/events/${id}`
   },
   admin: {
     stats: '/admin/stats',

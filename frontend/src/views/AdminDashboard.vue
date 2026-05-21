@@ -434,6 +434,7 @@
 
         </div>
         <AdminCommunityPanel />
+        <AdminHeritagePanel />
         <div class="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden mt-8">
           <div class="flex flex-col gap-3 border-b border-stone-100 bg-gradient-to-r from-stone-50 to-white px-4 py-4 transition-colors hover:bg-stone-100/50 sm:flex-row sm:items-center sm:justify-between sm:px-6 cursor-pointer" @click="showAllNews = !showAllNews">
             <div class="flex items-center gap-3">
@@ -955,6 +956,7 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import AdminAnalyticsPanel from '../components/AdminAnalyticsPanel.vue'
 import AdminCommunityPanel from '../components/AdminCommunityPanel.vue'
+import AdminHeritagePanel from '../components/AdminHeritagePanel.vue'
 import ImageUploadField from '../components/ImageUploadField.vue'
 import MotionModal from '../components/motion/MotionModal.vue'
 import api, { endpoints, clearTokenCache } from '../api'
