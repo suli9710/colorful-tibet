@@ -25,8 +25,10 @@ import javax.crypto.spec.SecretKeySpec;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.Mock;
+import org.springframework.mock.env.MockEnvironment;
 import org.springframework.test.util.ReflectionTestUtils;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -76,7 +78,7 @@ class OrderCenterServiceTest {
         when(orderRepository.findByUserIdAndIdempotencyKey(1L, "idem-1")).thenReturn(Optional.empty());
         when(scenicSpotRepository.findById(10L)).thenReturn(Optional.of(spot));
         when(orderRepository.save(any(PlatformOrder.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(inventoryLockRepository.save(any(InventoryLock.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(inventoryLockRepository.saveAndFlush(any(InventoryLock.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         var response = orderCenterService.createOrder(user, scenicOrderRequest(), "idem-1");
 
@@ -85,7 +87,7 @@ class OrderCenterServiceTest {
         assertEquals(BigDecimal.valueOf(600), response.payableAmount());
         assertEquals(1, response.items().size());
         assertEquals("SCENIC_SPOT", response.items().get(0).productType());
-        verify(inventoryLockRepository).save(any(InventoryLock.class));
+        verify(inventoryLockRepository).saveAndFlush(any(InventoryLock.class));
     }
 
     @Test
@@ -113,7 +115,7 @@ class OrderCenterServiceTest {
             savedOrder.set(order);
             return order;
         });
-        when(inventoryLockRepository.save(any(InventoryLock.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(inventoryLockRepository.saveAndFlush(any(InventoryLock.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(inventoryLockRepository.findByOrder(any(PlatformOrder.class))).thenReturn(List.of());
 
         var created = orderCenterService.createOrder(user, scenicOrderRequest(), "idem-1");
@@ -129,6 +131,91 @@ class OrderCenterServiceTest {
         assertEquals("PAID", response.paymentStatus());
         assertEquals(1, response.vouchers().size());
         assertEquals("SUCCESS", response.paymentTransactions().get(0).status());
+    }
+
+    @Test
+    void hotelRoomOrderCreatesActiveLockForEachNight() {
+        Hotel hotel = hotel();
+        com.tibet.tourism.modules.hotel.domain.RoomType roomType = roomType(hotel);
+        when(orderRepository.findByUserIdAndIdempotencyKey(1L, "hotel-1")).thenReturn(Optional.empty());
+        when(hotelRepository.findById(20L)).thenReturn(Optional.of(hotel));
+        when(roomTypeRepository.findByIdForUpdate(30L)).thenReturn(Optional.of(roomType));
+        when(orderRepository.save(any(PlatformOrder.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(inventoryLockRepository.findByActiveLockKey(anyString())).thenReturn(Optional.empty());
+        when(inventoryLockRepository.existsByActiveLockKey(anyString())).thenReturn(false);
+        when(inventoryLockRepository.saveAndFlush(any(InventoryLock.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        orderCenterService.createOrder(user, hotelOrderRequest(), "hotel-1");
+
+        ArgumentCaptor<InventoryLock> captor = ArgumentCaptor.forClass(InventoryLock.class);
+        verify(inventoryLockRepository, times(2)).saveAndFlush(captor.capture());
+        assertEquals(
+                List.of("HOTEL_ROOM:20:30:2026-06-01", "HOTEL_ROOM:20:30:2026-06-02"),
+                captor.getAllValues().stream().map(InventoryLock::getActiveLockKey).toList());
+    }
+
+    @Test
+    void hotelRoomOrderRejectsExistingActiveLock() {
+        Hotel hotel = hotel();
+        com.tibet.tourism.modules.hotel.domain.RoomType roomType = roomType(hotel);
+        when(orderRepository.findByUserIdAndIdempotencyKey(1L, "hotel-1")).thenReturn(Optional.empty());
+        when(hotelRepository.findById(20L)).thenReturn(Optional.of(hotel));
+        when(roomTypeRepository.findByIdForUpdate(30L)).thenReturn(Optional.of(roomType));
+        when(orderRepository.save(any(PlatformOrder.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(inventoryLockRepository.findByActiveLockKey("HOTEL_ROOM:20:30:2026-06-01")).thenReturn(Optional.empty());
+        when(inventoryLockRepository.existsByActiveLockKey("HOTEL_ROOM:20:30:2026-06-01")).thenReturn(true);
+
+        IllegalStateException error = assertThrows(
+                IllegalStateException.class,
+                () -> orderCenterService.createOrder(user, hotelOrderRequest(), "hotel-1"));
+
+        assertEquals("Room type is unavailable for the selected dates", error.getMessage());
+        verify(inventoryLockRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void mockPaymentCallbackIsDisabledByDefault() {
+        ReflectionTestUtils.setField(orderCenterService, "mockCallbackEnabled", false);
+
+        IllegalStateException error = assertThrows(
+                IllegalStateException.class,
+                () -> orderCenterService.handleMockPaymentCallback(user,
+                        new PaymentCallbackRequest("ORD-1", "PAY-1", "MOCK", BigDecimal.TEN, "SUCCESS", "sig")));
+
+        assertEquals("Mock payment callback is disabled", error.getMessage());
+        verify(orderRepository, never()).findByOrderNo(anyString());
+    }
+
+    @Test
+    void mockPaymentCallbackRejectsNonOwnerOrder() {
+        ReflectionTestUtils.setField(orderCenterService, "mockCallbackEnabled", true);
+
+        User anotherUser = new User();
+        anotherUser.setId(2L);
+
+        PlatformOrder order = new PlatformOrder();
+        order.setUser(anotherUser);
+        order.setOrderNo("ORD-OTHER");
+        when(orderRepository.findByOrderNo("ORD-OTHER")).thenReturn(Optional.of(order));
+
+        assertThrows(
+                java.util.NoSuchElementException.class,
+                () -> orderCenterService.handleMockPaymentCallback(user,
+                        new PaymentCallbackRequest("ORD-OTHER", "PAY-1", "MOCK", BigDecimal.TEN, "SUCCESS", "sig")));
+    }
+
+    @Test
+    void strictConfigurationRejectsDevelopmentPaymentCallbackSecret() {
+        ReflectionTestUtils.setField(orderCenterService, "mockCallbackEnabled", true);
+        ReflectionTestUtils.setField(orderCenterService, "requireStrongSecrets", true);
+        ReflectionTestUtils.setField(orderCenterService, "callbackSecret", "dev-payment-callback-secret");
+        ReflectionTestUtils.setField(orderCenterService, "environment", new MockEnvironment().withProperty("spring.profiles.active", "prod"));
+
+        IllegalStateException error = assertThrows(
+                IllegalStateException.class,
+                () -> orderCenterService.validatePaymentCallbackConfiguration());
+
+        assertEquals("Production payment callback secret cannot use the development placeholder", error.getMessage());
     }
 
     @Test
@@ -178,6 +265,40 @@ class OrderCenterServiceTest {
         request.setCustomerName("Traveler");
         request.setItems(List.of(item));
         return request;
+    }
+
+    private CreateOrderRequest hotelOrderRequest() {
+        CreateOrderItemRequest item = new CreateOrderItemRequest();
+        item.setProductType("HOTEL_ROOM");
+        item.setProductId(20L);
+        item.setSkuId(30L);
+        item.setServiceStartDate(LocalDate.of(2026, 6, 1));
+        item.setServiceEndDate(LocalDate.of(2026, 6, 3));
+        item.setQuantity(1);
+
+        CreateOrderRequest request = new CreateOrderRequest();
+        request.setIdempotencyKey("hotel-1");
+        request.setCustomerName("Traveler");
+        request.setItems(List.of(item));
+        return request;
+    }
+
+    private Hotel hotel() {
+        Hotel hotel = new Hotel();
+        hotel.setId(20L);
+        hotel.setName("Lhasa Hotel");
+        return hotel;
+    }
+
+    private com.tibet.tourism.modules.hotel.domain.RoomType roomType(Hotel hotel) {
+        com.tibet.tourism.modules.hotel.domain.RoomType roomType =
+                new com.tibet.tourism.modules.hotel.domain.RoomType();
+        roomType.setId(30L);
+        roomType.setHotel(hotel);
+        roomType.setName("Twin Room");
+        roomType.setPrice(BigDecimal.valueOf(500));
+        roomType.setCapacity(2);
+        return roomType;
     }
 
     private String signature(String orderNo, String transactionNo, BigDecimal amount, String status) {

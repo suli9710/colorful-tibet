@@ -151,7 +151,7 @@ app:
     csrf-signing-secret: ${CSRF_SIGNING_SECRET}
     pii-encryption-key: ${PII_ENCRYPTION_KEY}
     trust-proxy-headers: ${TRUST_PROXY_HEADERS:false}
-    super-admin-secondary-password: ${SUPER_ADMIN_SECONDARY_PASSWORD}
+    super-admin-totp-secret: ${SUPER_ADMIN_TOTP_SECRET}
     rate-limit:
       enabled: ${RATE_LIMIT_ENABLED:true}
       redis-enabled: ${RATE_LIMIT_REDIS_ENABLED:true}
@@ -161,6 +161,7 @@ app:
         window-seconds: ${RATE_LIMIT_REGISTER_WINDOW_SECONDS:3600}
     cookie-secure: ${COOKIE_SECURE:true}
   payments:
+    mock-callback-enabled: ${PAYMENT_MOCK_CALLBACK_ENABLED:false}
     mock-callback-secret: ${PAYMENT_CALLBACK_SECRET}
   super-admin-username: ${SUPER_ADMIN_USERNAME}
   seed:

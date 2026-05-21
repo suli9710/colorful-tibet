@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { AnimatePresence, LayoutGroup, motion } from 'motion-v'
 import api, { endpoints } from '@/api'
@@ -21,6 +21,7 @@ import {
 const { t } = useI18n()
 
 const router = useRouter()
+const route = useRoute()
 const auth = useAuthStore()
 const user = ref<any>(null)
 const userInfo = ref<any>(null)
@@ -64,14 +65,17 @@ onMounted(async () => {
   user.value = auth.user ? { ...auth.user } : null
 
   try {
-    await Promise.all([
-      fetchUserInfo(),
-      fetchStats(),
-      fetchMyRoutes(),
-      fetchBookings(),
-      fetchHotelBookings(),
-      fetchMyComments()
-    ])
+    await fetchUserInfo()
+    const mustChangePassword = Boolean(userInfo.value?.mustChangePassword || auth.user?.mustChangePassword)
+    if (mustChangePassword) {
+      auth.updateUser({ mustChangePassword: true })
+    }
+    if (mustChangePassword || route.query.changePassword === '1') {
+      showPasswordModal.value = true
+      return
+    }
+
+    await loadProfileDetails()
   } catch (e: any) {
     // 如果API调用失败（特别是401），响应拦截器会处理跳转
     console.error('Failed to load user profile:', e)
@@ -83,6 +87,16 @@ onMounted(async () => {
     loading.value = false
   }
 })
+
+const loadProfileDetails = async () => {
+  await Promise.all([
+    fetchStats(),
+    fetchMyRoutes(),
+    fetchBookings(),
+    fetchHotelBookings(),
+    fetchMyComments()
+  ])
+}
 
 const fetchUserInfo = async () => {
   try {
@@ -286,11 +300,19 @@ const changePassword = async () => {
     })
     alert(t('profile.passwordChangeSuccess'))
     showPasswordModal.value = false
+    auth.updateUser({ mustChangePassword: false })
+    if (userInfo.value) {
+      userInfo.value.mustChangePassword = false
+    }
+    if (route.query.changePassword === '1') {
+      await router.replace({ path: '/profile' })
+    }
     passwordForm.value = {
       oldPassword: '',
       newPassword: '',
       confirmPassword: ''
     }
+    await loadProfileDetails()
   } catch (e: any) {
     console.error('Failed to change password:', e)
     const errorMsg = e.response?.data?.error || t('profile.passwordChangeFailed')

@@ -48,6 +48,270 @@
         </form>
       </div>
 
+      <motion.section
+        v-if="!loading"
+        class="mb-10 grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-6"
+        :initial="{ opacity: 0, y: 20 }"
+        :animate="{ opacity: 1, y: 0 }"
+        :transition="{ duration: 0.34, ease: motionEase }"
+      >
+        <div class="tibet-panel rounded-2xl p-5 sm:p-6">
+          <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-5">
+            <div>
+              <p class="text-xs font-semibold uppercase tracking-[0.2em] text-tibet-red/70 mb-2">Heritage Knowledge Base</p>
+              <h2 class="text-2xl font-bold text-tibet-dark">非遗项目库</h2>
+              <p class="mt-1 text-sm text-tibet-brown/60">
+                项目热度、传承人故事、活动日历与用户讨论集中呈现。
+              </p>
+            </div>
+            <button
+              type="button"
+              class="inline-flex items-center justify-center gap-2 rounded-xl border border-tibet-gold/30 bg-white/75 px-4 py-2 text-sm font-medium text-tibet-dark transition hover:border-tibet-red/35 hover:text-tibet-red disabled:opacity-50"
+              :disabled="searchLoading"
+              @click="refreshHeritageModule"
+            >
+              <RefreshCw class="h-4 w-4" :class="{ 'animate-spin': searchLoading }" />
+              刷新
+            </button>
+          </div>
+
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+            <div class="rounded-xl border border-stone-200 bg-white/70 px-4 py-3">
+              <div class="flex items-center justify-between gap-2">
+                <p class="text-xs text-stone-500">收录项目</p>
+                <BookOpen class="h-4 w-4 text-tibet-red" />
+              </div>
+              <p class="mt-2 text-2xl font-bold text-stone-900">{{ formatCompact(heritageItems.length) }}</p>
+            </div>
+            <div class="rounded-xl border border-stone-200 bg-white/70 px-4 py-3">
+              <div class="flex items-center justify-between gap-2">
+                <p class="text-xs text-stone-500">累计浏览</p>
+                <Eye class="h-4 w-4 text-blue-600" />
+              </div>
+              <p class="mt-2 text-2xl font-bold text-stone-900">{{ formatCompact(totalViews) }}</p>
+            </div>
+            <div class="rounded-xl border border-stone-200 bg-white/70 px-4 py-3">
+              <div class="flex items-center justify-between gap-2">
+                <p class="text-xs text-stone-500">互动量</p>
+                <MessageCircle class="h-4 w-4 text-emerald-600" />
+              </div>
+              <p class="mt-2 text-2xl font-bold text-stone-900">{{ formatCompact(totalInteractions) }}</p>
+            </div>
+            <div class="rounded-xl border border-stone-200 bg-white/70 px-4 py-3">
+              <div class="flex items-center justify-between gap-2">
+                <p class="text-xs text-stone-500">传承人档案</p>
+                <UserRound class="h-4 w-4 text-amber-600" />
+              </div>
+              <p class="mt-2 text-2xl font-bold text-stone-900">{{ formatCompact(featuredInheritors.length) }}</p>
+            </div>
+          </div>
+
+          <div class="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div class="flex min-w-0 items-center gap-2 overflow-x-auto pb-1">
+              <button
+                type="button"
+                class="shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition"
+                :class="selectedCategory === 'all' ? 'border-tibet-red bg-tibet-red text-white' : 'border-stone-200 bg-white/70 text-stone-600 hover:border-tibet-red/30 hover:text-tibet-red'"
+                @click="selectedCategory = 'all'"
+              >
+                全部
+              </button>
+              <button
+                v-for="category in categoryOptions"
+                :key="category"
+                type="button"
+                class="shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition"
+                :class="selectedCategory === category ? 'border-tibet-red bg-tibet-red text-white' : 'border-stone-200 bg-white/70 text-stone-600 hover:border-tibet-red/30 hover:text-tibet-red'"
+                @click="selectCategory(category)"
+              >
+                {{ category }}
+              </button>
+            </div>
+            <label class="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white/75 px-3 py-2 text-sm text-stone-600">
+              <SlidersHorizontal class="h-4 w-4 text-stone-400" />
+              <select v-model="sortMode" class="bg-transparent text-sm font-medium text-stone-700 focus:outline-none">
+                <option v-for="option in sortOptions" :key="option.value" :value="option.value">
+                  {{ option.label }}
+                </option>
+              </select>
+            </label>
+          </div>
+
+          <AnimatePresence mode="popLayout">
+            <motion.div
+              v-if="filteredHeritageItems.length"
+              key="heritage-dynamic-grid"
+              class="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-4"
+              :initial="{ opacity: 0 }"
+              :animate="{ opacity: 1 }"
+              :exit="{ opacity: 0 }"
+              :transition="{ duration: 0.22, ease: motionEase }"
+            >
+              <motion.button
+                v-for="(item, index) in filteredHeritageItems"
+                :key="item.id"
+                type="button"
+                layout
+                class="group rounded-2xl border border-stone-200 bg-white/80 p-3 text-left shadow-sm transition hover:border-tibet-red/30 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-tibet-gold/60 focus:ring-offset-2"
+                :initial="{ opacity: 0, y: 14 }"
+                :animate="{ opacity: 1, y: 0 }"
+                :transition="cardTransition(index, 0.03)"
+                :whileHover="{ y: -4 }"
+                :whileTap="{ scale: 0.99 }"
+                @click="openDetail(item)"
+              >
+                <div class="relative h-40 overflow-hidden rounded-xl bg-stone-100">
+                  <img
+                    v-if="resolveHeritageImage(item)"
+                    :src="resolveHeritageImage(item)"
+                    :alt="item.name"
+                    class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    loading="lazy"
+                    @error="applyHeritageImageFallback"
+                  />
+                  <div v-else class="flex h-full w-full items-center justify-center bg-gradient-to-br from-stone-100 to-amber-50 text-stone-400">
+                    <BookOpen class="h-8 w-8" />
+                  </div>
+                  <div class="absolute left-3 top-3 max-w-[75%] rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur">
+                    <span class="line-clamp-1">{{ item.category || '非遗项目' }}</span>
+                  </div>
+                  <div v-if="item.videoUrl" class="absolute bottom-3 right-3 rounded-full bg-white/90 p-2 text-tibet-red shadow-sm">
+                    <Video class="h-4 w-4" />
+                  </div>
+                </div>
+                <div class="px-1 pt-3">
+                  <div class="mb-2 flex items-start justify-between gap-3">
+                    <h3 class="line-clamp-1 text-lg font-bold text-stone-900 group-hover:text-tibet-red">
+                      {{ item.name }}
+                    </h3>
+                    <ArrowUpRight class="mt-1 h-4 w-4 shrink-0 text-stone-300 transition group-hover:text-tibet-red" />
+                  </div>
+                  <p class="line-clamp-2 min-h-[2.5rem] text-sm leading-relaxed text-stone-600">
+                    {{ item.description || '项目简介正在完善。' }}
+                  </p>
+                  <div class="mt-3 flex flex-wrap items-center gap-3 text-xs text-stone-500">
+                    <span class="inline-flex items-center gap-1">
+                      <Eye class="h-3.5 w-3.5" />
+                      {{ formatCompact(item.viewCount || 0) }}
+                    </span>
+                    <span class="inline-flex items-center gap-1">
+                      <Heart class="h-3.5 w-3.5" />
+                      {{ formatCompact(item.likeCount || 0) }}
+                    </span>
+                    <span class="inline-flex items-center gap-1">
+                      <MessageCircle class="h-3.5 w-3.5" />
+                      {{ formatCompact(item.commentCount || 0) }}
+                    </span>
+                    <span v-if="item.protectionLevel" class="ml-auto rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+                      {{ item.protectionLevel }}
+                    </span>
+                  </div>
+                </div>
+              </motion.button>
+            </motion.div>
+            <motion.div
+              v-else
+              key="heritage-empty"
+              class="rounded-2xl border border-dashed border-stone-300 bg-white/60 px-6 py-10 text-center"
+              :initial="{ opacity: 0, y: 12 }"
+              :animate="{ opacity: 1, y: 0 }"
+              :exit="{ opacity: 0, y: 12 }"
+              :transition="{ duration: 0.22, ease: motionEase }"
+            >
+              <Search class="mx-auto h-8 w-8 text-stone-300" />
+              <p class="mt-3 text-sm font-medium text-stone-700">没有匹配的非遗项目</p>
+              <p class="mt-1 text-xs text-stone-400">清空关键词或切换分类后再查看。</p>
+            </motion.div>
+          </AnimatePresence>
+        </div>
+
+        <aside class="space-y-4">
+          <div class="tibet-panel rounded-2xl p-5">
+            <div class="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-tibet-red/60">Inheritors</p>
+                <h3 class="mt-1 text-lg font-bold text-stone-900">传承人档案</h3>
+              </div>
+              <UserRound class="h-5 w-5 text-tibet-red" />
+            </div>
+            <div v-if="featuredInheritorsLoading" class="flex justify-center py-6">
+              <div class="h-6 w-6 rounded-full border-b-2 border-tibet-red animate-spin"></div>
+            </div>
+            <div v-else-if="featuredInheritors.length" class="space-y-3">
+              <button
+                v-for="inheritor in featuredInheritors"
+                :key="inheritor.id"
+                type="button"
+                class="flex w-full items-start gap-3 rounded-xl border border-stone-200 bg-white/70 px-3 py-3 text-left transition hover:border-tibet-red/30 hover:bg-white"
+                @click="openHeritageById(inheritor.heritageItemId)"
+              >
+                <div class="h-12 w-12 shrink-0 overflow-hidden rounded-full bg-stone-100">
+                  <img
+                    v-if="inheritor.avatarUrl"
+                    :src="inheritor.avatarUrl"
+                    :alt="inheritor.name"
+                    class="h-full w-full object-cover"
+                    loading="lazy"
+                  />
+                  <div v-else class="flex h-full w-full items-center justify-center text-sm font-bold text-tibet-red">
+                    {{ inheritor.name?.charAt(0) }}
+                  </div>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-center gap-2">
+                    <p class="truncate text-sm font-bold text-stone-900">{{ inheritor.name }}</p>
+                    <span v-if="inheritor.level" class="shrink-0 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                      {{ inheritor.level }}
+                    </span>
+                  </div>
+                  <p class="mt-0.5 text-[11px] text-stone-400">
+                    {{ heritageNameById[inheritor.heritageItemId] || inheritor.region || '非遗项目' }}
+                  </p>
+                  <p class="mt-1 line-clamp-2 text-xs leading-relaxed text-stone-600">
+                    {{ inheritor.story || inheritor.bio || '暂无传承故事' }}
+                  </p>
+                </div>
+              </button>
+            </div>
+            <p v-else class="rounded-xl border border-dashed border-stone-200 bg-white/60 px-4 py-5 text-center text-xs text-stone-400">
+              暂无可展示的传承人档案
+            </p>
+          </div>
+
+          <div class="tibet-panel rounded-2xl p-5">
+            <div class="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-tibet-red/60">Calendar</p>
+                <h3 class="mt-1 text-lg font-bold text-stone-900">活动日历</h3>
+              </div>
+              <CalendarDays class="h-5 w-5 text-tibet-red" />
+            </div>
+            <div v-if="upcomingEvents.length" class="space-y-3">
+              <button
+                v-for="event in upcomingEvents.slice(0, 5)"
+                :key="event.id"
+                type="button"
+                class="flex w-full gap-3 rounded-xl border border-stone-200 bg-white/70 px-3 py-3 text-left transition hover:border-tibet-red/30 hover:bg-white"
+                @click="event.heritageItemId && openHeritageById(event.heritageItemId)"
+              >
+                <div class="w-14 shrink-0 rounded-lg bg-tibet-red/10 px-2 py-2 text-center text-tibet-red">
+                  <p class="text-[11px] font-semibold leading-tight">{{ formatEventMonth(event.eventDate) }}</p>
+                  <p class="text-lg font-bold leading-tight">{{ formatEventDay(event.eventDate) }}</p>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <p class="line-clamp-1 text-sm font-semibold text-stone-900">{{ event.title }}</p>
+                  <p v-if="event.location" class="mt-1 line-clamp-1 text-xs text-stone-500">{{ event.location }}</p>
+                  <p v-if="event.description" class="mt-1 line-clamp-2 text-xs leading-relaxed text-stone-500">{{ event.description }}</p>
+                </div>
+              </button>
+            </div>
+            <p v-else class="rounded-xl border border-dashed border-stone-200 bg-white/60 px-4 py-5 text-center text-xs text-stone-400">
+              暂无近期活动
+            </p>
+          </div>
+        </aside>
+      </motion.section>
+
       <!-- 非遗大类一览（简洁卡片设计） -->
       <motion.section
         class="mb-14"
@@ -759,6 +1023,19 @@
 import { ref, onMounted, computed, watch, nextTick, onBeforeUnmount } from 'vue'
 import { AnimatePresence, motion } from 'motion-v'
 import { useI18n } from 'vue-i18n'
+import {
+  ArrowUpRight,
+  BookOpen,
+  CalendarDays,
+  Eye,
+  Heart,
+  MessageCircle,
+  RefreshCw,
+  Search,
+  SlidersHorizontal,
+  UserRound,
+  Video
+} from 'lucide-vue-next'
 import MotionModal from '../components/motion/MotionModal.vue'
 import api, { endpoints } from '../api'
 import type {
@@ -857,6 +1134,13 @@ const newCommentContent = ref('')
 const newCommentRating = ref(5)
 const submittingComment = ref(false)
 const upcomingEvents = ref<HeritageEventItem[]>([])
+const featuredInheritors = ref<HeritageInheritorItem[]>([])
+const featuredInheritorsLoading = ref(false)
+const selectedCategory = ref('all')
+
+type HeritageSortMode = 'hot' | 'views' | 'likes' | 'comments' | 'latest' | 'name'
+
+const sortMode = ref<HeritageSortMode>('hot')
 
 const genericHeritageImagePatterns = [
   'images.unsplash.com/photo-1559827291'
@@ -870,6 +1154,37 @@ const heritageImageByName: Record<string, string> = {
   唐卡: '/heritage/唐卡.jpg',
   藏医药浴法: '/heritage/藏药.jpg',
   藏药: '/heritage/藏药.jpg',
+  拉萨囊玛: '/heritage/拉萨囊玛.jpg',
+  拉萨朗玛: '/heritage/拉萨囊玛.jpg',
+  囊玛: '/heritage/拉萨囊玛.jpg',
+  那曲山歌: '/heritage/那曲山歌.jpeg',
+  藏族山歌: '/heritage/那曲山歌.jpeg',
+  藏北民歌: '/heritage/那曲山歌.jpeg',
+  热巴舞: '/heritage/热巴舞.jpg',
+  锅庄舞: '/heritage/锅庄舞.jpg',
+  弦子舞: '/heritage/弦子舞.jpg',
+  门巴戏: '/heritage/门巴戏.jpg',
+  藏族传统马术: '/heritage/藏族传统马术.jpg',
+  马术: '/heritage/藏族传统马术.jpg',
+  藏香制作技艺: '/heritage/藏香制作技艺.jpg',
+  藏香: '/heritage/藏香制作技艺.jpg',
+  藏刀锻制技艺: '/heritage/藏刀锻制技艺.jpg',
+  藏刀: '/heritage/藏刀锻制技艺.jpg',
+  '藏族邦典/卡垫织造技艺': '/heritage/藏族邦典卡垫织造技艺.jpg',
+  藏族邦典卡垫织造技艺: '/heritage/藏族邦典卡垫织造技艺.jpg',
+  邦典: '/heritage/藏族邦典卡垫织造技艺.jpg',
+  卡垫: '/heritage/藏族邦典卡垫织造技艺.jpg',
+  藏族雕版印刷技艺: '/heritage/藏族雕版印刷技艺.jpg',
+  雕版印刷: '/heritage/藏族雕版印刷技艺.jpg',
+  藏族造纸技艺: '/heritage/藏族造纸技艺.jpg',
+  藏纸: '/heritage/藏族造纸技艺.jpg',
+  雪顿节: '/heritage/雪顿节.jpg',
+  望果节: '/heritage/望果节.jpg',
+  藏族金属锻造技艺: '/heritage/藏族金属锻造技艺.jpg',
+  金属锻造: '/heritage/藏族金属锻造技艺.jpg',
+  墨脱石锅制作技艺: '/heritage/墨脱石锅制作技艺.jpg',
+  墨脱石锅: '/heritage/墨脱石锅制作技艺.jpg',
+  羌姆: '/heritage/羌姆.jpg',
   'གེ་སར': '/heritage/格萨尔史诗.jpg',
   'བོད་ཟློས་གར': '/heritage/藏戏.jpg',
   'ཐང་ཀ': '/heritage/唐卡.jpg',
@@ -881,12 +1196,12 @@ const isGenericHeritageImage = (imageUrl?: string | null): boolean =>
 
 const findMappedHeritageImage = (name?: string | null): string => {
   if (!name) return ''
-  const normalizedName = name.replace(/[（）()《》“”"·\s]/g, '')
+  const normalizedName = name.replace(/[（）()《》“”"·/、\s]/g, '')
   const direct = heritageImageByName[name] || heritageImageByName[normalizedName]
   if (direct) return direct
 
   const match = Object.entries(heritageImageByName).find(([key]) => {
-    const normalizedKey = key.replace(/[（）()《》“”"·\s]/g, '')
+    const normalizedKey = key.replace(/[（）()《》“”"·/、\s]/g, '')
     return normalizedName.includes(normalizedKey) || normalizedKey.includes(normalizedName)
   })
   return match?.[1] || ''
@@ -1405,12 +1720,172 @@ const getItemsByCategory = (categoryName: string): NationalHeritageItem[] => {
   return nationalHeritageByCategory.value[key] || []
 }
 
+const sortOptions = computed<Array<{ value: HeritageSortMode; label: string }>>(() => [
+  { value: 'hot', label: '综合热度' },
+  { value: 'views', label: '浏览最多' },
+  { value: 'likes', label: '点赞最多' },
+  { value: 'comments', label: '评论最多' },
+  { value: 'latest', label: '最新收录' },
+  { value: 'name', label: '名称排序' }
+])
+
+const categoryOptions = computed(() => {
+  const categories = new Set<string>()
+  heritageItems.value.forEach(item => {
+    const category = item.category?.trim()
+    if (category) categories.add(category)
+  })
+  return Array.from(categories).sort((a, b) => a.localeCompare(b, 'zh-CN'))
+})
+
+const heritageNameById = computed<Record<number, string>>(() => {
+  return heritageItems.value.reduce<Record<number, string>>((map, item) => {
+    map[item.id] = item.name
+    return map
+  }, {})
+})
+
+const totalViews = computed(() =>
+  heritageItems.value.reduce((sum, item) => sum + (item.viewCount || 0), 0)
+)
+
+const totalInteractions = computed(() =>
+  heritageItems.value.reduce((sum, item) => sum + (item.likeCount || 0) + (item.commentCount || 0), 0)
+)
+
+const getHeritageScore = (item: HeritageItem) =>
+  (item.viewCount || 0) + (item.likeCount || 0) * 8 + (item.commentCount || 0) * 12 + (item.videoUrl ? 15 : 0) + (item.protectionLevel ? 5 : 0)
+
+const filteredHeritageItems = computed<HeritageItem[]>(() => {
+  const keyword = searchKeyword.value.trim().toLocaleLowerCase()
+  const items = heritageItems.value.filter(item => {
+    if (selectedCategory.value !== 'all' && item.category !== selectedCategory.value) return false
+    if (!keyword) return true
+
+    return [
+      item.name,
+      item.nameTibetan,
+      item.description,
+      item.category,
+      item.region,
+      item.protectionLevel,
+      item.originStory,
+      item.significance
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLocaleLowerCase()
+      .includes(keyword)
+  })
+
+  return [...items].sort((a, b) => {
+    switch (sortMode.value) {
+      case 'views':
+        return (b.viewCount || 0) - (a.viewCount || 0)
+      case 'likes':
+        return (b.likeCount || 0) - (a.likeCount || 0)
+      case 'comments':
+        return (b.commentCount || 0) - (a.commentCount || 0)
+      case 'latest':
+        return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+      case 'name':
+        return (a.name || '').localeCompare(b.name || '', 'zh-CN')
+      case 'hot':
+      default:
+        return getHeritageScore(b) - getHeritageScore(a)
+    }
+  })
+})
+
+const formatCompact = (value: number) =>
+  new Intl.NumberFormat('zh-CN', {
+    notation: 'compact',
+    maximumFractionDigits: 1
+  }).format(value)
+
+const formatEventMonth = (dateStr?: string) => {
+  if (!dateStr) return '--'
+  const date = new Date(dateStr)
+  if (Number.isNaN(date.getTime())) return '--'
+  return `${date.getMonth() + 1}月`
+}
+
+const formatEventDay = (dateStr?: string) => {
+  if (!dateStr) return '--'
+  const date = new Date(dateStr)
+  if (Number.isNaN(date.getTime())) return '--'
+  return String(date.getDate()).padStart(2, '0')
+}
+
+const selectCategory = (category: string) => {
+  selectedCategory.value = selectedCategory.value === category ? 'all' : category
+}
+
+const mergeFeaturedInheritors = (inheritors: HeritageInheritorItem[]) => {
+  const merged = new Map<number, HeritageInheritorItem>()
+  ;[...featuredInheritors.value, ...inheritors].forEach(inheritor => {
+    if (inheritor?.id) merged.set(inheritor.id, inheritor)
+  })
+  featuredInheritors.value = Array.from(merged.values()).slice(0, 6)
+}
+
+const fetchFeaturedInheritors = async (items: HeritageItem[]) => {
+  const candidates = items.filter(item => item.id && item.id < 10000).slice(0, 8)
+  if (!candidates.length) {
+    featuredInheritors.value = []
+    return
+  }
+
+  featuredInheritorsLoading.value = true
+  try {
+    const responses = await Promise.all(
+      candidates.map(item =>
+        api.get(endpoints.heritage.inheritors(item.id))
+          .then(response => response.data || [])
+          .catch(() => [])
+      )
+    )
+    const merged = new Map<number, HeritageInheritorItem>()
+    responses.flat().forEach((inheritor: HeritageInheritorItem) => {
+      if (inheritor?.id) merged.set(inheritor.id, inheritor)
+    })
+    featuredInheritors.value = Array.from(merged.values()).slice(0, 6)
+  } catch (error) {
+    console.error('Failed to fetch featured inheritors:', error)
+  } finally {
+    featuredInheritorsLoading.value = false
+  }
+}
+
+const fetchUpcomingEvents = async () => {
+  try {
+    const response = await api.get(endpoints.heritage.upcomingEvents, { params: { size: 6 } })
+    upcomingEvents.value = response.data?.content || response.data || []
+  } catch (error) {
+    console.error('Failed to fetch upcoming heritage events:', error)
+  }
+}
+
+const updateHeritageItem = (id: number, patch: Partial<HeritageItem>) => {
+  heritageItems.value = heritageItems.value.map(item =>
+    item.id === id ? { ...item, ...patch } : item
+  )
+}
+
+const openHeritageById = (id?: number) => {
+  if (!id) return
+  const item = heritageItems.value.find(entry => entry.id === id)
+  if (item) openDetail(item)
+}
+
 const fetchHeritageItems = async (keyword?: string) => {
   try {
-    const params: Record<string, string> = {}
+    const params: Record<string, string> = { size: '100' }
     if (keyword) params.keyword = keyword
     const response = await api.get(endpoints.heritage.list, { params })
-    heritageItems.value = response.data?.content || response.data || []
+    const items = response.data?.content || response.data || []
+    heritageItems.value = items
+    void fetchFeaturedInheritors(items)
   } catch (error) {
     console.error('Failed to fetch heritage items:', error)
   } finally {
@@ -1430,19 +1905,34 @@ const handleSearch = async () => {
   await fetchHeritageItems(kw)
 }
 
+const refreshHeritageModule = async () => {
+  searchLoading.value = true
+  await Promise.all([
+    fetchHeritageItems(searchKeyword.value.trim() || undefined),
+    fetchUpcomingEvents()
+  ])
+}
+
 const loadDetailData = async (item: HeritageItem) => {
   if (!item.id || item.id >= 10000) return
 
   commentsLoading.value = true
   try {
-    const [commentsRes, inheritorsRes, eventsRes] = await Promise.all([
+    const [detailRes, commentsRes, inheritorsRes, eventsRes] = await Promise.all([
+      api.get(endpoints.heritage.detail(item.id)).catch(() => null),
       api.get(endpoints.heritage.comments(item.id)).catch(() => null),
       api.get(endpoints.heritage.inheritors(item.id)).catch(() => null),
       api.get(endpoints.heritage.events(item.id)).catch(() => null)
     ])
+    const detailItem = detailRes?.data as HeritageItem | undefined
+    if (detailItem?.id) {
+      selectedItem.value = { ...item, ...detailItem }
+      updateHeritageItem(item.id, detailItem)
+    }
     itemComments.value = commentsRes?.data?.content || commentsRes?.data || []
     itemInheritors.value = inheritorsRes?.data || []
     itemEvents.value = eventsRes?.data || []
+    mergeFeaturedInheritors(itemInheritors.value)
   } catch (e) {
     console.error('Failed to load detail data:', e)
   } finally {
@@ -1461,10 +1951,13 @@ const toggleLike = async () => {
   if (!selectedItem.value || !authStore.isLoggedIn) return
   try {
     const res = await api.post(endpoints.heritage.like(selectedItem.value.id))
-    liked.value = res.data?.liked ?? !liked.value
-    if (selectedItem.value) {
-      selectedItem.value = { ...selectedItem.value, likeCount: res.data?.likeCount }
-    }
+    const nextLiked = res.data?.liked ?? !liked.value
+    const nextLikeCount = typeof res.data?.likeCount === 'number'
+      ? res.data.likeCount
+      : Math.max(0, (selectedItem.value.likeCount || 0) + (nextLiked ? 1 : -1))
+    liked.value = nextLiked
+    selectedItem.value = { ...selectedItem.value, likeCount: nextLikeCount }
+    updateHeritageItem(selectedItem.value.id, { likeCount: nextLikeCount })
   } catch (e) {
     console.error('Failed to toggle like:', e)
   }
@@ -1481,7 +1974,9 @@ const submitComment = async () => {
     if (res.data) {
       itemComments.value = [res.data, ...itemComments.value]
       if (selectedItem.value) {
-        selectedItem.value = { ...selectedItem.value, commentCount: (selectedItem.value.commentCount || 0) + 1 }
+        const nextCommentCount = (selectedItem.value.commentCount || 0) + 1
+        selectedItem.value = { ...selectedItem.value, commentCount: nextCommentCount }
+        updateHeritageItem(selectedItem.value.id, { commentCount: nextCommentCount })
       }
     }
     newCommentContent.value = ''
@@ -1499,7 +1994,9 @@ const deleteComment = async (commentId: number) => {
     await api.delete(endpoints.heritage.deleteComment(selectedItem.value.id, commentId))
     itemComments.value = itemComments.value.filter(c => c.id !== commentId)
     if (selectedItem.value) {
-      selectedItem.value = { ...selectedItem.value, commentCount: Math.max(0, (selectedItem.value.commentCount || 1) - 1) }
+      const nextCommentCount = Math.max(0, (selectedItem.value.commentCount || 1) - 1)
+      selectedItem.value = { ...selectedItem.value, commentCount: nextCommentCount }
+      updateHeritageItem(selectedItem.value.id, { commentCount: nextCommentCount })
     }
   } catch (e) {
     console.error('Failed to delete comment:', e)
@@ -1514,7 +2011,8 @@ const formatDate = (dateStr: string) => {
 
 // 监听语言变化，重新获取数据
 watch(locale, () => {
-  fetchHeritageItems(searchKeyword.value.trim() || undefined)
+  void fetchHeritageItems(searchKeyword.value.trim() || undefined)
+  void fetchUpcomingEvents()
 })
 
 const toggleCategory = (categoryName: string) => {
@@ -1733,7 +2231,8 @@ watch(selectedItem, async (newItem) => {
 })
 
 onMounted(() => {
-  fetchHeritageItems()
+  void fetchHeritageItems()
+  void fetchUpcomingEvents()
 })
 
 onBeforeUnmount(() => {

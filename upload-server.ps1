@@ -140,6 +140,21 @@ if ! grep -Eq '^(DOUBAO_API_KEY|ARK_API_KEY)=[^[:space:]]+' "$PROJECT_DIR/.env";
   echo "WARNING: DOUBAO_API_KEY/ARK_API_KEY is empty; AI route generation will use local fallback routes." >&2
 fi
 
+if grep -qx 'SUPER_ADMIN_SECONDARY_PASSWORD=lzh031224' "$PROJECT_DIR/.env"; then
+  echo "Refusing deployment: remove the legacy SUPER_ADMIN_SECONDARY_PASSWORD published default before uploading." >&2
+  exit 1
+fi
+
+if grep -qx 'SEED_DEMO_SUPER_ADMIN_PASSWORD=031224' "$PROJECT_DIR/.env"; then
+  echo "Refusing deployment: SEED_DEMO_SUPER_ADMIN_PASSWORD still uses the published default. Rotate or remove it before uploading." >&2
+  exit 1
+fi
+
+if ! grep -Eq '^SUPER_ADMIN_TOTP_SECRET=[A-Z2-7]{32,}$' "$PROJECT_DIR/.env"; then
+  echo "Refusing deployment: SUPER_ADMIN_TOTP_SECRET must be a Base32 secret with at least 32 characters." >&2
+  exit 1
+fi
+
 echo "Prebuilding release before stopping current containers..."
 tar -xzf "$ARCHIVE" -C "$RELEASE_DIR"
 cp "$PROJECT_DIR/.env" "$RELEASE_DIR/.env"
@@ -198,6 +213,9 @@ curl -fsS http://127.0.0.1:8080/actuator/health/readiness
 echo ""
 curl -fsS http://127.0.0.1/health
 curl -fsS -I "$SITE_URL" | head -n 12
+
+echo "Pruning unused Docker build cache..."
+docker builder prune -af >/dev/null 2>&1 || true
 
 rm -f "$ARCHIVE" "$REMOTE_SCRIPT"
 echo "Upload deployment completed."

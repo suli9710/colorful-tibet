@@ -105,7 +105,7 @@ springdoc:
 
 # JWT配置（必须与登录时使用的密钥一致）
 jwt:
-  secret: ${JWT_SECRET:dev-only-jwt-secret-change-me-before-any-shared-deployment-2026}
+  secret: ${JWT_SECRET:}
   expiration: 86400000  # 24小时
 
 ark:
@@ -164,7 +164,7 @@ app:
     pii-encryption-key: ${PII_ENCRYPTION_KEY:}
     cookie-secure: ${COOKIE_SECURE:true}
     trust-proxy-headers: ${TRUST_PROXY_HEADERS:false}
-    super-admin-secondary-password: ${SUPER_ADMIN_SECONDARY_PASSWORD:lzh031224}
+    super-admin-totp-secret: ${SUPER_ADMIN_TOTP_SECRET:}
     rate-limit:
       enabled: ${RATE_LIMIT_ENABLED:true}
       redis-enabled: ${RATE_LIMIT_REDIS_ENABLED:true}
@@ -220,7 +220,8 @@ app:
         challenge-threshold: 60
         block-threshold: 85
   payments:
-    mock-callback-secret: ${PAYMENT_CALLBACK_SECRET:dev-payment-callback-secret}
+    mock-callback-enabled: ${PAYMENT_MOCK_CALLBACK_ENABLED:false}
+    mock-callback-secret: ${PAYMENT_CALLBACK_SECRET:}
   super-admin-username: ${SUPER_ADMIN_USERNAME:lzh}
   seed:
     content:
@@ -228,5 +229,5 @@ app:
     demo-users:
       enabled: ${SEED_DEMO_USERS:false}
       admin-password: ${SEED_DEMO_ADMIN_PASSWORD:}
-      super-admin-password: ${SEED_DEMO_SUPER_ADMIN_PASSWORD:031224}
+      super-admin-password: ${SEED_DEMO_SUPER_ADMIN_PASSWORD:}
       user-password: ${SEED_DEMO_USER_PASSWORD:}

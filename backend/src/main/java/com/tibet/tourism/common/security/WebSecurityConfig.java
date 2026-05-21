@@ -1,5 +1,6 @@
 package com.tibet.tourism.common.security;
 
+import com.tibet.tourism.modules.user.infra.UserRepository;
 import jakarta.servlet.DispatcherType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -45,6 +46,9 @@ public class WebSecurityConfig {
     @Autowired
     private CsrfCookieFilter csrfCookieFilter;
 
+    @Autowired
+    private TokenRevocationService tokenRevocationService;
+
     @Value("${app.security.public-docs-enabled:false}")
     private boolean publicDocsEnabled;
 
@@ -53,7 +57,12 @@ public class WebSecurityConfig {
 
     @Bean
     public AuthTokenFilter authenticationJwtTokenFilter() {
-        return new AuthTokenFilter(jwtUtils, userDetailsService);
+        return new AuthTokenFilter(jwtUtils, userDetailsService, tokenRevocationService);
+    }
+
+    @Bean
+    public MustChangePasswordFilter mustChangePasswordFilter(UserRepository userRepository) {
+        return new MustChangePasswordFilter(userRepository);
     }
 
     @Bean
@@ -75,7 +84,9 @@ public class WebSecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain filterChain(
+            HttpSecurity http,
+            MustChangePasswordFilter mustChangePasswordFilter) throws Exception {
         http.cors(Customizer.withDefaults())
             .csrf(csrf -> csrf.disable())
             .exceptionHandling(exception -> exception.authenticationEntryPoint(unauthorizedHandler))
@@ -103,10 +114,10 @@ public class WebSecurityConfig {
         http.headers(headers -> headers
                 .contentSecurityPolicy(csp -> csp.policyDirectives(
                         "default-src 'self'; " +
-                        "script-src 'self' https://www.recaptcha.net https://www.gstatic.com https://www.gstatic.cn; " +
+                        "script-src 'self' https://www.recaptcha.net https://www.google.com https://www.gstatic.com https://www.gstatic.cn; " +
                         "style-src 'self'; " +
                         "img-src 'self' data: blob:; " +
-                        "frame-src 'self' https://www.recaptcha.net; " +
+                        "frame-src 'self' https://www.recaptcha.net https://www.google.com; " +
                         "object-src 'none'; " +
                         "base-uri 'self'; " +
                         "frame-ancestors 'self'"))
@@ -126,6 +137,7 @@ public class WebSecurityConfig {
 
         http.addFilterBefore(csrfCookieFilter, UsernamePasswordAuthenticationFilter.class);
         http.addFilterBefore(authenticationJwtTokenFilter(), UsernamePasswordAuthenticationFilter.class);
+        http.addFilterAfter(mustChangePasswordFilter, AuthTokenFilter.class);
 
         return http.build();
     }

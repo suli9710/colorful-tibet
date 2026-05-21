@@ -474,7 +474,7 @@
     "subtitle": "登录您的七彩西藏账号",
     "username": "用户名",
     "password": "密码",
-    "secondaryPassword": "二级密码",
+    "secondaryPassword": "动态验证码",
     "loggingIn": "登录中...",
     "noAccount": "还没有账号？",
     "registerNow": "立即注册",

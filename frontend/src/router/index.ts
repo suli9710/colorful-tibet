@@ -131,6 +131,10 @@ router.beforeEach(async (to) => {
         return '/login'
     }
 
+    if (isAuthenticated && auth.user?.mustChangePassword && to.path !== '/profile') {
+        return { path: '/profile', query: { changePassword: '1' } }
+    }
+
     if (to.path.startsWith('/admin') && !auth.isAdmin) {
         return '/'
     }

@@ -4,7 +4,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "inventory_locks", indexes = {
+@Table(name = "inventory_locks", uniqueConstraints = {
+        @UniqueConstraint(name = "uk_inventory_locks_active_lock_key", columnNames = "active_lock_key")
+}, indexes = {
         @Index(name = "idx_inventory_locks_product_date", columnList = "product_type, product_id, service_date"),
         @Index(name = "idx_inventory_locks_expires", columnList = "expires_at, status")
 })
@@ -40,6 +42,9 @@ public class InventoryLock {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 32)
     private Status status = Status.LOCKED;
+
+    @Column(name = "active_lock_key", length = 160)
+    private String activeLockKey;
 
     @Column(name = "expires_at")
     private LocalDateTime expiresAt;
@@ -82,6 +87,9 @@ public class InventoryLock {
 
     public Status getStatus() { return status; }
     public void setStatus(Status status) { this.status = status; }
+
+    public String getActiveLockKey() { return activeLockKey; }
+    public void setActiveLockKey(String activeLockKey) { this.activeLockKey = activeLockKey; }
 
     public LocalDateTime getExpiresAt() { return expiresAt; }
     public void setExpiresAt(LocalDateTime expiresAt) { this.expiresAt = expiresAt; }

@@ -2,6 +2,8 @@
 
 interface ImportMetaEnv {
   readonly VITE_API_BASE_URL?: string
+  readonly VITE_RECAPTCHA_ENABLED?: string
+  readonly VITE_RECAPTCHA_MODE?: string
   readonly VITE_RECAPTCHA_SITE_KEY?: string
   readonly VITE_AMAP_KEY?: string
   readonly VITE_AMAP_SECURITY_CODE?: string

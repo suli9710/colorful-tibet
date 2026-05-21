@@ -12,6 +12,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 public class RecaptchaService {
 
     private static final Logger log = LoggerFactory.getLogger(RecaptchaService.class);
+    private static final double RECAPTCHA_V2_SUCCESS_SCORE = 1.0;
 
     private final AntibotProperties properties;
     private final WebClient webClient;
@@ -46,8 +47,11 @@ public class RecaptchaService {
                     .block(Duration.ofSeconds(3));
 
             if (response != null && response.path("success").asBoolean(false)) {
-                double score = response.path("score").asDouble(0.0);
-                log.debug("reCAPTCHA score={} for ip={}", score, remoteIp);
+                JsonNode scoreNode = response.get("score");
+                double score = scoreNode != null && scoreNode.isNumber()
+                        ? scoreNode.asDouble()
+                        : RECAPTCHA_V2_SUCCESS_SCORE;
+                log.debug("reCAPTCHA verification succeeded score={} for ip={}", score, remoteIp);
                 return OptionalDouble.of(score);
             }
             log.warn("reCAPTCHA verification failed: {}", response);

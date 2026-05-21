@@ -53,7 +53,6 @@ public class CurrentUserApplicationService {
         response.put("username", user.getUsername());
         response.put("nickname", user.getNickname());
         response.put("avatar", user.getAvatar());
-        response.put("phone", user.getPhone());
         response.put("role", user.getRole());
         response.put("createdAt", user.getCreatedAt());
         response.put("mustChangePassword", Boolean.TRUE.equals(user.getMustChangePassword()));

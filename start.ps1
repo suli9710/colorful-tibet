@@ -1,9 +1,11 @@
-# 七彩西藏 · 一键启动脚本
+﻿# 七彩西藏 · 一键启动脚本
 # 用法: 右键 start.bat → 以管理员身份运行，或在 PowerShell 中: .\start.ps1
 
 $ErrorActionPreference = "Stop"
 $ProjectDir = (Resolve-Path -LiteralPath $PSScriptRoot).Path
 $PreferredWslDistro = "Ubuntu"
+$StartupStateDir = Join-Path $ProjectDir ".startup"
+$StartupFingerprintFile = Join-Path $StartupStateDir "docker-build-inputs.sha256"
 
 $Script:LastStdOut = ""
 $Script:LastStdErr = ""
@@ -161,12 +163,12 @@ function Test-WslKeepAlive {
 
 function Start-WslKeepAlive {
     if (Test-WslKeepAlive) {
-        Write-Host "  WSL 保活进程已存在" -ForegroundColor Gray
+        Write-Host "  WSL keep-alive process already exists." -ForegroundColor Gray
         return
     }
 
-    Write-Host "  启动 WSL 保活进程，避免容器后台运行时自动断开..." -ForegroundColor Gray
-    $keepAliveArguments = "-d $Script:WslDistro -- bash -lc `"exec -a $Script:WslKeepAliveTag tail -f /dev/null`""
+    Write-Host "  Starting WSL keep-alive process..." -ForegroundColor Gray
+    $keepAliveArguments = '-d ' + $Script:WslDistro + ' -- bash -lc "exec -a ' + $Script:WslKeepAliveTag + ' tail -f /dev/null"'
     Start-Process `
         -FilePath "wsl.exe" `
         -ArgumentList $keepAliveArguments `
@@ -194,7 +196,7 @@ function Get-ProjectCommand {
     param([Parameter(Mandatory = $true)][string]$Command)
 
     $safeDir = $Script:WslProjectDir.Replace('"', '\"')
-    return "cd `"$safeDir`" && $Command"
+    return 'cd "' + $safeDir + '" && ' + $Command
 }
 
 function Convert-ToWslPath {
@@ -208,6 +210,85 @@ function Convert-ToWslPath {
     }
 
     return $resolvedPath
+}
+
+function Get-StartupFingerprint {
+    $buildInputFiles = @(
+        "docker-compose.yml",
+        "docker-compose.prod.yml",
+        "backend/Dockerfile",
+        "backend/pom.xml",
+        "frontend/Dockerfile",
+        "frontend/nginx.conf",
+        "frontend/nginx.http.conf",
+        "frontend/package.json",
+        "frontend/package-lock.json",
+        "frontend/tsconfig.json",
+        "frontend/tsconfig.node.json",
+        "frontend/vite.config.ts",
+        "frontend/tailwind.config.js",
+        "scrapler/Dockerfile",
+        "scrapler/requirements.txt"
+    )
+    $buildInputDirectories = @(
+        "backend/src",
+        "frontend/src",
+        "frontend/public",
+        "scrapler"
+    )
+    $excludedPathPattern = "\\(node_modules|dist|target|\.venv|__pycache__|\.pytest_cache|logs)\\"
+
+    $lines = @()
+    foreach ($relativePath in $buildInputFiles) {
+        $fullPath = Join-Path $ProjectDir $relativePath
+        if (Test-Path -LiteralPath $fullPath -PathType Leaf) {
+            $hash = (Get-FileHash -LiteralPath $fullPath -Algorithm SHA256).Hash
+            $lines += "$relativePath=$hash"
+        }
+        else {
+            $lines += "$relativePath=missing"
+        }
+    }
+
+    foreach ($relativeDirectory in $buildInputDirectories) {
+        $directory = Join-Path $ProjectDir $relativeDirectory
+        if (-not (Test-Path -LiteralPath $directory -PathType Container)) {
+            $lines += "$relativeDirectory=missing"
+            continue
+        }
+
+        Get-ChildItem -LiteralPath $directory -Recurse -File |
+            Where-Object { $_.FullName -notmatch $excludedPathPattern } |
+            Sort-Object FullName |
+            ForEach-Object {
+                $relativeFile = $_.FullName.Substring($ProjectDir.Length + 1).Replace("\", "/")
+                $hash = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash
+                $lines += "$relativeFile=$hash"
+            }
+    }
+
+    return ($lines -join "`n")
+}
+
+function Test-StartupFingerprintChanged {
+    param([Parameter(Mandatory = $true)][string]$Fingerprint)
+
+    if (-not (Test-Path -LiteralPath $StartupFingerprintFile -PathType Leaf)) {
+        return $true
+    }
+
+    $previousFingerprint = Get-Content -Raw -LiteralPath $StartupFingerprintFile
+    return $previousFingerprint.Trim() -ne $Fingerprint.Trim()
+}
+
+function Save-StartupFingerprint {
+    param([Parameter(Mandatory = $true)][string]$Fingerprint)
+
+    if (-not (Test-Path -LiteralPath $StartupStateDir -PathType Container)) {
+        New-Item -ItemType Directory -Path $StartupStateDir -Force | Out-Null
+    }
+
+    Set-Content -LiteralPath $StartupFingerprintFile -Value $Fingerprint -Encoding UTF8
 }
 
 function Get-ComposeStatus {
@@ -331,9 +412,20 @@ Write-Host "  Docker 守护进程就绪" -ForegroundColor Green
 # ── 3. 启动项目容器 ──
 Write-Host "[3/4] 启动项目容器..." -ForegroundColor Yellow
 
+$startupFingerprint = Get-StartupFingerprint
+$startupFingerprintChanged = Test-StartupFingerprintChanged -Fingerprint $startupFingerprint
+$forceRebuild = $env:COLORFUL_TIBET_REBUILD -eq "1"
+$skipAutoRebuild = $env:COLORFUL_TIBET_SKIP_AUTO_REBUILD -eq "1"
+
 $composeUpCommand = "docker compose up -d"
-if ($env:COLORFUL_TIBET_REBUILD -eq "1") {
+if ($forceRebuild -or ($startupFingerprintChanged -and -not $skipAutoRebuild)) {
     $composeUpCommand = "docker compose up -d --build"
+    if ($forceRebuild) {
+        Write-Host "  Forced image rebuild enabled by COLORFUL_TIBET_REBUILD=1." -ForegroundColor Gray
+    }
+    else {
+        Write-Host "  Build inputs changed; rebuilding Docker images automatically." -ForegroundColor Gray
+    }
     Write-Host "  已启用强制重建镜像，首次执行可能需要几分钟..." -ForegroundColor Gray
 }
 else {
@@ -348,6 +440,9 @@ if (-not (Invoke-WslBash -Command (Get-ProjectCommand -Command $composeUpCommand
 }
 if (-not [string]::IsNullOrWhiteSpace($Script:LastStdOut)) {
     Write-Host $Script:LastStdOut
+}
+if (-not ($startupFingerprintChanged -and $skipAutoRebuild -and -not $forceRebuild)) {
+    Save-StartupFingerprint -Fingerprint $startupFingerprint
 }
 Write-Host "  容器已启动，等待健康检查..." -ForegroundColor Gray
 

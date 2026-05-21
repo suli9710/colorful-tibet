@@ -3,6 +3,8 @@ package com.tibet.tourism.common.security.antibot;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.tibet.tourism.common.security.antibot.infra.BehaviorLogRepository;
@@ -37,6 +39,7 @@ class RiskAssessmentServiceTest {
         properties = new AntibotProperties();
         properties.setEnabled(true);
         properties.getRecaptcha().setEnabled(true);
+        properties.getRecaptcha().setSiteKey("test-site");
         properties.getRecaptcha().setSecretKey("test-secret");
 
         Executor directExecutor = Runnable::run;
@@ -89,6 +92,24 @@ class RiskAssessmentServiceTest {
     }
 
     @Test
+    void successfulV2RecaptchaScoreAllowsLowRiskRequest() {
+        when(recaptchaService.verify(eq("v2-token"), eq("203.0.113.10")))
+                .thenReturn(OptionalDouble.of(1.0));
+
+        RiskResult result = service.assess(
+                "v2-token",
+                null,
+                42L,
+                null,
+                "203.0.113.10",
+                "/api/hotel-bookings");
+
+        assertThat(result.recaptchaRisk()).isEqualTo(0.0);
+        assertThat(result.finalScore()).isEqualTo(0.0);
+        assertThat(result.decision()).isEqualTo(RiskResult.Decision.ALLOW);
+    }
+
+    @Test
     void disabledRecaptchaDoesNotForceChallenge() {
         properties.getRecaptcha().setEnabled(false);
 
@@ -102,5 +123,23 @@ class RiskAssessmentServiceTest {
 
         assertThat(result.decision()).isEqualTo(RiskResult.Decision.ALLOW);
         assertThat(result.finalScore()).isEqualTo(0.0);
+    }
+
+    @Test
+    void incompleteRecaptchaConfigurationDoesNotForceChallenge() {
+        properties.getRecaptcha().setSiteKey("");
+        properties.getRecaptcha().setSecretKey("");
+
+        RiskResult result = service.assess(
+                null,
+                null,
+                42L,
+                null,
+                "203.0.113.10",
+                "/api/hotel-bookings");
+
+        assertThat(result.decision()).isEqualTo(RiskResult.Decision.ALLOW);
+        assertThat(result.finalScore()).isEqualTo(0.0);
+        verify(recaptchaService, never()).verify(any(), any());
     }
 }

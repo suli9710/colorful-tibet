@@ -25,6 +25,8 @@ public class JwtUtils {
     private static final int MIN_PROD_SECRET_LENGTH = 64;
     private static final int MIN_EXPIRATION_MS = 5 * 60 * 1000;
     private static final int MAX_EXPIRATION_MS = 7 * 24 * 60 * 60 * 1000;
+    private static final String PUBLISHED_DEVELOPMENT_SECRET =
+            "dev-only-jwt-secret-change-me-before-any-shared-deployment-2026";
     private static final String DEV_SECRET_MARKER = "dev-only";
     private static final String CHANGE_ME_MARKER = "change-me";
 
@@ -53,6 +55,9 @@ public class JwtUtils {
         jwtSecret = secret;
         if (jwtExpirationMs < MIN_EXPIRATION_MS || jwtExpirationMs > MAX_EXPIRATION_MS) {
             throw new IllegalStateException("JWT expiration must be between 5 minutes and 7 days");
+        }
+        if (PUBLISHED_DEVELOPMENT_SECRET.equals(secret)) {
+            throw new IllegalStateException("JWT secret cannot use the published development placeholder");
         }
         if (secret.length() < MIN_SECRET_LENGTH) {
             throw new IllegalStateException("JWT secret must be at least " + MIN_SECRET_LENGTH + " characters");
@@ -87,6 +92,10 @@ public class JwtUtils {
 
     public String getUserNameFromJwtToken(String token) {
         return parseClaims(token).getPayload().getSubject();
+    }
+
+    public Date getExpirationDateFromJwtToken(String token) {
+        return parseClaims(token).getPayload().getExpiration();
     }
 
     public boolean validateJwtToken(String authToken) {

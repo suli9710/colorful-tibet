@@ -417,6 +417,7 @@
   <PaymentModal
     :show="showPaymentModal"
     :amount="paymentOrder?.payableAmount ?? undefined"
+    recaptcha-action="payment"
     @close="showPaymentModal = false; paymentOrder = null"
     @paid="handlePaymentConfirmed"
   />
@@ -446,7 +447,6 @@ import {
 import api, { endpoints } from '../api'
 import PaymentModal from '../components/PaymentModal.vue'
 import { useBehaviorTracker } from '../composables/useBehaviorTracker'
-import { getRecaptchaToken } from '../utils/recaptcha'
 import { useAuthStore } from '../stores/auth'
 
 interface OrderItem {
@@ -563,18 +563,17 @@ const showPaymentForOrder = (order: Order) => {
   showPaymentModal.value = true
 }
 
-const handlePaymentConfirmed = async () => {
+const handlePaymentConfirmed = async (recaptchaToken = '') => {
   const order = paymentOrder.value
   if (!order) return
   showPaymentModal.value = false
-  const recaptchaToken = await getRecaptchaToken('payment')
   const behaviorData = encodeBehaviorData()
 
   try {
     await api.post(endpoints.payments.mockCallback, {
       orderNo: order.orderNo,
       transactionNo: `MOCK-${Date.now()}`,
-      provider: 'WECHAT_PAY',
+      provider: 'MOCK',
       amount: order.payableAmount,
       status: 'SUCCESS',
       signature: 'mock-signature'

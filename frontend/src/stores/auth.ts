@@ -23,9 +23,19 @@ const hasStorage = () => typeof window !== 'undefined' && typeof window.localSto
 
 const normalizedApiBaseURL = () => String(apiBaseURL).replace(/\/+$/, '')
 
+const SAFE_USER_FIELDS = new Set(['id', 'username', 'nickname', 'avatar', 'role', 'createdAt', 'mustChangePassword'])
+
 const stripAuthTokens = (userData: AuthUser): AuthUser => {
   const { token: _token, accessToken: _accessToken, jwt: _jwt, data: _data, ...userWithoutToken } = userData
   return userWithoutToken
+}
+
+const sanitizeForStorage = (userData: AuthUser): AuthUser => {
+  const safe: AuthUser = {}
+  for (const key of SAFE_USER_FIELDS) {
+    if (key in userData) safe[key] = userData[key]
+  }
+  return safe
 }
 
 const readStoredUser = (): AuthUser | null => {
@@ -45,7 +55,7 @@ const readStoredUser = (): AuthUser | null => {
 
 const persistUser = (userData: AuthUser) => {
   if (!hasStorage()) return
-  localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(stripAuthTokens(userData)))
+  localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(sanitizeForStorage(userData)))
 }
 
 export const clearStoredAuth = () => {

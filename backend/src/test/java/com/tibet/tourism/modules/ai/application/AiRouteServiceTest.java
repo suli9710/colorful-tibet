@@ -2,6 +2,7 @@ package com.tibet.tourism.modules.ai.application;
 import com.tibet.tourism.modules.ai.web.dto.AiRouteGenerateResponse;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -117,8 +118,9 @@ class AiRouteServiceTest {
         assertNotNull(body);
         assertTrue(body.containsKey("messages"));
         assertFalse(body.containsKey("input"));
-        assertEquals(Map.of("type", "disabled"), body.get("thinking"));
-        assertEquals(2400, body.get("max_tokens"));
+        assertEquals(Map.of("type", "enabled"), body.get("thinking"));
+        assertEquals("medium", body.get("reasoning_effort"));
+        assertEquals(5200, body.get("max_tokens"));
         assertEquals(Boolean.TRUE, body.get("stream"));
     }
 
@@ -144,10 +146,47 @@ class AiRouteServiceTest {
         assertNotNull(body);
         assertTrue(body.containsKey("input"));
         assertFalse(body.containsKey("messages"));
-        assertEquals(Map.of("type", "disabled"), body.get("thinking"));
-        assertEquals(2400, body.get("max_output_tokens"));
+        assertEquals(Map.of("type", "enabled"), body.get("thinking"));
+        assertEquals("medium", body.get("reasoning_effort"));
+        assertEquals(5200, body.get("max_output_tokens"));
         assertEquals(Boolean.TRUE, body.get("stream"));
         assertEquals("ep-20260516173036-4dpgm", body.get("model"));
+    }
+
+    @Test
+    void streamEventDoesNotForwardReasoningDelta() throws Exception {
+        AiRouteService service = new AiRouteService(
+                WebClient.builder(),
+                "https://ark.cn-beijing.volces.com/api/v3/responses",
+                "test-api-key",
+                "ep-20260516173036-4dpgm",
+                30,
+                "",
+                30
+        );
+        CapturingSseEmitter emitter = new CapturingSseEmitter();
+        AtomicInteger lineCounter = new AtomicInteger();
+        AtomicInteger deltaCounter = new AtomicInteger();
+
+        ReflectionTestUtils.invokeMethod(
+                service,
+                "processStreamEvent",
+                "{\"type\":\"response.reasoning.delta\",\"delta\":\"hidden chain\"}",
+                emitter,
+                lineCounter,
+                deltaCounter
+        );
+        ReflectionTestUtils.invokeMethod(
+                service,
+                "processStreamEvent",
+                "{\"type\":\"response.output_text.delta\",\"delta\":\"visible route\"}",
+                emitter,
+                lineCounter,
+                deltaCounter
+        );
+
+        assertTrue(emitter.payloads().stream().anyMatch(payload -> payload.contains("visible route")));
+        assertFalse(emitter.payloads().stream().anyMatch(payload -> payload.contains("hidden chain")));
     }
 
     @Test
@@ -162,13 +201,19 @@ class AiRouteServiceTest {
                 30
         );
         Map<String, Object> response = Map.of(
-                "output", List.of(Map.of(
-                        "type", "message",
-                        "content", List.of(Map.of(
-                                "type", "output_text",
-                                "text", "# Test route"
-                        ))
-                ))
+                "output", List.of(
+                        Map.of(
+                                "type", "reasoning",
+                                "summary", "# Hidden route"
+                        ),
+                        Map.of(
+                                "type", "message",
+                                "content", List.of(Map.of(
+                                        "type", "output_text",
+                                        "text", "# Test route"
+                                ))
+                        )
+                )
         );
 
         String text = ReflectionTestUtils.invokeMethod(service, "extractResponseText", response);

@@ -14,9 +14,11 @@ import com.tibet.tourism.common.security.JwtUtils;
 import com.tibet.tourism.common.security.LoginAttemptService;
 import com.tibet.tourism.modules.auth.domain.AuthForbiddenException;
 import com.tibet.tourism.modules.auth.web.dto.LoginRequest;
+import com.tibet.tourism.modules.auth.web.dto.RegisterRequest;
 import com.tibet.tourism.modules.user.domain.User;
 import com.tibet.tourism.modules.user.infra.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
+import java.time.Instant;
 import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -27,8 +29,11 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.mock.env.MockEnvironment;
 
 class AuthApplicationServiceTest {
+
+    private static final String TOTP_SECRET = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ";
 
     private AuthenticationManager authenticationManager;
     private UserRepository userRepository;
@@ -37,6 +42,7 @@ class AuthApplicationServiceTest {
     private PasswordEncoder passwordEncoder;
     private IpLocationService ipLocationService;
     private LoginAttemptService loginAttemptService;
+    private TotpService totpService;
     private HttpServletRequest httpRequest;
     private AuthApplicationService service;
 
@@ -49,8 +55,9 @@ class AuthApplicationServiceTest {
         passwordEncoder = mock(PasswordEncoder.class);
         ipLocationService = mock(IpLocationService.class);
         loginAttemptService = mock(LoginAttemptService.class);
+        totpService = new TotpService();
         httpRequest = mock(HttpServletRequest.class);
-        service = serviceWithSecondaryPassword("lzh031224");
+        service = serviceWithTotpSecret(TOTP_SECRET);
 
         when(loginAttemptService.remainingLockSeconds(anyString())).thenReturn(0L);
         when(jwtUtils.generateJwtToken(any(Authentication.class))).thenReturn("jwt-token");
@@ -66,7 +73,7 @@ class AuthApplicationServiceTest {
     }
 
     @Test
-    void superAdminLoginRequiresSecondaryPassword() {
+    void superAdminLoginRequiresTotpCode() {
         User superAdmin = user("lzh", User.Role.ADMIN);
         stubAuthenticatedUser("lzh", superAdmin);
 
@@ -78,16 +85,44 @@ class AuthApplicationServiceTest {
     }
 
     @Test
-    void superAdminLoginAcceptsConfiguredSecondaryPassword() {
+    void superAdminLoginAcceptsValidTotpCode() {
         User superAdmin = user("lzh", User.Role.ADMIN);
         stubAuthenticatedUser("lzh", superAdmin);
+        String currentCode = totpService.generateCodeForTime(TOTP_SECRET, Instant.now());
 
-        LoginResult result = service.login(loginRequest("lzh", "031224", "lzh031224"), httpRequest);
+        LoginResult result = service.login(loginRequest("lzh", "031224", currentCode), httpRequest);
 
         assertThat(result.jwt()).isEqualTo("jwt-token");
         assertThat(result.csrfToken()).isEqualTo("csrf-token");
         assertThat(result.user()).containsEntry("username", "lzh");
         assertThat(superAdmin.getAllowedLoginFingerprintHash()).isNull();
+    }
+
+    @Test
+    void superAdminLoginAllowsDifferentDeviceWhenTotpIsValid() {
+        User superAdmin = user("lzh", User.Role.ADMIN);
+        superAdmin.setAllowedLoginFingerprintHash("legacy-fingerprint-hash");
+        stubAuthenticatedUser("lzh", superAdmin);
+        when(httpRequest.getHeader("X-Device-Fingerprint")).thenReturn("new-device");
+        String currentCode = totpService.generateCodeForTime(TOTP_SECRET, Instant.now());
+
+        LoginResult result = service.login(loginRequest("lzh", "031224", currentCode), httpRequest);
+
+        assertThat(result.jwt()).isEqualTo("jwt-token");
+        assertThat(result.user()).containsEntry("role", User.Role.ADMIN);
+        assertThat(superAdmin.getAllowedLoginFingerprintHash()).isEqualTo("legacy-fingerprint-hash");
+    }
+
+    @Test
+    void verifiedSuperAdminLoginRepairsAdminRole() {
+        User superAdmin = user("lzh", User.Role.USER);
+        stubAuthenticatedUser("lzh", superAdmin);
+        String currentCode = totpService.generateCodeForTime(TOTP_SECRET, Instant.now());
+
+        LoginResult result = service.login(loginRequest("lzh", "031224", currentCode), httpRequest);
+
+        assertThat(superAdmin.getRole()).isEqualTo(User.Role.ADMIN);
+        assertThat(result.user()).containsEntry("role", User.Role.ADMIN);
     }
 
     @Test
@@ -102,16 +137,58 @@ class AuthApplicationServiceTest {
     }
 
     @Test
-    void missingSecondaryPasswordConfigBlocksSuperAdminLogin() {
-        service = serviceWithSecondaryPassword("");
+    void missingTotpSecretConfigBlocksSuperAdminLogin() {
+        service = serviceWithTotpSecret("");
         User superAdmin = user("lzh", User.Role.ADMIN);
         stubAuthenticatedUser("lzh", superAdmin);
 
-        assertThatThrownBy(() -> service.login(loginRequest("lzh", "031224", "lzh031224"), httpRequest))
+        assertThatThrownBy(() -> service.login(loginRequest("lzh", "031224", "123456"), httpRequest))
                 .isInstanceOf(AuthForbiddenException.class);
     }
 
-    private AuthApplicationService serviceWithSecondaryPassword(String secondaryPassword) {
+    @Test
+    void rejectsMissingTotpSecretInStrictMode() {
+        service = serviceWithTotpSecret("", true);
+
+        assertThatThrownBy(service::validateSuperAdminConfiguration)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("must be configured");
+    }
+
+    @Test
+    void rejectsInvalidTotpSecretDuringStartup() {
+        service = serviceWithTotpSecret("not-a-valid-secret!");
+
+        assertThatThrownBy(service::validateSuperAdminConfiguration)
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("valid Base32");
+    }
+
+    @Test
+    void rejectsShortTotpSecretDuringStartup() {
+        service = serviceWithTotpSecret("JBSWY3DPEHPK3PXP");
+
+        assertThatThrownBy(service::validateSuperAdminConfiguration)
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("128 bits");
+    }
+
+    @Test
+    void registerRejectsHomoglyphUsername() {
+        RegisterRequest request = new RegisterRequest();
+        request.setUsername("adm\u0456n");
+        request.setPassword("Strong1!");
+
+        assertThatThrownBy(() -> service.register(request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Registration failed");
+    }
+
+    private AuthApplicationService serviceWithTotpSecret(String totpSecret) {
+        return serviceWithTotpSecret(totpSecret, false);
+    }
+
+    private AuthApplicationService serviceWithTotpSecret(String totpSecret, boolean requireStrongSecrets) {
         return new AuthApplicationService(
                 authenticationManager,
                 userRepository,
@@ -120,8 +197,11 @@ class AuthApplicationServiceTest {
                 passwordEncoder,
                 ipLocationService,
                 loginAttemptService,
+                totpService,
                 "lzh",
-                secondaryPassword);
+                totpSecret,
+                requireStrongSecrets,
+                new MockEnvironment());
     }
 
     private void stubAuthenticatedUser(String username, User user) {

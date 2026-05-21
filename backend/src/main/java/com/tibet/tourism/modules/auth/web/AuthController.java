@@ -1,5 +1,6 @@
 package com.tibet.tourism.modules.auth.web;
 import com.tibet.tourism.common.security.CookieAuthConstants;
+import com.tibet.tourism.common.security.TokenRevocationService;
 import com.tibet.tourism.modules.auth.application.AuthApplicationService;
 import com.tibet.tourism.modules.auth.application.LoginResult;
 import com.tibet.tourism.modules.auth.domain.AuthFailureException;
@@ -8,7 +9,6 @@ import com.tibet.tourism.modules.auth.domain.AuthRateLimitException;
 import com.tibet.tourism.modules.auth.domain.DuplicateRegistrationException;
 import com.tibet.tourism.modules.auth.web.dto.LoginRequest;
 import com.tibet.tourism.modules.auth.web.dto.RegisterRequest;
-import com.tibet.tourism.modules.user.domain.User;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.time.Duration;
@@ -18,10 +18,12 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.util.WebUtils;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -30,12 +32,15 @@ public class AuthController {
     private static final Duration AUTH_COOKIE_MAX_AGE = Duration.ofDays(1);
 
     private final AuthApplicationService authApplicationService;
+    private final TokenRevocationService tokenRevocationService;
     private final boolean secureCookies;
 
     public AuthController(
             AuthApplicationService authApplicationService,
+            TokenRevocationService tokenRevocationService,
             @Value("${app.security.cookie-secure:true}") boolean secureCookies) {
         this.authApplicationService = authApplicationService;
+        this.tokenRevocationService = tokenRevocationService;
         this.secureCookies = secureCookies;
     }
 
@@ -57,7 +62,11 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<?> logout() {
+    public ResponseEntity<?> logout(HttpServletRequest request) {
+        String token = resolveToken(request);
+        if (StringUtils.hasText(token)) {
+            tokenRevocationService.revoke(token);
+        }
         return ResponseEntity.noContent()
                 .header(HttpHeaders.SET_COOKIE, authCookie("", Duration.ZERO).toString())
                 .header(HttpHeaders.SET_COOKIE, csrfCookie("", Duration.ZERO).toString())
@@ -94,5 +103,14 @@ public class AuthController {
                 .path("/")
                 .maxAge(maxAge)
                 .build();
+    }
+
+    private String resolveToken(HttpServletRequest request) {
+        String headerAuth = request.getHeader("Authorization");
+        if (StringUtils.hasText(headerAuth) && headerAuth.startsWith("Bearer ")) {
+            return headerAuth.substring(7);
+        }
+        var authCookie = WebUtils.getCookie(request, CookieAuthConstants.AUTH_COOKIE_NAME);
+        return authCookie == null ? null : authCookie.getValue();
     }
 }

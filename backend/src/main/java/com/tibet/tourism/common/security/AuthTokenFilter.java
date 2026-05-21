@@ -22,10 +22,15 @@ public class AuthTokenFilter extends OncePerRequestFilter {
 
     private final JwtUtils jwtUtils;
     private final UserDetailsService userDetailsService;
+    private final TokenRevocationService tokenRevocationService;
 
-    public AuthTokenFilter(JwtUtils jwtUtils, UserDetailsService userDetailsService) {
+    public AuthTokenFilter(
+            JwtUtils jwtUtils,
+            UserDetailsService userDetailsService,
+            TokenRevocationService tokenRevocationService) {
         this.jwtUtils = jwtUtils;
         this.userDetailsService = userDetailsService;
+        this.tokenRevocationService = tokenRevocationService;
     }
 
     @Override
@@ -41,6 +46,8 @@ public class AuthTokenFilter extends OncePerRequestFilter {
                 }
             } else if (jwtUtils == null) {
                 logger.error("JwtUtils is null; injection failure");
+            } else if (tokenRevocationService != null && tokenRevocationService.isRevoked(jwt)) {
+                logger.warn("Rejected revoked JWT for path: {}", path);
             } else if (!jwtUtils.validateJwtToken(jwt)) {
                 logger.warn("JWT validation failed for path: {}", path);
             } else {

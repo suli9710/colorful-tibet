@@ -48,9 +48,12 @@ public class RiskAssessmentService {
         }
 
         BehaviorData behaviorData = decodeBehaviorData(behaviorDataHeader);
+        AntibotProperties.Recaptcha recaptchaCfg = properties.getRecaptcha();
+        boolean recaptchaRequired = isRecaptchaRequired(recaptchaCfg);
 
-        CompletableFuture<OptionalDouble> recaptchaFuture = CompletableFuture.supplyAsync(
-                () -> recaptchaService.verify(recaptchaToken, remoteIp), executor);
+        CompletableFuture<OptionalDouble> recaptchaFuture = recaptchaRequired
+                ? CompletableFuture.supplyAsync(() -> recaptchaService.verify(recaptchaToken, remoteIp), executor)
+                : CompletableFuture.completedFuture(OptionalDouble.empty());
 
         CompletableFuture<BehaviorAnalysisService.BehaviorMetrics> behaviorFuture = CompletableFuture.supplyAsync(
                 () -> behaviorService.analyze(behaviorData), executor);
@@ -70,8 +73,6 @@ public class RiskAssessmentService {
         }
 
         AntibotProperties.Risk riskCfg = properties.getRisk();
-        AntibotProperties.Recaptcha recaptchaCfg = properties.getRecaptcha();
-        boolean recaptchaRequired = recaptchaCfg.isEnabled();
 
         double recaptchaRisk = recaptchaScore.isPresent()
                 ? (1.0 - recaptchaScore.getAsDouble()) * 100.0
@@ -121,6 +122,12 @@ public class RiskAssessmentService {
                 userId, endpoint, fingerprint, m, captchaScore, finalScore, decision), executor);
 
         return result;
+    }
+
+    private boolean isRecaptchaRequired(AntibotProperties.Recaptcha recaptchaCfg) {
+        return recaptchaCfg.isEnabled()
+                && StringUtils.hasText(recaptchaCfg.getSiteKey())
+                && StringUtils.hasText(recaptchaCfg.getSecretKey());
     }
 
     private BehaviorData decodeBehaviorData(String header) {

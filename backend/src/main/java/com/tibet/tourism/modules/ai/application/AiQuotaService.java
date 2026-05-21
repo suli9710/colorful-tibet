@@ -47,13 +47,11 @@ public class AiQuotaService {
                 int count = parseInt(val);
                 return count >= dailyLimit;
             } catch (Exception e) {
-                log.warn("Redis quota check failed, allowing request: {}", e.getMessage());
-                return false;
+                log.warn("Redis quota check failed, using in-memory fallback: {}", e.getMessage());
+                return isFallbackQuotaExceeded(dateKey, userId);
             }
         }
-        resetFallbackIfNewDay(dateKey);
-        AtomicInteger counter = fallbackQuota.computeIfAbsent(userId.toString(), k -> new AtomicInteger(0));
-        return counter.get() >= dailyLimit;
+        return isFallbackQuotaExceeded(dateKey, userId);
     }
 
     public void incrementQuota(Long userId) {
@@ -62,6 +60,7 @@ public class AiQuotaService {
         }
         String dateKey = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE);
         String key = QUOTA_KEY_PREFIX + dateKey + ":" + userId;
+        incrementFallbackQuota(dateKey, userId);
 
         if (redisTemplate != null) {
             try {
@@ -74,8 +73,6 @@ public class AiQuotaService {
                 log.warn("Redis quota increment failed: {}", e.getMessage());
             }
         }
-        resetFallbackIfNewDay(dateKey);
-        fallbackQuota.computeIfAbsent(userId.toString(), k -> new AtomicInteger(0)).incrementAndGet();
     }
 
     public int getRemainingQuota(Long userId) {
@@ -91,12 +88,11 @@ public class AiQuotaService {
                 Object val = redisTemplate.opsForValue().get(key);
                 used = parseInt(val);
             } catch (Exception e) {
-                return dailyLimit;
+                log.warn("Redis quota remaining check failed, using in-memory fallback: {}", e.getMessage());
+                used = getFallbackQuotaCount(dateKey, userId);
             }
         } else {
-            resetFallbackIfNewDay(dateKey);
-            AtomicInteger counter = fallbackQuota.get(userId.toString());
-            used = counter == null ? 0 : counter.get();
+            used = getFallbackQuotaCount(dateKey, userId);
         }
         return Math.max(0, dailyLimit - used);
     }
@@ -154,6 +150,21 @@ public class AiQuotaService {
 
     private String normalize(String val) {
         return val == null ? "" : val.trim().toLowerCase();
+    }
+
+    private boolean isFallbackQuotaExceeded(String dateKey, Long userId) {
+        return getFallbackQuotaCount(dateKey, userId) >= dailyLimit;
+    }
+
+    private int getFallbackQuotaCount(String dateKey, Long userId) {
+        resetFallbackIfNewDay(dateKey);
+        AtomicInteger counter = fallbackQuota.computeIfAbsent(userId.toString(), k -> new AtomicInteger(0));
+        return counter.get();
+    }
+
+    private void incrementFallbackQuota(String dateKey, Long userId) {
+        resetFallbackIfNewDay(dateKey);
+        fallbackQuota.computeIfAbsent(userId.toString(), k -> new AtomicInteger(0)).incrementAndGet();
     }
 
     private void resetFallbackIfNewDay(String dateKey) {
