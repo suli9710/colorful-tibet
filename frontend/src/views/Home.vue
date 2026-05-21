@@ -1,62 +1,93 @@
 <template>
   <div class="min-h-screen tibet-page-shell">
     <!-- Hero Section: Multi-layer Parallax -->
-    <div class="relative h-[calc(100vh-5rem)] md:h-[calc(100vh-6rem)] flex items-center justify-center overflow-hidden -mt-20 md:-mt-24">
+    <div class="relative flex h-[calc(100svh-5rem)] min-h-[600px] items-center justify-center overflow-hidden -mt-20 sm:min-h-[680px] md:h-[calc(100vh-6rem)] md:-mt-24">
       <!-- Layer 0: Sky gradient base -->
       <div class="absolute inset-0 z-0 bg-gradient-to-b from-tibet-dark via-tibet-brown/60 to-tibet-dark/40"></div>
 
       <!-- Layer 1: Background image -->
-      <img :src="heroSlides[currentSlide].image" :alt="heroSlides[currentSlide].title"
-           class="absolute inset-0 w-full h-full object-cover z-1 opacity-60 hero-parallax-bg will-change-transform"
-           style="transform-origin: center center;">
+      <AnimatePresence :initial="false">
+        <motion.img
+          :key="heroSlides[currentSlide].image"
+          :src="heroSlides[currentSlide].image"
+          :alt="heroSlides[currentSlide].title"
+          :initial="{ opacity: 0 }"
+          :animate="{ opacity: 0.6 }"
+          :exit="{ opacity: 0 }"
+          :transition="{ duration: 1.05, ease: motionEase }"
+          class="absolute inset-0 w-full h-full object-cover z-1 scale-[1.05]"
+        />
+      </AnimatePresence>
 
       <!-- Layer 2: Distant mountains (slowest parallax) -->
-      <div class="hero-mountains-far z-2 parallax-layer" data-speed="0.1" style="bottom: 20%; height: 40%;"></div>
+      <motion.div class="hero-mountains-far z-2" style="bottom: 20%; height: 40%;"></motion.div>
 
       <!-- Layer 3: Mid-ground mountains with snow -->
-      <div class="hero-mountains-mid z-3 parallax-layer" data-speed="0.25" style="bottom: 10%; height: 50%;"></div>
+      <motion.div class="hero-mountains-mid z-3" style="bottom: 10%; height: 50%;"></motion.div>
 
       <!-- Layer 4: Foreground terrain -->
-      <div class="hero-foreground z-4 parallax-layer" data-speed="0.45" style="bottom: 0; height: 30%;"></div>
+      <motion.div class="hero-foreground z-4" style="bottom: 0; height: 30%;"></motion.div>
 
       <!-- Layer 5: Golden light -->
-      <div class="hero-golden-light z-5"></div>
+      <motion.div
+        class="hero-golden-light z-5"
+        :animate="prefersReducedMotion ? { opacity: 0.68, scale: 1 } : { opacity: [0.55, 0.95, 0.65], scale: [1, 1.05, 1] }"
+        :transition="prefersReducedMotion ? { duration: 0 } : { duration: 9, repeat: Infinity, ease: 'easeInOut' }"
+      ></motion.div>
 
       <!-- Layer 6: Floating mist -->
       <div class="hero-mist z-6"></div>
 
-      <!-- Layer 7: Prayer flags -->
-      <div class="hero-prayer-flags z-7"></div>
-
       <!-- Layer 8: Content overlay -->
       <div class="relative z-10 text-center px-4 max-w-5xl mx-auto">
-        <div class="mb-6 inline-flex items-center gap-2 rounded-full bg-tibet-red/25 px-4 py-2 text-sm text-tibet-yellow backdrop-blur-md border border-tibet-gold/30 animate-slide-up will-change-transform" style="animation-delay: 0.1s">
-          <span class="h-2 w-2 rounded-full bg-tibet-yellow animate-pulse-slow"></span>
-          {{ heroSlides[currentSlide].tag }}
-        </div>
-        <h1 class="text-5xl md:text-7xl font-bold text-white mb-6 tracking-tight animate-slide-up will-change-transform font-display" style="animation-delay: 0.2s; text-shadow: 0 2px 24px rgba(0,0,0,0.3);">
-          {{ heroSlides[currentSlide].title }}
-        </h1>
-        <p class="text-xl md:text-2xl text-white/85 mb-10 font-light max-w-2xl mx-auto animate-slide-up will-change-transform" style="animation-delay: 0.4s; text-shadow: 0 1px 12px rgba(0,0,0,0.2);">
-          {{ heroSlides[currentSlide].subtitle }}
-        </p>
-        <div class="flex flex-col sm:flex-row justify-center gap-4 animate-slide-up will-change-transform" style="animation-delay: 0.6s">
-          <router-link to="/spots" class="tibet-btn text-lg px-8 py-4 shadow-xl will-change-transform">
-            {{ t('home.startExploring') }}
-          </router-link>
-          <button @click="scrollToHeatmap"
-                  class="tibet-btn-ghost text-white border-white/30 hover:bg-white/10 hover:border-white/50 hover:text-white text-lg px-8 py-4 will-change-transform">
-            {{ t('home.viewHeatmap') }}
-          </button>
+        <div :key="`hero-content-${currentSlide}`" class="hero-content-fade">
+            <div
+              class="mb-5 inline-flex items-center gap-2 rounded-full bg-tibet-red/25 px-3.5 py-2 text-xs text-tibet-yellow backdrop-blur-md border border-tibet-gold/30 sm:mb-6 sm:px-4 sm:text-sm"
+            >
+              <span class="h-2 w-2 rounded-full bg-tibet-yellow animate-pulse-slow"></span>
+              {{ heroSlides[currentSlide].tag }}
+            </div>
+            <h1
+              class="mb-5 text-4xl font-bold text-white sm:text-5xl md:mb-6 md:text-7xl font-display"
+              style="text-shadow: 0 2px 24px rgba(0,0,0,0.3);"
+            >
+              {{ heroSlides[currentSlide].title }}
+            </h1>
+            <p
+              class="mx-auto mb-8 max-w-2xl text-base font-light leading-relaxed text-white/85 sm:text-xl md:mb-10 md:text-2xl"
+              style="text-shadow: 0 1px 12px rgba(0,0,0,0.2);"
+            >
+              {{ heroSlides[currentSlide].subtitle }}
+            </p>
+            <div
+              class="flex flex-col justify-center gap-3 sm:flex-row sm:gap-4"
+            >
+              <router-link to="/spots" class="tibet-btn w-full px-6 py-3.5 text-base shadow-xl will-change-transform hover:-translate-y-1 hover:scale-[1.03] active:scale-95 sm:w-auto sm:px-8 sm:py-4 sm:text-lg">
+                {{ t('home.startExploring') }}
+              </router-link>
+              <button
+                      @click="scrollToHeatmap"
+                      class="tibet-btn-ghost w-full border-white/30 px-6 py-3.5 text-base text-white will-change-transform hover:-translate-y-1 hover:scale-[1.03] hover:border-white/50 hover:bg-white/10 hover:text-white active:scale-95 sm:w-auto sm:px-8 sm:py-4 sm:text-lg">
+                {{ t('home.viewHeatmap') }}
+              </button>
+            </div>
         </div>
 
         <!-- Bead-style carousel dots -->
-        <div class="mt-10 flex items-center justify-center gap-2.5">
-          <button v-for="(slide, index) in heroSlides" :key="slide.title" @click="goToSlide(index)"
+        <div class="mt-8 flex items-center justify-center gap-2.5 sm:mt-10">
+          <button v-for="(slide, index) in heroSlides" :key="`${slide.image}-${index}`" @click="goToSlide(index)"
                   class="tibet-carousel-dot"
+                  :style="{ width: currentSlide === index ? '28px' : '8px', opacity: currentSlide === index ? 1 : 0.68 }"
                   :class="{ active: currentSlide === index }"
-                  :aria-label="`切换到第 ${index + 1} 张轮播图`"></button>
+                  :aria-label="t('home.carouselDot', { index: index + 1 })"></button>
         </div>
+      </div>
+
+      <div
+        v-if="!prefersReducedMotion"
+        class="absolute bottom-12 left-1/2 z-10 hidden -translate-x-1/2 flex-col items-center gap-2 text-xs text-white/70 md:flex"
+      >
+        <span class="h-10 w-px bg-gradient-to-b from-white/70 to-transparent"></span>
       </div>
     </div>
 
@@ -64,24 +95,47 @@
     <div class="tibet-mountain-divider -mt-8 relative z-10"></div>
 
     <!-- Heatmap Section -->
-    <div id="heatmap" class="py-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-      <div class="text-center mb-16 animate-on-scroll">
-        <h2 class="tibet-heading text-4xl font-bold text-tibet-dark mb-4 tibetan-font">{{ t('home.hotSpotsDistribution') }}</h2>
-        <p class="text-lg text-tibet-brown/70 tibetan-font">{{ t('home.hotSpotsDescription') }}</p>
-      </div>
+    <div id="heatmap" class="mx-auto max-w-7xl px-4 py-14 sm:px-6 sm:py-20 lg:px-8 lg:py-24">
+      <motion.div
+        class="mb-10 text-center sm:mb-16"
+        :initial="revealInitial"
+        :whileInView="revealInView"
+        :inViewOptions="inViewOnce"
+        :transition="revealTransition"
+      >
+        <h2 class="tibet-heading mb-3 text-3xl font-bold text-tibet-dark sm:mb-4 sm:text-4xl tibetan-font">{{ t('home.hotSpotsDistribution') }}</h2>
+        <p class="text-base text-tibet-brown/70 sm:text-lg tibetan-font">{{ t('home.hotSpotsDescription') }}</p>
+      </motion.div>
       
-      <div class="rounded-3xl p-6 shadow-2xl animate-on-scroll scroll-pop-card tibet-panel">
-        <HeatMap />
-      </div>
+      <motion.div
+        class="rounded-2xl p-3 shadow-2xl sm:rounded-3xl sm:p-6 tibet-panel"
+        :initial="cardInitial"
+        :whileInView="cardInView"
+        :whileHover="{ y: -4, boxShadow: '0 22px 60px rgba(92, 61, 46, 0.14)' }"
+        :inViewOptions="inViewOnce"
+        :transition="cardTransition(0, 0.08)"
+        @viewportEnter="heatmapMounted = true"
+      >
+        <HeatMap v-if="heatmapMounted" />
+        <div v-else class="flex h-[420px] items-center justify-center rounded-2xl bg-white/70 sm:h-[600px]">
+          <div class="tibet-spinner"></div>
+        </div>
+      </motion.div>
     </div>
 
     <!-- Recommendations Section -->
-    <div class="py-24 tibet-section-band">
+    <div class="py-14 sm:py-20 lg:py-24 tibet-section-band">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex justify-between items-end mb-12 animate-on-scroll">
+        <motion.div
+          class="mb-10 flex flex-col gap-4 sm:mb-12 sm:flex-row sm:items-end sm:justify-between"
+          :initial="revealInitial"
+          :whileInView="revealInView"
+          :inViewOptions="inViewOnce"
+          :transition="revealTransition"
+        >
           <div>
-            <h2 class="tibet-heading text-4xl font-bold text-tibet-dark mb-2 tibetan-font">{{ t('home.recommendations') }}</h2>
-            <p class="text-lg text-tibet-brown/70 tibetan-font">{{ t('home.recommendationsDescription') }}</p>
+            <h2 class="tibet-heading mb-2 text-3xl font-bold text-tibet-dark sm:text-4xl tibetan-font">{{ t('home.recommendations') }}</h2>
+            <p class="text-base text-tibet-brown/70 sm:text-lg tibetan-font">{{ t('home.recommendationsDescription') }}</p>
           </div>
           <router-link to="/spots" class="hidden md:flex items-center text-tibet-red hover:text-tibet-red/80 font-medium transition-colors tibetan-font">
             {{ t('common.viewAll') }}
@@ -89,53 +143,85 @@
               <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
             </svg>
           </router-link>
-        </div>
+        </motion.div>
 
         <div v-if="loading" class="flex justify-center py-20">
-          <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-tibet-gold"></div>
+          <motion.div
+            class="rounded-full h-12 w-12 border-b-2 border-tibet-gold"
+            :animate="{ rotate: 360 }"
+            :transition="{ duration: 0.9, ease: 'linear', repeat: Infinity }"
+          />
         </div>
 
         <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          <div v-for="(spot, index) in recommendedSpots" :key="spot.id"
-               class="group tibet-card-elevated overflow-hidden animate-on-scroll scroll-pop-card gpu-accelerated"
-               :style="{ animationDelay: `${index * 100}ms` }">
-            <div class="relative h-72 overflow-hidden">
-              <img :src="spot.imageUrl" :alt="spot.name"
+          <AnimatePresence mode="popLayout">
+          <motion.div v-for="(spot, index) in recommendedSpots" :key="spot.id"
+               layout
+               class="group tibet-card-elevated overflow-hidden gpu-accelerated cursor-pointer focus:outline-none focus:ring-2 focus:ring-tibet-gold/60 focus:ring-offset-4"
+               role="link"
+               tabindex="0"
+               @click="goToSpot(spot)"
+               @keydown.enter.prevent="goToSpot(spot)"
+               @keydown.space.prevent="goToSpot(spot)"
+               :initial="cardInitial"
+               :whileInView="cardInView"
+               :exit="cardExit"
+               :inViewOptions="inViewOnce"
+               :transition="cardTransition(index)"
+               :whileHover="{ y: -4, scale: 1.01 }"
+               :whilePress="{ scale: 0.998 }">
+            <div class="relative h-56 overflow-hidden sm:h-72">
+              <motion.img :src="spot.imageUrl" :alt="spot.name"
                    class="w-full h-full object-cover tibet-image-hover img-fade-in will-change-transform"
-                   loading="lazy">
+                   loading="lazy"
+                   :whileHover="{ scale: 1.08 }"
+                   :transition="{ duration: 0.65, ease: [0.16, 1, 0.3, 1] }">
+              </motion.img>
               <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/15 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 ease-out-expo"></div>
-              <div class="absolute top-4 right-4 bg-tibet-white/95 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-bold text-tibet-red shadow-lg transform group-hover:scale-105 transition-transform duration-300 ease-out-expo will-change-transform">
+              <motion.div
+                class="absolute left-0 top-0 h-full w-1/2 bg-gradient-to-r from-transparent via-white/20 to-transparent opacity-0 mix-blend-screen group-hover:opacity-100"
+                :initial="{ x: '-120%' }"
+                :whileHover="{ x: '220%' }"
+                :transition="{ duration: 0.85, ease: [0.16, 1, 0.3, 1] }"
+              ></motion.div>
+              <motion.div
+                class="absolute top-4 right-4 bg-tibet-white/95 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-bold text-tibet-red shadow-lg will-change-transform"
+                :whileHover="{ scale: 1.08, rotate: 1 }"
+              >
                 {{ spot.category === 'NATURAL' ? t('home.natural') : t('home.cultural') }}
-              </div>
+              </motion.div>
             </div>
 
-              <div class="p-8">
-              <div class="flex justify-between items-start mb-4">
-                <h3 class="text-2xl font-bold text-tibet-dark group-hover:text-tibet-red transition-colors duration-300 ease-out-expo font-display">{{ spot.name }}</h3>
-                <span class="text-lg font-semibold text-tibet-red transform group-hover:scale-105 transition-transform duration-300 ease-out-expo will-change-transform">¥{{ spot.ticketPrice }}</span>
+              <div class="p-5 sm:p-8">
+              <div class="mb-4 flex items-start justify-between gap-3">
+                <h3 class="min-w-0 text-xl font-bold text-tibet-dark transition-colors duration-300 ease-out-expo group-hover:text-tibet-red sm:text-2xl font-display">{{ spot.name }}</h3>
+                <span class="shrink-0 text-base font-semibold text-tibet-red transform transition-transform duration-300 ease-out-expo group-hover:scale-105 sm:text-lg will-change-transform">¥{{ spot.ticketPrice }}</span>
               </div>
               <p v-if="getRecommendationReason(spot.id)" class="text-xs text-tibet-gold mb-3 font-medium tibetan-font">
                 💡 {{ getRecommendationReason(spot.id) }}
               </p>
               <p class="text-tibet-brown/70 mb-6 line-clamp-2 leading-relaxed tibetan-font">{{ spot.description }}</p>
 
-              <div class="flex items-center justify-between pt-6 border-t border-tibet-gold/20">
-                <div class="flex space-x-2">
-                  <span v-for="tag in spot.tags?.slice(0, 2)" :key="tag.id"
+              <div class="flex flex-wrap items-center justify-between gap-3 border-t border-tibet-gold/20 pt-5 sm:pt-6">
+                <div class="flex flex-wrap gap-2">
+                  <motion.span v-for="(tag, tagIndex) in spot.tags?.slice(0, 2)" :key="tag.id"
                         class="tibet-tag tibetan-font">
                     {{ tag.tag }}
-                  </span>
+                  </motion.span>
                 </div>
-                <button @click="router.push(`/spots/${spot.id}`)"
+                <motion.button @click.stop="goToSpot(spot)"
+                        :whileHover="{ x: 3 }"
+                        :whilePress="{ scale: 0.96 }"
                         class="tibet-link text-sm flex items-center group/btn tibetan-font">
                   {{ t('common.book') }}
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-1 transform group-hover/btn:translate-x-2 transition-transform duration-300 ease-out-expo will-change-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
                   </svg>
-                </button>
+                </motion.button>
               </div>
             </div>
-          </div>
+          </motion.div>
+          </AnimatePresence>
         </div>
       </div>
     </div>
@@ -143,21 +229,97 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { defineAsyncComponent, ref, onMounted, onUnmounted, watch } from 'vue'
+import { AnimatePresence, motion, useReducedMotion } from 'motion-v'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import HeatMap from '../components/HeatMap.vue'
 import api, { endpoints } from '../api'
+import { useAuthStore } from '../stores/auth'
+import {
+  cardExit,
+  cardInitial,
+  cardInView,
+  cardTransition,
+  inViewOnce,
+  motionEase,
+  revealInitial,
+  revealInView,
+  revealTransition
+} from '../motion/presets'
+
+const HeatMap = defineAsyncComponent(() => import('../components/HeatMap.vue'))
 
 const router = useRouter()
 const { t, locale } = useI18n()
+const auth = useAuthStore()
+const prefersReducedMotion = useReducedMotion()
 const recommendedSpots = ref<any[]>([])
 const recommendationReasons = ref<Map<number, string>>(new Map())
 const loading = ref(true)
+const heatmapMounted = ref(false)
 const currentSlide = ref(0)
-const heroSlides = ref<Array<{ image: string; title: string; subtitle: string; tag: string; linkUrl?: string }>>([
-  { image: '/heritage/布达拉宫3.jpg', title: '', subtitle: '', tag: '' }
-])
+const createDefaultHeroSlides = () => [
+  {
+    image: '/heritage/布达拉宫3.jpg',
+    title: t('home.carousel1Title'),
+    subtitle: t('home.carousel1Sub'),
+    tag: t('home.carousel1Tag'),
+    linkUrl: '/spots'
+  },
+  {
+    image: '/heritage/纳木错.jpg',
+    title: t('home.carousel2Title'),
+    subtitle: t('home.carousel2Sub'),
+    tag: t('home.carousel2Tag'),
+    linkUrl: '/spots'
+  },
+  {
+    image: '/heritage/藏戏.jpg',
+    title: t('home.carousel3Title'),
+    subtitle: t('home.carousel3Sub'),
+    tag: t('home.carousel3Tag'),
+    linkUrl: '/heritage'
+  }
+]
+const heroSlides = ref<Array<{ image: string; title: string; subtitle: string; tag: string; linkUrl?: string }>>(createDefaultHeroSlides())
+const fallbackRecommendedSpots = [
+  {
+    id: 1,
+    name: '布达拉宫',
+    imageUrl: '/heritage/布达拉宫3.jpg',
+    category: 'CULTURAL',
+    ticketPrice: 200,
+    description: '拉萨城市天际线中最具代表性的宫堡建筑，也是藏地历史、宗教与建筑艺术的集中呈现。',
+    tags: [
+      { id: 'fallback-potala-1', tag: '世界遗产' },
+      { id: 'fallback-potala-2', tag: '文化地标' }
+    ]
+  },
+  {
+    id: 2,
+    name: '纳木错',
+    imageUrl: '/heritage/纳木错.jpg',
+    category: 'NATURAL',
+    ticketPrice: 120,
+    description: '高原湖泊、雪山和辽阔草甸交织的经典路线，适合把西藏的空间感慢慢看进去。',
+    tags: [
+      { id: 'fallback-namco-1', tag: '圣湖' },
+      { id: 'fallback-namco-2', tag: '自然风光' }
+    ]
+  },
+  {
+    id: 3,
+    name: '雅鲁藏布大峡谷',
+    imageUrl: '/heritage/雅鲁藏布大峡谷.jpg',
+    category: 'NATURAL',
+    ticketPrice: 150,
+    description: '峡谷、江流与南迦巴瓦峰同框出现，层次强烈，适合深度旅行和摄影。',
+    tags: [
+      { id: 'fallback-canyon-1', tag: '峡谷' },
+      { id: 'fallback-canyon-2', tag: '摄影' }
+    ]
+  }
+]
 let slideTimer: number | null = null
 
 const fetchCarousels = async () => {
@@ -171,14 +333,18 @@ const fetchCarousels = async () => {
         tag: c.tag || '',
         linkUrl: c.linkUrl || ''
       }))
+    } else {
+      heroSlides.value = createDefaultHeroSlides()
     }
   } catch (e) {
-    // Fall back to defaults
+    heroSlides.value = createDefaultHeroSlides()
   }
 }
 
 const scrollToHeatmap = () => {
-  document.getElementById('heatmap')?.scrollIntoView({ behavior: 'smooth' })
+  document.getElementById('heatmap')?.scrollIntoView({
+    behavior: prefersReducedMotion.value ? 'auto' : 'smooth'
+  })
 }
 
 const goToSlide = (index: number) => {
@@ -187,6 +353,8 @@ const goToSlide = (index: number) => {
 
 const startCarousel = () => {
   stopCarousel()
+  if (prefersReducedMotion.value || heroSlides.value.length < 2) return
+
   slideTimer = window.setInterval(() => {
     currentSlide.value = (currentSlide.value + 1) % heroSlides.value.length
   }, 4000)
@@ -199,6 +367,13 @@ const stopCarousel = () => {
   }
 }
 
+const applyFallbackRecommendations = () => {
+  recommendedSpots.value = fallbackRecommendedSpots
+  recommendationReasons.value = new Map(
+    fallbackRecommendedSpots.map((spot) => [spot.id, t('home.selectedForYou')])
+  )
+}
+
 // 获取推荐原因（处理类型转换）
 const getRecommendationReason = (spotId: number) => {
   if (!spotId) return null
@@ -209,221 +384,104 @@ const getRecommendationReason = (spotId: number) => {
   return reason || t('home.recommendationReason')
 }
 
-const logDebugToConsole = (debug: any) => {
-  console.group('%c🔬 协同过滤推荐算法 - 中间过程', 'font-size:16px;font-weight:bold;color:#e74c3c')
-
-  // 1. 基本信息
-  console.group('%c📋 基本信息', 'font-weight:bold;color:#3498db')
-  console.log('用户ID:', debug.userId)
-  console.log('是否有历史记录:', debug.hasHistory)
-  console.log('是否使用兜底策略(冷启动):', debug.fallbackUsed)
-  console.log('计算耗时:', debug.computationTimeMs + 'ms')
-  console.groupEnd()
-
-  // 2. 算法配置
-  if (debug.algorithmConfig) {
-    console.group('%c⚙️ 算法配置', 'font-weight:bold;color:#9b59b6')
-    console.table(debug.algorithmConfig)
-    console.groupEnd()
+const goToSpot = (spot: any) => {
+  if (spot?.id == null) {
+    console.warn('推荐景点数据缺少 id，无法进入详情页:', spot)
+    return
   }
-
-  // 3. 用户历史记录
-  if (debug.history && debug.history.length > 0) {
-    console.group('%c📜 用户访问历史 (' + debug.history.length + '条)', 'font-weight:bold;color:#e67e22')
-    console.table(debug.history.map((h: any) => ({
-      '景点ID': h.spotId,
-      '景点名称': h.spotName,
-      '评分': h.rating,
-      '访问时间': h.visitDate
-    })))
-    console.groupEnd()
-  } else {
-    console.log('%c📜 用户访问历史: 无 (冷启动用户)', 'color:#e67e22')
-  }
-
-  // 4. 用户标签画像
-  if (debug.tagProfile && Object.keys(debug.tagProfile).length > 0) {
-    console.group('%c🏷️ 用户标签画像', 'font-weight:bold;color:#2ecc71')
-    const tagEntries = Object.entries(debug.tagProfile) as [string, number][]
-    tagEntries.sort((a, b) => b[1] - a[1])
-    console.table(tagEntries.map(([tag, weight]) => ({
-      '标签': tag,
-      '权重': Number(weight).toFixed(4)
-    })))
-    console.groupEnd()
-  }
-
-  // 5. 相似用户 (User-Based CF 核心)
-  if (debug.similarUsers && debug.similarUsers.length > 0) {
-    console.group('%c👥 相似用户 (User-Based CF)', 'font-weight:bold;color:#e91e63')
-    console.log('找到 ' + debug.similarUsers.length + ' 个相似用户')
-    console.table(debug.similarUsers.map((u: any, i: number) => ({
-      '排名': i + 1,
-      '用户ID': u.userId,
-      '综合相似度': Number(u.similarity).toFixed(4),
-      '余弦相似度(Adjusted)': u.adjustedCosine != null ? Number(u.adjustedCosine).toFixed(4) : '-',
-      'Jaccard相似度': u.jaccard != null ? Number(u.jaccard).toFixed(4) : '-',
-      '时间加权相似度': u.timeWeighted != null ? Number(u.timeWeighted).toFixed(4) : '-',
-      '共同访问景点数': u.commonSpotsCount ?? '-'
-    })))
-    console.groupEnd()
-  } else if (!debug.fallbackUsed) {
-    console.log('%c👥 相似用户: 未找到相似度达标的用户', 'color:#e91e63')
-  }
-
-  // 6. 候选景点得分 (最终排序依据)
-  if (debug.candidateScores && debug.candidateScores.length > 0) {
-    console.group('%c🎯 候选景点得分 (混合协同过滤 + 标签匹配)', 'font-weight:bold;color:#f39c12')
-    console.log('候选景点总数: ' + debug.candidateScores.length)
-    console.table(debug.candidateScores.map((c: any, i: number) => ({
-      '排名': i + 1,
-      '景点ID': c.spotId,
-      '景点名称': c.spotName,
-      '最终得分': Number(c.finalScore).toFixed(4),
-      '混合协同(UB+IB)': Number(c.collaborativeScore || 0).toFixed(4),
-      'User-Based CF': Number(c.userBasedScore || 0).toFixed(4),
-      'Item-Based CF': Number(c.itemBasedScore || 0).toFixed(4),
-      '标签匹配得分': Number(c.tagScore || 0).toFixed(4)
-    })))
-    console.groupEnd()
-  }
-
-  // 7. 最终推荐结果
-  if (debug.recommendations && debug.recommendations.length > 0) {
-    console.group('%c✨ 最终推荐结果 (' + debug.recommendations.length + '个)', 'font-weight:bold;color:#27ae60')
-    console.table(debug.recommendations.map((spot: any, i: number) => ({
-      '排名': i + 1,
-      'ID': spot.id,
-      '名称': spot.name,
-      '类别': spot.category,
-      '评分': spot.rating,
-      '访问量': spot.visitCount,
-      '推荐原因': (debug.recommendationReasons && debug.recommendationReasons[spot.id]) || '-'
-    })))
-    console.groupEnd()
-  }
-
-  console.groupEnd()
+  router.push(`/spots/${encodeURIComponent(String(spot.id))}`)
 }
 
 const fetchRecommendations = async () => {
   try {
-    const userStr = localStorage.getItem('user')
-    if (userStr) {
-      const user = JSON.parse(userStr)
+    const user = auth.user
+    if (user?.id != null) {
+      const recommendationRes = await api.get(`${endpoints.spots.recommendations}?userId=${encodeURIComponent(String(user.id))}`)
 
-      // 并行请求：常规推荐 + debug 详情
-      const [recommendationRes, debugRes] = await Promise.all([
-        api.get(`${endpoints.spots.recommendations}?userId=${user.id}`),
-        api.get(`${endpoints.spots.recommendationsDebug}?userId=${user.id}`).catch(() => null)
-      ])
+      recommendedSpots.value = Array.isArray(recommendationRes.data) ? recommendationRes.data : []
 
-      recommendedSpots.value = recommendationRes.data
-
-      // 将协同过滤中间过程输出到浏览器控制台
-      if (debugRes && debugRes.data) {
-        logDebugToConsole(debugRes.data)
+      if (!recommendedSpots.value.length) {
+        applyFallbackRecommendations()
+        return
       }
 
-      // 使用后端返回的推荐原因
-      if (debugRes && debugRes.data && debugRes.data.recommendationReasons) {
-        const reasonsMap = new Map<number, string>()
-        Object.entries(debugRes.data.recommendationReasons).forEach(([spotId, reason]) => {
-          reasonsMap.set(Number(spotId), reason as string)
-        })
-        recommendationReasons.value = reasonsMap
-      } else {
-        const reasonsMap = new Map<number, string>()
-        recommendedSpots.value.forEach((spot: any) => {
-          if (spot.rating && spot.rating >= 4.0) {
-            reasonsMap.set(spot.id, '高评分景点')
-          } else if (spot.visitCount && spot.visitCount > 15000) {
-            reasonsMap.set(spot.id, '热门景点')
-          } else {
-            reasonsMap.set(spot.id, '为您精选')
-          }
-        })
-        recommendationReasons.value = reasonsMap
-      }
+      const reasonsMap = new Map<number, string>()
+      recommendedSpots.value.forEach((spot: any) => {
+        if (spot.rating && spot.rating >= 4.0) {
+          reasonsMap.set(spot.id, t('home.highRatingSpot'))
+        } else if (spot.visitCount && spot.visitCount > 15000) {
+          reasonsMap.set(spot.id, t('home.popularSpot'))
+        } else {
+          reasonsMap.set(spot.id, t('home.selectedForYou'))
+        }
+      })
+      recommendationReasons.value = reasonsMap
     } else {
       const response = await api.get(endpoints.spots.list)
       const spots = response.data?.content || response.data || []
       recommendedSpots.value = spots.slice(0, 3)
+      if (!recommendedSpots.value.length) {
+        applyFallbackRecommendations()
+        return
+      }
       const defaultReasons = new Map<number, string>()
       recommendedSpots.value.forEach((spot: any) => {
-        defaultReasons.set(spot.id, '热门景点')
+        defaultReasons.set(spot.id, t('home.popularSpot'))
       })
       recommendationReasons.value = defaultReasons
     }
   } catch (error) {
-    console.error('Failed to fetch recommendations:', error)
+    console.warn('Using fallback recommendations after request failed:', error)
+    applyFallbackRecommendations()
   } finally {
     loading.value = false
   }
 }
 
-const initScrollAnimations = () => {
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        entry.target.classList.add('revealed')
-        observer.unobserve(entry.target)
-      }
-    })
-  }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' })
-
-  document.querySelectorAll('.animate-on-scroll:not(.revealed)').forEach(el => {
-    observer.observe(el)
-  })
-}
-
-// 多层视差滚动效果
-const initParallax = () => {
-  const layers = document.querySelectorAll('.parallax-layer') as NodeListOf<HTMLElement>
-  if (!layers.length) return
-
-  let ticking = false
-  const onScroll = () => {
-    if (!ticking) {
-      requestAnimationFrame(() => {
-        const scrollY = window.scrollY
-        layers.forEach(layer => {
-          const speed = parseFloat(layer.dataset.speed || '0.3')
-          layer.style.transform = `translateY(${scrollY * speed}px)`
-        })
-        // Also move the background image for depth
-        const heroBg = document.querySelector('.hero-parallax-bg') as HTMLElement | null
-        if (heroBg) {
-          heroBg.style.transform = `translateY(${scrollY * 0.15}px) scale(1.05)`
-        }
-        ticking = false
-      })
-      ticking = true
-    }
-  }
-
-  window.addEventListener('scroll', onScroll, { passive: true })
-  return () => window.removeEventListener('scroll', onScroll)
-}
-
 // 监听语言变化，重新获取数据
 watch(locale, () => {
+  heroSlides.value = createDefaultHeroSlides()
   fetchRecommendations()
-  setTimeout(initScrollAnimations, 300)
+  fetchCarousels()
+})
+
+watch(prefersReducedMotion, () => {
+  startCarousel()
 })
 
 onMounted(async () => {
-  await fetchCarousels()
-  await fetchRecommendations()
-  setTimeout(initScrollAnimations, 100)
-  const cleanupParallax = initParallax()
+  await auth.refreshSession()
+  await Promise.allSettled([
+    fetchCarousels(),
+    fetchRecommendations()
+  ])
   startCarousel()
-  if (cleanupParallax) {
-    onUnmounted(cleanupParallax)
-  }
 })
 
 onUnmounted(() => {
   stopCarousel()
 })
 </script>
+
+<style scoped>
+.hero-content-fade {
+  animation: heroContentFade 320ms ease-out both;
+}
+
+@keyframes heroContentFade {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.tibet-carousel-dot {
+  transition: width 220ms ease, opacity 220ms ease, transform 160ms ease;
+}
+
+.tibet-carousel-dot:hover {
+  transform: scale(1.18);
+}
+
+.tibet-carousel-dot:active {
+  transform: scale(0.85);
+}
+</style>

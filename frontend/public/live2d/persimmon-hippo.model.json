@@ -1,0 +1,43 @@
+{
+  "schema": "codex-live2d-sprite-v2",
+  "id": "capybara-lulu-v2",
+  "displayName": "水豚噜噜",
+  "description": "水豚噜噜 Live2D 精灵模型，支持交互动画与环境动作。",
+  "texture": "spritesheet.webp",
+  "atlas": {
+    "columns": 8,
+    "rows": 9,
+    "cellWidth": 192,
+    "cellHeight": 208
+  },
+  "motions": {
+    "idle": { "row": 0, "frames": 6, "fps": 6, "loop": true, "weight": 1 },
+    "runningRight": { "row": 1, "frames": 8, "fps": 10, "loop": true, "weight": 0 },
+    "runningLeft": { "row": 2, "frames": 8, "fps": 10, "loop": true, "weight": 0 },
+    "waving": { "row": 3, "frames": 4, "fps": 7, "loop": false, "next": "idle", "weight": 0 },
+    "jumping": { "row": 4, "frames": 5, "fps": 8, "loop": false, "next": "idle", "weight": 0 },
+    "failed": { "row": 5, "frames": 8, "fps": 7, "loop": false, "next": "idle", "weight": 0 },
+    "waiting": { "row": 6, "frames": 6, "fps": 6, "loop": true, "weight": 0 },
+    "running": { "row": 7, "frames": 6, "fps": 8, "loop": true, "weight": 0 },
+    "review": { "row": 8, "frames": 6, "fps": 7, "loop": true, "weight": 0 }
+  },
+  "defaultMotion": "idle",
+  "interactions": {
+    "click": ["waving", "jumping"],
+    "doubleClick": "review",
+    "hover": "waiting",
+    "far": "idle",
+    "ambient": ["idle", "waiting", "review"]
+  },
+  "motionTuning": {
+    "breathAmplitude": 0.018,
+    "breathSpeed": 1.1,
+    "floatAmplitude": 2.4,
+    "floatSpeed": 0.85,
+    "maxPointerTilt": 5,
+    "maxPointerOffset": 5,
+    "motionBlendMs": 180,
+    "ambientMinMs": 6500,
+    "ambientMaxMs": 12000
+  }
+}

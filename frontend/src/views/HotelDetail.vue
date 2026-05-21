@@ -1,8 +1,18 @@
 <template>
   <div class="min-h-screen tibet-bg-subtle">
     <!-- Hero -->
-    <section class="relative h-[50vh] overflow-hidden">
-      <img :src="hotel.coverImage" :alt="hotel.name" class="w-full h-full object-cover" />
+    <motion.section
+      class="relative h-[50vh] overflow-hidden"
+      :initial="{ opacity: 0, scale: 1.02 }"
+      :animate="{ opacity: 1, scale: 1 }"
+      :transition="{ duration: 0.5, ease: motionEase }"
+    >
+      <img
+        :src="hotelCoverImage"
+        :alt="hotel.name"
+        class="w-full h-full object-cover"
+        @error="applyHotelImageFallback"
+      />
       <div class="absolute inset-0 bg-gradient-to-b from-tibet-dark/30 via-tibet-dark/10 to-tibet-dark/80"></div>
       <!-- 底部经幡色带 -->
       <div class="absolute bottom-0 left-0 right-0 h-1 tibet-prayer-flag opacity-80"></div>
@@ -10,7 +20,12 @@
       <router-link to="/hotels" class="absolute top-6 left-6 p-2.5 rounded-full bg-tibet-white/15 backdrop-blur border border-tibet-gold/30 text-tibet-white hover:bg-tibet-white/25 transition-colors z-10">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
       </router-link>
-      <div class="absolute bottom-0 left-0 right-0 p-8 max-w-7xl mx-auto">
+      <motion.div
+        class="absolute bottom-0 left-0 right-0 p-8 max-w-7xl mx-auto"
+        :initial="{ opacity: 0, y: 20 }"
+        :animate="{ opacity: 1, y: 0 }"
+        :transition="{ duration: 0.6, delay: 0.2, ease: motionEase }"
+      >
         <div class="flex items-center gap-2 mb-3">
           <span class="flex items-center gap-0.5 text-tibet-yellow text-sm">
             <span v-for="n in hotel.stars" :key="n">★</span>
@@ -24,14 +39,20 @@
           <span>·</span>
           <span class="flex items-center gap-1">★ {{ hotel.rating }} ({{ hotel.reviewCount }}{{ t('hotel.reviewCountUnit') }})</span>
         </div>
-      </div>
-    </section>
+      </motion.div>
+    </motion.section>
 
     <!-- Content -->
     <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <!-- Main -->
-        <div class="lg:col-span-2 space-y-8">
+        <motion.div
+          class="lg:col-span-2 space-y-8"
+          :initial="revealInitial"
+          :whileInView="revealInView"
+          :inViewOptions="inViewOnce"
+          :transition="revealTransition"
+        >
           <!-- Description — 藏式卡片 -->
           <div class="tibet-card rounded-2xl p-8">
             <h2 class="tibet-heading text-xl font-bold text-tibet-dark mb-5">{{ t('hotel.introduction') }}</h2>
@@ -55,14 +76,14 @@
           <!-- Rooms — 藏式房型卡片 -->
           <div class="tibet-card rounded-2xl p-8">
             <h2 class="tibet-heading text-xl font-bold text-tibet-dark mb-5">{{ t('hotel.roomSelection') }}</h2>
-            <div v-if="loadingRooms" class="text-center py-4 text-stone-500">加载中...</div>
-            <div v-else-if="roomTypes.length === 0" class="text-center py-4 text-stone-500">暂无房型信息</div>
+            <div v-if="loadingRooms" class="text-center py-4 text-stone-500">{{ t('common.loading') }}</div>
+            <div v-else-if="roomTypes.length === 0" class="text-center py-4 text-stone-500">{{ t('hotel.noRoomTypes') }}</div>
             <div v-else class="space-y-4">
               <div v-for="room in roomTypes" :key="room.id"
                    class="group rounded-xl border border-tibet-gold/15 p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 hover:border-tibet-gold/40 hover:shadow-lg hover:shadow-tibet-red/5 transition-all duration-300">
                 <div class="flex-1">
                   <h3 class="text-lg font-semibold text-tibet-dark">{{ room.name }}</h3>
-                  <p class="text-sm text-tibet-brown/50 mt-1">{{ room.amenities || (room.capacity ? room.capacity + '人' : '') }}</p>
+                  <p class="text-sm text-tibet-brown/50 mt-1">{{ room.amenities || (room.capacity ? room.capacity + t('common.peopleUnit') : '') }}</p>
                 </div>
                 <div class="flex items-center gap-5">
                   <div class="text-right">
@@ -77,10 +98,15 @@
               </div>
             </div>
           </div>
-        </div>
+        </motion.div>
 
         <!-- Sidebar -->
-        <div>
+        <motion.div
+          :initial="revealInitial"
+          :whileInView="revealInView"
+          :inViewOptions="inViewOnce"
+          :transition="{ duration: 0.5, delay: 0.15, ease: motionEase }"
+        >
           <div class="sticky top-24 space-y-6">
             <!-- Price Card — 藏式金边 -->
             <div class="tibet-card rounded-2xl p-8">
@@ -124,7 +150,7 @@
               </div>
             </div>
           </div>
-        </div>
+        </motion.div>
       </div>
     </section>
 
@@ -137,80 +163,102 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { motion } from 'motion-v'
+import { motionEase, revealInitial, revealInView, revealTransition, inViewOnce } from '../motion/presets'
+import { getHotelById, hotels, type HotelItem } from '../data/hotels'
+import { applyHotelImageFallback, resolveHotelCoverImage } from '../data/hotelImages'
+import { getCanonicalRegion, localizeApiRoom, localizeHotel } from '../data/hotelTranslations'
 import api, { endpoints } from '../api'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const route = useRoute()
 const hotelId = Number(route.params.id || 1)
-const hotel = ref<any>({})
-const roomTypes = ref<any[]>([])
+const rawHotel = ref<any>({})
+const rawRoomTypes = ref<any[]>([])
 const loadingRooms = ref(true)
+const hotel = computed(() => localizeHotel(rawHotel.value, locale.value))
+const hotelCoverImage = computed(() => resolveHotelCoverImage(hotel.value.coverImage))
+const roomTypes = computed(() => rawRoomTypes.value.map(room => localizeApiRoom(room, locale.value)))
 
 const displayPrice = computed(() => {
   if (hotel.value.priceRange) return hotel.value.priceRange
   if (hotel.value.priceMin) return String(hotel.value.priceMin)
-  return '咨询'
+  return t('common.consult')
 })
 
 const resolveRegion = (location: string): string => {
-  for (const r of ['拉萨', '林芝', '日喀则', '阿里', '那曲']) {
-    if (location.includes(r)) return r
+  return getCanonicalRegion(location)
+}
+
+const splitFacilities = (facilities?: string): string[] =>
+  facilities
+    ? facilities.split(',').map((item: string) => item.trim()).filter(Boolean)
+    : []
+
+const parsePriceMin = (priceRange?: string, fallback = 300): number => {
+  const match = (priceRange || '').match(/(\d+)/)
+  return match ? parseInt(match[1], 10) || fallback : fallback
+}
+
+const mapApiHotel = (apiHotel: any, staticHotel?: HotelItem) => {
+  const region = resolveRegion(apiHotel.location || '')
+  const facilities = splitFacilities(apiHotel.facilities)
+
+  return {
+    ...(staticHotel || {}),
+    ...apiHotel,
+    id: apiHotel.id,
+    region,
+    coverImage: resolveHotelCoverImage(staticHotel?.coverImage || apiHotel.imageUrl),
+    stars: Math.min(5, Math.max(3, Math.round(Number(apiHotel.rating) || staticHotel?.rating || 4))),
+    city: region,
+    address: apiHotel.location || staticHotel?.address || '',
+    description: staticHotel?.description || t('hotel.apiHotelDescription', {
+      name: apiHotel.name,
+      location: apiHotel.location || t('common.unknownLocation'),
+      phone: apiHotel.phone || t('hotel.noPhone')
+    }),
+    tags: facilities.length ? facilities.slice(0, 4) : (staticHotel?.tags || []),
+    amenities: facilities.length ? facilities : (staticHotel?.amenities || []),
+    reviewCount: staticHotel?.reviewCount || 0,
+    priceMin: apiHotel.priceRange ? parsePriceMin(apiHotel.priceRange, staticHotel?.priceMin || 300) : (staticHotel?.priceMin || 300),
+    lng: staticHotel?.lng || 91.0,
+    lat: staticHotel?.lat || 29.6,
   }
-  return '拉萨'
 }
 
 onMounted(async () => {
-  // 1. Try static data first for rich display fields
-  const { getHotelById, hotels } = await import('../data/hotels')
   const staticHotel = getHotelById(hotelId)
+  let matchingStaticHotel = staticHotel
 
   if (staticHotel) {
-    hotel.value = staticHotel
+    rawHotel.value = staticHotel
   }
 
-  // 2. Fetch API room types (try for all hotels)
+  try {
+    const hotelRes = await api.get(endpoints.hotels.detail(hotelId))
+    if (hotelRes.data) {
+      const apiHotel = hotelRes.data
+      matchingStaticHotel = hotels.find(item => item.name === apiHotel.name) || staticHotel
+      rawHotel.value = mapApiHotel(apiHotel, matchingStaticHotel)
+    }
+  } catch {
+    if (!staticHotel) {
+      rawHotel.value = hotels[0]
+      matchingStaticHotel = hotels[0]
+    }
+  }
+
   try {
     const roomRes = await api.get(endpoints.hotels.roomTypes(hotelId))
     if (roomRes.data && roomRes.data.length > 0) {
-      roomTypes.value = roomRes.data
-    } else if (staticHotel?.rooms) {
-      roomTypes.value = staticHotel.rooms
+      rawRoomTypes.value = roomRes.data
+    } else if (matchingStaticHotel?.rooms) {
+      rawRoomTypes.value = matchingStaticHotel.rooms
     }
   } catch {
-    if (staticHotel?.rooms) {
-      roomTypes.value = staticHotel.rooms
-    }
-  }
-
-  // 3. If no static data, fetch from API and map fields
-  if (!staticHotel) {
-    try {
-      const hotelRes = await api.get(endpoints.hotels.detail(hotelId))
-      const apiHotel = hotelRes.data
-      const region = resolveRegion(apiHotel.location || '')
-      const facilities = apiHotel.facilities
-        ? apiHotel.facilities.split(',').map((f: string) => f.trim()).filter(Boolean)
-        : []
-      let priceMin = 300
-      const m = (apiHotel.priceRange || '').match(/(\d+)/)
-      if (m) priceMin = parseInt(m[1]) || 300
-
-      hotel.value = {
-        ...apiHotel,
-        coverImage: apiHotel.imageUrl || '',
-        stars: Math.min(5, Math.max(3, Math.round(Number(apiHotel.rating) || 4))),
-        city: region,
-        address: apiHotel.location || '',
-        description: `${apiHotel.name}位于${apiHotel.location || '西藏'}，电话：${apiHotel.phone || '暂无'}`,
-        tags: facilities.slice(0, 4),
-        amenities: facilities,
-        reviewCount: 0,
-        priceMin,
-        lng: 91.0,
-        lat: 29.6,
-      }
-    } catch {
-      hotel.value = hotels[0]
+    if (matchingStaticHotel?.rooms) {
+      rawRoomTypes.value = matchingStaticHotel.rooms
     }
   }
 

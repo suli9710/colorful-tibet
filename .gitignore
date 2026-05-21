@@ -14,9 +14,14 @@ frontend/dist/
 frontend/.vite/
 frontend/package-lock.json
 
+# Python
+scrapler/.venv/
+
 # IDE
 .idea/
 .vscode/
+.claude/settings.local.json
+.claude/*.local.json
 *.iml
 *.swp
 *.swo
@@ -31,6 +36,10 @@ desktop.ini
 .env
 .env.local
 .env.production
+backend/.env
+backend/.env.local
+frontend/.env
+frontend/.env.local
 
 # Logs
 *.log
@@ -43,15 +52,22 @@ dist/
 out/
 
 # Temporary files
+.startup/
 *.tmp
 *.temp
 *.bak
 *.cache
 
-# Database files (H2)
+# Uploaded files
+backend/uploads/
+
+# Local database files
 backend/data/*.mv.db
 backend/data/*.trace.db
 backend/data/*.lock.db
+backend/data/**/*.mv.db
+backend/data/**/*.trace.db
+backend/data/**/*.lock.db
 
 # FRP files (optional, can be committed if needed)
 # frp_0.65.0_windows_amd64/

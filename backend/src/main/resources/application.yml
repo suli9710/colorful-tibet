@@ -6,8 +6,6 @@ server:
     min-response-size: 1024
 
 spring:
-  profiles:
-    active: local
   application:
     name: colorful-tibet-tourism
   data:
@@ -16,6 +14,18 @@ spring:
         default-page-size: 20
         max-page-size: 100
         one-indexed-parameters: false
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DATABASE:0}
+      timeout: 5000ms
+      lettuce:
+        pool:
+          max-active: 16
+          max-idle: 8
+          min-idle: 2
+          max-wait: 3000ms
   servlet:
     multipart:
       max-file-size: 10MB
@@ -24,50 +34,107 @@ spring:
     async:
       request-timeout: 120000  # 120秒异步请求超时，适应AI生成时间
   datasource:
-    # 默认使用固定路径的 H2 文件数据库，避免重启后数据丢失
-    url: jdbc:h2:file:./data/h2/tibet_tourism;AUTO_SERVER=TRUE;DB_CLOSE_DELAY=-1
-    username: sa
-    password:
-    driver-class-name: org.h2.Driver
-    # HikariCP 连接池配置（适配 H2 数据库）
+    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:colorful_tibet}?useUnicode=true&characterEncoding=utf8&sslMode=${MYSQL_SSL_MODE:VERIFY_CA}&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=false
+    username: ${MYSQL_USERNAME:root}
+    password: ${MYSQL_PASSWORD:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
       maximum-pool-size: 15
       minimum-idle: 5
       connection-timeout: 30000
       idle-timeout: 600000
       max-lifetime: 1800000
-      pool-name: TibetH2Pool
+      pool-name: TibetMySQLPool
   jpa:
-    database-platform: org.hibernate.dialect.H2Dialect
+    database-platform: org.hibernate.dialect.MySQLDialect
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     show-sql: false
     properties:
       hibernate:
-        format_sql: true
+        format_sql: false
         # JPA 批量处理优化
         jdbc:
           batch_size: 25
         order_inserts: true
         order_updates: true
         default_batch_fetch_size: 25
+        session:
+          events:
+            log:
+              LOG_QUERIES_SLOWER_THAN_MS: ${HIBERNATE_SLOW_QUERY_MS:500}
+  flyway:
+    enabled: false
+
+management:
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLING_PROBABILITY:0.0}
+  zipkin:
+    tracing:
+      endpoint: ${ZIPKIN_ENDPOINT:http://localhost:9411/api/v2/spans}
+
+logging:
+  level:
+    org.hibernate.SQL_SLOW: WARN
+
+springdoc:
+  packages-to-scan: com.tibet.tourism.controller
+  paths-to-match: /api/**
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+    doc-expansion: none
 
 # JWT配置（必须与登录时使用的密钥一致）
 jwt:
-  secret: ${JWT_SECRET:tibetTourismSecretKey12345678901234567890}
+  secret: ${JWT_SECRET:}
   expiration: 86400000  # 24小时
 
 ark:
   api:
-    url: ${ARK_API_URL:https://ark.cn-beijing.volces.com/api/v3/responses}
-    key: ${ARK_API_KEY:}
-    model: ${AI_MODEL:doubao-seed-2-0-pro-260215}
-    stream-url: ${ARK_STREAM_API_URL:}  # 流式端点，为空时从url自动推导
+    url: ${ARK_API_URL:${DOUBAO_API_URL:https://ark.cn-beijing.volces.com/api/v3/responses}}
+    key: ${ARK_API_KEY:${DOUBAO_API_KEY:}}
+    model: ${AI_MODEL:${ARK_MODEL:${DOUBAO_MODEL:ep-20260516173036-4dpgm}}}
+    stream-url: ${ARK_STREAM_API_URL:${DOUBAO_STREAM_API_URL:}}  # 流式端点，为空时从url自动推导
+
+doubao:
+  api:
+    url: ${DOUBAO_API_URL:https://ark.cn-beijing.volces.com/api/v3/responses}
+    key: ${DOUBAO_API_KEY:${ARK_API_KEY:}}
+    model: ${DOUBAO_MODEL:${AI_MODEL:ep-20260516173036-4dpgm}}
+    stream-url: ${DOUBAO_STREAM_API_URL:}
 
 ai:
   route:
     timeout-seconds: 180
     stream-timeout-seconds: ${AI_STREAM_TIMEOUT:180}
+
+# Scrapling 爬虫微服务配置
+scrapling:
+  service:
+    url: ${SCRAPLING_SERVICE_URL:}
+    timeout-seconds: ${SCRAPLING_SERVICE_TIMEOUT:30}
+    max-sources: ${SCRAPLING_MAX_SOURCES:4}
+    mode: ${SCRAPLING_MODE:}
+    health-enabled: ${SCRAPLING_HEALTH_ENABLED:false}
 
 # 价格定时更新配置
 price:
@@ -80,8 +147,93 @@ price:
     hourly:
       cron: "0 0 * * * ?"  # 每小时执行一次（仅更新缺失价格的景点）
 
-# 密码加密配置（仅管理员可解密）
+recommendation:
+  item-similarity:
+    enabled: true
+    preload-on-startup: true
+    cron: "0 30 3 * * ?"
+
 app:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000}
+  security:
+    public-docs-enabled: ${PUBLIC_DOCS_ENABLED:false}
+    public-metrics-enabled: ${PUBLIC_METRICS_ENABLED:false}
+    require-strong-secrets: ${REQUIRE_STRONG_SECRETS:true}
+    csrf-signing-secret: ${CSRF_SIGNING_SECRET:}
+    pii-encryption-key: ${PII_ENCRYPTION_KEY:}
+    cookie-secure: ${COOKIE_SECURE:true}
+    trust-proxy-headers: ${TRUST_PROXY_HEADERS:false}
+    trusted-proxy-cidrs: ${TRUSTED_PROXY_CIDRS:}
+    super-admin-totp-secret: ${SUPER_ADMIN_TOTP_SECRET:}
+    rate-limit:
+      enabled: ${RATE_LIMIT_ENABLED:true}
+      redis-enabled: ${RATE_LIMIT_REDIS_ENABLED:true}
+      trust-proxy-headers: ${TRUST_PROXY_HEADERS:false}
+      trusted-proxy-cidrs: ${RATE_LIMIT_TRUSTED_PROXY_CIDRS:${TRUSTED_PROXY_CIDRS:}}
+      default:
+        requests: ${RATE_LIMIT_DEFAULT_REQUESTS:300}
+        window-seconds: ${RATE_LIMIT_DEFAULT_WINDOW_SECONDS:60}
+      auth:
+        requests: ${RATE_LIMIT_AUTH_REQUESTS:12}
+        window-seconds: ${RATE_LIMIT_AUTH_WINDOW_SECONDS:60}
+      register:
+        requests: ${RATE_LIMIT_REGISTER_REQUESTS:5}
+        window-seconds: ${RATE_LIMIT_REGISTER_WINDOW_SECONDS:3600}
+      ai:
+        requests: ${RATE_LIMIT_AI_REQUESTS:6}
+        window-seconds: ${RATE_LIMIT_AI_WINDOW_SECONDS:600}
+      upload:
+        requests: ${RATE_LIMIT_UPLOAD_REQUESTS:30}
+        window-seconds: ${RATE_LIMIT_UPLOAD_WINDOW_SECONDS:60}
+      admin:
+        requests: ${RATE_LIMIT_ADMIN_REQUESTS:120}
+        window-seconds: ${RATE_LIMIT_ADMIN_WINDOW_SECONDS:60}
+    ai-quota:
+      daily-limit: ${AI_DAILY_QUOTA_PER_USER:20}
+      cache-ttl-seconds: ${AI_CACHE_TTL_SECONDS:300}
+    brute-force:
+      enabled: ${BRUTE_FORCE_ENABLED:true}
+      max-attempts: ${BRUTE_FORCE_MAX_ATTEMPTS:5}
+      account-step-up-at: ${BRUTE_FORCE_ACCOUNT_STEP_UP_AT:${BRUTE_FORCE_MAX_ATTEMPTS:5}}
+      pair-max-attempts: ${BRUTE_FORCE_PAIR_MAX_ATTEMPTS:${BRUTE_FORCE_MAX_ATTEMPTS:5}}
+      ip-max-attempts: ${BRUTE_FORCE_IP_MAX_ATTEMPTS:30}
+      network-max-attempts: ${BRUTE_FORCE_NETWORK_MAX_ATTEMPTS:120}
+      redis-enabled: ${BRUTE_FORCE_REDIS_ENABLED:true}
+      exempt-usernames: ${BRUTE_FORCE_EXEMPT_USERNAMES:}
+    antibot:
+      enabled: ${ANTIBOT_ENABLED:false}
+      recaptcha:
+        enabled: ${RECAPTCHA_ENABLED:false}
+        site-key: ${RECAPTCHA_SITE_KEY:}
+        secret-key: ${RECAPTCHA_SECRET_KEY:}
+        min-score: ${RECAPTCHA_MIN_SCORE:0.5}
+        verify-url: ${RECAPTCHA_VERIFY_URL:https://www.recaptcha.net/recaptcha/api/siteverify}
+      fingerprint:
+        enabled: ${FINGERPRINT_ENABLED:false}
+        max-users-per-fingerprint: 5
+        max-fingerprints-per-user: 10
+        ttl-seconds: 86400
+      behavior:
+        enabled: ${BEHAVIOR_ENABLED:false}
+        max-straightness-ratio: 0.95
+        min-speed-std-dev: 0.5
+        min-interval-std-dev: 5.0
+      risk:
+        recaptcha-weight: 0.3
+        behavior-weight: 0.4
+        fingerprint-weight: 0.3
+        challenge-threshold: 60
+        block-threshold: 85
+  payments:
+    mock-callback-enabled: ${PAYMENT_MOCK_CALLBACK_ENABLED:false}
+    mock-callback-secret: ${PAYMENT_CALLBACK_SECRET:}
   super-admin-username: ${SUPER_ADMIN_USERNAME:lzh}
-  encryption:
-    key: ${ADMIN_ENCRYPTION_KEY:tibetTourismSecretKey12345678901234567890}  # 生产环境请使用环境变量设置
+  seed:
+    content:
+      enabled: ${SEED_CONTENT_ENABLED:true}
+    demo-users:
+      enabled: ${SEED_DEMO_USERS:false}
+      admin-password: ${SEED_DEMO_ADMIN_PASSWORD:}
+      super-admin-password: ${SEED_DEMO_SUPER_ADMIN_PASSWORD:}
+      user-password: ${SEED_DEMO_USER_PASSWORD:}

@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wsl -u *)",
+      "PowerShell($profilePath = $PROFILE.CurrentUserAllHosts; $profileDir = Split-Path $profilePath -Parent; if \\(-not \\(Test-Path $profileDir\\)\\) { New-Item -ItemType Directory -Force $profileDir | Out-Null }; if \\(-not \\(Test-Path $profilePath\\)\\) { New-Item -ItemType File -Force $profilePath | Out-Null }; $existing = Get-Content $profilePath -Raw -ErrorAction SilentlyContinue; $dockerFunc = \"`n# Docker via WSL2`nfunction docker { wsl docker @args }`nfunction docker-compose { wsl docker compose @args }`n\"; if \\($existing -notmatch \"function docker \\\\{ wsl docker\"\\) { Add-Content $profilePath $dockerFunc; Write-Host \"Docker alias added to PowerShell profile\" } else { Write-Host \"Docker alias already exists\" }; Write-Host \"Profile: $profilePath\")",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\Suli\\\\Desktop\\\\colorful-tibet\\\\scrapler\" -ErrorAction SilentlyContinue)"
+    ]
+  }
+}

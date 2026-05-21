@@ -1,7 +1,12 @@
 <template>
-  <div class="min-h-screen tibet-page-shell py-24">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="text-center mb-10">
+  <div class="min-h-screen tibet-page-shell py-24 relative overflow-hidden">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
+      <motion.div
+        class="text-center mb-10"
+        :initial="revealInitial"
+        :animate="revealInView"
+        :transition="revealTransition"
+      >
         <h1 class="tibet-heading inline-flex justify-center text-4xl font-bold text-tibet-dark mb-4">{{ t('heritage.title') }}</h1>
         <p class="text-lg text-tibet-brown/70 max-w-3xl mx-auto mb-3">
           {{ t('heritage.description') }}
@@ -9,10 +14,312 @@
         <p class="text-sm text-tibet-brown/50 max-w-3xl mx-auto">
           {{ t('heritage.description2') }}
         </p>
+      </motion.div>
+
+      <!-- 搜索栏 -->
+      <div class="mb-8 max-w-xl mx-auto">
+        <form class="flex items-center gap-2" @submit.prevent="handleSearch">
+          <div class="relative flex-1">
+            <input
+              v-model="searchKeyword"
+              type="text"
+              :placeholder="t('heritage.searchPlaceholder', '搜索非遗项目...')"
+              class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-stone-200 bg-white/80 backdrop-blur text-sm text-stone-700 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-tibet-red/30 focus:border-tibet-red/40 transition"
+            />
+            <svg xmlns="http://www.w3.org/2000/svg" class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+          <button
+            type="submit"
+            class="px-4 py-2.5 rounded-xl bg-tibet-red text-white text-sm font-medium hover:bg-tibet-red/90 transition disabled:opacity-50"
+            :disabled="searchLoading"
+          >
+            {{ searchLoading ? '...' : t('heritage.search', '搜索') }}
+          </button>
+          <button
+            v-if="searchKeyword"
+            type="button"
+            class="px-3 py-2.5 rounded-xl border border-stone-200 text-sm text-stone-500 hover:bg-stone-50 transition"
+            @click="searchKeyword = ''; handleSearch()"
+          >
+            {{ t('heritage.clearSearch', '清除') }}
+          </button>
+        </form>
       </div>
 
+      <motion.section
+        v-if="!loading"
+        class="mb-10 grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-6"
+        :initial="{ opacity: 0, y: 20 }"
+        :animate="{ opacity: 1, y: 0 }"
+        :transition="{ duration: 0.34, ease: motionEase }"
+      >
+        <div class="tibet-panel rounded-2xl p-5 sm:p-6">
+          <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-5">
+            <div>
+              <p class="text-xs font-semibold uppercase tracking-[0.2em] text-tibet-red/70 mb-2">Heritage Knowledge Base</p>
+              <h2 class="text-2xl font-bold text-tibet-dark">非遗项目库</h2>
+              <p class="mt-1 text-sm text-tibet-brown/60">
+                项目热度、传承人故事、活动日历与用户讨论集中呈现。
+              </p>
+            </div>
+            <button
+              type="button"
+              class="inline-flex items-center justify-center gap-2 rounded-xl border border-tibet-gold/30 bg-white/75 px-4 py-2 text-sm font-medium text-tibet-dark transition hover:border-tibet-red/35 hover:text-tibet-red disabled:opacity-50"
+              :disabled="searchLoading"
+              @click="refreshHeritageModule"
+            >
+              <RefreshCw class="h-4 w-4" :class="{ 'animate-spin': searchLoading }" />
+              刷新
+            </button>
+          </div>
+
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+            <div class="rounded-xl border border-stone-200 bg-white/70 px-4 py-3">
+              <div class="flex items-center justify-between gap-2">
+                <p class="text-xs text-stone-500">收录项目</p>
+                <BookOpen class="h-4 w-4 text-tibet-red" />
+              </div>
+              <p class="mt-2 text-2xl font-bold text-stone-900">{{ formatCompact(heritageItems.length) }}</p>
+            </div>
+            <div class="rounded-xl border border-stone-200 bg-white/70 px-4 py-3">
+              <div class="flex items-center justify-between gap-2">
+                <p class="text-xs text-stone-500">累计浏览</p>
+                <Eye class="h-4 w-4 text-blue-600" />
+              </div>
+              <p class="mt-2 text-2xl font-bold text-stone-900">{{ formatCompact(totalViews) }}</p>
+            </div>
+            <div class="rounded-xl border border-stone-200 bg-white/70 px-4 py-3">
+              <div class="flex items-center justify-between gap-2">
+                <p class="text-xs text-stone-500">互动量</p>
+                <MessageCircle class="h-4 w-4 text-emerald-600" />
+              </div>
+              <p class="mt-2 text-2xl font-bold text-stone-900">{{ formatCompact(totalInteractions) }}</p>
+            </div>
+            <div class="rounded-xl border border-stone-200 bg-white/70 px-4 py-3">
+              <div class="flex items-center justify-between gap-2">
+                <p class="text-xs text-stone-500">传承人档案</p>
+                <UserRound class="h-4 w-4 text-amber-600" />
+              </div>
+              <p class="mt-2 text-2xl font-bold text-stone-900">{{ formatCompact(featuredInheritors.length) }}</p>
+            </div>
+          </div>
+
+          <div class="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div class="flex min-w-0 items-center gap-2 overflow-x-auto pb-1">
+              <button
+                type="button"
+                class="shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition"
+                :class="selectedCategory === 'all' ? 'border-tibet-red bg-tibet-red text-white' : 'border-stone-200 bg-white/70 text-stone-600 hover:border-tibet-red/30 hover:text-tibet-red'"
+                @click="selectedCategory = 'all'"
+              >
+                全部
+              </button>
+              <button
+                v-for="category in categoryOptions"
+                :key="category"
+                type="button"
+                class="shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition"
+                :class="selectedCategory === category ? 'border-tibet-red bg-tibet-red text-white' : 'border-stone-200 bg-white/70 text-stone-600 hover:border-tibet-red/30 hover:text-tibet-red'"
+                @click="selectCategory(category)"
+              >
+                {{ category }}
+              </button>
+            </div>
+            <label class="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white/75 px-3 py-2 text-sm text-stone-600">
+              <SlidersHorizontal class="h-4 w-4 text-stone-400" />
+              <select v-model="sortMode" class="bg-transparent text-sm font-medium text-stone-700 focus:outline-none">
+                <option v-for="option in sortOptions" :key="option.value" :value="option.value">
+                  {{ option.label }}
+                </option>
+              </select>
+            </label>
+          </div>
+
+          <AnimatePresence mode="popLayout">
+            <motion.div
+              v-if="filteredHeritageItems.length"
+              key="heritage-dynamic-grid"
+              class="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-4"
+              :initial="{ opacity: 0 }"
+              :animate="{ opacity: 1 }"
+              :exit="{ opacity: 0 }"
+              :transition="{ duration: 0.22, ease: motionEase }"
+            >
+              <motion.button
+                v-for="(item, index) in filteredHeritageItems"
+                :key="item.id"
+                type="button"
+                layout
+                class="group rounded-2xl border border-stone-200 bg-white/80 p-3 text-left shadow-sm transition hover:border-tibet-red/30 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-tibet-gold/60 focus:ring-offset-2"
+                :initial="{ opacity: 0, y: 14 }"
+                :animate="{ opacity: 1, y: 0 }"
+                :transition="cardTransition(index, 0.03)"
+                :whileHover="{ y: -4 }"
+                :whileTap="{ scale: 0.99 }"
+                @click="openDetail(item)"
+              >
+                <div class="relative h-40 overflow-hidden rounded-xl bg-stone-100">
+                  <img
+                    v-if="resolveHeritageImage(item)"
+                    :src="resolveHeritageImage(item)"
+                    :alt="item.name"
+                    class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    loading="lazy"
+                    @error="applyHeritageImageFallback"
+                  />
+                  <div v-else class="flex h-full w-full items-center justify-center bg-gradient-to-br from-stone-100 to-amber-50 text-stone-400">
+                    <BookOpen class="h-8 w-8" />
+                  </div>
+                  <div class="absolute left-3 top-3 max-w-[75%] rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur">
+                    <span class="line-clamp-1">{{ item.category || '非遗项目' }}</span>
+                  </div>
+                  <div v-if="item.videoUrl" class="absolute bottom-3 right-3 rounded-full bg-white/90 p-2 text-tibet-red shadow-sm">
+                    <Video class="h-4 w-4" />
+                  </div>
+                </div>
+                <div class="px-1 pt-3">
+                  <div class="mb-2 flex items-start justify-between gap-3">
+                    <h3 class="line-clamp-1 text-lg font-bold text-stone-900 group-hover:text-tibet-red">
+                      {{ item.name }}
+                    </h3>
+                    <ArrowUpRight class="mt-1 h-4 w-4 shrink-0 text-stone-300 transition group-hover:text-tibet-red" />
+                  </div>
+                  <p class="line-clamp-2 min-h-[2.5rem] text-sm leading-relaxed text-stone-600">
+                    {{ item.description || '项目简介正在完善。' }}
+                  </p>
+                  <div class="mt-3 flex flex-wrap items-center gap-3 text-xs text-stone-500">
+                    <span class="inline-flex items-center gap-1">
+                      <Eye class="h-3.5 w-3.5" />
+                      {{ formatCompact(item.viewCount || 0) }}
+                    </span>
+                    <span class="inline-flex items-center gap-1">
+                      <Heart class="h-3.5 w-3.5" />
+                      {{ formatCompact(item.likeCount || 0) }}
+                    </span>
+                    <span class="inline-flex items-center gap-1">
+                      <MessageCircle class="h-3.5 w-3.5" />
+                      {{ formatCompact(item.commentCount || 0) }}
+                    </span>
+                    <span v-if="item.protectionLevel" class="ml-auto rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+                      {{ item.protectionLevel }}
+                    </span>
+                  </div>
+                </div>
+              </motion.button>
+            </motion.div>
+            <motion.div
+              v-else
+              key="heritage-empty"
+              class="rounded-2xl border border-dashed border-stone-300 bg-white/60 px-6 py-10 text-center"
+              :initial="{ opacity: 0, y: 12 }"
+              :animate="{ opacity: 1, y: 0 }"
+              :exit="{ opacity: 0, y: 12 }"
+              :transition="{ duration: 0.22, ease: motionEase }"
+            >
+              <Search class="mx-auto h-8 w-8 text-stone-300" />
+              <p class="mt-3 text-sm font-medium text-stone-700">没有匹配的非遗项目</p>
+              <p class="mt-1 text-xs text-stone-400">清空关键词或切换分类后再查看。</p>
+            </motion.div>
+          </AnimatePresence>
+        </div>
+
+        <aside class="space-y-4">
+          <div class="tibet-panel rounded-2xl p-5">
+            <div class="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-tibet-red/60">Inheritors</p>
+                <h3 class="mt-1 text-lg font-bold text-stone-900">传承人档案</h3>
+              </div>
+              <UserRound class="h-5 w-5 text-tibet-red" />
+            </div>
+            <div v-if="featuredInheritorsLoading" class="flex justify-center py-6">
+              <div class="h-6 w-6 rounded-full border-b-2 border-tibet-red animate-spin"></div>
+            </div>
+            <div v-else-if="featuredInheritors.length" class="space-y-3">
+              <button
+                v-for="inheritor in featuredInheritors"
+                :key="inheritor.id"
+                type="button"
+                class="flex w-full items-start gap-3 rounded-xl border border-stone-200 bg-white/70 px-3 py-3 text-left transition hover:border-tibet-red/30 hover:bg-white"
+                @click="openHeritageById(inheritor.heritageItemId)"
+              >
+                <div class="h-12 w-12 shrink-0 overflow-hidden rounded-full bg-stone-100">
+                  <img
+                    v-if="inheritor.avatarUrl"
+                    :src="inheritor.avatarUrl"
+                    :alt="inheritor.name"
+                    class="h-full w-full object-cover"
+                    loading="lazy"
+                  />
+                  <div v-else class="flex h-full w-full items-center justify-center text-sm font-bold text-tibet-red">
+                    {{ inheritor.name?.charAt(0) }}
+                  </div>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-center gap-2">
+                    <p class="truncate text-sm font-bold text-stone-900">{{ inheritor.name }}</p>
+                    <span v-if="inheritor.level" class="shrink-0 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                      {{ inheritor.level }}
+                    </span>
+                  </div>
+                  <p class="mt-0.5 text-[11px] text-stone-400">
+                    {{ heritageNameById[inheritor.heritageItemId] || inheritor.region || '非遗项目' }}
+                  </p>
+                  <p class="mt-1 line-clamp-2 text-xs leading-relaxed text-stone-600">
+                    {{ inheritor.story || inheritor.bio || '暂无传承故事' }}
+                  </p>
+                </div>
+              </button>
+            </div>
+            <p v-else class="rounded-xl border border-dashed border-stone-200 bg-white/60 px-4 py-5 text-center text-xs text-stone-400">
+              暂无可展示的传承人档案
+            </p>
+          </div>
+
+          <div class="tibet-panel rounded-2xl p-5">
+            <div class="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-tibet-red/60">Calendar</p>
+                <h3 class="mt-1 text-lg font-bold text-stone-900">活动日历</h3>
+              </div>
+              <CalendarDays class="h-5 w-5 text-tibet-red" />
+            </div>
+            <div v-if="upcomingEvents.length" class="space-y-3">
+              <button
+                v-for="event in upcomingEvents.slice(0, 5)"
+                :key="event.id"
+                type="button"
+                class="flex w-full gap-3 rounded-xl border border-stone-200 bg-white/70 px-3 py-3 text-left transition hover:border-tibet-red/30 hover:bg-white"
+                @click="event.heritageItemId && openHeritageById(event.heritageItemId)"
+              >
+                <div class="w-14 shrink-0 rounded-lg bg-tibet-red/10 px-2 py-2 text-center text-tibet-red">
+                  <p class="text-[11px] font-semibold leading-tight">{{ formatEventMonth(event.eventDate) }}</p>
+                  <p class="text-lg font-bold leading-tight">{{ formatEventDay(event.eventDate) }}</p>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <p class="line-clamp-1 text-sm font-semibold text-stone-900">{{ event.title }}</p>
+                  <p v-if="event.location" class="mt-1 line-clamp-1 text-xs text-stone-500">{{ event.location }}</p>
+                  <p v-if="event.description" class="mt-1 line-clamp-2 text-xs leading-relaxed text-stone-500">{{ event.description }}</p>
+                </div>
+              </button>
+            </div>
+            <p v-else class="rounded-xl border border-dashed border-stone-200 bg-white/60 px-4 py-5 text-center text-xs text-stone-400">
+              暂无近期活动
+            </p>
+          </div>
+        </aside>
+      </motion.section>
+
       <!-- 非遗大类一览（简洁卡片设计） -->
-      <section class="mb-14">
+      <motion.section
+        class="mb-14"
+        :initial="cardInitial"
+        :whileInView="cardInView"
+        :inViewOptions="inViewOnce"
+        :transition="cardTransition(0, 0.05)"
+      >
         <div class="tibet-panel rounded-3xl px-5 sm:px-8 lg:px-10 py-8 lg:py-10">
           <!-- 区块标题 -->
           <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-8">
@@ -33,22 +340,32 @@
 
           <!-- 卡片网格（点击某一大类，在卡片内部展开可滑动的国家级非遗项目列表） -->
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-7">
-            <button
+            <motion.button
               v-for="(category, index) in heritageCategories"
               :key="category.name"
               type="button"
-              class="group tibet-card-elevated rounded-2xl border border-tibet-gold/20 px-4 py-4 sm:px-5 sm:py-5 flex flex-col gap-3 hover:border-tibet-red/25 hover:shadow-md transition duration-200 text-left w-full cursor-pointer"
-              :style="{ transitionDelay: (index * 60) + 'ms' }"
+              layout
+              class="group tibet-card-elevated rounded-2xl border border-tibet-gold/20 px-4 py-4 sm:px-5 sm:py-5 flex flex-col gap-3 hover:border-tibet-red/25 text-left w-full cursor-pointer"
+              :initial="cardInitial"
+              :whileInView="cardInView"
+              :inViewOptions="inViewOnce"
+              :transition="cardTransition(index, 0.08)"
+              :whileHover="{ y: -5, scale: 1.012 }"
+              :whileTap="{ scale: 0.985 }"
               @click="toggleCategory(category.name)"
             >
               <div class="flex items-center gap-4 w-full">
                 <!-- 图标 -->
                 <div class="flex-shrink-0">
-                  <div class="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-tibet-red via-tibet-gold to-tibet-yellow text-white flex items-center justify-center shadow-sm group-hover:shadow-md group-hover:scale-[1.03] transform transition">
+                  <motion.div
+                    class="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-tibet-red via-tibet-gold to-tibet-yellow text-white flex items-center justify-center shadow-sm group-hover:shadow-md"
+                    :animate="activeCategory === category.name ? { rotate: -4, scale: 1.06 } : { rotate: 0, scale: 1 }"
+                    :transition="softSpring"
+                  >
                     <span class="text-xl sm:text-2xl">
                       {{ category.icon }}
                     </span>
-                  </div>
+                  </motion.div>
                 </div>
 
                 <!-- 文本 -->
@@ -65,130 +382,184 @@
                     {{ t('heritage.clickToExpand') }}
                   </p>
                 </div>
+
+                <motion.span
+                  class="ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-tibet-gold/25 bg-white/70 text-lg leading-none text-tibet-red"
+                  :animate="activeCategory === category.name ? { rotate: 45, scale: 1.04 } : { rotate: 0, scale: 1 }"
+                  :transition="softSpring"
+                  aria-hidden="true"
+                >
+                  +
+                </motion.span>
               </div>
 
               <!-- 卡片内部可滚动的国家级非遗项目列表 -->
-              <div
-                v-if="activeCategory === category.name"
-                class="mt-1 w-full rounded-xl bg-tibet-white/70 border border-tibet-gold/25 px-3 py-2 max-h-44 overflow-y-auto text-xs sm:text-sm text-tibet-brown/80 space-y-2"
-              >
-                <p class="text-[11px] text-tibet-brown/45">
-                  {{ t('heritage.nationalItems') }} · {{ getItemsByCategory(category.name).length }} {{ t('heritage.items') }}
-                </p>
-                <div
-                  v-for="item in getItemsByCategory(category.name)"
-                  :key="item.id"
-                  class="border-b border-tibet-gold/15 last:border-b-0 pb-1.5 last:pb-0"
+              <AnimatePresence>
+                <motion.div
+                  v-if="activeCategory === category.name"
+                  :key="category.name + '-items'"
+                  layout
+                  class="mt-1 w-full origin-top rounded-xl bg-tibet-white/70 border border-tibet-gold/25 px-3 py-2 max-h-44 overflow-y-auto text-xs sm:text-sm text-tibet-brown/80 space-y-2"
+                  :initial="{ opacity: 0, y: -10, scaleY: 0.96 }"
+                  :animate="{ opacity: 1, y: 0, scaleY: 1 }"
+                  :exit="{ opacity: 0, y: -8, scaleY: 0.96 }"
+                  :transition="{ duration: 0.28, ease: motionEase }"
                 >
-                  <div class="flex items-center justify-between gap-2">
-                    <p class="font-medium text-tibet-dark mb-0.5 truncate">
-                      {{ item.name }}
-                    </p>
-                    <a
-                      :href="buildBaikeUrl(item.name)"
-                      target="_blank"
-                      rel="noopener"
-                      class="flex-shrink-0 inline-flex items-center gap-0.5 text-[10px] text-tibet-red hover:text-tibet-brown hover:underline transition"
-                      :title="t('heritage.openBaike') + ': ' + item.name"
-                      @click.stop
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                      </svg>
-                      {{ t('heritage.openBaike') }}
-                    </a>
-                  </div>
-                  <p class="text-[11px] leading-snug text-tibet-brown/70 line-clamp-2">
-                    {{ item.description }}
+                  <p class="text-[11px] text-tibet-brown/45">
+                    {{ t('heritage.nationalItems') }} · {{ getItemsByCategory(category.name).length }} {{ t('heritage.items') }}
                   </p>
-                </div>
-                <p
-                  v-if="!getItemsByCategory(category.name).length"
-                  class="text-[11px] text-stone-400"
-                >
-                  {{ t('heritage.noItemsInCategory') }}
-                </p>
-              </div>
-            </button>
+                  <motion.div
+                    v-for="(item, itemIndex) in getItemsByCategory(category.name)"
+                    :key="item.id"
+                    class="border-b border-tibet-gold/15 last:border-b-0 pb-1.5 last:pb-0"
+                    :initial="{ opacity: 0, x: -8 }"
+                    :animate="{ opacity: 1, x: 0 }"
+                    :transition="cardTransition(itemIndex, 0.06)"
+                    :whileHover="{ x: 3 }"
+                  >
+                    <div class="flex items-center justify-between gap-2">
+                      <p class="font-medium text-tibet-dark mb-0.5 truncate">
+                        {{ item.name }}
+                      </p>
+                      <a
+                        :href="buildBaikeUrl(item.name)"
+                        target="_blank"
+                        rel="noopener"
+                        class="flex-shrink-0 inline-flex items-center gap-0.5 text-[10px] text-tibet-red hover:text-tibet-brown hover:underline transition"
+                        :title="t('heritage.openBaike') + ': ' + item.name"
+                        @click.stop
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                        {{ t('heritage.openBaike') }}
+                      </a>
+                    </div>
+                    <p class="text-[11px] leading-snug text-tibet-brown/70 line-clamp-2">
+                      {{ item.description }}
+                    </p>
+                  </motion.div>
+                  <p
+                    v-if="!getItemsByCategory(category.name).length"
+                    class="text-[11px] text-stone-400"
+                  >
+                    {{ t('heritage.noItemsInCategory') }}
+                  </p>
+                </motion.div>
+              </AnimatePresence>
+            </motion.button>
           </div>
         </div>
-      </section>
+      </motion.section>
 
       <!-- 代表性非遗项目：上来先展示几个可以点击的典型案例 -->
-      <section v-if="!loading && heritageItems.length" class="mb-12">
-        <div class="flex items-center justify-between mb-4">
-          <h2 class="tibet-heading text-2xl font-bold text-tibet-dark">{{ t('heritage.representativeTitle') }}</h2>
-          <p class="text-sm text-tibet-brown/50 hidden md:block">
-            {{ t('heritage.representativeDescription') }}
-          </p>
-        </div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <button
-            v-for="item in representativeItems"
-            :key="item.id"
-            @click="openDetail(item)"
-            class="tibet-card-elevated rounded-2xl p-5 text-left hover:shadow-lg hover:border-tibet-red/25 transition duration-200 focus:outline-none focus:ring-2 focus:ring-tibet-gold focus:ring-offset-2"
-          >
-            <div class="mb-3">
-              <span class="inline-block px-3 py-1 rounded-full text-xs font-medium bg-tibet-red/10 text-tibet-red border border-tibet-red/15">
-                {{ item.category }}
-              </span>
-            </div>
-            <h3 class="text-lg font-semibold text-tibet-dark mb-2 line-clamp-1">
-              {{ item.name }}
-            </h3>
-            <p class="text-sm text-tibet-brown/70 mb-3 line-clamp-3">
-              {{ item.description }}
+      <AnimatePresence mode="popLayout">
+        <motion.section
+          v-if="!loading && representativeItems.length"
+          key="heritage-representative"
+          class="mb-12"
+          :initial="{ opacity: 0, y: 24 }"
+          :animate="{ opacity: 1, y: 0 }"
+          :exit="{ opacity: 0, y: 16 }"
+          :transition="{ duration: 0.36, ease: motionEase }"
+        >
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="tibet-heading text-2xl font-bold text-tibet-dark">{{ t('heritage.representativeTitle') }}</h2>
+            <p class="text-sm text-tibet-brown/50 hidden md:block">
+              {{ t('heritage.representativeDescription') }}
             </p>
-            <div class="flex items-center justify-between gap-2">
-              <span class="inline-flex items-center text-sm font-medium text-tibet-red">
-                {{ t('heritage.viewDetails') }}
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  class="h-4 w-4 ml-1"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <motion.button
+              v-for="(item, index) in representativeItems"
+              :key="item.id"
+              layout
+              @click="openDetail(item)"
+              class="group tibet-card-elevated rounded-2xl p-5 text-left hover:border-tibet-red/25 focus:outline-none focus:ring-2 focus:ring-tibet-gold focus:ring-offset-2 overflow-hidden"
+              :initial="cardInitial"
+              :whileInView="cardInView"
+              :exit="cardExit"
+              :inViewOptions="inViewOnce"
+              :transition="cardTransition(index, 0.04)"
+              :whileHover="{ y: -6, scale: 1.015 }"
+              :whileTap="{ scale: 0.985 }"
+            >
+              <div class="h-36 -mx-5 -mt-5 mb-4 overflow-hidden rounded-t-2xl bg-stone-100">
+                <img
+                  :src="resolveHeritageImage(item)"
+                  :alt="item.name"
+                  class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                  loading="lazy"
+                  @error="applyHeritageImageFallback"
+                />
+              </div>
+              <div class="mb-3">
+                <span class="inline-block px-3 py-1 rounded-full text-xs font-medium bg-tibet-red/10 text-tibet-red border border-tibet-red/15">
+                  {{ item.category }}
+                </span>
+              </div>
+              <h3 class="text-lg font-semibold text-tibet-dark mb-2 line-clamp-1">
+                {{ item.name }}
+              </h3>
+              <p class="text-sm text-tibet-brown/70 mb-3 line-clamp-3">
+                {{ item.description }}
+              </p>
+              <div class="flex items-center justify-between gap-2">
+                <span class="inline-flex items-center text-sm font-medium text-tibet-red">
+                  {{ t('heritage.viewDetails') }}
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    class="h-4 w-4 ml-1"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                  </svg>
+                </span>
+                <span
+                  v-if="item.baikeUrl"
+                  class="inline-flex items-center gap-0.5 text-xs text-stone-400 hover:text-red-500 transition cursor-pointer"
+                  :title="t('heritage.openBaike')"
+                  @click.stop="openBaikeUrl(item.baikeUrl)"
                 >
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                </svg>
-              </span>
-              <span
-                v-if="item.baikeUrl"
-                class="inline-flex items-center gap-0.5 text-xs text-stone-400 hover:text-red-500 transition cursor-pointer"
-                :title="t('heritage.openBaike')"
-                @click.stop="openBaikeUrl(item.baikeUrl)"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                </svg>
-                {{ t('heritage.openBaike') }}
-              </span>
-            </div>
-          </button>
-        </div>
-      </section>
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                  {{ t('heritage.openBaike') }}
+                </span>
+              </div>
+            </motion.button>
+          </div>
+        </motion.section>
+      </AnimatePresence>
 
       <!-- 代表性非遗项目详情弹层（带图片与更详细介绍） -->
-      <div
-        v-if="selectedItem"
-        class="fixed inset-0 bg-black/40 flex items-center justify-center px-4 z-40"
-        @click="selectedItem = null"
+      <MotionModal
+        :show="Boolean(selectedItem)"
+        modal-key="heritage-detail-modal"
+        root-class="z-[120] px-4"
+        backdrop-class="bg-black/45 backdrop-blur-sm"
+        panel-class="max-w-3xl rounded-2xl bg-white overflow-hidden p-0"
+        @close="selectedItem = null"
       >
-        <div
-          class="bg-white rounded-2xl max-w-3xl w-full shadow-2xl overflow-hidden"
-          @click.stop
-        >
+        <template v-if="selectedItem">
           <!-- 顶部大图 -->
           <div class="relative h-56 md:h-72 bg-stone-100">
-            <img
-              :src="selectedItem.imageUrl || 'https://images.unsplash.com/photo-1559827291-baf8ef4d3285?w=800&q=60'"
+            <motion.img
+              :src="resolveHeritageImage(selectedItem)"
               :alt="selectedItem.name"
               class="w-full h-full object-cover"
-            >
-            <button
+              :initial="{ opacity: 0, scale: 1.06 }"
+              :animate="{ opacity: 1, scale: 1 }"
+              :transition="{ duration: 0.5, ease: motionEase }"
+              @error="applyHeritageImageFallback"
+            />
+            <motion.button
               type="button"
               class="absolute top-4 right-4 bg-black/50 text-white p-2 rounded-full hover:bg-black/70 transition"
+              :whileHover="{ rotate: 90, scale: 1.08 }"
+              :whileTap="{ scale: 0.92 }"
               @click="selectedItem = null"
             >
               <svg
@@ -203,20 +574,65 @@
                   clip-rule="evenodd"
                 />
               </svg>
-            </button>
-            <div class="absolute bottom-4 left-4 bg-black/45 backdrop-blur px-4 py-2 rounded-xl">
+            </motion.button>
+            <motion.div
+              class="absolute bottom-4 left-4 bg-black/45 backdrop-blur px-4 py-2 rounded-xl"
+              :initial="{ opacity: 0, y: 12 }"
+              :animate="{ opacity: 1, y: 0 }"
+              :transition="{ duration: 0.34, delay: 0.1, ease: motionEase }"
+            >
               <p class="text-xs text-red-100 font-medium mb-1">
                 {{ selectedItem.category || t('heritage.representativeTitle') }}
               </p>
               <h3 class="text-xl md:text-2xl font-bold text-white">
                 {{ selectedItem.name }}
               </h3>
+            </motion.div>
+          </div>
+
+          <!-- 互动状态栏：浏览数 / 点赞 / 评论 -->
+          <div v-if="selectedItem.id < 10000" class="px-6 py-3 flex items-center justify-between border-b border-stone-100">
+            <div class="flex items-center gap-4 text-xs text-stone-400">
+              <span v-if="selectedItem.viewCount" class="flex items-center gap-1">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                {{ selectedItem.viewCount }}
+              </span>
+              <span class="flex items-center gap-1">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg>
+                {{ selectedItem.likeCount || 0 }}
+              </span>
+              <span class="flex items-center gap-1">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
+                {{ selectedItem.commentCount || 0 }}
+              </span>
+              <span v-if="selectedItem.protectionLevel" class="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-100 text-[11px] font-medium">
+                {{ selectedItem.protectionLevel }}
+              </span>
             </div>
+            <button
+              v-if="authStore.isLoggedIn"
+              class="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition"
+              :class="liked ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-stone-50 text-stone-500 border border-stone-200 hover:bg-red-50 hover:text-red-500'"
+              @click="toggleLike"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" :fill="liked ? 'currentColor' : 'none'" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg>
+              {{ liked ? '已点赞' : '点赞' }}
+            </button>
           </div>
 
           <!-- 文字内容区：分段更详细介绍 + 线下体验模块 -->
-          <div class="px-6 py-5 text-sm text-stone-700 space-y-5 max-h-[65vh] overflow-y-auto">
-            <div class="space-y-4">
+          <motion.div
+            class="px-6 py-5 text-sm text-stone-700 space-y-5 max-h-[65vh] overflow-y-auto"
+            :initial="{ opacity: 0, y: 14 }"
+            :animate="{ opacity: 1, y: 0 }"
+            :transition="{ duration: 0.34, delay: 0.12, ease: motionEase }"
+          >
+            <motion.div
+              class="space-y-4"
+              :initial="{ opacity: 0, y: 10 }"
+              :animate="{ opacity: 1, y: 0 }"
+              :transition="{ duration: 0.28, delay: 0.18, ease: motionEase }"
+            >
               <!-- 百度百科跳转按钮 -->
               <a
                 v-if="selectedItem.baikeUrl"
@@ -237,32 +653,61 @@
                 {{ t('heritage.detailNote') }}
               </p>
 
-              <div class="space-y-2">
+              <!-- 视频播放器 -->
+              <div v-if="selectedItem.videoUrl" class="rounded-xl overflow-hidden border border-stone-200 bg-black">
+                <video
+                  :src="selectedItem.videoUrl"
+                  controls
+                  preload="metadata"
+                  class="w-full max-h-[320px]"
+                >
+                  您的浏览器不支持视频播放
+                </video>
+              </div>
+
+              <motion.div
+                class="space-y-2"
+                :initial="{ opacity: 0, y: 8 }"
+                :animate="{ opacity: 1, y: 0 }"
+                :transition="{ duration: 0.26, delay: 0.22, ease: motionEase }"
+              >
                 <h4 class="text-sm font-semibold text-stone-900">
                   {{ t('heritage.basicIntroduction') }}
                 </h4>
                 <p class="leading-relaxed whitespace-pre-line">
                   {{ selectedItem.description || t('heritage.noDetailedDescription') }}
                 </p>
-              </div>
+              </motion.div>
 
-              <div v-if="selectedItem.originStory" class="space-y-2">
+              <motion.div
+                v-if="selectedItem.originStory"
+                class="space-y-2"
+                :initial="{ opacity: 0, y: 8 }"
+                :animate="{ opacity: 1, y: 0 }"
+                :transition="{ duration: 0.26, delay: 0.27, ease: motionEase }"
+              >
                 <h4 class="text-sm font-semibold text-stone-900">
                   {{ t('heritage.originStory') }}
                 </h4>
                 <p class="leading-relaxed whitespace-pre-line">
                   {{ selectedItem.originStory }}
                 </p>
-              </div>
+              </motion.div>
 
-              <div v-if="selectedItem.significance" class="space-y-2 border-t border-dashed border-stone-200 pt-3">
+              <motion.div
+                v-if="selectedItem.significance"
+                class="space-y-2 border-t border-dashed border-stone-200 pt-3"
+                :initial="{ opacity: 0, y: 8 }"
+                :animate="{ opacity: 1, y: 0 }"
+                :transition="{ duration: 0.26, delay: 0.32, ease: motionEase }"
+              >
                 <h4 class="text-sm font-semibold text-stone-900">
                   {{ t('heritage.culturalValue') }}
                 </h4>
                 <p class="text-stone-700 text-sm leading-relaxed whitespace-pre-line">
                   {{ selectedItem.significance }}
                 </p>
-              </div>
+              </motion.div>
 
               <p
                 v-if="!selectedItem.originStory && !selectedItem.significance"
@@ -270,10 +715,15 @@
               >
                 {{ t('heritage.basicDescriptionNote') }}
               </p>
-            </div>
+            </motion.div>
 
             <!-- 线下体验模块：地图示意 + 门店列表 + 导航 -->
-            <div class="border-t border-dashed border-stone-200 pt-4">
+            <motion.div
+              class="border-t border-dashed border-stone-200 pt-4"
+              :initial="{ opacity: 0, y: 12 }"
+              :animate="{ opacity: 1, y: 0 }"
+              :transition="{ duration: 0.3, delay: 0.28, ease: motionEase }"
+            >
               <div class="flex items-center justify-between gap-2 mb-3">
                 <div>
                   <h4 class="text-sm font-semibold text-stone-900">
@@ -293,19 +743,42 @@
                 <div class="md:col-span-2 relative rounded-xl overflow-hidden border border-stone-200 min-h-[220px] bg-stone-100">
                   <div ref="mapContainer" class="w-full h-full min-h-[220px]"></div>
                   <!-- 地图加载提示 -->
-                  <div v-if="mapLoading && !mapError" class="absolute inset-0 flex items-center justify-center bg-stone-100/90 backdrop-blur-sm z-20">
-                    <div class="text-center">
-                      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-red-500 mx-auto mb-2"></div>
-                      <p class="text-xs text-stone-600">{{ t('heritage.mapLoading') }}</p>
-                    </div>
-                  </div>
-                  <!-- 地图加载失败提示 -->
-                  <div v-if="mapError" class="absolute inset-0 flex items-center justify-center bg-stone-100/90 backdrop-blur-sm z-20">
-                    <div class="text-center px-4">
-                      <p class="text-xs text-stone-600 mb-2">{{ t('heritage.mapLoadFailed') }}</p>
-                      <p class="text-xs text-stone-500">{{ t('heritage.checkRightList') }}</p>
-                    </div>
-                  </div>
+                  <AnimatePresence>
+                    <!-- 地图加载提示 -->
+                    <motion.div
+                      v-if="mapLoading && !mapError"
+                      key="heritage-map-loading"
+                      class="absolute inset-0 flex items-center justify-center bg-stone-100/90 backdrop-blur-sm z-20"
+                      :initial="{ opacity: 0 }"
+                      :animate="{ opacity: 1 }"
+                      :exit="{ opacity: 0 }"
+                      :transition="{ duration: 0.22, ease: motionEase }"
+                    >
+                      <div class="text-center">
+                        <motion.div
+                          class="rounded-full h-8 w-8 border-b-2 border-red-500 mx-auto mb-2"
+                          :animate="{ rotate: 360 }"
+                          :transition="{ duration: 1, repeat: Infinity, ease: 'linear' }"
+                        ></motion.div>
+                        <p class="text-xs text-stone-600">{{ t('heritage.mapLoading') }}</p>
+                      </div>
+                    </motion.div>
+                    <!-- 地图加载失败提示 -->
+                    <motion.div
+                      v-if="mapError"
+                      key="heritage-map-error"
+                      class="absolute inset-0 flex items-center justify-center bg-stone-100/90 backdrop-blur-sm z-20"
+                      :initial="{ opacity: 0, scale: 0.98 }"
+                      :animate="{ opacity: 1, scale: 1 }"
+                      :exit="{ opacity: 0, scale: 0.98 }"
+                      :transition="{ duration: 0.22, ease: motionEase }"
+                    >
+                      <div class="text-center px-4">
+                        <p class="text-xs text-stone-600 mb-2">{{ t('heritage.mapLoadFailed') }}</p>
+                        <p class="text-xs text-stone-500">{{ t('heritage.checkRightList') }}</p>
+                      </div>
+                    </motion.div>
+                  </AnimatePresence>
                   <!-- 地图标题覆盖层 -->
                   <div class="absolute top-0 left-0 right-0 p-3 bg-gradient-to-b from-black/40 to-transparent z-10 pointer-events-none">
                     <p class="text-[11px] font-medium uppercase tracking-widest text-amber-200">
@@ -332,10 +805,14 @@
 
                 <!-- 门店列表 -->
                 <div class="md:col-span-3 space-y-3 max-h-[220px] overflow-y-auto pr-1">
-                  <div
-                    v-for="spot in experienceSpots"
+                  <motion.div
+                    v-for="(spot, index) in experienceSpots"
                     :key="spot.name"
                     class="flex items-start justify-between gap-3 rounded-xl border border-stone-200 bg-stone-50/60 px-3 py-2.5 hover:bg-white hover:border-red-200 transition"
+                    :initial="{ opacity: 0, x: 16 }"
+                    :animate="{ opacity: 1, x: 0 }"
+                    :transition="cardTransition(index, 0.18)"
+                    :whileHover="{ x: 4, scale: 1.01 }"
                   >
                     <div class="min-w-0 flex-1">
                       <div class="flex items-center gap-1.5 mb-0.5">
@@ -376,30 +853,213 @@
                         {{ t('heritage.checkIn') }} {{ spot.highlight }}
                       </span>
                     </div>
+                  </motion.div>
+                </div>
+              </div>
+            </motion.div>
+
+            <!-- 传承人 -->
+            <div v-if="itemInheritors.length" class="border-t border-dashed border-stone-200 pt-4">
+              <h4 class="text-sm font-semibold text-stone-900 mb-3">
+                {{ t('heritage.inheritors', '代表性传承人') }}
+              </h4>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div
+                  v-for="inheritor in itemInheritors"
+                  :key="inheritor.id"
+                  class="flex items-start gap-3 rounded-xl border border-stone-200 bg-stone-50/60 px-3 py-2.5"
+                >
+                  <div v-if="inheritor.avatarUrl" class="flex-shrink-0 w-10 h-10 rounded-full overflow-hidden bg-stone-200">
+                    <img :src="inheritor.avatarUrl" :alt="inheritor.name" class="w-full h-full object-cover" />
+                  </div>
+                  <div v-else class="flex-shrink-0 w-10 h-10 rounded-full bg-tibet-red/10 flex items-center justify-center text-tibet-red font-bold text-sm">
+                    {{ inheritor.name?.charAt(0) }}
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <div class="flex items-center gap-2 mb-0.5">
+                      <p class="text-sm font-semibold text-stone-900">{{ inheritor.name }}</p>
+                      <span v-if="inheritor.level" class="px-1.5 py-0.5 rounded text-[10px] bg-amber-50 text-amber-700 border border-amber-100">{{ inheritor.level }}</span>
+                    </div>
+                    <p v-if="inheritor.region" class="text-[11px] text-stone-400 mb-0.5">{{ inheritor.region }}</p>
+                    <p v-if="inheritor.bio" class="text-xs text-stone-500 line-clamp-2">{{ inheritor.bio }}</p>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-      </div>
 
-      <div v-if="loading" class="flex justify-center items-center h-64">
-        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
-      </div>
+            <!-- 相关活动 -->
+            <div v-if="itemEvents.length" class="border-t border-dashed border-stone-200 pt-4">
+              <h4 class="text-sm font-semibold text-stone-900 mb-3">
+                {{ t('heritage.relatedEvents', '相关活动') }}
+              </h4>
+              <div class="space-y-2">
+                <div
+                  v-for="event in itemEvents"
+                  :key="event.id"
+                  class="flex items-center gap-3 rounded-xl border border-stone-200 bg-stone-50/60 px-3 py-2"
+                >
+                  <div class="flex-shrink-0 w-12 text-center">
+                    <p class="text-xs font-bold text-tibet-red">{{ formatDate(event.eventDate || '') }}</p>
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <p class="text-sm font-medium text-stone-900">{{ event.title }}</p>
+                    <p v-if="event.location" class="text-[11px] text-stone-400">{{ event.location }}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 评论区 -->
+            <div v-if="selectedItem.id < 10000" class="border-t border-dashed border-stone-200 pt-4">
+              <h4 class="text-sm font-semibold text-stone-900 mb-3">
+                {{ t('heritage.commentsTitle', '用户评论') }} ({{ selectedItem.commentCount || 0 }})
+              </h4>
+
+              <!-- 发表评论 -->
+              <div v-if="authStore.isLoggedIn" class="mb-4 space-y-2">
+                <div class="flex items-center gap-1 mb-1">
+                  <span class="text-xs text-stone-500">{{ t('heritage.rating', '评分') }}:</span>
+                  <button
+                    v-for="star in 5"
+                    :key="star"
+                    type="button"
+                    class="text-lg leading-none transition"
+                    :class="star <= newCommentRating ? 'text-amber-400' : 'text-stone-200'"
+                    @click="newCommentRating = star"
+                  >
+                    ★
+                  </button>
+                </div>
+                <div class="flex gap-2">
+                  <input
+                    v-model="newCommentContent"
+                    type="text"
+                    maxlength="1000"
+                    :placeholder="t('heritage.commentPlaceholder', '分享你对这个非遗项目的感受...')"
+                    class="flex-1 px-3 py-2 rounded-lg border border-stone-200 text-sm focus:outline-none focus:ring-1 focus:ring-tibet-red/30"
+                    @keydown.enter.prevent="submitComment"
+                  />
+                  <button
+                    type="button"
+                    class="px-4 py-2 rounded-lg bg-tibet-red text-white text-sm font-medium hover:bg-tibet-red/90 transition disabled:opacity-50"
+                    :disabled="submittingComment || !newCommentContent.trim()"
+                    @click="submitComment"
+                  >
+                    {{ submittingComment ? '...' : t('heritage.submitComment', '发表') }}
+                  </button>
+                </div>
+              </div>
+              <p v-else class="text-xs text-stone-400 mb-3">
+                {{ t('heritage.loginToComment', '登录后可以评论') }}
+              </p>
+
+              <!-- 评论列表 -->
+              <div v-if="commentsLoading" class="flex justify-center py-4">
+                <div class="rounded-full h-6 w-6 border-b-2 border-red-500 animate-spin"></div>
+              </div>
+              <div v-else-if="itemComments.length" class="space-y-3">
+                <div
+                  v-for="comment in itemComments"
+                  :key="comment.id"
+                  class="rounded-lg border border-stone-100 bg-stone-50/40 px-3 py-2"
+                >
+                  <div class="flex items-center justify-between mb-1">
+                    <div class="flex items-center gap-2">
+                      <div class="w-6 h-6 rounded-full bg-tibet-red/10 flex items-center justify-center text-tibet-red text-[10px] font-bold overflow-hidden">
+                        <img v-if="comment.avatar" :src="comment.avatar" class="w-full h-full object-cover" />
+                        <span v-else>{{ (comment.nickname || comment.username)?.charAt(0) }}</span>
+                      </div>
+                      <span class="text-xs font-medium text-stone-700">{{ comment.nickname || comment.username }}</span>
+                      <span v-if="comment.rating" class="text-[11px] text-amber-500">
+                        {{ '★'.repeat(comment.rating) }}
+                      </span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <span class="text-[10px] text-stone-400">{{ formatDate(comment.createdAt) }}</span>
+                      <button
+                        v-if="authStore.user?.id === comment.userId"
+                        type="button"
+                        class="text-[10px] text-red-400 hover:text-red-600 transition"
+                        @click="deleteComment(comment.id)"
+                      >
+                        {{ t('heritage.deleteComment', '删除') }}
+                      </button>
+                    </div>
+                  </div>
+                  <p class="text-sm text-stone-600 leading-relaxed">{{ comment.content }}</p>
+                </div>
+              </div>
+              <p v-else class="text-xs text-stone-400 text-center py-3">
+                {{ t('heritage.noComments', '暂无评论，快来发表第一条吧') }}
+              </p>
+            </div>
+          </motion.div>
+        </template>
+      </MotionModal>
+
+      <AnimatePresence>
+        <motion.div
+          v-if="loading"
+          key="heritage-loading"
+          class="flex justify-center items-center h-64"
+          :initial="{ opacity: 0 }"
+          :animate="{ opacity: 1 }"
+          :exit="{ opacity: 0 }"
+          :transition="{ duration: 0.22, ease: motionEase }"
+        >
+          <motion.div
+            class="rounded-full h-12 w-12 border-b-2 border-red-600"
+            :animate="{ rotate: 360 }"
+            :transition="{ duration: 1, repeat: Infinity, ease: 'linear' }"
+          ></motion.div>
+        </motion.div>
+      </AnimatePresence>
 
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed, watch, nextTick } from 'vue'
+import { ref, onMounted, computed, watch, nextTick, onBeforeUnmount } from 'vue'
+import { AnimatePresence, motion } from 'motion-v'
 import { useI18n } from 'vue-i18n'
+import {
+  ArrowUpRight,
+  BookOpen,
+  CalendarDays,
+  Eye,
+  Heart,
+  MessageCircle,
+  RefreshCw,
+  Search,
+  SlidersHorizontal,
+  UserRound,
+  Video
+} from 'lucide-vue-next'
+import MotionModal from '../components/motion/MotionModal.vue'
 import api, { endpoints } from '../api'
+import type {
+  HeritageCommentItem,
+  HeritageEventItem,
+  HeritageInheritorItem,
+  HeritageItem
+} from '../api'
+import { useAuthStore } from '../stores/auth'
+import type * as Leaflet from 'leaflet'
+import {
+  cardExit,
+  cardInitial,
+  cardInView,
+  cardTransition,
+  inViewOnce,
+  motionEase,
+  revealInitial,
+  revealInView,
+  revealTransition,
+  softSpring
+} from '../motion/presets'
 
 const { t, locale } = useI18n()
-
-const cardsEntered = ref(false)
 
 const heritageCategories = computed(() => [
   {
@@ -437,22 +1097,23 @@ const heritageCategories = computed(() => [
     prefix: t('heritage.category.traditionalCraft'),
     icon: '🧶',
     layout: 'lg:-mt-6 lg:-mr-6 z-30'
+  },
+  {
+    name: t('heritage.category.traditionalMedicine'),
+    prefix: t('heritage.category.traditionalMedicine'),
+    icon: '🌿',
+    layout: 'lg:mt-6 z-20'
+  },
+  {
+    name: t('heritage.category.folkCustom'),
+    prefix: t('heritage.category.folkCustom'),
+    icon: '🏔️',
+    layout: 'lg:-mt-4 lg:mr-4 z-20'
   }
 ])
 
-interface HeritageItem {
-  id: number
-  name: string
-  description: string
-  category: string
-  imageUrl: string
-  videoUrl: string
-  originStory: string
-  significance: string
-  baikeUrl: string
-}
+const authStore = useAuthStore()
 
-// 根据名称构造百度百科链接
 const buildBaikeUrl = (name: string): string => {
   return 'https://baike.baidu.com/search?word=' + encodeURIComponent(name)
 }
@@ -461,12 +1122,124 @@ const heritageItems = ref<HeritageItem[]>([])
 const loading = ref(true)
 const selectedItem = ref<HeritageItem | null>(null)
 
+const searchKeyword = ref('')
+const searchLoading = ref(false)
+
+const itemComments = ref<HeritageCommentItem[]>([])
+const commentsLoading = ref(false)
+const itemInheritors = ref<HeritageInheritorItem[]>([])
+const itemEvents = ref<HeritageEventItem[]>([])
+const liked = ref(false)
+const newCommentContent = ref('')
+const newCommentRating = ref(5)
+const submittingComment = ref(false)
+const upcomingEvents = ref<HeritageEventItem[]>([])
+const featuredInheritors = ref<HeritageInheritorItem[]>([])
+const featuredInheritorsLoading = ref(false)
+const selectedCategory = ref('all')
+
+type HeritageSortMode = 'hot' | 'views' | 'likes' | 'comments' | 'latest' | 'name'
+
+const sortMode = ref<HeritageSortMode>('hot')
+
+const genericHeritageImagePatterns = [
+  'images.unsplash.com/photo-1559827291'
+]
+
+const heritageImageByName: Record<string, string> = {
+  格萨尔史诗: '/heritage/格萨尔史诗.jpg',
+  格萨尔: '/heritage/格萨尔史诗.jpg',
+  藏戏: '/heritage/藏戏.jpg',
+  藏族唐卡: '/heritage/唐卡.jpg',
+  唐卡: '/heritage/唐卡.jpg',
+  藏医药浴法: '/heritage/藏药.jpg',
+  藏药: '/heritage/藏药.jpg',
+  拉萨囊玛: '/heritage/拉萨囊玛.jpg',
+  拉萨朗玛: '/heritage/拉萨囊玛.jpg',
+  囊玛: '/heritage/拉萨囊玛.jpg',
+  那曲山歌: '/heritage/那曲山歌.jpeg',
+  藏族山歌: '/heritage/那曲山歌.jpeg',
+  藏北民歌: '/heritage/那曲山歌.jpeg',
+  热巴舞: '/heritage/热巴舞.jpg',
+  锅庄舞: '/heritage/锅庄舞.jpg',
+  弦子舞: '/heritage/弦子舞.jpg',
+  门巴戏: '/heritage/门巴戏.jpg',
+  藏族传统马术: '/heritage/藏族传统马术.jpg',
+  马术: '/heritage/藏族传统马术.jpg',
+  藏香制作技艺: '/heritage/藏香制作技艺.jpg',
+  藏香: '/heritage/藏香制作技艺.jpg',
+  藏刀锻制技艺: '/heritage/藏刀锻制技艺.jpg',
+  藏刀: '/heritage/藏刀锻制技艺.jpg',
+  '藏族邦典/卡垫织造技艺': '/heritage/藏族邦典卡垫织造技艺.jpg',
+  藏族邦典卡垫织造技艺: '/heritage/藏族邦典卡垫织造技艺.jpg',
+  邦典: '/heritage/藏族邦典卡垫织造技艺.jpg',
+  卡垫: '/heritage/藏族邦典卡垫织造技艺.jpg',
+  藏族雕版印刷技艺: '/heritage/藏族雕版印刷技艺.jpg',
+  雕版印刷: '/heritage/藏族雕版印刷技艺.jpg',
+  藏族造纸技艺: '/heritage/藏族造纸技艺.jpg',
+  藏纸: '/heritage/藏族造纸技艺.jpg',
+  雪顿节: '/heritage/雪顿节.jpg',
+  望果节: '/heritage/望果节.jpg',
+  藏族金属锻造技艺: '/heritage/藏族金属锻造技艺.jpg',
+  金属锻造: '/heritage/藏族金属锻造技艺.jpg',
+  墨脱石锅制作技艺: '/heritage/墨脱石锅制作技艺.jpg',
+  墨脱石锅: '/heritage/墨脱石锅制作技艺.jpg',
+  羌姆: '/heritage/羌姆.jpg',
+  'གེ་སར': '/heritage/格萨尔史诗.jpg',
+  'བོད་ཟློས་གར': '/heritage/藏戏.jpg',
+  'ཐང་ཀ': '/heritage/唐卡.jpg',
+  'བོད་སྨན': '/heritage/藏药.jpg'
+}
+
+const isGenericHeritageImage = (imageUrl?: string | null): boolean =>
+  !imageUrl || genericHeritageImagePatterns.some(pattern => imageUrl.includes(pattern))
+
+const findMappedHeritageImage = (name?: string | null): string => {
+  if (!name) return ''
+  const normalizedName = name.replace(/[（）()《》“”"·/、\s]/g, '')
+  const direct = heritageImageByName[name] || heritageImageByName[normalizedName]
+  if (direct) return direct
+
+  const match = Object.entries(heritageImageByName).find(([key]) => {
+    const normalizedKey = key.replace(/[（）()《》“”"·/、\s]/g, '')
+    return normalizedName.includes(normalizedKey) || normalizedKey.includes(normalizedName)
+  })
+  return match?.[1] || ''
+}
+
+const resolveHeritageImage = (item?: HeritageItem | null): string => {
+  const mapped = findMappedHeritageImage(item?.name)
+  if (mapped) return mapped
+
+  const imageUrl = item?.imageUrl?.trim()
+  return isGenericHeritageImage(imageUrl) ? '' : (imageUrl || '')
+}
+
+const applyHeritageImageFallback = (event: Event): void => {
+  const image = event.target as HTMLImageElement
+  image.style.display = 'none'
+}
+
 // 地图相关
 const mapContainer = ref<HTMLElement | null>(null)
 const mapLoading = ref(true)
 const mapError = ref(false) // 地图加载失败标志
-let map: any = null
-let markers: any[] = []
+let map: Leaflet.Map | null = null
+let markers: Leaflet.Layer[] = []
+let pendingMapFrame: number | null = null
+let mapInitVersion = 0
+let leafletLoader: Promise<typeof Leaflet> | null = null
+
+const loadLeaflet = async () => {
+  if (!leafletLoader) {
+    leafletLoader = Promise.all([
+      import('leaflet'),
+      import('leaflet/dist/leaflet.css')
+    ]).then(([leaflet]) => leaflet)
+  }
+
+  return leafletLoader
+}
 
 interface ExperienceSpot {
   name: string
@@ -480,7 +1253,7 @@ interface ExperienceSpot {
 }
 
 // 西藏本地线下体验点（示例数据，可在后台扩展为可配置）
-const experienceSpots: ExperienceSpot[] = [
+const experienceSpotsZh: ExperienceSpot[] = [
   {
     name: '拉萨非遗体验中心（八廓街）',
     city: '拉萨',
@@ -523,14 +1296,59 @@ const experienceSpots: ExperienceSpot[] = [
   }
 ]
 
+const experienceSpotsBo: ExperienceSpot[] = [
+  {
+    name: 'ལྷ་ས་རིག་གནས་ཤུལ་བཞག་ཉམས་མྱོང་ལྟེ་གནས། བར་སྐོར།',
+    city: 'ལྷ་ས།',
+    address: 'ལྷ་ས་ཁྲེང་ཀོན་ཆུས། བར་སྐོར་རྐང་ཐང་ལམ་ཉེ་འགྲམ།',
+    lat: 29.653,
+    lng: 91.117,
+    tag: 'བོད།',
+    brief: 'བོད་ཟློས་གར། ཐང་ཀ བོད་སྤོས་སོགས་རིག་གནས་ཤུལ་བཞག་ཉམས་མྱོང་ས་ཚིགས།',
+    highlight: 'ས་ཚིགས་གཅིག་ཏུ་རིག་གནས་ཤུལ་བཞག་མང་པོ་ཉམས་མྱོང་།'
+  },
+  {
+    name: 'ནོར་བུ་གླིང་ཁ་ཐང་ཀའི་ལས་ཁང་།',
+    city: 'ལྷ་ས།',
+    address: 'ལྷ་ས་ཁྲེང་ཀོན་ཆུས། ནོར་བུ་གླིང་ཁ་ཉེ་འགྲམ་གྱི་ལག་ཤེས་སྲང་ལམ།',
+    lat: 29.642,
+    lng: 91.071,
+    tag: 'རིས།',
+    brief: 'ཐང་ཀ་འབྲི་བ་དང་བཤམས་སྟོན་ལ་ཆེད་དུ་གནས་པའི་ལས་ཁང་།',
+    highlight: 'རང་གིས་ཐང་ཀའི་རི་མོ་དམར་པོ་ཞིག་ཚོད་འབྲི།'
+  },
+  {
+    name: 'གཞིས་ཀ་རྩེ་བོད་ཟློས་གར་སྦྱོང་བརྡར་ལྟེ་གནས།',
+    city: 'གཞིས་ཀ་རྩེ།',
+    address: 'གཞིས་ཀ་རྩེ་བསམ་འགྲུབ་རྩེ་ཆུས། རིག་གནས་སྲང་ལམ་ནང་།',
+    lat: 29.268,
+    lng: 88.882,
+    tag: 'ཟློས།',
+    brief: 'བོད་ཟློས་གར་སྦྱོང་བརྡར་དང་འཁྲབ་སྟོན་བྱེད་པའི་ས་ཚིགས།',
+    highlight: 'ཉེ་ས་ནས་བོད་ཟློས་གར་ཆ་ཚང་ཞིག་ལྟ།'
+  },
+  {
+    name: 'ཉིང་ཁྲི་བོད་སྨན་རིག་གནས་ཉམས་མྱོང་ཁང་།',
+    city: 'ཉིང་ཁྲི།',
+    address: 'ཉིང་ཁྲི་བ་ཡི་ཆུས། བོད་སྨན་དང་བདེ་ཐང་རིག་གནས་ས་ཁུལ།',
+    lat: 29.654,
+    lng: 94.362,
+    tag: 'སྨན།',
+    brief: 'བོད་སྨན་བཤམས་སྟོན། འགྲེལ་བཤད། སྟབས་བདེའི་གསོ་རིག་ཉམས་མྱོང་ཟུང་འབྲེལ།',
+    highlight: 'བོད་སྨན་རྒྱུ་ཆ་དང་སྲོལ་རྒྱུན་བདེ་ཐང་ཐབས་ལམ་ཤེས་པ།'
+  }
+]
+
+const experienceSpots = computed(() => locale.value === 'bo' ? experienceSpotsBo : experienceSpotsZh)
+
 // 代表性项目中要固定展示的几个核心项目
 const representativeItems = computed<HeritageItem[]>(() => {
-  const extra: HeritageItem[] = [
+  const extraZh: HeritageItem[] = [
     {
       id: 10001,
       name: '藏药',
       description: '源自雪域高原的传统医学体系，吸收了藏族本土经验与印度、汉地医学精华，以丸、散、膏、丹等剂型闻名。',
-      category: '传统医药',
+      category: t('heritage.category.traditionalMedicine'),
       imageUrl: '/heritage/藏药.jpg',
       videoUrl: '',
       originStory: '',
@@ -571,16 +1389,70 @@ const representativeItems = computed<HeritageItem[]>(() => {
       baikeUrl: 'https://baike.baidu.com/item/%E5%94%90%E5%8D%A1'
     }
   ]
+  const extraBo: HeritageItem[] = [
+    {
+      id: 10001,
+      name: 'བོད་སྨན།',
+      description: 'གངས་ལྗོངས་ས་མཐོ་ནས་བྱུང་བའི་སྲོལ་རྒྱུན་སྨན་རིག་མ་ལག བོད་མིའི་ཉམས་མྱོང་དང་རྒྱ་གར། རྒྱ་ནག་སྨན་རིག་གི་སྙིང་པོ་བསྡུས་ཡོད།',
+      category: t('heritage.category.traditionalMedicine'),
+      imageUrl: '/heritage/藏药.jpg',
+      videoUrl: '',
+      originStory: '',
+      significance: 'བོད་མིས་ས་མཐོའི་རང་བྱུང་ཁོར་ཡུག་དང་མཉམ་འཚོའི་ནང་གྲུབ་པའི་བདེ་ཐང་ཤེས་རབ་མཚོན།',
+      baikeUrl: 'https://baike.baidu.com/item/%E8%97%8F%E5%8C%BB%E8%8D%AF%E6%B5%B4%E6%B3%95'
+    },
+    {
+      id: 10002,
+      name: 'གེ་སར་སྒྲུང་།',
+      description: '“འཛམ་གླིང་གི་སྒྲུང་རིང་ཤོས” ཞེས་གྲགས། སྒྲུང་མཁན་གྱི་ཁ་བརྒྱུད་དང་རང་བྱུང་གླུ་སྒྲུང་གིས་མི་རབས་ནས་མི་རབས་སུ་བརྒྱུད།',
+      category: t('heritage.category.folkLiterature'),
+      imageUrl: '/heritage/格萨尔史诗.jpg',
+      videoUrl: '',
+      originStory: '',
+      significance: 'བོད་མིའི་ལོ་རྒྱུས་དྲན་ཤེས། དཔའ་བོའི་ཕུགས་བསམ། རིན་ཐང་ལྟ་ཚུལ་བཅས་ཟིན་ཐོར་བཀོད་ཡོད།',
+      baikeUrl: 'https://baike.baidu.com/item/%E6%A0%BC%E8%90%A8%E5%B0%94%E7%8E%8B%E4%BC%A0'
+    },
+    {
+      id: 10003,
+      name: 'བོད་ཟློས་གར།',
+      description: '“བོད་རིག་གནས་ཀྱི་གསོན་པོའི་དངོས་རྫས” ཞེས་གྲགས། གླུ་གར། གཏམ་བཤད། འཁྲབ་སྟོན་བཅས་ཟུང་འབྲེལ་གྱི་སྲོལ་རྒྱུན་ཟློས་གར།',
+      category: t('heritage.category.traditionalDrama'),
+      imageUrl: '/heritage/藏戏.jpg',
+      videoUrl: '',
+      originStory: '',
+      significance: 'ཆོས་ལུགས་ཆོ་ག ལོ་རྒྱུས་སྒྲུང་། མི་དམངས་གཏམ་རྒྱུད་བཅས་མཉམ་སྡེབ་བྱས་པའི་རིག་གནས་སྒེའུ་ཁུང་།',
+      baikeUrl: 'https://baike.baidu.com/item/%E8%97%8F%E6%88%8F'
+    },
+    {
+      id: 10004,
+      name: 'བོད་རིགས་ཐང་ཀ',
+      description: 'རྡོ་སྨན་ཚོན་རྫས་ཀྱིས་རས། ཤོག་བུའམ་དར་རས་ཐོག་ཏུ་འབྲི་བའི་ཆོས་ལུགས་རི་མོ། ཚོན་མདོག་བཀྲ་ཤིས་ཤིང་གྲུབ་ཚུལ་ནན་ཏན་ཡིན།',
+      category: t('heritage.category.traditionalCraft'),
+      imageUrl: '/heritage/唐卡.jpg',
+      videoUrl: '',
+      originStory: '',
+      significance: 'ཐང་ཀས་བོད་བརྒྱུད་ནང་བསྟན་གྱི་ཆོས་དོན། ལོ་རྒྱུས་མི་སྣ། འཇིག་རྟེན་ལྟ་ཚུལ་བཅས་འཁུར་ཡོད།',
+      baikeUrl: 'https://baike.baidu.com/item/%E5%94%90%E5%8D%A1'
+    }
+  ]
+
+  const extra = locale.value === 'bo' ? extraBo : extraZh
 
   // 为了避免和后台数据重复，先把与手动固定项目同名的条目从后台列表中排除
   const extraNames = new Set(extra.map(item => item.name))
 
   const base = heritageItems.value
+    .map(item => ({
+      ...item,
+      imageUrl: resolveHeritageImage(item)
+    }))
     .filter(item => {
       // 1. 排除与固定项目同名的条目
       if (extraNames.has(item.name)) return false
       // 2. 特殊处理：后台里叫“唐卡”，前端固定用“藏族唐卡”，这里直接去掉后台的“唐卡”
       if (item.name === '唐卡' && extraNames.has('藏族唐卡')) return false
+      // 3. 代表卡片只收录能映射到明确本地图片的条目，避免泛图或断链图混入
+      if (!item.imageUrl) return false
       return true
     })
     .slice(0, 4)
@@ -597,9 +1469,9 @@ interface NationalHeritageItem {
   description: string
 }
 
-// 直接把你提供的 txt 内容嵌进来，后面做简单解析
-const nationalHeritageRaw = `西藏国家级非物质文化遗产名录 (仅国家级项目)
-西藏自治区共有106 项国家级非物质文化遗产代表性项目，其中 3 项 (格萨尔、藏戏、藏医药浴法) 被列入联合国教科文组织人类非物质文化遗产代表作名录。以下是按照六大类整理的完整名单：
+// 结合本模块已收录内容与国家级非遗类别，保留明确属于非遗的项目。
+const nationalHeritageRaw = `西藏国家级非物质文化遗产项目导览
+西藏自治区拥有丰富的国家级非物质文化遗产代表性项目，其中格萨尔、藏戏、藏医药浴法等项目还被列入联合国教科文组织人类非物质文化遗产代表作名录。以下围绕本模块已收录内容与常见国家级项目，按八类整理，避免把普通景点或泛文化内容混入非遗名录：
 一、民间文学类 (1 项)
 格萨尔（第一批，2006 年）：世界最长的史诗，被誉为 "活形态史诗"，由艺人口头传唱，2009 年入选联合国教科文组织人类非遗代表作名录
 二、传统音乐类 (5 项)
@@ -670,7 +1542,105 @@ const nationalHeritageRaw = `西藏国家级非物质文化遗产名录 (仅国�
 藏族扎囊木雕（第五批，2021 年）：扎囊县传统木雕工艺，用于制作佛像和家具
 晒盐技艺（井盐晒制技艺）（第二批，2008 年）：芒康县传统制盐工艺，展示了藏族人民与自然和谐共处的智慧
 墨脱石锅制作技艺（第四批，2014 年）：林芝市墨脱县传统厨具制作技艺，2015 年成为国家批准保护的地理标志产品
-藏族传统榨油技艺（江孜传统榨油技艺）：日喀则市江孜县传统榨油工艺，使用传统的木制榨油设备`
+藏族传统榨油技艺（江孜传统榨油技艺）：日喀则市江孜县传统榨油工艺，使用传统的木制榨油设备
+七、传统医药类 (1 项)
+藏医药浴法（藏医药浴疗法）：以藏医学理论为基础，结合雪域高原药材、温泉资源和浴疗经验形成的外治疗法，2018 年入选联合国教科文组织人类非遗代表作名录
+八、民俗类 (2 项)
+雪顿节（第一批，2006 年）：以展佛、藏戏汇演、民俗游艺等活动为核心的藏族重要节庆
+望果节（第四批，2014 年）：西藏农区秋收前后举行的农耕民俗节日，以绕田巡游、祈愿丰收、歌舞竞技等活动传承乡土共同体记忆`
+
+const getTibetanNationalHeritageItems = (): NationalHeritageItem[] => [
+  {
+    id: 1,
+    category: t('heritage.category.folkLiterature'),
+    name: 'གེ་སར།',
+    description: 'འཛམ་གླིང་གི་སྒྲུང་རིང་ཤོས་སུ་གྲགས་པའི་བོད་ཀྱི་དཔའ་བོའི་སྒྲུང་། སྒྲུང་མཁན་གྱི་ཁ་བརྒྱུད་ཀྱིས་ད་བར་བརྒྱུད་ཡོད།'
+  },
+  {
+    id: 2,
+    category: t('heritage.category.traditionalMusic'),
+    name: 'ནག་ཆུའི་རི་གླུ།',
+    description: 'བྱང་ཐང་ས་མཐོའི་རྩྭ་ཐང་འཚོ་བ་ལས་བྱུང་བའི་སྲོལ་རྒྱུན་དམངས་གླུ།'
+  },
+  {
+    id: 3,
+    category: t('heritage.category.traditionalMusic'),
+    name: 'ལྷ་སའི་ནང་མ།',
+    description: 'བོད་ཀྱི་གསོལ་སྟོན་དང་གླུ་གར་སྲོལ་རྒྱུན་ནང་གི་གླུ་རོལ་རྣམ་པ་གཙོ་བོ།'
+  },
+  {
+    id: 4,
+    category: t('heritage.category.traditionalDance'),
+    name: 'རེ་པ་གར།',
+    description: 'གླུ་དང་གར། རྩལ་འཁྲབ་བཅས་མཉམ་སྡེབ་ཀྱི་བོད་ཀྱི་སྲོལ་རྒྱུན་འཁྲབ་རྩལ།'
+  },
+  {
+    id: 5,
+    category: t('heritage.category.traditionalDance'),
+    name: 'མང་ཁང་གི་ཞན་ཙི།',
+    description: 'སྒྲ་སྙན་གྱི་རོལ་མོ་དང་མཉམ་དུ་འཁྲབ་པའི་མང་ཁང་ས་ཁུལ་གྱི་མཉམ་གར།'
+  },
+  {
+    id: 6,
+    category: t('heritage.category.traditionalDance'),
+    name: 'སྐོར་གར།',
+    description: 'བོད་མིའི་རྩྭ་ཐང་དང་གྲོང་སྡེའི་འཚོ་བའི་ནང་ཁྱབ་པའི་སྡེ་ཚན་མཉམ་གར།'
+  },
+  {
+    id: 7,
+    category: t('heritage.category.traditionalDrama'),
+    name: 'བོད་ཟློས་གར།',
+    description: 'ཆོས་ལུགས་ཆོ་ག་དང་ལོ་རྒྱུས་སྒྲུང་མཉམ་འདྲེས་ཀྱི་སྲོལ་རྒྱུན་ཟློས་གར།'
+  },
+  {
+    id: 8,
+    category: t('heritage.category.traditionalDrama'),
+    name: 'ལྷ་ས་ཇོ་མོ་ལུང་།',
+    description: 'བོད་ཟློས་གར་གྱི་གྲགས་ཆེ་བའི་རྒྱུན་ལུགས་གཅིག'
+  },
+  {
+    id: 9,
+    category: t('heritage.category.traditionalSports'),
+    name: 'བོད་རིགས་ཀྱི་རྟ་རྩལ།',
+    description: 'བོད་ཀྱི་རྟ་ཞོན་རྩལ་དང་རྩྭ་ཐང་འཚོ་བ་མཚོན་པའི་སྲོལ་རྒྱུན་ལུས་རྩལ།'
+  },
+  {
+    id: 10,
+    category: t('heritage.category.traditionalCraft'),
+    name: 'བོད་རིགས་ཐང་ཀ',
+    description: 'ཆོས་ལུགས་རི་མོ་དང་རྡོ་སྨན་ཚོན་རྫས་ལག་རྩལ་ཟུང་འབྲེལ་གྱི་བོད་ཀྱི་རི་མོའི་མཚོན་རྟགས།'
+  },
+  {
+    id: 11,
+    category: t('heritage.category.traditionalCraft'),
+    name: 'བོད་རིགས་ལྕགས་རིགས་བཟོ་རྩལ།',
+    description: 'བོད་ཀྱི་གྲི། ཟངས་ཆས། གསེར་དངུལ་རྒྱན་ཆ་སོགས་བཟོ་བའི་ལག་ཤེས།'
+  },
+  {
+    id: 12,
+    category: t('heritage.category.traditionalCraft'),
+    name: 'བོད་སྤོས་བཟོ་རྩལ།',
+    description: 'མིན་གྲོལ་གླིང་སོགས་སྲོལ་རྒྱུན་ནས་བྱུང་བའི་སྤོས་རྫས་དང་བཟོ་རྩལ།'
+  },
+  {
+    id: 13,
+    category: t('heritage.category.traditionalMedicine'),
+    name: 'བོད་སྨན་ཁྲུས་ཐབས།',
+    description: 'བོད་སྨན་རིག་པའི་གཞི་རྩ་དང་ས་མཐོའི་སྨན་རྩྭ། ཆུ་ཚན་སོགས་ཟུང་འབྲེལ་གྱི་ཕྱི་བཅོས་ཐབས་ལམ།'
+  },
+  {
+    id: 14,
+    category: t('heritage.category.folkCustom'),
+    name: 'ཞོ་སྟོན།',
+    description: 'འགྲེམས་སྟོན་ཆོ་ག བོད་ཟློས་གར་འཁྲབ་སྟོན། དམངས་ཁྲོད་རྩེད་མོ་བཅས་མཉམ་སྡེབ་ཀྱི་བོད་ཀྱི་དུས་ཆེན་གལ་ཆེན།'
+  },
+  {
+    id: 15,
+    category: t('heritage.category.folkCustom'),
+    name: 'འོང་སྐོར།',
+    description: 'ཞིང་ལས་ཐོན་སྐྱེད་དང་ལོ་ལེགས་སྨོན་འདུན་ལ་འབྲེལ་བའི་བོད་ཀྱི་ཞིང་གྲོང་དམངས་སྲོལ།'
+  }
+]
 
 // 简单归一化分类名称，便于和上方大类卡片对应
 const normalizeCategoryName = (name: string) => {
@@ -682,12 +1652,16 @@ const normalizeCategoryName = (name: string) => {
 }
 
 const nationalHeritageItems = computed<NationalHeritageItem[]>(() => {
+  if (locale.value === 'bo') {
+    return getTibetanNationalHeritageItems()
+  }
+
   const lines = nationalHeritageRaw.split('\n').map(l => l.trim()).filter(Boolean)
   const items: NationalHeritageItem[] = []
   let currentCategory = ''
   let id = 1
 
-  const categoryPrefixes = ['一、', '二、', '三、', '四、', '五、', '六、']
+  const categoryPrefixes = ['一、', '二、', '三、', '四、', '五、', '六、', '七、', '八、']
 
   for (const line of lines) {
     // 分类标题行
@@ -746,21 +1720,299 @@ const getItemsByCategory = (categoryName: string): NationalHeritageItem[] => {
   return nationalHeritageByCategory.value[key] || []
 }
 
-const fetchHeritageItems = async () => {
+const sortOptions = computed<Array<{ value: HeritageSortMode; label: string }>>(() => [
+  { value: 'hot', label: '综合热度' },
+  { value: 'views', label: '浏览最多' },
+  { value: 'likes', label: '点赞最多' },
+  { value: 'comments', label: '评论最多' },
+  { value: 'latest', label: '最新收录' },
+  { value: 'name', label: '名称排序' }
+])
+
+const categoryOptions = computed(() => {
+  const categories = new Set<string>()
+  heritageItems.value.forEach(item => {
+    const category = item.category?.trim()
+    if (category) categories.add(category)
+  })
+  return Array.from(categories).sort((a, b) => a.localeCompare(b, 'zh-CN'))
+})
+
+const heritageNameById = computed<Record<number, string>>(() => {
+  return heritageItems.value.reduce<Record<number, string>>((map, item) => {
+    map[item.id] = item.name
+    return map
+  }, {})
+})
+
+const totalViews = computed(() =>
+  heritageItems.value.reduce((sum, item) => sum + (item.viewCount || 0), 0)
+)
+
+const totalInteractions = computed(() =>
+  heritageItems.value.reduce((sum, item) => sum + (item.likeCount || 0) + (item.commentCount || 0), 0)
+)
+
+const getHeritageScore = (item: HeritageItem) =>
+  (item.viewCount || 0) + (item.likeCount || 0) * 8 + (item.commentCount || 0) * 12 + (item.videoUrl ? 15 : 0) + (item.protectionLevel ? 5 : 0)
+
+const filteredHeritageItems = computed<HeritageItem[]>(() => {
+  const keyword = searchKeyword.value.trim().toLocaleLowerCase()
+  const items = heritageItems.value.filter(item => {
+    if (selectedCategory.value !== 'all' && item.category !== selectedCategory.value) return false
+    if (!keyword) return true
+
+    return [
+      item.name,
+      item.nameTibetan,
+      item.description,
+      item.category,
+      item.region,
+      item.protectionLevel,
+      item.originStory,
+      item.significance
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLocaleLowerCase()
+      .includes(keyword)
+  })
+
+  return [...items].sort((a, b) => {
+    switch (sortMode.value) {
+      case 'views':
+        return (b.viewCount || 0) - (a.viewCount || 0)
+      case 'likes':
+        return (b.likeCount || 0) - (a.likeCount || 0)
+      case 'comments':
+        return (b.commentCount || 0) - (a.commentCount || 0)
+      case 'latest':
+        return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+      case 'name':
+        return (a.name || '').localeCompare(b.name || '', 'zh-CN')
+      case 'hot':
+      default:
+        return getHeritageScore(b) - getHeritageScore(a)
+    }
+  })
+})
+
+const formatCompact = (value: number) =>
+  new Intl.NumberFormat('zh-CN', {
+    notation: 'compact',
+    maximumFractionDigits: 1
+  }).format(value)
+
+const formatEventMonth = (dateStr?: string) => {
+  if (!dateStr) return '--'
+  const date = new Date(dateStr)
+  if (Number.isNaN(date.getTime())) return '--'
+  return `${date.getMonth() + 1}月`
+}
+
+const formatEventDay = (dateStr?: string) => {
+  if (!dateStr) return '--'
+  const date = new Date(dateStr)
+  if (Number.isNaN(date.getTime())) return '--'
+  return String(date.getDate()).padStart(2, '0')
+}
+
+const selectCategory = (category: string) => {
+  selectedCategory.value = selectedCategory.value === category ? 'all' : category
+}
+
+const mergeFeaturedInheritors = (inheritors: HeritageInheritorItem[]) => {
+  const merged = new Map<number, HeritageInheritorItem>()
+  ;[...featuredInheritors.value, ...inheritors].forEach(inheritor => {
+    if (inheritor?.id) merged.set(inheritor.id, inheritor)
+  })
+  featuredInheritors.value = Array.from(merged.values()).slice(0, 6)
+}
+
+const fetchFeaturedInheritors = async (items: HeritageItem[]) => {
+  const candidates = items.filter(item => item.id && item.id < 10000).slice(0, 8)
+  if (!candidates.length) {
+    featuredInheritors.value = []
+    return
+  }
+
+  featuredInheritorsLoading.value = true
   try {
-    // API拦截器会自动添加locale参数
-    const response = await api.get(endpoints.heritage.list)
-    heritageItems.value = response.data?.content || response.data || []
+    const responses = await Promise.all(
+      candidates.map(item =>
+        api.get(endpoints.heritage.inheritors(item.id))
+          .then(response => response.data || [])
+          .catch(() => [])
+      )
+    )
+    const merged = new Map<number, HeritageInheritorItem>()
+    responses.flat().forEach((inheritor: HeritageInheritorItem) => {
+      if (inheritor?.id) merged.set(inheritor.id, inheritor)
+    })
+    featuredInheritors.value = Array.from(merged.values()).slice(0, 6)
+  } catch (error) {
+    console.error('Failed to fetch featured inheritors:', error)
+  } finally {
+    featuredInheritorsLoading.value = false
+  }
+}
+
+const fetchUpcomingEvents = async () => {
+  try {
+    const response = await api.get(endpoints.heritage.upcomingEvents, { params: { size: 6 } })
+    upcomingEvents.value = response.data?.content || response.data || []
+  } catch (error) {
+    console.error('Failed to fetch upcoming heritage events:', error)
+  }
+}
+
+const updateHeritageItem = (id: number, patch: Partial<HeritageItem>) => {
+  heritageItems.value = heritageItems.value.map(item =>
+    item.id === id ? { ...item, ...patch } : item
+  )
+}
+
+const openHeritageById = (id?: number) => {
+  if (!id) return
+  const item = heritageItems.value.find(entry => entry.id === id)
+  if (item) openDetail(item)
+}
+
+const fetchHeritageItems = async (keyword?: string) => {
+  try {
+    const params: Record<string, string> = { size: '100' }
+    if (keyword) params.keyword = keyword
+    const response = await api.get(endpoints.heritage.list, { params })
+    const items = response.data?.content || response.data || []
+    heritageItems.value = items
+    void fetchFeaturedInheritors(items)
   } catch (error) {
     console.error('Failed to fetch heritage items:', error)
   } finally {
     loading.value = false
+    searchLoading.value = false
   }
+}
+
+const handleSearch = async () => {
+  const kw = searchKeyword.value.trim()
+  if (!kw) {
+    loading.value = true
+    await fetchHeritageItems()
+    return
+  }
+  searchLoading.value = true
+  await fetchHeritageItems(kw)
+}
+
+const refreshHeritageModule = async () => {
+  searchLoading.value = true
+  await Promise.all([
+    fetchHeritageItems(searchKeyword.value.trim() || undefined),
+    fetchUpcomingEvents()
+  ])
+}
+
+const loadDetailData = async (item: HeritageItem) => {
+  if (!item.id || item.id >= 10000) return
+
+  commentsLoading.value = true
+  try {
+    const [detailRes, commentsRes, inheritorsRes, eventsRes] = await Promise.all([
+      api.get(endpoints.heritage.detail(item.id)).catch(() => null),
+      api.get(endpoints.heritage.comments(item.id)).catch(() => null),
+      api.get(endpoints.heritage.inheritors(item.id)).catch(() => null),
+      api.get(endpoints.heritage.events(item.id)).catch(() => null)
+    ])
+    const detailItem = detailRes?.data as HeritageItem | undefined
+    if (detailItem?.id) {
+      selectedItem.value = { ...item, ...detailItem }
+      updateHeritageItem(item.id, detailItem)
+    }
+    itemComments.value = commentsRes?.data?.content || commentsRes?.data || []
+    itemInheritors.value = inheritorsRes?.data || []
+    itemEvents.value = eventsRes?.data || []
+    mergeFeaturedInheritors(itemInheritors.value)
+  } catch (e) {
+    console.error('Failed to load detail data:', e)
+  } finally {
+    commentsLoading.value = false
+  }
+
+  if (authStore.isLoggedIn) {
+    try {
+      const res = await api.get(endpoints.heritage.likeStatus(item.id))
+      liked.value = res.data?.liked || false
+    } catch { liked.value = false }
+  }
+}
+
+const toggleLike = async () => {
+  if (!selectedItem.value || !authStore.isLoggedIn) return
+  try {
+    const res = await api.post(endpoints.heritage.like(selectedItem.value.id))
+    const nextLiked = res.data?.liked ?? !liked.value
+    const nextLikeCount = typeof res.data?.likeCount === 'number'
+      ? res.data.likeCount
+      : Math.max(0, (selectedItem.value.likeCount || 0) + (nextLiked ? 1 : -1))
+    liked.value = nextLiked
+    selectedItem.value = { ...selectedItem.value, likeCount: nextLikeCount }
+    updateHeritageItem(selectedItem.value.id, { likeCount: nextLikeCount })
+  } catch (e) {
+    console.error('Failed to toggle like:', e)
+  }
+}
+
+const submitComment = async () => {
+  if (!selectedItem.value || !authStore.isLoggedIn || !newCommentContent.value.trim()) return
+  submittingComment.value = true
+  try {
+    const res = await api.post(endpoints.heritage.comments(selectedItem.value.id), {
+      content: newCommentContent.value.trim(),
+      rating: newCommentRating.value
+    })
+    if (res.data) {
+      itemComments.value = [res.data, ...itemComments.value]
+      if (selectedItem.value) {
+        const nextCommentCount = (selectedItem.value.commentCount || 0) + 1
+        selectedItem.value = { ...selectedItem.value, commentCount: nextCommentCount }
+        updateHeritageItem(selectedItem.value.id, { commentCount: nextCommentCount })
+      }
+    }
+    newCommentContent.value = ''
+    newCommentRating.value = 5
+  } catch (e) {
+    console.error('Failed to submit comment:', e)
+  } finally {
+    submittingComment.value = false
+  }
+}
+
+const deleteComment = async (commentId: number) => {
+  if (!selectedItem.value) return
+  try {
+    await api.delete(endpoints.heritage.deleteComment(selectedItem.value.id, commentId))
+    itemComments.value = itemComments.value.filter(c => c.id !== commentId)
+    if (selectedItem.value) {
+      const nextCommentCount = Math.max(0, (selectedItem.value.commentCount || 1) - 1)
+      selectedItem.value = { ...selectedItem.value, commentCount: nextCommentCount }
+      updateHeritageItem(selectedItem.value.id, { commentCount: nextCommentCount })
+    }
+  } catch (e) {
+    console.error('Failed to delete comment:', e)
+  }
+}
+
+const formatDate = (dateStr: string) => {
+  try {
+    return new Date(dateStr).toLocaleDateString('zh-CN', { year: 'numeric', month: 'short', day: 'numeric' })
+  } catch { return dateStr }
 }
 
 // 监听语言变化，重新获取数据
 watch(locale, () => {
-  fetchHeritageItems()
+  void fetchHeritageItems(searchKeyword.value.trim() || undefined)
+  void fetchUpcomingEvents()
 })
 
 const toggleCategory = (categoryName: string) => {
@@ -769,6 +2021,12 @@ const toggleCategory = (categoryName: string) => {
 
 const openDetail = (item: HeritageItem) => {
   selectedItem.value = item
+  itemComments.value = []
+  itemInheritors.value = []
+  itemEvents.value = []
+  liked.value = false
+  newCommentContent.value = ''
+  loadDetailData(item)
 }
 
 const openBaikeUrl = (url: string) => {
@@ -782,176 +2040,177 @@ const buildNavUrl = (spot: ExperienceSpot) => {
   return `${base}?to=${to}&mode=car&utm_source=colorful-tibet`
 }
 
-// 处理地图图片加载错误
-const handleImageError = (event: Event) => {
-  const img = event.target as HTMLImageElement
-  console.warn('地图图片加载失败，使用备用方案')
-  // 如果图片加载失败，可以设置一个备用图片或隐藏图片
-  img.style.display = 'none'
+const clearMap = () => {
+  mapInitVersion += 1
+  if (pendingMapFrame !== null) {
+    window.cancelAnimationFrame(pendingMapFrame)
+    pendingMapFrame = null
+  }
+
+  if (map) {
+    map.remove()
+    map = null
+  }
+  markers = []
 }
 
-// 初始化高德地图
-const initMap = () => {
+const htmlEscapeMap: Record<string, string> = {
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '"': '&quot;',
+  "'": '&#39;'
+}
+
+const escapeHtml = (value: string): string =>
+  value.replace(/[&<>"']/g, char => htmlEscapeMap[char] || char)
+
+const PI = Math.PI
+const A = 6378245.0
+const EE = 0.00669342162296594323
+
+const outOfChina = (lng: number, lat: number): boolean =>
+  lng < 72.004 || lng > 137.8347 || lat < 0.8293 || lat > 55.8271
+
+const transformLat = (x: number, y: number): number => {
+  let ret = -100.0 + 2.0 * x + 3.0 * y + 0.2 * y * y + 0.1 * x * y + 0.2 * Math.sqrt(Math.abs(x))
+  ret += (20.0 * Math.sin(6.0 * x * PI) + 20.0 * Math.sin(2.0 * x * PI)) * 2.0 / 3.0
+  ret += (20.0 * Math.sin(y * PI) + 40.0 * Math.sin(y / 3.0 * PI)) * 2.0 / 3.0
+  ret += (160.0 * Math.sin(y / 12.0 * PI) + 320 * Math.sin(y * PI / 30.0)) * 2.0 / 3.0
+  return ret
+}
+
+const transformLon = (x: number, y: number): number => {
+  let ret = 300.0 + x + 2.0 * y + 0.1 * x * x + 0.1 * x * y + 0.1 * Math.sqrt(Math.abs(x))
+  ret += (20.0 * Math.sin(6.0 * x * PI) + 20.0 * Math.sin(2.0 * x * PI)) * 2.0 / 3.0
+  ret += (20.0 * Math.sin(x * PI) + 40.0 * Math.sin(x / 3.0 * PI)) * 2.0 / 3.0
+  ret += (150.0 * Math.sin(x / 12.0 * PI) + 300.0 * Math.sin(x / 30.0 * PI)) * 2.0 / 3.0
+  return ret
+}
+
+const wgs84ToGcj02 = (lng: number, lat: number): [number, number] => {
+  if (outOfChina(lng, lat)) return [lng, lat]
+  const dlat = transformLat(lng - 105.0, lat - 35.0)
+  const dlng = transformLon(lng - 105.0, lat - 35.0)
+  const radlat = lat / 180.0 * PI
+  let magic = Math.sin(radlat)
+  magic = 1 - EE * magic * magic
+  const sqrtmagic = Math.sqrt(magic)
+  const mglat = (dlat * 180.0) / ((A * (1 - EE)) / (magic * sqrtmagic) * PI)
+  const mglng = (dlng * 180.0) / (A / sqrtmagic * Math.cos(radlat) * PI)
+  return [lng + mglng, lat + mglat]
+}
+
+const fitExperienceMarkers = (L: typeof Leaflet) => {
+  const leafletMap = map
+  if (!leafletMap) return
+
+  const positions = experienceSpots.value.map((spot) => {
+    const [lng, lat] = wgs84ToGcj02(spot.lng, spot.lat)
+    return L.latLng(lat, lng)
+  })
+  if (!positions.length) return
+
+  leafletMap.fitBounds(L.latLngBounds(positions), {
+    padding: [28, 28],
+    maxZoom: 8
+  })
+}
+
+const addExperienceMarkers = (L: typeof Leaflet) => {
+  const leafletMap = map
+  if (!leafletMap) return
+  markers.forEach(marker => marker.remove())
+  markers = []
+
+  experienceSpots.value.forEach((spot) => {
+    try {
+      const [lng, lat] = wgs84ToGcj02(spot.lng, spot.lat)
+      const marker = L.marker([lat, lng], {
+        title: spot.name,
+        icon: L.divIcon({
+          className: 'heritage-map-marker',
+          html: `<span style="display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:26px;padding:0 7px;border-radius:999px;background:#ef4444;color:#fff;font-size:12px;font-weight:700;box-shadow:0 8px 18px rgba(127,29,29,.28);border:2px solid rgba(255,255,255,.9);">${escapeHtml(spot.tag)}</span>`,
+          iconSize: [34, 34],
+          iconAnchor: [17, 17],
+          popupAnchor: [0, -16]
+        })
+      })
+
+      marker.bindPopup(`
+        <div style="padding:6px 2px;min-width:190px;max-width:240px;">
+          <h3 style="margin:0 0 8px 0;font-size:15px;font-weight:700;color:#1c1917;">${escapeHtml(spot.name)}</h3>
+          <p style="margin:4px 0;font-size:12px;color:#57534e;line-height:1.55;">${escapeHtml(spot.address)}</p>
+          <p style="margin:6px 0 0 0;font-size:12px;color:#78716c;line-height:1.55;">${escapeHtml(spot.brief)}</p>
+          <p style="margin:6px 0 0 0;font-size:12px;color:#dc2626;line-height:1.55;">${escapeHtml(spot.highlight)}</p>
+        </div>
+      `)
+      marker.addTo(leafletMap)
+      markers.push(marker)
+    } catch (error) {
+      console.error('添加标记失败:', error)
+    }
+  })
+
+  fitExperienceMarkers(L)
+}
+
+// 初始化体验点地图
+const initMap = async () => {
   if (!mapContainer.value) {
     console.warn('地图容器未找到')
     mapLoading.value = false
     return
   }
-  
-  let retryCount = 0
-  const maxRetries = 20 // 最多重试20次（10秒）
-  
-  // 等待高德地图API加载完成
-  const checkAndInit = () => {
-    const AMap = (window as any).AMap
-    
-    if (!AMap) {
-      retryCount++
-      if (retryCount >= maxRetries) {
-        console.error('高德地图API加载超时，地图功能不可用')
-        mapError.value = true
-        mapLoading.value = false
-        return
-      }
-      // 如果高德地图API还没加载，等待一段时间后重试
-      setTimeout(() => {
-        checkAndInit()
-      }, 500)
-      return
-    }
-    
-    try {
-      console.log('开始初始化高德地图，容器:', mapContainer.value)
-      
-      // 创建地图实例，中心点设为拉萨
-      map = new AMap.Map(mapContainer.value, {
-        zoom: 6,
-        center: [91.117, 29.653], // 拉萨坐标 [经度, 纬度]
-        viewMode: '3D',
-        mapStyle: 'amap://styles/normal'
-      })
-      
-      console.log('地图实例创建成功')
-      
-      let mapComplete = false
-      
-      // 监听地图加载完成事件
-      map.on('complete', () => {
-        if (mapComplete) return // 防止重复触发
-        mapComplete = true
-        console.log('地图加载完成事件触发')
-        mapLoading.value = false
-        
-        // 添加体验点标记
-        try {
-          experienceSpots.forEach((spot) => {
-            try {
-              const marker = new AMap.Marker({
-                position: [spot.lng, spot.lat],
-                title: spot.name,
-                label: {
-                  content: `<div style="background: #ef4444; color: white; padding: 2px 6px; border-radius: 4px; font-size: 12px; white-space: nowrap;">${spot.tag}</div>`,
-                  direction: 'right',
-                  offset: [10, 0]
-                }
-              })
-              
-              // 添加信息窗口
-              const infoWindow = new AMap.InfoWindow({
-                content: `
-                  <div style="padding: 8px; min-width: 200px;">
-                    <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: bold;">${spot.name}</h3>
-                    <p style="margin: 4px 0; font-size: 12px; color: #666;">${spot.address}</p>
-                    <p style="margin: 4px 0; font-size: 12px; color: #666;">${spot.brief}</p>
-                    <p style="margin: 4px 0; font-size: 12px; color: #ef4444;">${spot.highlight}</p>
-                  </div>
-                `,
-                offset: [0, -30]
-              })
-              
-              marker.on('click', () => {
-                infoWindow.open(map, marker.getPosition())
-              })
-              
-              markers.push(marker)
-              map.add(marker)
-            } catch (markerError) {
-              console.error('添加标记失败:', markerError)
-            }
-          })
-          console.log('所有标记添加完成')
-        } catch (addMarkerError) {
-          console.error('添加标记过程出错:', addMarkerError)
-        }
-      })
-      
-      // 监听地图加载错误
-      map.on('error', (error: any) => {
-        console.error('地图加载错误:', error)
-        mapError.value = true
-        mapLoading.value = false
-      })
-      
-      // 检查地图状态，如果地图已经可用，立即隐藏加载提示
-      const checkMapStatus = () => {
-        try {
-          if (map && map.getStatus && map.getStatus() === 'complete') {
-            if (!mapComplete) {
-              console.log('地图状态检查：已加载完成')
-              mapComplete = true
-              mapLoading.value = false
-              // 触发添加标记
-              map.fire('complete')
-            }
-          }
-        } catch (e) {
-          // 忽略检查错误
-        }
-      }
-      
-      // 立即检查一次
-      setTimeout(checkMapStatus, 500)
-      
-      // 设置超时，如果5秒后还没加载完成，也隐藏加载提示（地图可能已经显示，只是事件没触发）
-      setTimeout(() => {
-        if (mapLoading.value && !mapComplete) {
-          console.warn('地图加载超时，但地图可能已显示，隐藏加载提示')
-          mapLoading.value = false
-          // 即使超时，也尝试添加标记
-          if (map) {
-            try {
-              experienceSpots.forEach((spot) => {
-                try {
-                  const marker = new AMap.Marker({
-                    position: [spot.lng, spot.lat],
-                    title: spot.name,
-                    label: {
-                      content: `<div style="background: #ef4444; color: white; padding: 2px 6px; border-radius: 4px; font-size: 12px; white-space: nowrap;">${spot.tag}</div>`,
-                      direction: 'right',
-                      offset: [10, 0]
-                    }
-                  })
-                  markers.push(marker)
-                  map.add(marker)
-                } catch (e) {
-                  // 忽略单个标记错误
-                }
-              })
-            } catch (e) {
-              console.error('超时后添加标记失败:', e)
-            }
-          }
-        }
-      }, 5000)
-      
-    } catch (error) {
-      console.error('地图初始化失败:', error)
-      mapError.value = true
+
+  mapLoading.value = true
+  mapError.value = false
+  const initVersion = ++mapInitVersion
+
+  try {
+    const L = await loadLeaflet()
+    if (!mapContainer.value || !selectedItem.value || initVersion !== mapInitVersion) return
+
+    map = L.map(mapContainer.value, {
+      zoomControl: false,
+      attributionControl: false
+    })
+    map.setView([29.653, 91.117], 6)
+
+    const tileLayer = L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}', {
+      maxZoom: 18,
+      minZoom: 3,
+      subdomains: '1234'
+    })
+
+    tileLayer.on('load', () => {
+      if (initVersion !== mapInitVersion) return
+      mapLoading.value = false
+    })
+    tileLayer.on('tileerror', () => {
+      if (initVersion !== mapInitVersion) return
+      mapLoading.value = false
+    })
+    tileLayer.addTo(map)
+    addExperienceMarkers(L)
+
+    window.setTimeout(() => {
+      if (initVersion !== mapInitVersion || !map) return
+      map.invalidateSize()
+      fitExperienceMarkers(L)
+    }, 250)
+
+    const finishMapLoad = () => {
+      if (initVersion !== mapInitVersion || !selectedItem.value) return
       mapLoading.value = false
     }
+    window.setTimeout(finishMapLoad, 8000)
+  } catch (error) {
+    if (initVersion !== mapInitVersion) return
+    console.error('地图初始化失败:', error)
+    mapError.value = true
+    mapLoading.value = false
   }
-  
-  checkAndInit()
 }
 
 // 监听 selectedItem 变化，当地图容器出现时初始化地图
@@ -959,24 +2218,25 @@ watch(selectedItem, async (newItem) => {
   if (newItem) {
     // 等待DOM更新，确保地图容器已渲染
     await nextTick()
-    // 再等待一小段时间确保容器完全渲染
-    setTimeout(() => {
-      initMap()
-    }, 100)
+    pendingMapFrame = window.requestAnimationFrame(() => {
+      pendingMapFrame = null
+      void initMap()
+    })
   } else {
     // 如果关闭了详情，清理地图
-    if (map) {
-      map.destroy()
-      map = null
-      markers = []
-    }
+    clearMap()
     mapLoading.value = true
     mapError.value = false
   }
 })
 
 onMounted(() => {
-  fetchHeritageItems()
+  void fetchHeritageItems()
+  void fetchUpcomingEvents()
+})
+
+onBeforeUnmount(() => {
+  clearMap()
 })
 </script>
 

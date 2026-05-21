@@ -1,43 +1,181 @@
+import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
 
-export const useAuthStore = defineStore('auth', () => {
-  const user = ref<any>(null)
-  const token = ref<string | null>(null)
+export interface AuthUser {
+  id?: number
+  username?: string
+  nickname?: string
+  role?: string
+  token?: string
+  accessToken?: string
+  jwt?: string
+  data?: {
+    token?: string
+    accessToken?: string
+  }
+  [key: string]: unknown
+}
 
-  const isLoggedIn = computed(() => !!token.value)
-  const isAdmin = computed(() => user.value?.role === 'ADMIN')
+const USER_STORAGE_KEY = 'user'
+const apiBaseURL = import.meta.env.VITE_API_BASE_URL || '/api'
 
-  function restoreFromStorage() {
-    const storedUser = localStorage.getItem('user')
-    const storedToken = localStorage.getItem('token')
-    if (storedUser && storedToken) {
-      try {
-        user.value = JSON.parse(storedUser)
-        token.value = storedToken
-      } catch {
-        user.value = null
-        token.value = null
-      }
+const hasStorage = () => typeof window !== 'undefined' && typeof window.localStorage !== 'undefined'
+
+const normalizedApiBaseURL = () => String(apiBaseURL).replace(/\/+$/, '')
+
+const SAFE_USER_FIELDS = new Set(['id', 'username', 'nickname', 'avatar', 'role', 'createdAt', 'mustChangePassword'])
+
+const stripAuthTokens = (userData: AuthUser): AuthUser => {
+  const { token: _token, accessToken: _accessToken, jwt: _jwt, data: _data, ...userWithoutToken } = userData
+  return userWithoutToken
+}
+
+const sanitizeForStorage = (userData: AuthUser): AuthUser => {
+  const safe: AuthUser = {}
+  for (const key of SAFE_USER_FIELDS) {
+    if (key in userData) safe[key] = userData[key]
+  }
+  return safe
+}
+
+const readStoredUser = (): AuthUser | null => {
+  if (!hasStorage()) return null
+
+  localStorage.removeItem('token')
+  const storedUser = localStorage.getItem(USER_STORAGE_KEY)
+  if (!storedUser) return null
+
+  try {
+    return stripAuthTokens(JSON.parse(storedUser) as AuthUser)
+  } catch {
+    clearStoredAuth()
+    return null
+  }
+}
+
+const persistUser = (userData: AuthUser) => {
+  if (!hasStorage()) return
+  localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(sanitizeForStorage(userData)))
+}
+
+export const clearStoredAuth = () => {
+  if (!hasStorage()) return
+  localStorage.removeItem(USER_STORAGE_KEY)
+  localStorage.removeItem('token')
+}
+
+const fetchCurrentUser = async (): Promise<AuthUser> => {
+  const locale = hasStorage() ? localStorage.getItem('locale') || 'zh' : 'zh'
+  const response = await fetch(`${normalizedApiBaseURL()}/auth/me`, {
+    credentials: 'include',
+    headers: {
+      Accept: 'application/json',
+      'Accept-Language': locale
     }
+  })
+
+  if (!response.ok) {
+    throw new Error(`Session refresh failed with status ${response.status}`)
   }
 
-  function login(userData: any, authToken: string) {
-    user.value = userData
-    token.value = authToken
-    localStorage.setItem('user', JSON.stringify(userData))
-    localStorage.setItem('token', authToken)
+  return response.json()
+}
+
+export const useAuthStore = defineStore('auth', () => {
+  const user = ref<AuthUser | null>(null)
+  const sessionChecked = ref(false)
+  const sessionLoading = ref(false)
+  let sessionRefreshPromise: Promise<boolean> | null = null
+
+  const isLoggedIn = computed(() => !!user.value)
+  const isAdmin = computed(() => isLoggedIn.value && user.value?.role === 'ADMIN')
+
+  function applySession(userData: AuthUser) {
+    const nextUser = stripAuthTokens(userData)
+    user.value = nextUser
+    sessionChecked.value = true
+    persistUser(nextUser)
+    return true
+  }
+
+  function login(userData: AuthUser, _authToken?: string | null) {
+    return applySession(userData)
   }
 
   function logout() {
     user.value = null
-    token.value = null
-    localStorage.removeItem('user')
-    localStorage.removeItem('token')
+    sessionChecked.value = true
+    clearStoredAuth()
   }
 
-  // Restore on store creation
-  restoreFromStorage()
+  async function refreshSession() {
+    if (sessionRefreshPromise) {
+      return sessionRefreshPromise
+    }
 
-  return { user, token, isLoggedIn, isAdmin, login, logout, restoreFromStorage }
+    sessionLoading.value = true
+    sessionRefreshPromise = (async () => {
+      try {
+        const currentUser = await fetchCurrentUser()
+        return applySession(currentUser)
+      } catch {
+        logout()
+        return false
+      } finally {
+        sessionChecked.value = true
+        sessionLoading.value = false
+        sessionRefreshPromise = null
+      }
+    })()
+
+    return sessionRefreshPromise
+  }
+
+  async function ensureSession() {
+    if (isLoggedIn.value) {
+      return true
+    }
+    return refreshSession()
+  }
+
+  function hasValidSession() {
+    return isLoggedIn.value
+  }
+
+  function restoreFromStorage() {
+    return !!readStoredUser()
+  }
+
+  function updateUser(patch: Partial<AuthUser>) {
+    if (!user.value) return
+    applySession({ ...user.value, ...patch })
+  }
+
+  if (typeof window !== 'undefined') {
+    window.addEventListener('auth-expired', logout)
+    window.addEventListener('storage', event => {
+      if (event.key === USER_STORAGE_KEY) {
+        if (event.newValue) {
+          void refreshSession()
+        } else {
+          logout()
+        }
+      }
+    })
+  }
+
+  return {
+    user,
+    sessionChecked,
+    sessionLoading,
+    isLoggedIn,
+    isAdmin,
+    login,
+    logout,
+    refreshSession,
+    ensureSession,
+    restoreFromStorage,
+    hasValidSession,
+    updateUser
+  }
 })

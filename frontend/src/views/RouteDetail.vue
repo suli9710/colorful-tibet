@@ -5,22 +5,26 @@
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-tibet-gold mx-auto"></div>
       </div>
       
-      <div v-else-if="route" class="animate-fade-in">
+      <motion.div v-else-if="routeData"
+        :initial="revealInitial"
+        :animate="revealInView"
+        :transition="revealTransition"
+      >
         <!-- Header -->
         <div class="mb-8">
           <button @click="router.back()" class="text-gray-500 hover:text-gray-900 mb-4 flex items-center">
             ← {{ t('routeDetail.backToList') }}
           </button>
-          <h1 class="text-3xl font-bold text-gray-900 mb-4">{{ route.title }}</h1>
+          <h1 class="text-3xl font-bold text-gray-900 mb-4">{{ routeData.title }}</h1>
           <div class="flex items-center justify-between text-sm text-gray-500">
             <div class="flex items-center gap-4">
-              <span>{{ t('routeDetail.author') }}：{{ route.author?.username || t('routeDetail.anonymous') }}</span>
-              <span>{{ t('routeDetail.publishedAt') }}：{{ formatDate(route.createdAt) }}</span>
+              <span>{{ t('routeDetail.author') }}：{{ routeAuthorName(routeData) }}</span>
+              <span>{{ t('routeDetail.publishedAt') }}：{{ formatDate(routeData.createdAt) }}</span>
             </div>
             <div class="flex gap-2">
-              <span class="px-2 py-1 bg-blue-50 text-blue-600 rounded-lg">{{ route.days }}{{ t('routeDetail.days') }}</span>
-              <span class="px-2 py-1 bg-gray-100 rounded-lg">{{ route.budget }}</span>
-              <span class="px-2 py-1 bg-gray-100 rounded-lg">{{ route.preference }}</span>
+              <span class="px-2 py-1 bg-blue-50 text-blue-600 rounded-lg">{{ routeData.days }}{{ t('routeDetail.days') }}</span>
+              <span class="px-2 py-1 bg-gray-100 rounded-lg">{{ routeData.budget }}</span>
+              <span class="px-2 py-1 bg-gray-100 rounded-lg">{{ routeData.preference }}</span>
             </div>
           </div>
         </div>
@@ -40,12 +44,12 @@
             :class="isLiked ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-white text-gray-600 border border-tibet-gold/25 hover:bg-gray-50'"
           >
             <span class="text-xl">{{ isLiked ? '❤️' : '🤍' }}</span>
-            <span class="font-medium">{{ route.likeCount }}</span>
+            <span class="font-medium">{{ routeData.likeCount }}</span>
           </button>
           
           <div class="flex items-center gap-2 px-6 py-3 bg-white text-gray-600 rounded-full border border-tibet-gold/25 shadow-sm">
             <span class="text-xl">👁️</span>
-            <span class="font-medium">{{ route.viewCount }}</span>
+            <span class="font-medium">{{ routeData.viewCount }}</span>
           </div>
         </div>
 
@@ -79,7 +83,16 @@
             <div v-for="comment in comments" :key="comment.id" class="border-b border-tibet-gold/20 last:border-0 pb-6 last:pb-0">
               <div class="flex justify-between items-start mb-2">
                 <span class="font-medium text-gray-900">{{ comment.user?.username || t('routeDetail.anonymous') }}</span>
-                <span class="text-xs text-gray-500">{{ formatDate(comment.createdAt) }}</span>
+                <div class="flex items-center gap-3">
+                  <span class="text-xs text-gray-500">{{ formatDate(comment.createdAt) }}</span>
+                  <button
+                    v-if="isOwnComment(comment)"
+                    @click="deleteComment(comment)"
+                    class="text-xs font-medium text-red-500 hover:text-red-700 transition-colors"
+                  >
+                    {{ t('common.delete') }}
+                  </button>
+                </div>
               </div>
               <p class="text-gray-600">{{ comment.content }}</p>
             </div>
@@ -89,8 +102,8 @@
             </div>
           </div>
         </div>
-      </div>
-      
+      </motion.div>
+
       <div v-else class="text-center py-12 text-gray-500">
         {{ t('routeDetail.notFound') }}
       </div>
@@ -103,13 +116,18 @@ import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { marked } from 'marked'
-import api from '../api'
+import DOMPurify from 'dompurify'
+import { motion } from 'motion-v'
+import { revealInitial, revealInView, revealTransition } from '../motion/presets'
+import api, { endpoints } from '../api'
+import { useAuthStore } from '../stores/auth'
 
 const { t } = useI18n()
 
-const route = useRoute()
+const currentRoute = useRoute()
 const router = useRouter()
-const routeId = route.params.id
+const auth = useAuthStore()
+const routeId = currentRoute.params.id
 
 const loading = ref(true)
 const routeData = ref<any>(null)
@@ -117,9 +135,10 @@ const comments = ref<any[]>([])
 const isLiked = ref(false)
 const newComment = ref('')
 const submitting = ref(false)
+const currentUser = computed(() => auth.user)
 
 const renderedContent = computed(() => {
-  return routeData.value ? marked(routeData.value.content) : ''
+  return routeData.value ? DOMPurify.sanitize(marked(routeData.value.content) as string) : ''
 })
 
 const loadRouteDetail = async () => {
@@ -142,6 +161,12 @@ const loadRouteDetail = async () => {
 }
 
 const toggleLike = async () => {
+  if (!(await auth.ensureSession())) {
+    alert(t('routeDetail.loginRequiredLike'))
+    router.push('/login')
+    return
+  }
+
   try {
     if (isLiked.value) {
       await api.delete(`/routes/shared/${routeId}/like`)
@@ -164,6 +189,11 @@ const toggleLike = async () => {
 
 const submitComment = async () => {
   if (!newComment.value.trim()) return
+  if (!(await auth.ensureSession())) {
+    alert(t('routeDetail.loginRequiredComment'))
+    router.push('/login')
+    return
+  }
   
   submitting.value = true
   try {
@@ -186,12 +216,40 @@ const submitComment = async () => {
   }
 }
 
+const isOwnComment = (comment: any) => {
+  if (!currentUser.value || !comment?.user) return false
+  return Number(comment.user.id) === Number(currentUser.value.id) || comment.user.username === currentUser.value.username
+}
+
+const routeAuthorName = (route: any) => {
+  if (route?.sourceType === 'OFFICIAL' && !route?.author?.username) {
+    return t('community.officialRoute')
+  }
+  return route?.author?.nickname || route?.author?.username || t('routeDetail.anonymous')
+}
+
+const deleteComment = async (comment: any) => {
+  if (!confirm(t('routeDetail.confirmDeleteComment'))) return
+
+  try {
+    await api.delete(endpoints.routes.deleteSharedComment(Number(routeId), comment.id))
+    comments.value = comments.value.filter(item => item.id !== comment.id)
+    if (routeData.value?.commentCount > 0) {
+      routeData.value.commentCount--
+    }
+  } catch (error) {
+    console.error('Failed to delete comment:', error)
+    alert(t('routeDetail.deleteCommentFailed'))
+  }
+}
+
 const formatDate = (dateStr: string) => {
   const locale = localStorage.getItem('locale') || 'zh'
   return new Date(dateStr).toLocaleString(locale === 'bo' ? 'bo-CN' : 'zh-CN')
 }
 
-onMounted(() => {
+onMounted(async () => {
+  await auth.refreshSession()
   loadRouteDetail()
 })
 </script>

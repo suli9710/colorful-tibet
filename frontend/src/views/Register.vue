@@ -1,64 +1,85 @@
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-cover bg-center py-12 px-4 sm:px-6 lg:px-8 relative overflow-hidden"
-       style="background-image: url('/heritage/布达拉宫3.jpg')">
+  <motion.div
+    class="min-h-screen flex items-center justify-center bg-cover bg-center py-12 px-4 sm:px-6 lg:px-8 relative overflow-hidden"
+    style="background-image: url('/heritage/布达拉宫3.jpg')"
+    :initial="authPageInitial"
+    :animate="authPageAnimate"
+    :transition="authPageTransition"
+  >
 
     <!-- Overlay -->
-    <div class="absolute inset-0 bg-gradient-to-b from-tibet-dark/60 via-tibet-dark/40 to-tibet-dark/70 backdrop-blur-[1px]"></div>
+    <motion.div
+      class="absolute inset-0 bg-gradient-to-b from-tibet-dark/60 via-tibet-dark/40 to-tibet-dark/70 backdrop-blur-[1px]"
+      :initial="authPageInitial"
+      :animate="authPageAnimate"
+      :transition="authOverlayTransition"
+    ></motion.div>
 
     <!-- Falling particles -->
-    <div class="auth-particles">
-      <div class="auth-particle"></div>
-      <div class="auth-particle"></div>
-      <div class="auth-particle"></div>
-      <div class="auth-particle"></div>
-      <div class="auth-particle"></div>
-      <div class="auth-particle"></div>
-      <div class="auth-particle"></div>
-      <div class="auth-particle"></div>
+    <div v-if="!prefersReducedMotion" class="auth-particles">
+      <div v-for="index in 8" :key="index" class="auth-particle"></div>
     </div>
 
     <!-- Sacred Gate Card -->
-    <div class="max-w-md w-full space-y-8 relative z-10 bg-tibet-white/95 backdrop-blur-xl p-10 rounded-2xl shadow-2xl animate-scale-in gpu-accelerated tibet-top-ornament tibet-four-corners">
+    <motion.div
+      class="max-w-md w-full space-y-8 relative z-10 bg-tibet-white/95 backdrop-blur-xl p-10 rounded-2xl shadow-2xl gpu-accelerated tibet-top-ornament tibet-four-corners"
+      :initial="authCardInitial"
+      :animate="authCardAnimate"
+      :transition="authCardTransition"
+    >
 
       <!-- Auth arch decoration -->
       <div class="auth-arch"></div>
 
-      <div class="text-center animate-slide-up pt-4">
+      <motion.div
+        class="text-center pt-4"
+        :initial="authItemInitial"
+        :animate="authItemAnimate"
+        :transition="authItemTransition(0.1)"
+      >
         <h2 class="text-3xl font-bold text-tibet-dark mb-2 font-display">{{ t('register.createAccount') }}</h2>
         <div class="tibet-divider w-24 mx-auto mt-3 mb-3"></div>
         <p class="text-tibet-brown/70 text-sm">{{ t('register.subtitle') }}</p>
-      </div>
+      </motion.div>
 
-      <form class="mt-8 space-y-5" @submit.prevent="handleRegister">
+      <motion.form
+        class="mt-8 space-y-5"
+        :initial="authItemInitial"
+        :animate="authItemAnimate"
+        :transition="authItemTransition(0.18)"
+        @submit.prevent="handleRegister"
+      >
         <div class="space-y-4">
-          <div>
+          <motion.div :initial="authItemInitial" :animate="authItemAnimate" :transition="authItemTransition(0.28)">
             <label for="username" class="sr-only">{{ t('login.username') }}</label>
             <input id="username" name="username" type="text" required v-model="form.username"
                    class="appearance-none rounded-xl relative block w-full px-4 py-3 border border-tibet-gold/25 placeholder-tibet-brown/40 text-tibet-dark bg-tibet-white focus:outline-none focus:ring-2 focus:ring-tibet-gold/60 focus:border-transparent sm:text-sm input-focus"
                    :placeholder="t('login.username')">
-          </div>
-          <div>
+          </motion.div>
+          <motion.div :initial="authItemInitial" :animate="authItemAnimate" :transition="authItemTransition(0.34)">
             <label for="nickname" class="sr-only">{{ t('register.nickname') }}</label>
             <input id="nickname" name="nickname" type="text" required v-model="form.nickname"
                    class="appearance-none rounded-xl relative block w-full px-4 py-3 border border-tibet-gold/25 placeholder-tibet-brown/40 text-tibet-dark bg-tibet-white focus:outline-none focus:ring-2 focus:ring-tibet-gold/60 focus:border-transparent sm:text-sm input-focus"
                    :placeholder="t('register.nicknamePlaceholder')">
-          </div>
-          <div>
+          </motion.div>
+          <motion.div :initial="authItemInitial" :animate="authItemAnimate" :transition="authItemTransition(0.4)">
             <label for="password" class="sr-only">{{ t('login.password') }}</label>
             <input id="password" name="password" type="password" required v-model="form.password"
                    class="appearance-none rounded-xl relative block w-full px-4 py-3 border border-tibet-gold/25 placeholder-tibet-brown/40 text-tibet-dark bg-tibet-white focus:outline-none focus:ring-2 focus:ring-tibet-gold/60 focus:border-transparent sm:text-sm input-focus"
                    :placeholder="t('login.password')">
-          </div>
-          <div>
+          </motion.div>
+          <motion.div :initial="authItemInitial" :animate="authItemAnimate" :transition="authItemTransition(0.46)">
             <label for="confirmPassword" class="sr-only">{{ t('register.confirmPassword') }}</label>
             <input id="confirmPassword" name="confirmPassword" type="password" required v-model="confirmPassword"
                    class="appearance-none rounded-xl relative block w-full px-4 py-3 border border-tibet-gold/25 placeholder-tibet-brown/40 text-tibet-dark bg-tibet-white focus:outline-none focus:ring-2 focus:ring-tibet-gold/60 focus:border-transparent sm:text-sm input-focus"
                    :placeholder="t('register.confirmPassword')">
-          </div>
+          </motion.div>
         </div>
 
-        <div>
-          <button type="submit" :disabled="loading"
+        <motion.div :initial="authItemInitial" :animate="authItemAnimate" :transition="authItemTransition(0.54)">
+          <motion.button type="submit" :disabled="loading"
+                  :whileHover="loading ? {} : authSubmitHover"
+                  :whileTap="loading ? {} : authSubmitPress"
                   class="tibet-btn w-full flex justify-center py-3 text-base disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none">
             <span v-if="loading" class="absolute left-0 inset-y-0 flex items-center pl-3 z-10">
               <svg class="animate-spin h-5 w-5 text-tibet-yellow" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -67,31 +88,52 @@
               </svg>
             </span>
             <span class="relative z-10">{{ loading ? t('register.registering') : t('register.registerNow') }}</span>
-          </button>
-        </div>
-      </form>
+          </motion.button>
+        </motion.div>
+      </motion.form>
 
-      <div class="text-center mt-4">
+      <motion.div
+        class="text-center mt-4"
+        :initial="authItemInitial"
+        :animate="authItemAnimate"
+        :transition="authItemTransition(0.62)"
+      >
         <p class="text-sm text-tibet-brown/70">
           {{ t('register.hasAccount') }}
           <router-link to="/login" class="tibet-link">
             {{ t('register.goToLogin') }}
           </router-link>
         </p>
-      </div>
-    </div>
-  </div>
+      </motion.div>
+    </motion.div>
+  </motion.div>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { motion, useReducedMotion } from 'motion-v'
 import api from '../api'
+import {
+  authCardAnimate,
+  authCardInitial,
+  authCardTransition,
+  authItemAnimate,
+  authItemInitial,
+  authItemTransition,
+  authOverlayTransition,
+  authPageAnimate,
+  authPageInitial,
+  authPageTransition,
+  authSubmitHover,
+  authSubmitPress
+} from '../motion/presets'
 
 const { t } = useI18n()
 
 const router = useRouter()
+const prefersReducedMotion = useReducedMotion()
 const loading = ref(false)
 const confirmPassword = ref('')
 const form = ref({

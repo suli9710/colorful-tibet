@@ -1,8 +1,5 @@
-# 本地部署配置（默认连接 MySQL）
-# 使用方式：
-# 1. 先启动 MySQL，并创建数据库：colorful_tibet
-# 2. 配置环境变量或直接修改下面的连接信息
-# 3. 启动时使用：java -jar app.jar --spring.profiles.active=local
+# 本地部署配置（MySQL）
+# 使用方式：先启动 MySQL，创建数据库 colorful_tibet，并设置 MYSQL_PASSWORD。
 
 server:
   port: 8080
@@ -19,9 +16,9 @@ spring:
     async:
       request-timeout: 120000
   datasource:
-    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:colorful_tibet}?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:colorful_tibet}?useUnicode=true&characterEncoding=utf8&sslMode=${MYSQL_SSL_MODE:DISABLED}&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=${MYSQL_ALLOW_PUBLIC_KEY_RETRIEVAL:false}
     username: ${MYSQL_USERNAME:root}
-    password: ${MYSQL_PASSWORD:031224}
+    password: ${MYSQL_PASSWORD:}
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
       maximum-pool-size: 15
@@ -38,19 +35,50 @@ spring:
     properties:
       hibernate:
         format_sql: false
-
-# 可选：如果你仍想临时使用 H2，可把上面的 datasource 改回 H2 配置
+        session:
+          events:
+            log:
+              LOG_QUERIES_SLOWER_THAN_MS: ${HIBERNATE_SLOW_QUERY_MS:500}
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 3000ms
+      connect-timeout: 2000ms
+      lettuce:
+        pool:
+          min-idle: 0
+          max-active: 8
+          max-idle: 4
+          max-wait: 2000ms
 
 ark:
   api:
-    url: ${ARK_API_URL:https://ark.cn-beijing.volces.com/api/v3/responses}
-    key: ${ARK_API_KEY:}
-    model: ${AI_MODEL:doubao-seed-2-0-pro-260215}
-    stream-url: ${ARK_STREAM_API_URL:}  # 流式端点，为空时从url自动推导
+    url: ${ARK_API_URL:${DOUBAO_API_URL:https://ark.cn-beijing.volces.com/api/v3/responses}}
+    key: ${ARK_API_KEY:${DOUBAO_API_KEY:}}
+    model: ${AI_MODEL:${ARK_MODEL:${DOUBAO_MODEL:ep-20260516173036-4dpgm}}}
+    stream-url: ${ARK_STREAM_API_URL:${DOUBAO_STREAM_API_URL:}}  # 流式端点，为空时从url自动推导
+
+doubao:
+  api:
+    url: ${DOUBAO_API_URL:https://ark.cn-beijing.volces.com/api/v3/responses}
+    key: ${DOUBAO_API_KEY:${ARK_API_KEY:}}
+    model: ${DOUBAO_MODEL:${AI_MODEL:ep-20260516173036-4dpgm}}
+    stream-url: ${DOUBAO_STREAM_API_URL:}
 
 ai:
   route:
     stream-timeout-seconds: ${AI_STREAM_TIMEOUT:180}
+
+# Scrapling 爬虫微服务配置
+scrapling:
+  service:
+    url: ${SCRAPLING_SERVICE_URL:http://localhost:8000}
+    timeout-seconds: ${SCRAPLING_SERVICE_TIMEOUT:30}
+    max-sources: ${SCRAPLING_MAX_SOURCES:4}
+    mode: ${SCRAPLING_MODE:basic}
+    health-enabled: ${SCRAPLING_HEALTH_ENABLED:false}
 
 # 价格定时更新配置
 price:
@@ -65,27 +93,54 @@ price:
 
 # JWT配置
 jwt:
-  secret: ${JWT_SECRET:tibetTourismSecretKey12345678901234567890}
+  secret: ${JWT_SECRET:}
   expiration: 86400000  # 24小时
 
-# 密码加密配置 + H2 -> MySQL 一次性迁移开关
+# 演示用户播种
 app:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000}
+  security:
+    public-docs-enabled: ${PUBLIC_DOCS_ENABLED:true}
+    public-metrics-enabled: ${PUBLIC_METRICS_ENABLED:false}
+    require-strong-secrets: ${REQUIRE_STRONG_SECRETS:false}
+    csrf-signing-secret: ${CSRF_SIGNING_SECRET:}
+    pii-encryption-key: ${PII_ENCRYPTION_KEY:}
+    cookie-secure: ${COOKIE_SECURE:false}
+    trust-proxy-headers: ${TRUST_PROXY_HEADERS:false}
+    trusted-proxy-cidrs: ${TRUSTED_PROXY_CIDRS:}
+    super-admin-totp-secret: ${SUPER_ADMIN_TOTP_SECRET:}
+    rate-limit:
+      enabled: ${RATE_LIMIT_ENABLED:true}
+      redis-enabled: ${RATE_LIMIT_REDIS_ENABLED:true}
+      trust-proxy-headers: ${TRUST_PROXY_HEADERS:false}
+      trusted-proxy-cidrs: ${RATE_LIMIT_TRUSTED_PROXY_CIDRS:${TRUSTED_PROXY_CIDRS:}}
+      register:
+        requests: ${RATE_LIMIT_REGISTER_REQUESTS:5}
+        window-seconds: ${RATE_LIMIT_REGISTER_WINDOW_SECONDS:3600}
+  payments:
+    mock-callback-enabled: ${PAYMENT_MOCK_CALLBACK_ENABLED:true}
+    mock-callback-secret: ${PAYMENT_CALLBACK_SECRET:dev-payment-callback-secret}
   super-admin-username: ${SUPER_ADMIN_USERNAME:lzh}
-  encryption:
-    key: ${ADMIN_ENCRYPTION_KEY:tibetTourismSecretKey12345678901234567890}
-  migration:
-    h2-to-mysql:
-      enabled: ${H2_TO_MYSQL_MIGRATION_ENABLED:false}
-      h2-url: ${H2_MIGRATION_URL:jdbc:h2:file:./data/h2/tibet_tourism;AUTO_SERVER=TRUE;DB_CLOSE_DELAY=-1}
-      h2-username: ${H2_MIGRATION_USERNAME:sa}
-      h2-password: ${H2_MIGRATION_PASSWORD:}
-      skip-non-empty-table: ${H2_TO_MYSQL_SKIP_NON_EMPTY_TABLE:true}
+  seed:
+    content:
+      enabled: ${SEED_CONTENT_ENABLED:true}
+    demo-users:
+      enabled: ${SEED_DEMO_USERS:false}
+      admin-password: ${SEED_DEMO_ADMIN_PASSWORD:}
+      super-admin-password: ${SEED_DEMO_SUPER_ADMIN_PASSWORD:}
+      user-password: ${SEED_DEMO_USER_PASSWORD:}
+
+recommendation:
+  item-similarity:
+    preload-on-startup: false
 
 # 日志配置
 logging:
   level:
     root: INFO
     com.tibet.tourism: INFO
+    org.hibernate.SQL_SLOW: WARN
   file:
     name: ./logs/backend.log
   pattern:

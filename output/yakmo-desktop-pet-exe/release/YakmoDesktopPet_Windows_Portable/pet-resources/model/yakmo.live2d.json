@@ -1,0 +1,270 @@
+{
+  "format": "yakmo-live2d-like/1.0",
+  "id": "yakmo",
+  "displayName": "牦牦",
+  "description": "A browser-ready Live2D-style Yakmo package with hand-retouched in-between frames.",
+  "size": {
+    "width": 384,
+    "height": 416
+  },
+  "defaultMotion": "idle",
+  "parts": {
+    "base": "assets/parts/yakmo-base.png",
+    "aura": "assets/parts/yakmo-soft-aura.png"
+  },
+  "parameters": {
+    "breath": {
+      "amplitude": 0.018,
+      "speed": 0.86
+    },
+    "sway": {
+      "amplitude": 0.035,
+      "speed": 0.42
+    },
+    "mesh": {
+      "slices": 28,
+      "amplitude": 3.2
+    },
+    "pointerFollow": {
+      "x": 18,
+      "y": 10,
+      "rotation": 0.055
+    }
+  },
+  "motions": {
+    "idle": {
+      "fps": 18,
+      "loop": true,
+      "frames": [
+        "assets/frames/idle/000.png",
+        "assets/frames/idle/001.png",
+        "assets/frames/idle/002.png",
+        "assets/frames/idle/003.png",
+        "assets/frames/idle/004.png",
+        "assets/frames/idle/005.png",
+        "assets/frames/idle/006.png",
+        "assets/frames/idle/007.png",
+        "assets/frames/idle/008.png",
+        "assets/frames/idle/009.png",
+        "assets/frames/idle/010.png",
+        "assets/frames/idle/011.png",
+        "assets/frames/idle/012.png",
+        "assets/frames/idle/013.png",
+        "assets/frames/idle/014.png",
+        "assets/frames/idle/015.png",
+        "assets/frames/idle/016.png",
+        "assets/frames/idle/017.png"
+      ],
+      "description": "calm breathing and blink"
+    },
+    "running-right": {
+      "fps": 20,
+      "loop": true,
+      "frames": [
+        "assets/frames/running-right/000.png",
+        "assets/frames/running-right/001.png",
+        "assets/frames/running-right/002.png",
+        "assets/frames/running-right/003.png",
+        "assets/frames/running-right/004.png",
+        "assets/frames/running-right/005.png",
+        "assets/frames/running-right/006.png",
+        "assets/frames/running-right/007.png",
+        "assets/frames/running-right/008.png",
+        "assets/frames/running-right/009.png",
+        "assets/frames/running-right/010.png",
+        "assets/frames/running-right/011.png",
+        "assets/frames/running-right/012.png",
+        "assets/frames/running-right/013.png",
+        "assets/frames/running-right/014.png",
+        "assets/frames/running-right/015.png",
+        "assets/frames/running-right/016.png",
+        "assets/frames/running-right/017.png",
+        "assets/frames/running-right/018.png",
+        "assets/frames/running-right/019.png",
+        "assets/frames/running-right/020.png",
+        "assets/frames/running-right/021.png",
+        "assets/frames/running-right/022.png",
+        "assets/frames/running-right/023.png"
+      ],
+      "description": "rightward side movement"
+    },
+    "running-left": {
+      "fps": 20,
+      "loop": true,
+      "frames": [
+        "assets/frames/running-left/000.png",
+        "assets/frames/running-left/001.png",
+        "assets/frames/running-left/002.png",
+        "assets/frames/running-left/003.png",
+        "assets/frames/running-left/004.png",
+        "assets/frames/running-left/005.png",
+        "assets/frames/running-left/006.png",
+        "assets/frames/running-left/007.png",
+        "assets/frames/running-left/008.png",
+        "assets/frames/running-left/009.png",
+        "assets/frames/running-left/010.png",
+        "assets/frames/running-left/011.png",
+        "assets/frames/running-left/012.png",
+        "assets/frames/running-left/013.png",
+        "assets/frames/running-left/014.png",
+        "assets/frames/running-left/015.png",
+        "assets/frames/running-left/016.png",
+        "assets/frames/running-left/017.png",
+        "assets/frames/running-left/018.png",
+        "assets/frames/running-left/019.png",
+        "assets/frames/running-left/020.png",
+        "assets/frames/running-left/021.png",
+        "assets/frames/running-left/022.png",
+        "assets/frames/running-left/023.png"
+      ],
+      "description": "leftward side movement"
+    },
+    "waving": {
+      "fps": 18,
+      "loop": true,
+      "frames": [
+        "assets/frames/waving/000.png",
+        "assets/frames/waving/001.png",
+        "assets/frames/waving/002.png",
+        "assets/frames/waving/003.png",
+        "assets/frames/waving/004.png",
+        "assets/frames/waving/005.png",
+        "assets/frames/waving/006.png",
+        "assets/frames/waving/007.png",
+        "assets/frames/waving/008.png",
+        "assets/frames/waving/009.png",
+        "assets/frames/waving/010.png",
+        "assets/frames/waving/011.png"
+      ],
+      "description": "friendly wave"
+    },
+    "jumping": {
+      "fps": 18,
+      "loop": true,
+      "frames": [
+        "assets/frames/jumping/000.png",
+        "assets/frames/jumping/001.png",
+        "assets/frames/jumping/002.png",
+        "assets/frames/jumping/003.png",
+        "assets/frames/jumping/004.png",
+        "assets/frames/jumping/005.png",
+        "assets/frames/jumping/006.png",
+        "assets/frames/jumping/007.png",
+        "assets/frames/jumping/008.png",
+        "assets/frames/jumping/009.png",
+        "assets/frames/jumping/010.png",
+        "assets/frames/jumping/011.png",
+        "assets/frames/jumping/012.png",
+        "assets/frames/jumping/013.png",
+        "assets/frames/jumping/014.png"
+      ],
+      "description": "soft hop"
+    },
+    "failed": {
+      "fps": 20,
+      "loop": true,
+      "frames": [
+        "assets/frames/failed/000.png",
+        "assets/frames/failed/001.png",
+        "assets/frames/failed/002.png",
+        "assets/frames/failed/003.png",
+        "assets/frames/failed/004.png",
+        "assets/frames/failed/005.png",
+        "assets/frames/failed/006.png",
+        "assets/frames/failed/007.png",
+        "assets/frames/failed/008.png",
+        "assets/frames/failed/009.png",
+        "assets/frames/failed/010.png",
+        "assets/frames/failed/011.png",
+        "assets/frames/failed/012.png",
+        "assets/frames/failed/013.png",
+        "assets/frames/failed/014.png",
+        "assets/frames/failed/015.png",
+        "assets/frames/failed/016.png",
+        "assets/frames/failed/017.png",
+        "assets/frames/failed/018.png",
+        "assets/frames/failed/019.png",
+        "assets/frames/failed/020.png",
+        "assets/frames/failed/021.png",
+        "assets/frames/failed/022.png",
+        "assets/frames/failed/023.png"
+      ],
+      "description": "slump and recover"
+    },
+    "waiting": {
+      "fps": 18,
+      "loop": true,
+      "frames": [
+        "assets/frames/waiting/000.png",
+        "assets/frames/waiting/001.png",
+        "assets/frames/waiting/002.png",
+        "assets/frames/waiting/003.png",
+        "assets/frames/waiting/004.png",
+        "assets/frames/waiting/005.png",
+        "assets/frames/waiting/006.png",
+        "assets/frames/waiting/007.png",
+        "assets/frames/waiting/008.png",
+        "assets/frames/waiting/009.png",
+        "assets/frames/waiting/010.png",
+        "assets/frames/waiting/011.png",
+        "assets/frames/waiting/012.png",
+        "assets/frames/waiting/013.png",
+        "assets/frames/waiting/014.png",
+        "assets/frames/waiting/015.png",
+        "assets/frames/waiting/016.png",
+        "assets/frames/waiting/017.png"
+      ],
+      "description": "expectant waiting"
+    },
+    "running": {
+      "fps": 18,
+      "loop": true,
+      "frames": [
+        "assets/frames/running/000.png",
+        "assets/frames/running/001.png",
+        "assets/frames/running/002.png",
+        "assets/frames/running/003.png",
+        "assets/frames/running/004.png",
+        "assets/frames/running/005.png",
+        "assets/frames/running/006.png",
+        "assets/frames/running/007.png",
+        "assets/frames/running/008.png",
+        "assets/frames/running/009.png",
+        "assets/frames/running/010.png",
+        "assets/frames/running/011.png",
+        "assets/frames/running/012.png",
+        "assets/frames/running/013.png",
+        "assets/frames/running/014.png",
+        "assets/frames/running/015.png",
+        "assets/frames/running/016.png",
+        "assets/frames/running/017.png"
+      ],
+      "description": "focused processing"
+    },
+    "review": {
+      "fps": 18,
+      "loop": true,
+      "frames": [
+        "assets/frames/review/000.png",
+        "assets/frames/review/001.png",
+        "assets/frames/review/002.png",
+        "assets/frames/review/003.png",
+        "assets/frames/review/004.png",
+        "assets/frames/review/005.png",
+        "assets/frames/review/006.png",
+        "assets/frames/review/007.png",
+        "assets/frames/review/008.png",
+        "assets/frames/review/009.png",
+        "assets/frames/review/010.png",
+        "assets/frames/review/011.png",
+        "assets/frames/review/012.png",
+        "assets/frames/review/013.png",
+        "assets/frames/review/014.png",
+        "assets/frames/review/015.png",
+        "assets/frames/review/016.png",
+        "assets/frames/review/017.png"
+      ],
+      "description": "attentive review"
+    }
+  }
+}
