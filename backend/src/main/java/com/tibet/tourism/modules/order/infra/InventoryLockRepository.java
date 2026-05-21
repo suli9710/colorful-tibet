@@ -1,9 +1,16 @@
 package com.tibet.tourism.modules.order.infra;
 import com.tibet.tourism.modules.order.domain.InventoryLock;
 import com.tibet.tourism.modules.order.domain.PlatformOrder;
+import jakarta.persistence.LockModeType;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 
 public interface InventoryLockRepository extends JpaRepository<InventoryLock, Long> {
     List<InventoryLock> findByOrder(PlatformOrder order);
+    boolean existsByActiveLockKey(String activeLockKey);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    Optional<InventoryLock> findByActiveLockKey(String activeLockKey);
 }

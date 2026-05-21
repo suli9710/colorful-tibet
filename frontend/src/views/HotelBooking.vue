@@ -201,6 +201,7 @@
   <PaymentModal
     :show="showPaymentModal"
     :amount="totalPrice"
+    recaptcha-action="hotel_booking"
     @close="showPaymentModal = false"
     @paid="handlePaymentConfirmed"
   />
@@ -217,7 +218,6 @@ import { getCanonicalRegion, localizeApiRoom, localizeHotel } from '../data/hote
 import api, { endpoints } from '../api'
 import PaymentModal from '../components/PaymentModal.vue'
 import { useBehaviorTracker } from '../composables/useBehaviorTracker'
-import { getRecaptchaToken } from '../utils/recaptcha'
 import {
   cardInitial,
   cardInView,
@@ -357,12 +357,12 @@ const submitBooking = () => {
   showPaymentModal.value = true
 }
 
-const handlePaymentConfirmed = async () => {
+const handlePaymentConfirmed = async (recaptchaToken = '') => {
   showPaymentModal.value = false
   submitting.value = true
-  const recaptchaToken = await getRecaptchaToken('hotel_booking')
-  const behaviorData = encodeBehaviorData()
+  submitError.value = ''
   try {
+    const behaviorData = encodeBehaviorData()
     await api.post(endpoints.hotelBookings.create, {
       hotelId: hotelId.value,
       roomId: roomId.value,
@@ -383,6 +383,10 @@ const handlePaymentConfirmed = async () => {
     })
   } catch (error: any) {
     if (error.response) {
+      if (String(error.response?.data?.code || '').startsWith('ANTIBOT_')) {
+        submitError.value = t('hotel.securityVerificationFailed')
+        return
+      }
       submitError.value = error.response?.data?.message || error.response?.data?.error || t('hotel.bookingFailed')
       return
     }

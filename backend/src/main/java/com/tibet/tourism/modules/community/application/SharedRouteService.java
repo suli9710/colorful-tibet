@@ -86,12 +86,13 @@ public class SharedRouteService {
     // 获取路线详情
     @Transactional
     public SharedRoute getRoute(Long id) {
-        SharedRoute route = routeRepository.findById(id)
+        // 原子增加浏览量，避免乐观锁冲突
+        int updated = routeRepository.incrementViewCount(id);
+        if (updated == 0) {
+            throw new ResourceNotFoundException("Route not found");
+        }
+        return routeRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Route not found"));
-        
-        // 增加浏览量
-        route.incrementViewCount();
-        return routeRepository.save(route);
     }
 
     // 删除路线
@@ -125,8 +126,7 @@ public class SharedRouteService {
         like.setUser(user);
         likeRepository.save(like);
 
-        route.incrementLikeCount();
-        routeRepository.save(route);
+        routeRepository.incrementLikeCount(routeId);
         return true;
     }
 
@@ -146,8 +146,7 @@ public class SharedRouteService {
 
         likeRepository.delete(like.get());
 
-        route.decrementLikeCount();
-        routeRepository.save(route);
+        routeRepository.decrementLikeCount(routeId);
         return true;
     }
     
@@ -177,8 +176,7 @@ public class SharedRouteService {
         
         RouteComment savedComment = commentRepository.save(comment);
 
-        route.incrementCommentCount();
-        routeRepository.save(route);
+        routeRepository.incrementCommentCount(routeId);
         
         return savedComment;
     }
@@ -203,10 +201,9 @@ public class SharedRouteService {
             throw new SecurityException("只能删除自己的评论");
         }
 
-        SharedRoute route = comment.getRoute();
+        Long targetRouteId = comment.getRoute().getId();
         commentRepository.delete(comment);
-        route.decrementCommentCount();
-        routeRepository.save(route);
+        routeRepository.decrementCommentCount(targetRouteId);
     }
 
     // 获取用户创建的路线列表

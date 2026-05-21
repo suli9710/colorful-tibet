@@ -6,6 +6,7 @@ import com.tibet.tourism.modules.order.application.OrderCenterService;
 import com.tibet.tourism.modules.order.domain.Booking;
 import com.tibet.tourism.modules.order.infra.BookingRepository;
 import com.tibet.tourism.modules.order.web.dto.BookingRequest;
+import com.tibet.tourism.modules.order.web.dto.BookingResponse;
 import com.tibet.tourism.modules.spot.domain.ScenicSpot;
 import com.tibet.tourism.modules.spot.infra.ScenicSpotRepository;
 import com.tibet.tourism.modules.user.domain.User;
@@ -120,7 +121,9 @@ public class BookingController {
             return ResponseEntity.status(401).body("User not authenticated");
         }
 
-        List<Booking> bookings = bookingRepository.findByUserId(user.getId());
+        List<BookingResponse> bookings = bookingRepository.findByUserId(user.getId()).stream()
+                .map(BookingResponse::fromEntity)
+                .toList();
         return ResponseEntity.ok(bookings);
     }
 

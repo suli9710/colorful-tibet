@@ -12,10 +12,15 @@ public class JwtAuthSupport {
 
     private final JwtUtils jwtUtils;
     private final UserRepository userRepository;
+    private final TokenRevocationService tokenRevocationService;
 
-    public JwtAuthSupport(JwtUtils jwtUtils, UserRepository userRepository) {
+    public JwtAuthSupport(
+            JwtUtils jwtUtils,
+            UserRepository userRepository,
+            TokenRevocationService tokenRevocationService) {
         this.jwtUtils = jwtUtils;
         this.userRepository = userRepository;
+        this.tokenRevocationService = tokenRevocationService;
     }
 
     public User resolveCurrentUser(HttpServletRequest request) {
@@ -25,6 +30,9 @@ public class JwtAuthSupport {
         }
         if (!jwtUtils.validateJwtToken(token)) {
             throw new IllegalStateException("Invalid or expired JWT token");
+        }
+        if (tokenRevocationService.isRevoked(token)) {
+            throw new IllegalStateException("Revoked JWT token");
         }
         String username = jwtUtils.getUserNameFromJwtToken(token);
         return userRepository.findByUsername(username)

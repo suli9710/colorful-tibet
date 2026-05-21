@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.tibet.tourism.modules.user.infra.UserRepository;
 import java.util.Map;
 import java.util.stream.Stream;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -44,6 +45,12 @@ class WebSecurityConfigPublicAccessTest {
     @MockBean
     private CsrfTokenService csrfTokenService;
 
+    @MockBean
+    private TokenRevocationService tokenRevocationService;
+
+    @MockBean
+    private UserRepository userRepository;
+
     @ParameterizedTest
     @MethodSource("publicReadRequests")
     void publicReadEndpointsAllowAnonymous(MockHttpServletRequestBuilder request) throws Exception {
@@ -53,7 +60,7 @@ class WebSecurityConfigPublicAccessTest {
 
     @ParameterizedTest
     @MethodSource("publicPostRequests")
-    void publicAuthAndCallbackPostsAllowAnonymous(MockHttpServletRequestBuilder request) throws Exception {
+    void publicAuthPostsAllowAnonymous(MockHttpServletRequestBuilder request) throws Exception {
         mockMvc.perform(request.contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isOk());
     }
@@ -99,8 +106,7 @@ class WebSecurityConfigPublicAccessTest {
         return Stream.of(
                 post("/api/auth/login"),
                 post("/api/auth/logout"),
-                post("/api/auth/register"),
-                post("/api/payments/callbacks/mock"));
+                post("/api/auth/register"));
     }
 
     private static Stream<MockHttpServletRequestBuilder> protectedRequestsInsidePublicNamespaces() {
@@ -109,6 +115,7 @@ class WebSecurityConfigPublicAccessTest {
                 put("/api/news/1"),
                 post("/api/heritage"),
                 put("/api/heritage/1"),
+                post("/api/payments/callbacks/mock"),
                 post("/api/hotel-bookings/hotels"),
                 post("/api/hotel-bookings/room-types/1"),
                 post("/api/routes/shared/1/comments"),

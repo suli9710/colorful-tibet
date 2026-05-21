@@ -140,14 +140,16 @@ public class OrderCenterController {
     }
 
     @PostMapping("/api/payments/callbacks/mock")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<?> paymentCallback(
             @Valid @RequestBody PaymentCallbackRequest request,
             @RequestHeader(value = "X-Recaptcha-Token", required = false) String recaptchaToken,
             @RequestHeader(value = "X-Device-Fingerprint", required = false) String fingerprint,
             @RequestHeader(value = "X-Behavior-Data", required = false) String behaviorData,
             HttpServletRequest httpRequest) {
+        User user = jwtAuthSupport.resolveCurrentUser(httpRequest);
         RiskResult risk = riskAssessmentService.assess(
-                recaptchaToken, fingerprint, null, behaviorData,
+                recaptchaToken, fingerprint, user.getId(), behaviorData,
                 httpRequest.getRemoteAddr(), "/api/payments/callbacks/mock");
         if (risk.decision() == RiskResult.Decision.BLOCK) {
             return ResponseEntity.status(403).body(Map.of(
@@ -156,11 +158,13 @@ public class OrderCenterController {
         }
 
         try {
-            return ResponseEntity.ok(orderCenterService.handlePaymentCallback(request));
+            return ResponseEntity.ok(orderCenterService.handleMockPaymentCallback(user, request));
         } catch (SecurityException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "支付回调签名无效"));
         } catch (NoSuchElementException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "订单不存在"));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "支付回调未启用"));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }

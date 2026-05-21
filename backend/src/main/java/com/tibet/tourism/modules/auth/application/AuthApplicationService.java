@@ -12,15 +12,17 @@ import com.tibet.tourism.modules.auth.web.dto.LoginRequest;
 import com.tibet.tourism.modules.auth.web.dto.RegisterRequest;
 import com.tibet.tourism.modules.user.domain.User;
 import com.tibet.tourism.modules.user.infra.UserRepository;
+import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -40,6 +42,7 @@ public class AuthApplicationService {
     private static final String GENERIC_LOGIN_ERROR = "Invalid username or password";
     private static final String RATE_LIMIT_ERROR = "Too many requests, please try again later";
     private static final String REGISTRATION_FAILED = "Registration failed, please check your input";
+    private static final Pattern SAFE_USERNAME = Pattern.compile("^[A-Za-z0-9_-]{3,32}$");
 
     private final AuthenticationManager authenticationManager;
     private final UserRepository userRepository;
@@ -48,8 +51,11 @@ public class AuthApplicationService {
     private final PasswordEncoder passwordEncoder;
     private final IpLocationService ipLocationService;
     private final LoginAttemptService loginAttemptService;
+    private final TotpService totpService;
     private final String superAdminUsername;
-    private final String superAdminSecondaryPassword;
+    private final String superAdminTotpSecret;
+    private final boolean requireStrongSecrets;
+    private final Environment environment;
 
     public AuthApplicationService(
             AuthenticationManager authenticationManager,
@@ -59,8 +65,11 @@ public class AuthApplicationService {
             PasswordEncoder passwordEncoder,
             IpLocationService ipLocationService,
             LoginAttemptService loginAttemptService,
+            TotpService totpService,
             @Value("${app.super-admin-username:lzh}") String superAdminUsername,
-            @Value("${app.security.super-admin-secondary-password:}") String superAdminSecondaryPassword) {
+            @Value("${app.security.super-admin-totp-secret:}") String superAdminTotpSecret,
+            @Value("${app.security.require-strong-secrets:false}") boolean requireStrongSecrets,
+            Environment environment) {
         this.authenticationManager = authenticationManager;
         this.userRepository = userRepository;
         this.jwtUtils = jwtUtils;
@@ -68,8 +77,33 @@ public class AuthApplicationService {
         this.passwordEncoder = passwordEncoder;
         this.ipLocationService = ipLocationService;
         this.loginAttemptService = loginAttemptService;
+        this.totpService = totpService;
         this.superAdminUsername = superAdminUsername;
-        this.superAdminSecondaryPassword = superAdminSecondaryPassword;
+        this.superAdminTotpSecret = superAdminTotpSecret;
+        this.requireStrongSecrets = requireStrongSecrets;
+        this.environment = environment;
+    }
+
+    @PostConstruct
+    void validateSuperAdminConfiguration() {
+        boolean strictMode = requireStrongSecrets || isProdProfileActive();
+        if (!StringUtils.hasText(superAdminUsername)) {
+            if (strictMode) {
+                throw new IllegalStateException("Super-admin username must be configured");
+            }
+            logger.warn("Super-admin username is not configured; TOTP enforcement is disabled");
+            return;
+        }
+
+        if (!StringUtils.hasText(superAdminTotpSecret)) {
+            if (strictMode) {
+                throw new IllegalStateException("Super-admin TOTP secret must be configured");
+            }
+            logger.warn("Super-admin TOTP secret is not configured; super-admin login will be blocked");
+            return;
+        }
+
+        totpService.validateSecret(superAdminTotpSecret);
     }
 
     public LoginResult login(LoginRequest loginRequest, HttpServletRequest request) {
@@ -97,7 +131,7 @@ public class AuthApplicationService {
         UserDetails userDetails = (UserDetails) authentication.getPrincipal();
         User user = userRepository.findByUsername(userDetails.getUsername()).orElseThrow();
 
-        enforceSuperAdminSecondPassword(user, loginRequest);
+        enforceSuperAdminControls(user, loginRequest);
 
         loginAttemptService.reset(username);
         SecurityContextHolder.getContext().setAuthentication(authentication);
@@ -118,7 +152,7 @@ public class AuthApplicationService {
 
     @Transactional
     public void register(RegisterRequest signUpRequest) {
-        String username = signUpRequest.getUsername().trim();
+        String username = signUpRequest.getUsername() == null ? "" : signUpRequest.getUsername().trim();
         String nickname = InputSanitizer.optionalPlainText(signUpRequest.getNickname(), 32, "nickname");
         String plainPassword = signUpRequest.getPassword();
 
@@ -126,6 +160,9 @@ public class AuthApplicationService {
                 username, nickname, !StringUtils.hasText(plainPassword));
 
         InputSanitizer.validatePassword(plainPassword);
+        if (!SAFE_USERNAME.matcher(username).matches()) {
+            throw new IllegalArgumentException(REGISTRATION_FAILED);
+        }
 
         if (userRepository.existsByUsernameIgnoreCase(username)) {
             throw new DuplicateRegistrationException(REGISTRATION_FAILED);
@@ -159,19 +196,26 @@ public class AuthApplicationService {
         }
     }
 
-    private void enforceSuperAdminSecondPassword(User user, LoginRequest loginRequest) {
+    private void enforceSuperAdminControls(User user, LoginRequest loginRequest) {
         if (!superAdminUsername.equalsIgnoreCase(user.getUsername())) {
             return;
         }
 
-        if (!StringUtils.hasText(superAdminSecondaryPassword)) {
-            logger.error("Super-admin secondary password is not configured: username={}", user.getUsername());
+        enforceSuperAdminTotp(user, loginRequest);
+        if (ensureSuperAdminRole(user)) {
+            userRepository.saveAndFlush(user);
+        }
+    }
+
+    private void enforceSuperAdminTotp(User user, LoginRequest loginRequest) {
+        if (!StringUtils.hasText(superAdminTotpSecret)) {
+            logger.error("Super-admin TOTP secret is not configured: username={}", user.getUsername());
             throw new AuthForbiddenException(GENERIC_LOGIN_ERROR);
         }
 
         String provided = loginRequest.getSecondaryPassword();
-        if (!StringUtils.hasText(provided) || !matchesSecondaryPassword(provided)) {
-            logger.warn("Rejected super-admin login with invalid secondary password: username={}", user.getUsername());
+        if (!StringUtils.hasText(provided) || !totpService.isValidCode(superAdminTotpSecret, provided)) {
+            logger.warn("Rejected super-admin login with invalid TOTP code: username={}", user.getUsername());
             long lockSeconds = loginAttemptService.recordFailure(user.getUsername());
             if (lockSeconds > 0) {
                 throw new AuthRateLimitException(RATE_LIMIT_ERROR);
@@ -180,14 +224,18 @@ public class AuthApplicationService {
         }
     }
 
-    private boolean matchesSecondaryPassword(String provided) {
-        if (superAdminSecondaryPassword.startsWith("$2a$")
-                || superAdminSecondaryPassword.startsWith("$2b$")
-                || superAdminSecondaryPassword.startsWith("$2y$")) {
-            return passwordEncoder.matches(provided, superAdminSecondaryPassword);
+    private boolean ensureSuperAdminRole(User user) {
+        if (user.getRole() == User.Role.ADMIN) {
+            return false;
         }
-        return MessageDigest.isEqual(
-                provided.getBytes(StandardCharsets.UTF_8),
-                superAdminSecondaryPassword.getBytes(StandardCharsets.UTF_8));
+        logger.warn("Promoting configured super-admin account to ADMIN during verified login: username={}",
+                user.getUsername());
+        user.setRole(User.Role.ADMIN);
+        return true;
+    }
+
+    private boolean isProdProfileActive() {
+        return environment != null
+                && Arrays.stream(environment.getActiveProfiles()).anyMatch("prod"::equalsIgnoreCase);
     }
 }

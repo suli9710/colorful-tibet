@@ -28,6 +28,9 @@ import reactor.core.publisher.Mono;
 public class AiRouteService {
 
     private static final Logger log = LoggerFactory.getLogger(AiRouteService.class);
+    private static final Map<String, Object> THINKING_ENABLED = Map.of("type", "enabled");
+    private static final String REASONING_EFFORT = "medium";
+    private static final int ROUTE_MAX_OUTPUT_TOKENS = 5200;
     private static final Map<String, String> BUDGET_LABELS = Map.of(
             "economy", "经济型",
             "comfort", "舒适型",
@@ -267,7 +270,7 @@ public class AiRouteService {
 
         // ARK Responses API format: {"type":"response.output_text.delta","delta":"text"}
         Object deltaField = event.get("delta");
-        if (deltaField instanceof String deltaText && !deltaText.isEmpty()) {
+        if (deltaField instanceof String deltaText && !deltaText.isEmpty() && isOutputTextDelta(event)) {
             int streamDeltaCount = streamDeltaCounter.incrementAndGet();
             if (streamDeltaCount <= 3) {
                 log.info("AI stream delta #{}: {}", streamDeltaCount, previewText(deltaText, 200));
@@ -296,7 +299,7 @@ public class AiRouteService {
 
         // Also check for top-level "text" field (some APIs use this)
         Object textField = event.get("text");
-        if (textField instanceof String text && !text.isEmpty()) {
+        if (textField instanceof String text && !text.isEmpty() && isOutputTextDelta(event)) {
             int streamDeltaCount = streamDeltaCounter.incrementAndGet();
             if (streamDeltaCount <= 3) {
                 log.info("AI stream delta #{} (text field): {}", streamDeltaCount, previewText(text, 200));
@@ -309,6 +312,22 @@ public class AiRouteService {
         if (streamLineCount <= 5) {
             log.info("AI stream non-delta event keys: {}", event.keySet());
         }
+    }
+
+    private boolean isOutputTextDelta(Map<String, Object> event) {
+        Object type = event.get("type");
+        if (!(type instanceof String eventType) || eventType.isBlank()) {
+            return true;
+        }
+
+        String normalized = eventType.toLowerCase(Locale.ROOT);
+        if (normalized.contains("reasoning") || normalized.contains("thinking")) {
+            return false;
+        }
+        return normalized.contains("output_text")
+                || normalized.contains("content")
+                || normalized.contains("message")
+                || normalized.contains("text");
     }
 
     private void sendEmitterEvent(SseEmitter emitter, String type, Map<String, Object> payload) {
@@ -439,10 +458,11 @@ public class AiRouteService {
 
         if (isChatCompletionsEndpoint(endpointUrl)) {
             requestBody.put("messages", List.of(Map.of("role", "user", "content", prompt)));
-            requestBody.put("thinking", Map.of("type", "disabled"));
-            requestBody.put("temperature", 0.6);
+            requestBody.put("thinking", THINKING_ENABLED);
+            requestBody.put("reasoning_effort", REASONING_EFFORT);
+            requestBody.put("temperature", 0.65);
             requestBody.put("top_p", 0.9);
-            requestBody.put("max_tokens", 2400);
+            requestBody.put("max_tokens", ROUTE_MAX_OUTPUT_TOKENS);
             requestBody.put("stream", stream);
             return requestBody;
         }
@@ -458,11 +478,11 @@ public class AiRouteService {
                         )
                 )
         ));
-        // Disable thinking/reasoning to get direct markdown output
-        requestBody.put("thinking", Map.of("type", "disabled"));
-        requestBody.put("temperature", 0.6);
+        requestBody.put("thinking", THINKING_ENABLED);
+        requestBody.put("reasoning_effort", REASONING_EFFORT);
+        requestBody.put("temperature", 0.65);
         requestBody.put("top_p", 0.9);
-        requestBody.put("max_output_tokens", 2400);
+        requestBody.put("max_output_tokens", ROUTE_MAX_OUTPUT_TOKENS);
         requestBody.put("stream", stream);
         return requestBody;
     }
@@ -541,8 +561,10 @@ public class AiRouteService {
         }
 
         return String.format(""
-                + "【重要指令】你是西藏旅行规划师。直接输出下方 Markdown 格式的旅行计划，不要输出任何思考过程、开场白、解释、分析或客套话。你的回复从第一行 # 标题开始，到「进藏必读」结束，中间不得有任何额外内容。\n"
-                + "【长度控制】输出要适合网页卡片阅读，总字数控制在900-1400字；每天最多4条要点；每条要点不超过35个中文字符；避免散文式长段落。\n\n"
+                + "【重要指令】你是西藏旅行规划师。可以先在内部推理路线取舍，但最终只输出下方 Markdown 格式的旅行计划，不要输出思考过程、开场白、解释、分析或客套话。你的回复从第一行 # 标题开始，到「进藏必读」结束，中间不得有任何额外内容。\n"
+                + "【长度控制】输出要有真实旅行方案的密度，总字数控制在1800-2600字；每天6-8条要点；每条要点优先写清时间、地点、车程、体验和注意事项，避免空泛短句。\n"
+                + "【深度要求】每一天都必须包含真实景点名、建议时间段、游玩时长、交通方式/车程、餐食或住宿建议、预算体现、海拔/体力提醒；禁止只写“游览某地”“自由活动”“体验当地风情”。\n"
+                + "【取舍要求】在内部比较路线方向、海拔适应、车程、天气备选和用户偏好后再给方案；不要把比较过程写出来，只输出最优可执行路线。\n\n"
                 + "%s\n\n"
                 + "%s\n\n"
                 + "═══════════════════════════════════\n"
@@ -573,13 +595,16 @@ public class AiRouteService {
                 + "- 每条一句话，必须包含具体景点\n\n"
                 + "## 每日行程\n\n"
                 + "### 第1天：拉萨 —— 高原初适应\n"
-                + "- **上午**：具体安排（含交通方式）\n"
-                + "- **下午**：1个核心景点与游玩时长\n"
-                + "- **晚上/住宿**：美食 + 酒店类型 + 价格区间\n"
-                + "- **贴心提示**：海拔或穿衣注意事项\n\n"
+                + "- **清晨/上午**：时间段 + 真实景点 + 游玩时长 + 到达方式\n"
+                + "- **午餐/转场**：餐食建议 + 车程/路况 + 途中停靠点\n"
+                + "- **下午**：核心景点深度玩法 + 推荐机位/讲解重点\n"
+                + "- **傍晚**：日落/散步/轻体验安排 + 体力控制\n"
+                + "- **晚上/住宿**：美食 + 酒店类型 + 价格区间 + 所在区域\n"
+                + "- **当日理由**：说明这一天为什么这样排，体现偏好和高原适应\n"
+                + "- **贴心提示**：海拔、证件、穿衣、补给或备选方案\n\n"
                 + "### 第2天：[城市/地区] —— [当日主题，如「羊卓雍措环湖之旅」]\n"
-                + "[同上结构，每天最多4条要点，避免长段落]\n\n"
-                + "[逐日输出至第%d天，每天必须包含上午/下午/晚上住宿/贴心提示]\n\n"
+                + "[同上结构，每天6-8条要点，避免空泛长段落]\n\n"
+                + "[逐日输出至第%d天，每天必须包含清晨/上午、午餐/转场、下午、傍晚、晚上住宿、当日理由、贴心提示]\n\n"
                 + "## 预算预估\n"
                 + "按%s标准，用3条以内列出交通、住宿餐饮、门票其他的人均估算。\n\n"
                 + "## 进藏必读\n"
@@ -655,6 +680,9 @@ public class AiRouteService {
         Object output = response.get("output");
         if (output instanceof List<?> outputList) {
             for (Object item : outputList) {
+                if (isReasoningContent(item)) {
+                    continue;
+                }
                 text = extractTextFromContent(item);
                 if (!text.isBlank()) {
                     return text;
@@ -686,6 +714,9 @@ public class AiRouteService {
             return text.trim();
         }
         if (content instanceof Map<?, ?> map) {
+            if (isReasoningContent(map)) {
+                return "";
+            }
             for (String key : List.of("text", "content", "output_text", "summary", "message")) {
                 Object value = map.get(key);
                 String text = extractTextFromContent(value);
@@ -708,6 +739,18 @@ public class AiRouteService {
             return builder.toString().trim();
         }
         return "";
+    }
+
+    private boolean isReasoningContent(Object content) {
+        if (!(content instanceof Map<?, ?> map)) {
+            return false;
+        }
+        Object type = map.get("type");
+        if (!(type instanceof String text)) {
+            return false;
+        }
+        String normalized = text.toLowerCase(Locale.ROOT);
+        return normalized.contains("reasoning") || normalized.contains("thinking");
     }
 
     private String normalizeMarkdownRoute(String rawContent, int days, String budgetLabel, String preferenceLabel, String locale) {

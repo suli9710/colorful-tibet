@@ -78,10 +78,13 @@ public class TravelQAService {
 
     @Transactional
     public TravelQuestion getQuestion(Long id) {
-        TravelQuestion question = questionRepository.findById(id)
+        // 原子增加浏览量，避免乐观锁冲突
+        int updated = questionRepository.incrementViewCount(id);
+        if (updated == 0) {
+            throw new ResourceNotFoundException("Question not found");
+        }
+        return questionRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Question not found"));
-        question.incrementViewCount();
-        return questionRepository.save(question);
     }
 
     @Transactional
@@ -113,8 +116,7 @@ public class TravelQAService {
 
         TravelAnswer saved = answerRepository.save(answer);
 
-        question.incrementAnswerCount();
-        questionRepository.save(question);
+        questionRepository.incrementAnswerCount(questionId);
 
         return saved;
     }
@@ -159,8 +161,7 @@ public class TravelQAService {
         like.setUser(user);
         likeRepository.save(like);
 
-        question.incrementLikeCount();
-        questionRepository.save(question);
+        questionRepository.incrementLikeCount(questionId);
         return true;
     }
 
@@ -178,8 +179,7 @@ public class TravelQAService {
         }
 
         likeRepository.delete(like.get());
-        question.decrementLikeCount();
-        questionRepository.save(question);
+        questionRepository.decrementLikeCount(questionId);
         return true;
     }
 

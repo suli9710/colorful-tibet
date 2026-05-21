@@ -337,6 +337,7 @@
   <PaymentModal
     :show="showPaymentModal"
     :amount="totalPrice"
+    recaptcha-action="booking"
     @close="showPaymentModal = false"
     @paid="handlePaymentConfirmed"
   />
@@ -351,7 +352,6 @@ import { motionEase, revealInitial, revealInView, inViewOnce } from '../motion/p
 import api, { endpoints } from '../api'
 import PaymentModal from '../components/PaymentModal.vue'
 import { useBehaviorTracker } from '../composables/useBehaviorTracker'
-import { getRecaptchaToken } from '../utils/recaptcha'
 import { useAuthStore } from '../stores/auth'
 import type * as Leaflet from 'leaflet'
 
@@ -615,10 +615,9 @@ const handleBooking = async () => {
   showPaymentModal.value = true
 }
 
-const handlePaymentConfirmed = async () => {
+const handlePaymentConfirmed = async (recaptchaToken = '') => {
   showPaymentModal.value = false
   submitting.value = true
-  const recaptchaToken = await getRecaptchaToken('booking')
   const behaviorData = encodeBehaviorData()
 
   try {

@@ -246,6 +246,7 @@ const extraMessages = {
       checkInRequired: '请选择入住和离店日期',
       guestNameRequired: '请填写预订人姓名',
       phoneRequired: '请填写联系电话',
+      securityVerificationFailed: '安全验证加载失败，请刷新页面后重试',
       noRoomTypes: '暂无房型信息'
     },
     admin: {
@@ -664,6 +665,7 @@ const extraMessages = {
       checkInRequired: 'ནང་སྡོད་དང་ཕྱིར་ཐོན་ཚེས་གྲངས་འདེམས་རོགས།',
       guestNameRequired: 'ཐོ་འགོད་མཁན་གྱི་མིང་འབྲི་རོགས།',
       phoneRequired: 'འབྲེལ་བའི་ཁ་པར་འབྲི་རོགས།',
+      securityVerificationFailed: 'བདེ་འཇགས་ར་སྤྲོད་འཇུག་མ་ཐུབ། ཤོག་ངོས་བསྐྱར་སྒྲིག་བྱས་ནས་བསྐྱར་ཚོད་ལྟ་གནང་རོགས།',
       noRoomTypes: 'ཁང་རིགས་ཆ་འཕྲིན་མེད།'
     },
     admin: {

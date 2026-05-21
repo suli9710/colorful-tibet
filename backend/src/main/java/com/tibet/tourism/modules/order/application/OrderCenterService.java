@@ -44,13 +44,20 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.MonthDay;
 import java.time.temporal.ChronoUnit;
+import java.util.Arrays;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import jakarta.annotation.PostConstruct;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -58,8 +65,11 @@ import org.springframework.util.StringUtils;
 @Service
 public class OrderCenterService {
 
+    private static final Logger logger = LoggerFactory.getLogger(OrderCenterService.class);
     private static final int LOCK_MINUTES = 15;
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+    private static final int MIN_CALLBACK_SECRET_LENGTH = 32;
+    private static final String DEV_CALLBACK_SECRET = "dev-payment-callback-secret";
 
     private final PlatformOrderRepository orderRepository;
     private final PaymentTransactionRepository paymentTransactionRepository;
@@ -69,8 +79,17 @@ public class OrderCenterService {
     private final HotelRepository hotelRepository;
     private final RoomTypeRepository roomTypeRepository;
 
-    @Value("${app.payments.mock-callback-secret}")
+    @Value("${app.payments.mock-callback-enabled:false}")
+    private boolean mockCallbackEnabled;
+
+    @Value("${app.payments.mock-callback-secret:}")
     private String callbackSecret;
+
+    @Value("${app.security.require-strong-secrets:false}")
+    private boolean requireStrongSecrets;
+
+    @Autowired
+    private Environment environment;
 
     public OrderCenterService(PlatformOrderRepository orderRepository,
                               PaymentTransactionRepository paymentTransactionRepository,
@@ -86,6 +105,37 @@ public class OrderCenterService {
         this.scenicSpotRepository = scenicSpotRepository;
         this.hotelRepository = hotelRepository;
         this.roomTypeRepository = roomTypeRepository;
+    }
+
+    @PostConstruct
+    void validatePaymentCallbackConfiguration() {
+        String secret = callbackSecret == null ? "" : callbackSecret.trim();
+        callbackSecret = secret;
+
+        if (!mockCallbackEnabled) {
+            if (DEV_CALLBACK_SECRET.equals(secret)) {
+                logger.warn("Mock payment callback is disabled, but the development callback secret is configured");
+            }
+            return;
+        }
+
+        boolean prodProfile = environment != null
+                && Arrays.stream(environment.getActiveProfiles()).anyMatch("prod"::equalsIgnoreCase);
+        boolean strictMode = requireStrongSecrets || prodProfile;
+
+        if (!StringUtils.hasText(secret)) {
+            throw new IllegalStateException("Payment callback secret must be configured when mock callbacks are enabled");
+        }
+        if (strictMode && DEV_CALLBACK_SECRET.equals(secret)) {
+            throw new IllegalStateException("Production payment callback secret cannot use the development placeholder");
+        }
+        if (secret.length() < MIN_CALLBACK_SECRET_LENGTH) {
+            throw new IllegalStateException("Payment callback secret must be at least "
+                    + MIN_CALLBACK_SECRET_LENGTH + " characters when mock callbacks are enabled");
+        }
+        if (DEV_CALLBACK_SECRET.equals(secret)) {
+            logger.warn("Using development payment callback secret; keep mock callbacks disabled outside local development");
+        }
     }
 
     @Transactional
@@ -219,9 +269,33 @@ public class OrderCenterService {
     }
 
     @Transactional
+    public OrderResponse handleMockPaymentCallback(User actor, PaymentCallbackRequest request) {
+        if (!mockCallbackEnabled) {
+            throw new IllegalStateException("Mock payment callback is disabled");
+        }
+        if (actor == null || actor.getId() == null) {
+            throw new SecurityException("Authenticated user is required for mock payment callback");
+        }
+        if (!"MOCK".equalsIgnoreCase(request.provider())) {
+            throw new IllegalArgumentException("Mock payment callback only accepts MOCK provider");
+        }
+
+        PlatformOrder order = orderRepository.findByOrderNo(request.orderNo())
+                .orElseThrow(() -> new NoSuchElementException("Order not found"));
+        if (order.getUser() == null || !actor.getId().equals(order.getUser().getId())) {
+            throw new NoSuchElementException("Order not found");
+        }
+        return handlePaymentCallback(order, request);
+    }
+
+    @Transactional
     public OrderResponse handlePaymentCallback(PaymentCallbackRequest request) {
         PlatformOrder order = orderRepository.findByOrderNo(request.orderNo())
                 .orElseThrow(() -> new NoSuchElementException("Order not found"));
+        return handlePaymentCallback(order, request);
+    }
+
+    private OrderResponse handlePaymentCallback(PlatformOrder order, PaymentCallbackRequest request) {
         boolean signatureValid = verifyCallbackSignature(request);
         PaymentTransaction transaction = new PaymentTransaction();
         transaction.setTransactionNo(InputSanitizer.requiredPlainText(request.transactionNo(), 64, "交易号"));
@@ -383,7 +457,7 @@ public class OrderCenterService {
         }
         Hotel hotel = hotelRepository.findById(request.getProductId())
                 .orElseThrow(() -> new NoSuchElementException("Hotel not found"));
-        RoomType roomType = roomTypeRepository.findById(request.getSkuId())
+        RoomType roomType = roomTypeRepository.findByIdForUpdate(request.getSkuId())
                 .orElseThrow(() -> new NoSuchElementException("Room type not found"));
         if (roomType.getHotel() == null || !hotel.getId().equals(roomType.getHotel().getId())) {
             throw new IllegalArgumentException("房型不属于该酒店");
@@ -421,17 +495,67 @@ public class OrderCenterService {
 
     private void createInventoryLocks(PlatformOrder order) {
         for (OrderItem item : order.getItems()) {
-            InventoryLock lock = new InventoryLock();
-            lock.setOrder(order);
-            lock.setOrderItem(item);
-            lock.setProductType(item.getProductType());
-            lock.setProductId(item.getProductId());
-            lock.setSkuId(item.getSkuId());
-            lock.setServiceDate(item.getServiceStartDate());
-            lock.setQuantity(item.getQuantity());
-            lock.setExpiresAt(order.getExpiresAt());
-            inventoryLockRepository.save(lock);
+            for (LocalDate serviceDate : lockDates(item)) {
+                createInventoryLock(order, item, serviceDate);
+            }
         }
+    }
+
+    private void createInventoryLock(PlatformOrder order, OrderItem item, LocalDate serviceDate) {
+        InventoryLock lock = new InventoryLock();
+        lock.setOrder(order);
+        lock.setOrderItem(item);
+        lock.setProductType(item.getProductType());
+        lock.setProductId(item.getProductId());
+        lock.setSkuId(item.getSkuId());
+        lock.setServiceDate(serviceDate);
+        lock.setQuantity(item.getQuantity());
+        lock.setExpiresAt(order.getExpiresAt());
+        String activeLockKey = activeLockKey(item, serviceDate);
+        lock.setActiveLockKey(activeLockKey);
+        if (StringUtils.hasText(activeLockKey)) {
+            releaseExpiredActiveLock(activeLockKey);
+            if (inventoryLockRepository.existsByActiveLockKey(activeLockKey)) {
+                throw new IllegalStateException("Room type is unavailable for the selected dates");
+            }
+        }
+        try {
+            inventoryLockRepository.saveAndFlush(lock);
+        } catch (DataIntegrityViolationException exception) {
+            throw new IllegalStateException("Room type is unavailable for the selected dates", exception);
+        }
+    }
+
+    private List<LocalDate> lockDates(OrderItem item) {
+        if (item.getServiceStartDate() == null) {
+            return List.of();
+        }
+        if (item.getProductType() == OrderItem.ProductType.HOTEL_ROOM && item.getServiceEndDate() != null) {
+            long nights = ChronoUnit.DAYS.between(item.getServiceStartDate(), item.getServiceEndDate());
+            return java.util.stream.LongStream.range(0, nights)
+                    .mapToObj(item.getServiceStartDate()::plusDays)
+                    .toList();
+        }
+        return List.of(item.getServiceStartDate());
+    }
+
+    private String activeLockKey(OrderItem item, LocalDate serviceDate) {
+        if (item.getProductType() != OrderItem.ProductType.HOTEL_ROOM || serviceDate == null || item.getSkuId() == null) {
+            return null;
+        }
+        return item.getProductType() + ":" + item.getProductId() + ":" + item.getSkuId() + ":" + serviceDate;
+    }
+
+    private void releaseExpiredActiveLock(String activeLockKey) {
+        inventoryLockRepository.findByActiveLockKey(activeLockKey).ifPresent(existing -> {
+            if (existing.getStatus() == InventoryLock.Status.LOCKED
+                    && existing.getExpiresAt() != null
+                    && existing.getExpiresAt().isBefore(LocalDateTime.now())) {
+                existing.setStatus(InventoryLock.Status.EXPIRED);
+                existing.setActiveLockKey(null);
+                inventoryLockRepository.saveAndFlush(existing);
+            }
+        });
     }
 
     private PlatformOrder expireIfNeeded(PlatformOrder order) {
@@ -474,6 +598,9 @@ public class OrderCenterService {
     private void releaseLocks(PlatformOrder order, InventoryLock.Status status) {
         inventoryLockRepository.findByOrder(order).forEach(lock -> {
             lock.setStatus(status);
+            if (status == InventoryLock.Status.RELEASED || status == InventoryLock.Status.EXPIRED) {
+                lock.setActiveLockKey(null);
+            }
             inventoryLockRepository.save(lock);
         });
     }

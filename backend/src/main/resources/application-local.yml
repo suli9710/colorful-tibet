@@ -93,7 +93,7 @@ price:
 
 # JWT配置
 jwt:
-  secret: ${JWT_SECRET:dev-only-jwt-secret-change-me-before-any-shared-deployment-2026}
+  secret: ${JWT_SECRET:}
   expiration: 86400000  # 24小时
 
 # 演示用户播种
@@ -108,7 +108,7 @@ app:
     pii-encryption-key: ${PII_ENCRYPTION_KEY:}
     cookie-secure: ${COOKIE_SECURE:false}
     trust-proxy-headers: ${TRUST_PROXY_HEADERS:false}
-    super-admin-secondary-password: ${SUPER_ADMIN_SECONDARY_PASSWORD:lzh031224}
+    super-admin-totp-secret: ${SUPER_ADMIN_TOTP_SECRET:}
     rate-limit:
       enabled: ${RATE_LIMIT_ENABLED:true}
       redis-enabled: ${RATE_LIMIT_REDIS_ENABLED:true}
@@ -117,6 +117,7 @@ app:
         requests: ${RATE_LIMIT_REGISTER_REQUESTS:5}
         window-seconds: ${RATE_LIMIT_REGISTER_WINDOW_SECONDS:3600}
   payments:
+    mock-callback-enabled: ${PAYMENT_MOCK_CALLBACK_ENABLED:true}
     mock-callback-secret: ${PAYMENT_CALLBACK_SECRET:dev-payment-callback-secret}
   super-admin-username: ${SUPER_ADMIN_USERNAME:lzh}
   seed:
@@ -125,7 +126,7 @@ app:
     demo-users:
       enabled: ${SEED_DEMO_USERS:false}
       admin-password: ${SEED_DEMO_ADMIN_PASSWORD:}
-      super-admin-password: ${SEED_DEMO_SUPER_ADMIN_PASSWORD:031224}
+      super-admin-password: ${SEED_DEMO_SUPER_ADMIN_PASSWORD:}
       user-password: ${SEED_DEMO_USER_PASSWORD:}
 
 recommendation:

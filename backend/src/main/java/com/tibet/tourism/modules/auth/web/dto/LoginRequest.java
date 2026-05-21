@@ -13,7 +13,7 @@ public class LoginRequest {
     @Size(max = 128, message = "密码长度不能超过128个字符")
     private String password;
 
-    @Size(max = 128, message = "二级密码长度不能超过128个字符")
+    @Size(max = 16, message = "动态验证码长度不能超过16个字符")
     private String secondaryPassword;
 
     public String getUsername() {

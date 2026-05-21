@@ -71,8 +71,11 @@
             :transition="authItemTransition(0.4)"
           >
             <label for="secondaryPassword" class="sr-only">{{ t('login.secondaryPassword') }}</label>
-            <input id="secondaryPassword" name="secondaryPassword" type="password" required v-model="form.secondaryPassword"
+            <input id="secondaryPassword" name="secondaryPassword" type="text" required v-model="form.secondaryPassword"
                    autocomplete="one-time-code"
+                   inputmode="numeric"
+                   maxlength="6"
+                   pattern="[0-9]{6}"
                    class="appearance-none rounded-xl relative block w-full px-4 py-3 border border-tibet-gold/25 placeholder-tibet-brown/40 text-tibet-dark bg-tibet-white focus:outline-none focus:ring-2 focus:ring-tibet-gold/60 focus:border-transparent sm:text-sm input-focus"
                    :placeholder="t('login.secondaryPassword')"
                    @input="clearError">
@@ -197,6 +200,11 @@ const handleLogin = async () => {
 
     clearTokenCache()
     auth.login(user)
+
+    if (user.mustChangePassword) {
+      router.push({ path: '/profile', query: { changePassword: '1' } })
+      return
+    }
 
     router.push(user.role === 'ADMIN' ? '/admin' : '/')
   } catch (error: any) {

@@ -752,7 +752,8 @@
   <PaymentModal
     :show="showPaymentModal"
     :amount="pendingPaymentItem?.estimatedCost"
-    @close="showPaymentModal = false; pendingPaymentItem = null"
+    recaptcha-action="itinerary_booking"
+    @close="resetPendingItineraryBooking"
     @paid="handleItineraryPaymentConfirmed"
   />
 </template>
@@ -788,7 +789,6 @@ import api, { endpoints } from '../api'
 import PaymentModal from '../components/PaymentModal.vue'
 import { useRoutePlannerDraft, type RoutePlannerFormState } from '../composables/useRoutePlannerDraft'
 import { useBehaviorTracker } from '../composables/useBehaviorTracker'
-import { getRecaptchaToken } from '../utils/recaptcha'
 import { useAuthStore } from '../stores/auth'
 import { useRouteGenerationStore } from '../stores/routeGeneration'
 import {
@@ -1550,6 +1550,13 @@ const shareRoute = async () => {
 
 const showPaymentModal = ref(false)
 const pendingPaymentItem = ref<ItineraryItem | null>(null)
+const pendingBookingPhone = ref('')
+
+const resetPendingItineraryBooking = () => {
+  showPaymentModal.value = false
+  pendingPaymentItem.value = null
+  pendingBookingPhone.value = ''
+}
 
 const bookItineraryItem = async (item: ItineraryItem) => {
   if (!bookableItinerary.value || !isBookableItem(item)) return
@@ -1561,29 +1568,29 @@ const bookItineraryItem = async (item: ItineraryItem) => {
     return
   }
 
-  const user = auth.user || {}
-  let phone = typeof user.phone === 'string' ? user.phone : ''
+  const phone = item.bookingAction === 'BOOK_HOTEL'
+    ? (window.prompt(t('hotel.phonePlaceholder')) || '').trim()
+    : ''
 
   if (item.bookingAction === 'BOOK_HOTEL' && !phone) {
-    phone = window.prompt('请输入手机号用于酒店预订') || ''
-    if (!phone.trim()) return
+    return
   }
 
+  pendingBookingPhone.value = phone
   pendingPaymentItem.value = item
   showPaymentModal.value = true
 }
 
-const handleItineraryPaymentConfirmed = async () => {
+const handleItineraryPaymentConfirmed = async (recaptchaToken = '') => {
   const item = pendingPaymentItem.value
   if (!item || !bookableItinerary.value) return
 
   showPaymentModal.value = false
-  const recaptchaToken = await getRecaptchaToken('itinerary_booking')
   const behaviorData = encodeBehaviorData()
 
   const user = auth.user || {}
   const guestName = String(user.nickname || user.username || '')
-  let phone = typeof user.phone === 'string' ? user.phone : ''
+  const phone = pendingBookingPhone.value
 
   itineraryBookingItemId.value = item.id
   try {
@@ -1608,6 +1615,7 @@ const handleItineraryPaymentConfirmed = async () => {
   } finally {
     itineraryBookingItemId.value = null
     pendingPaymentItem.value = null
+    pendingBookingPhone.value = ''
     resetBehavior()
   }
 }

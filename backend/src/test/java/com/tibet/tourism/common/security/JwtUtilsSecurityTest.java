@@ -38,6 +38,18 @@ class JwtUtilsSecurityTest {
     }
 
     @Test
+    void rejectsPublishedDevelopmentSecretInAllModes() {
+        JwtUtils jwtUtils = jwtUtils(
+                "dev-only-jwt-secret-change-me-before-any-shared-deployment-2026",
+                86_400_000,
+                false);
+
+        assertThatThrownBy(jwtUtils::validateJwtConfiguration)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("published development placeholder");
+    }
+
+    @Test
     void rejectsDevelopmentSecretWhenProdProfileIsActive() {
         JwtUtils jwtUtils = jwtUtils(
                 "dev-only-jwt-secret-change-me-before-any-shared-deployment-2026-extra",
