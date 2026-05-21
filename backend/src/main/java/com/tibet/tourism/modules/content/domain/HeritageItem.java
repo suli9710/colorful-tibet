@@ -33,6 +33,20 @@ public class HeritageItem {
     @Column(name = "baike_url", length = 512)
     private String baikeUrl;
 
+    private String region;
+
+    @Column(name = "protection_level")
+    private String protectionLevel;
+
+    @Column(name = "view_count")
+    private Integer viewCount = 0;
+
+    @Column(name = "like_count")
+    private Integer likeCount = 0;
+
+    @Column(name = "comment_count")
+    private Integer commentCount = 0;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
@@ -128,6 +142,46 @@ public class HeritageItem {
 
     public void setBaikeUrl(String baikeUrl) {
         this.baikeUrl = baikeUrl;
+    }
+
+    public String getRegion() {
+        return region;
+    }
+
+    public void setRegion(String region) {
+        this.region = region;
+    }
+
+    public String getProtectionLevel() {
+        return protectionLevel;
+    }
+
+    public void setProtectionLevel(String protectionLevel) {
+        this.protectionLevel = protectionLevel;
+    }
+
+    public Integer getViewCount() {
+        return viewCount;
+    }
+
+    public void setViewCount(Integer viewCount) {
+        this.viewCount = viewCount;
+    }
+
+    public Integer getLikeCount() {
+        return likeCount;
+    }
+
+    public void setLikeCount(Integer likeCount) {
+        this.likeCount = likeCount;
+    }
+
+    public Integer getCommentCount() {
+        return commentCount;
+    }
+
+    public void setCommentCount(Integer commentCount) {
+        this.commentCount = commentCount;
     }
 
     public LocalDateTime getCreatedAt() {

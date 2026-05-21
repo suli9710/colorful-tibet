@@ -16,6 +16,38 @@
         </p>
       </motion.div>
 
+      <!-- 搜索栏 -->
+      <div class="mb-8 max-w-xl mx-auto">
+        <form class="flex items-center gap-2" @submit.prevent="handleSearch">
+          <div class="relative flex-1">
+            <input
+              v-model="searchKeyword"
+              type="text"
+              :placeholder="t('heritage.searchPlaceholder', '搜索非遗项目...')"
+              class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-stone-200 bg-white/80 backdrop-blur text-sm text-stone-700 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-tibet-red/30 focus:border-tibet-red/40 transition"
+            />
+            <svg xmlns="http://www.w3.org/2000/svg" class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+          <button
+            type="submit"
+            class="px-4 py-2.5 rounded-xl bg-tibet-red text-white text-sm font-medium hover:bg-tibet-red/90 transition disabled:opacity-50"
+            :disabled="searchLoading"
+          >
+            {{ searchLoading ? '...' : t('heritage.search', '搜索') }}
+          </button>
+          <button
+            v-if="searchKeyword"
+            type="button"
+            class="px-3 py-2.5 rounded-xl border border-stone-200 text-sm text-stone-500 hover:bg-stone-50 transition"
+            @click="searchKeyword = ''; handleSearch()"
+          >
+            {{ t('heritage.clearSearch', '清除') }}
+          </button>
+        </form>
+      </div>
+
       <!-- 非遗大类一览（简洁卡片设计） -->
       <motion.section
         class="mb-14"
@@ -294,6 +326,36 @@
             </motion.div>
           </div>
 
+          <!-- 互动状态栏：浏览数 / 点赞 / 评论 -->
+          <div v-if="selectedItem.id < 10000" class="px-6 py-3 flex items-center justify-between border-b border-stone-100">
+            <div class="flex items-center gap-4 text-xs text-stone-400">
+              <span v-if="selectedItem.viewCount" class="flex items-center gap-1">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                {{ selectedItem.viewCount }}
+              </span>
+              <span class="flex items-center gap-1">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg>
+                {{ selectedItem.likeCount || 0 }}
+              </span>
+              <span class="flex items-center gap-1">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
+                {{ selectedItem.commentCount || 0 }}
+              </span>
+              <span v-if="selectedItem.protectionLevel" class="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-100 text-[11px] font-medium">
+                {{ selectedItem.protectionLevel }}
+              </span>
+            </div>
+            <button
+              v-if="authStore.isLoggedIn"
+              class="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition"
+              :class="liked ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-stone-50 text-stone-500 border border-stone-200 hover:bg-red-50 hover:text-red-500'"
+              @click="toggleLike"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" :fill="liked ? 'currentColor' : 'none'" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg>
+              {{ liked ? '已点赞' : '点赞' }}
+            </button>
+          </div>
+
           <!-- 文字内容区：分段更详细介绍 + 线下体验模块 -->
           <motion.div
             class="px-6 py-5 text-sm text-stone-700 space-y-5 max-h-[65vh] overflow-y-auto"
@@ -326,6 +388,18 @@
               <p class="text-[13px] text-stone-500">
                 {{ t('heritage.detailNote') }}
               </p>
+
+              <!-- 视频播放器 -->
+              <div v-if="selectedItem.videoUrl" class="rounded-xl overflow-hidden border border-stone-200 bg-black">
+                <video
+                  :src="selectedItem.videoUrl"
+                  controls
+                  preload="metadata"
+                  class="w-full max-h-[320px]"
+                >
+                  您的浏览器不支持视频播放
+                </video>
+              </div>
 
               <motion.div
                 class="space-y-2"
@@ -519,6 +593,142 @@
                 </div>
               </div>
             </motion.div>
+
+            <!-- 传承人 -->
+            <div v-if="itemInheritors.length" class="border-t border-dashed border-stone-200 pt-4">
+              <h4 class="text-sm font-semibold text-stone-900 mb-3">
+                {{ t('heritage.inheritors', '代表性传承人') }}
+              </h4>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div
+                  v-for="inheritor in itemInheritors"
+                  :key="inheritor.id"
+                  class="flex items-start gap-3 rounded-xl border border-stone-200 bg-stone-50/60 px-3 py-2.5"
+                >
+                  <div v-if="inheritor.avatarUrl" class="flex-shrink-0 w-10 h-10 rounded-full overflow-hidden bg-stone-200">
+                    <img :src="inheritor.avatarUrl" :alt="inheritor.name" class="w-full h-full object-cover" />
+                  </div>
+                  <div v-else class="flex-shrink-0 w-10 h-10 rounded-full bg-tibet-red/10 flex items-center justify-center text-tibet-red font-bold text-sm">
+                    {{ inheritor.name?.charAt(0) }}
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <div class="flex items-center gap-2 mb-0.5">
+                      <p class="text-sm font-semibold text-stone-900">{{ inheritor.name }}</p>
+                      <span v-if="inheritor.level" class="px-1.5 py-0.5 rounded text-[10px] bg-amber-50 text-amber-700 border border-amber-100">{{ inheritor.level }}</span>
+                    </div>
+                    <p v-if="inheritor.region" class="text-[11px] text-stone-400 mb-0.5">{{ inheritor.region }}</p>
+                    <p v-if="inheritor.bio" class="text-xs text-stone-500 line-clamp-2">{{ inheritor.bio }}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 相关活动 -->
+            <div v-if="itemEvents.length" class="border-t border-dashed border-stone-200 pt-4">
+              <h4 class="text-sm font-semibold text-stone-900 mb-3">
+                {{ t('heritage.relatedEvents', '相关活动') }}
+              </h4>
+              <div class="space-y-2">
+                <div
+                  v-for="event in itemEvents"
+                  :key="event.id"
+                  class="flex items-center gap-3 rounded-xl border border-stone-200 bg-stone-50/60 px-3 py-2"
+                >
+                  <div class="flex-shrink-0 w-12 text-center">
+                    <p class="text-xs font-bold text-tibet-red">{{ formatDate(event.eventDate || '') }}</p>
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <p class="text-sm font-medium text-stone-900">{{ event.title }}</p>
+                    <p v-if="event.location" class="text-[11px] text-stone-400">{{ event.location }}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 评论区 -->
+            <div v-if="selectedItem.id < 10000" class="border-t border-dashed border-stone-200 pt-4">
+              <h4 class="text-sm font-semibold text-stone-900 mb-3">
+                {{ t('heritage.commentsTitle', '用户评论') }} ({{ selectedItem.commentCount || 0 }})
+              </h4>
+
+              <!-- 发表评论 -->
+              <div v-if="authStore.isLoggedIn" class="mb-4 space-y-2">
+                <div class="flex items-center gap-1 mb-1">
+                  <span class="text-xs text-stone-500">{{ t('heritage.rating', '评分') }}:</span>
+                  <button
+                    v-for="star in 5"
+                    :key="star"
+                    type="button"
+                    class="text-lg leading-none transition"
+                    :class="star <= newCommentRating ? 'text-amber-400' : 'text-stone-200'"
+                    @click="newCommentRating = star"
+                  >
+                    ★
+                  </button>
+                </div>
+                <div class="flex gap-2">
+                  <input
+                    v-model="newCommentContent"
+                    type="text"
+                    maxlength="1000"
+                    :placeholder="t('heritage.commentPlaceholder', '分享你对这个非遗项目的感受...')"
+                    class="flex-1 px-3 py-2 rounded-lg border border-stone-200 text-sm focus:outline-none focus:ring-1 focus:ring-tibet-red/30"
+                    @keydown.enter.prevent="submitComment"
+                  />
+                  <button
+                    type="button"
+                    class="px-4 py-2 rounded-lg bg-tibet-red text-white text-sm font-medium hover:bg-tibet-red/90 transition disabled:opacity-50"
+                    :disabled="submittingComment || !newCommentContent.trim()"
+                    @click="submitComment"
+                  >
+                    {{ submittingComment ? '...' : t('heritage.submitComment', '发表') }}
+                  </button>
+                </div>
+              </div>
+              <p v-else class="text-xs text-stone-400 mb-3">
+                {{ t('heritage.loginToComment', '登录后可以评论') }}
+              </p>
+
+              <!-- 评论列表 -->
+              <div v-if="commentsLoading" class="flex justify-center py-4">
+                <div class="rounded-full h-6 w-6 border-b-2 border-red-500 animate-spin"></div>
+              </div>
+              <div v-else-if="itemComments.length" class="space-y-3">
+                <div
+                  v-for="comment in itemComments"
+                  :key="comment.id"
+                  class="rounded-lg border border-stone-100 bg-stone-50/40 px-3 py-2"
+                >
+                  <div class="flex items-center justify-between mb-1">
+                    <div class="flex items-center gap-2">
+                      <div class="w-6 h-6 rounded-full bg-tibet-red/10 flex items-center justify-center text-tibet-red text-[10px] font-bold overflow-hidden">
+                        <img v-if="comment.avatar" :src="comment.avatar" class="w-full h-full object-cover" />
+                        <span v-else>{{ (comment.nickname || comment.username)?.charAt(0) }}</span>
+                      </div>
+                      <span class="text-xs font-medium text-stone-700">{{ comment.nickname || comment.username }}</span>
+                      <span v-if="comment.rating" class="text-[11px] text-amber-500">
+                        {{ '★'.repeat(comment.rating) }}
+                      </span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <span class="text-[10px] text-stone-400">{{ formatDate(comment.createdAt) }}</span>
+                      <button
+                        v-if="authStore.user?.id === comment.userId"
+                        type="button"
+                        class="text-[10px] text-red-400 hover:text-red-600 transition"
+                        @click="deleteComment(comment.id)"
+                      >
+                        {{ t('heritage.deleteComment', '删除') }}
+                      </button>
+                    </div>
+                  </div>
+                  <p class="text-sm text-stone-600 leading-relaxed">{{ comment.content }}</p>
+                </div>
+              </div>
+              <p v-else class="text-xs text-stone-400 text-center py-3">
+                {{ t('heritage.noComments', '暂无评论，快来发表第一条吧') }}
+              </p>
+            </div>
           </motion.div>
         </template>
       </MotionModal>
@@ -551,7 +761,14 @@ import { AnimatePresence, motion } from 'motion-v'
 import { useI18n } from 'vue-i18n'
 import MotionModal from '../components/motion/MotionModal.vue'
 import api, { endpoints } from '../api'
-import { loadAmap } from '../utils/amap'
+import type {
+  HeritageCommentItem,
+  HeritageEventItem,
+  HeritageInheritorItem,
+  HeritageItem
+} from '../api'
+import { useAuthStore } from '../stores/auth'
+import type * as Leaflet from 'leaflet'
 import {
   cardExit,
   cardInitial,
@@ -618,19 +835,8 @@ const heritageCategories = computed(() => [
   }
 ])
 
-interface HeritageItem {
-  id: number
-  name: string
-  description: string
-  category: string
-  imageUrl: string
-  videoUrl: string
-  originStory: string
-  significance: string
-  baikeUrl: string
-}
+const authStore = useAuthStore()
 
-// 根据名称构造百度百科链接
 const buildBaikeUrl = (name: string): string => {
   return 'https://baike.baidu.com/search?word=' + encodeURIComponent(name)
 }
@@ -638,6 +844,19 @@ const buildBaikeUrl = (name: string): string => {
 const heritageItems = ref<HeritageItem[]>([])
 const loading = ref(true)
 const selectedItem = ref<HeritageItem | null>(null)
+
+const searchKeyword = ref('')
+const searchLoading = ref(false)
+
+const itemComments = ref<HeritageCommentItem[]>([])
+const commentsLoading = ref(false)
+const itemInheritors = ref<HeritageInheritorItem[]>([])
+const itemEvents = ref<HeritageEventItem[]>([])
+const liked = ref(false)
+const newCommentContent = ref('')
+const newCommentRating = ref(5)
+const submittingComment = ref(false)
+const upcomingEvents = ref<HeritageEventItem[]>([])
 
 const genericHeritageImagePatterns = [
   'images.unsplash.com/photo-1559827291'
@@ -690,10 +909,22 @@ const applyHeritageImageFallback = (event: Event): void => {
 const mapContainer = ref<HTMLElement | null>(null)
 const mapLoading = ref(true)
 const mapError = ref(false) // 地图加载失败标志
-let map: any = null
-let markers: any[] = []
+let map: Leaflet.Map | null = null
+let markers: Leaflet.Layer[] = []
 let pendingMapFrame: number | null = null
 let mapInitVersion = 0
+let leafletLoader: Promise<typeof Leaflet> | null = null
+
+const loadLeaflet = async () => {
+  if (!leafletLoader) {
+    leafletLoader = Promise.all([
+      import('leaflet'),
+      import('leaflet/dist/leaflet.css')
+    ]).then(([leaflet]) => leaflet)
+  }
+
+  return leafletLoader
+}
 
 interface ExperienceSpot {
   name: string
@@ -1174,21 +1405,116 @@ const getItemsByCategory = (categoryName: string): NationalHeritageItem[] => {
   return nationalHeritageByCategory.value[key] || []
 }
 
-const fetchHeritageItems = async () => {
+const fetchHeritageItems = async (keyword?: string) => {
   try {
-    // API拦截器会自动添加locale参数
-    const response = await api.get(endpoints.heritage.list)
+    const params: Record<string, string> = {}
+    if (keyword) params.keyword = keyword
+    const response = await api.get(endpoints.heritage.list, { params })
     heritageItems.value = response.data?.content || response.data || []
   } catch (error) {
     console.error('Failed to fetch heritage items:', error)
   } finally {
     loading.value = false
+    searchLoading.value = false
   }
+}
+
+const handleSearch = async () => {
+  const kw = searchKeyword.value.trim()
+  if (!kw) {
+    loading.value = true
+    await fetchHeritageItems()
+    return
+  }
+  searchLoading.value = true
+  await fetchHeritageItems(kw)
+}
+
+const loadDetailData = async (item: HeritageItem) => {
+  if (!item.id || item.id >= 10000) return
+
+  commentsLoading.value = true
+  try {
+    const [commentsRes, inheritorsRes, eventsRes] = await Promise.all([
+      api.get(endpoints.heritage.comments(item.id)).catch(() => null),
+      api.get(endpoints.heritage.inheritors(item.id)).catch(() => null),
+      api.get(endpoints.heritage.events(item.id)).catch(() => null)
+    ])
+    itemComments.value = commentsRes?.data?.content || commentsRes?.data || []
+    itemInheritors.value = inheritorsRes?.data || []
+    itemEvents.value = eventsRes?.data || []
+  } catch (e) {
+    console.error('Failed to load detail data:', e)
+  } finally {
+    commentsLoading.value = false
+  }
+
+  if (authStore.isLoggedIn) {
+    try {
+      const res = await api.get(endpoints.heritage.likeStatus(item.id))
+      liked.value = res.data?.liked || false
+    } catch { liked.value = false }
+  }
+}
+
+const toggleLike = async () => {
+  if (!selectedItem.value || !authStore.isLoggedIn) return
+  try {
+    const res = await api.post(endpoints.heritage.like(selectedItem.value.id))
+    liked.value = res.data?.liked ?? !liked.value
+    if (selectedItem.value) {
+      selectedItem.value = { ...selectedItem.value, likeCount: res.data?.likeCount }
+    }
+  } catch (e) {
+    console.error('Failed to toggle like:', e)
+  }
+}
+
+const submitComment = async () => {
+  if (!selectedItem.value || !authStore.isLoggedIn || !newCommentContent.value.trim()) return
+  submittingComment.value = true
+  try {
+    const res = await api.post(endpoints.heritage.comments(selectedItem.value.id), {
+      content: newCommentContent.value.trim(),
+      rating: newCommentRating.value
+    })
+    if (res.data) {
+      itemComments.value = [res.data, ...itemComments.value]
+      if (selectedItem.value) {
+        selectedItem.value = { ...selectedItem.value, commentCount: (selectedItem.value.commentCount || 0) + 1 }
+      }
+    }
+    newCommentContent.value = ''
+    newCommentRating.value = 5
+  } catch (e) {
+    console.error('Failed to submit comment:', e)
+  } finally {
+    submittingComment.value = false
+  }
+}
+
+const deleteComment = async (commentId: number) => {
+  if (!selectedItem.value) return
+  try {
+    await api.delete(endpoints.heritage.deleteComment(selectedItem.value.id, commentId))
+    itemComments.value = itemComments.value.filter(c => c.id !== commentId)
+    if (selectedItem.value) {
+      selectedItem.value = { ...selectedItem.value, commentCount: Math.max(0, (selectedItem.value.commentCount || 1) - 1) }
+    }
+  } catch (e) {
+    console.error('Failed to delete comment:', e)
+  }
+}
+
+const formatDate = (dateStr: string) => {
+  try {
+    return new Date(dateStr).toLocaleDateString('zh-CN', { year: 'numeric', month: 'short', day: 'numeric' })
+  } catch { return dateStr }
 }
 
 // 监听语言变化，重新获取数据
 watch(locale, () => {
-  fetchHeritageItems()
+  fetchHeritageItems(searchKeyword.value.trim() || undefined)
 })
 
 const toggleCategory = (categoryName: string) => {
@@ -1197,6 +1523,12 @@ const toggleCategory = (categoryName: string) => {
 
 const openDetail = (item: HeritageItem) => {
   selectedItem.value = item
+  itemComments.value = []
+  itemInheritors.value = []
+  itemEvents.value = []
+  liked.value = false
+  newCommentContent.value = ''
+  loadDetailData(item)
 }
 
 const openBaikeUrl = (url: string) => {
@@ -1218,53 +1550,114 @@ const clearMap = () => {
   }
 
   if (map) {
-    map.destroy()
+    map.remove()
     map = null
   }
   markers = []
 }
 
-const addExperienceMarkers = (AMap: any) => {
-  if (!map) return
+const htmlEscapeMap: Record<string, string> = {
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '"': '&quot;',
+  "'": '&#39;'
+}
+
+const escapeHtml = (value: string): string =>
+  value.replace(/[&<>"']/g, char => htmlEscapeMap[char] || char)
+
+const PI = Math.PI
+const A = 6378245.0
+const EE = 0.00669342162296594323
+
+const outOfChina = (lng: number, lat: number): boolean =>
+  lng < 72.004 || lng > 137.8347 || lat < 0.8293 || lat > 55.8271
+
+const transformLat = (x: number, y: number): number => {
+  let ret = -100.0 + 2.0 * x + 3.0 * y + 0.2 * y * y + 0.1 * x * y + 0.2 * Math.sqrt(Math.abs(x))
+  ret += (20.0 * Math.sin(6.0 * x * PI) + 20.0 * Math.sin(2.0 * x * PI)) * 2.0 / 3.0
+  ret += (20.0 * Math.sin(y * PI) + 40.0 * Math.sin(y / 3.0 * PI)) * 2.0 / 3.0
+  ret += (160.0 * Math.sin(y / 12.0 * PI) + 320 * Math.sin(y * PI / 30.0)) * 2.0 / 3.0
+  return ret
+}
+
+const transformLon = (x: number, y: number): number => {
+  let ret = 300.0 + x + 2.0 * y + 0.1 * x * x + 0.1 * x * y + 0.1 * Math.sqrt(Math.abs(x))
+  ret += (20.0 * Math.sin(6.0 * x * PI) + 20.0 * Math.sin(2.0 * x * PI)) * 2.0 / 3.0
+  ret += (20.0 * Math.sin(x * PI) + 40.0 * Math.sin(x / 3.0 * PI)) * 2.0 / 3.0
+  ret += (150.0 * Math.sin(x / 12.0 * PI) + 300.0 * Math.sin(x / 30.0 * PI)) * 2.0 / 3.0
+  return ret
+}
+
+const wgs84ToGcj02 = (lng: number, lat: number): [number, number] => {
+  if (outOfChina(lng, lat)) return [lng, lat]
+  const dlat = transformLat(lng - 105.0, lat - 35.0)
+  const dlng = transformLon(lng - 105.0, lat - 35.0)
+  const radlat = lat / 180.0 * PI
+  let magic = Math.sin(radlat)
+  magic = 1 - EE * magic * magic
+  const sqrtmagic = Math.sqrt(magic)
+  const mglat = (dlat * 180.0) / ((A * (1 - EE)) / (magic * sqrtmagic) * PI)
+  const mglng = (dlng * 180.0) / (A / sqrtmagic * Math.cos(radlat) * PI)
+  return [lng + mglng, lat + mglat]
+}
+
+const fitExperienceMarkers = (L: typeof Leaflet) => {
+  const leafletMap = map
+  if (!leafletMap) return
+
+  const positions = experienceSpots.value.map((spot) => {
+    const [lng, lat] = wgs84ToGcj02(spot.lng, spot.lat)
+    return L.latLng(lat, lng)
+  })
+  if (!positions.length) return
+
+  leafletMap.fitBounds(L.latLngBounds(positions), {
+    padding: [28, 28],
+    maxZoom: 8
+  })
+}
+
+const addExperienceMarkers = (L: typeof Leaflet) => {
+  const leafletMap = map
+  if (!leafletMap) return
+  markers.forEach(marker => marker.remove())
   markers = []
 
   experienceSpots.value.forEach((spot) => {
     try {
-      const marker = new AMap.Marker({
-        position: [spot.lng, spot.lat],
+      const [lng, lat] = wgs84ToGcj02(spot.lng, spot.lat)
+      const marker = L.marker([lat, lng], {
         title: spot.name,
-        label: {
-          content: `<div style="background: #ef4444; color: white; padding: 2px 6px; border-radius: 4px; font-size: 12px; white-space: nowrap;">${spot.tag}</div>`,
-          direction: 'right',
-          offset: [10, 0]
-        }
+        icon: L.divIcon({
+          className: 'heritage-map-marker',
+          html: `<span style="display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:26px;padding:0 7px;border-radius:999px;background:#ef4444;color:#fff;font-size:12px;font-weight:700;box-shadow:0 8px 18px rgba(127,29,29,.28);border:2px solid rgba(255,255,255,.9);">${escapeHtml(spot.tag)}</span>`,
+          iconSize: [34, 34],
+          iconAnchor: [17, 17],
+          popupAnchor: [0, -16]
+        })
       })
 
-      const infoWindow = new AMap.InfoWindow({
-        content: `
-          <div style="padding: 8px; min-width: 200px;">
-            <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: bold;">${spot.name}</h3>
-            <p style="margin: 4px 0; font-size: 12px; color: #666;">${spot.address}</p>
-            <p style="margin: 4px 0; font-size: 12px; color: #666;">${spot.brief}</p>
-            <p style="margin: 4px 0; font-size: 12px; color: #ef4444;">${spot.highlight}</p>
-          </div>
-        `,
-        offset: [0, -30]
-      })
-
-      marker.on('click', () => {
-        infoWindow.open(map, marker.getPosition())
-      })
-
+      marker.bindPopup(`
+        <div style="padding:6px 2px;min-width:190px;max-width:240px;">
+          <h3 style="margin:0 0 8px 0;font-size:15px;font-weight:700;color:#1c1917;">${escapeHtml(spot.name)}</h3>
+          <p style="margin:4px 0;font-size:12px;color:#57534e;line-height:1.55;">${escapeHtml(spot.address)}</p>
+          <p style="margin:6px 0 0 0;font-size:12px;color:#78716c;line-height:1.55;">${escapeHtml(spot.brief)}</p>
+          <p style="margin:6px 0 0 0;font-size:12px;color:#dc2626;line-height:1.55;">${escapeHtml(spot.highlight)}</p>
+        </div>
+      `)
+      marker.addTo(leafletMap)
       markers.push(marker)
-      map.add(marker)
     } catch (error) {
       console.error('添加标记失败:', error)
     }
   })
+
+  fitExperienceMarkers(L)
 }
 
-// 初始化高德地图
+// 初始化体验点地图
 const initMap = async () => {
   if (!mapContainer.value) {
     console.warn('地图容器未找到')
@@ -1277,33 +1670,43 @@ const initMap = async () => {
   const initVersion = ++mapInitVersion
 
   try {
-    const AMap = await loadAmap()
+    const L = await loadLeaflet()
     if (!mapContainer.value || !selectedItem.value || initVersion !== mapInitVersion) return
 
-    map = new AMap.Map(mapContainer.value, {
-      zoom: 6,
-      center: [91.117, 29.653],
-      viewMode: '3D',
-      mapStyle: 'amap://styles/normal'
+    map = L.map(mapContainer.value, {
+      zoomControl: false,
+      attributionControl: false
+    })
+    map.setView([29.653, 91.117], 6)
+
+    const tileLayer = L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}', {
+      maxZoom: 18,
+      minZoom: 3,
+      subdomains: '1234'
     })
 
-    let settled = false
-    const finishMapLoad = () => {
-      if (settled || initVersion !== mapInitVersion || !selectedItem.value) return
-      settled = true
-      mapLoading.value = false
-      addExperienceMarkers(AMap)
-    }
-
-    map.on('complete', finishMapLoad)
-    map.on('error', (error: any) => {
+    tileLayer.on('load', () => {
       if (initVersion !== mapInitVersion) return
-      console.error('地图加载错误:', error)
-      mapError.value = true
       mapLoading.value = false
     })
+    tileLayer.on('tileerror', () => {
+      if (initVersion !== mapInitVersion) return
+      mapLoading.value = false
+    })
+    tileLayer.addTo(map)
+    addExperienceMarkers(L)
 
-    window.setTimeout(finishMapLoad, 5000)
+    window.setTimeout(() => {
+      if (initVersion !== mapInitVersion || !map) return
+      map.invalidateSize()
+      fitExperienceMarkers(L)
+    }, 250)
+
+    const finishMapLoad = () => {
+      if (initVersion !== mapInitVersion || !selectedItem.value) return
+      mapLoading.value = false
+    }
+    window.setTimeout(finishMapLoad, 8000)
   } catch (error) {
     if (initVersion !== mapInitVersion) return
     console.error('地图初始化失败:', error)
