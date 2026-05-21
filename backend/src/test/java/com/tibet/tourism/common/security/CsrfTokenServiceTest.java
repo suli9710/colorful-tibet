@@ -2,6 +2,7 @@ package com.tibet.tourism.common.security;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CsrfTokenServiceTest {
@@ -40,5 +41,17 @@ class CsrfTokenServiceTest {
         String token = csrfTokenService.generateToken(SESSION_TOKEN);
 
         assertFalse(csrfTokenService.isValid(token + "x", SESSION_TOKEN));
+    }
+
+    @Test
+    void publishedDevelopmentPlaceholderIsRejected() {
+        assertThrows(IllegalStateException.class, () -> new CsrfTokenService(
+                "dev-only-csrf-signing-secret-change-me-before-shared-deployment-2026-05-colorful-tibet"));
+    }
+
+    @Test
+    void copiedExamplePlaceholderIsRejected() {
+        assertThrows(IllegalStateException.class, () -> new CsrfTokenService(
+                "replace-with-different-at-least-64-random-characters-for-colorful-tibet"));
     }
 }

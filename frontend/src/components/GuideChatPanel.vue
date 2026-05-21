@@ -1,14 +1,18 @@
 <script setup lang="ts">
-import { ref, nextTick, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { AnimatePresence, motion } from 'motion-v'
 import { softSpring } from '../motion/presets'
 import { useRouteGenerationStore } from '../stores/routeGeneration'
 import {
   type ChatMessage,
-  processUserMessage,
+  type GuideChatHistoryItem,
+  createPendingGuideMessage,
+  createUserMessage,
+  getLocalGuideReply,
   getGreeting,
-  quickReplies
+  quickReplies,
+  requestGuideChat
 } from '../services/guideChat'
 
 const props = defineProps<{
@@ -25,6 +29,15 @@ const generationStore = useRouteGenerationStore()
 const messages = ref<ChatMessage[]>([])
 const inputText = ref('')
 const messagesContainer = ref<HTMLElement | null>(null)
+const isSending = ref(false)
+const cooldownRemaining = ref(0)
+
+const SEND_COOLDOWN_SECONDS = 6
+const MAX_UI_COOLDOWN_SECONDS = 300
+let cooldownTimer: number | undefined
+
+const canSend = computed(() => Boolean(inputText.value.trim()) && !isSending.value && cooldownRemaining.value <= 0)
+const interactionLocked = computed(() => isSending.value || cooldownRemaining.value > 0)
 
 function scrollToBottom() {
   nextTick(() => {
@@ -35,6 +48,27 @@ function scrollToBottom() {
   })
 }
 
+function clearCooldownTimer() {
+  if (cooldownTimer !== undefined) {
+    window.clearInterval(cooldownTimer)
+    cooldownTimer = undefined
+  }
+}
+
+function startCooldown(seconds = SEND_COOLDOWN_SECONDS) {
+  const nextSeconds = Math.max(SEND_COOLDOWN_SECONDS, Math.min(Math.ceil(seconds), MAX_UI_COOLDOWN_SECONDS))
+  cooldownRemaining.value = nextSeconds
+  clearCooldownTimer()
+  cooldownTimer = window.setInterval(() => {
+    cooldownRemaining.value = Math.max(0, cooldownRemaining.value - 1)
+    if (cooldownRemaining.value <= 0) {
+      clearCooldownTimer()
+    }
+  }, 1000)
+}
+
+onBeforeUnmount(clearCooldownTimer)
+
 watch(() => props.visible, (v) => {
   if (v && messages.value.length === 0) {
     messages.value = [getGreeting()]
@@ -42,14 +76,47 @@ watch(() => props.visible, (v) => {
   }
 })
 
-function sendMessage(text: string) {
-  const trimmed = text.trim()
-  if (!trimmed) return
+function replaceMessage(id: number, nextMessage: ChatMessage) {
+  const index = messages.value.findIndex(msg => msg.id === id)
+  if (index >= 0) {
+    messages.value[index] = nextMessage
+  }
+}
 
-  const newMessages = processUserMessage(trimmed)
-  messages.value.push(...newMessages)
+function buildHistory(): GuideChatHistoryItem[] {
+  return messages.value
+    .filter(msg => !msg.pending)
+    .slice(-8)
+    .map(msg => ({
+      role: msg.role,
+      content: msg.text.slice(0, 500)
+    }))
+}
+
+async function sendMessage(text: string) {
+  const trimmed = text.trim()
+  if (!trimmed || isSending.value || cooldownRemaining.value > 0) return
+
+  const history = buildHistory()
+  const userMessage = createUserMessage(trimmed)
+  const pendingMessage = createPendingGuideMessage()
+  messages.value.push(userMessage, pendingMessage)
   inputText.value = ''
   scrollToBottom()
+
+  isSending.value = true
+  try {
+    const guideMessage = await requestGuideChat(trimmed, history)
+    replaceMessage(pendingMessage.id, guideMessage)
+    startCooldown(guideMessage.limited ? guideMessage.retryAfterSeconds : SEND_COOLDOWN_SECONDS)
+  } catch (error) {
+    console.warn('AI guide chat failed, using local fallback:', error)
+    replaceMessage(pendingMessage.id, getLocalGuideReply(trimmed))
+    startCooldown(SEND_COOLDOWN_SECONDS)
+  } finally {
+    isSending.value = false
+    scrollToBottom()
+  }
 }
 
 function handleQuickReply(reply: (typeof quickReplies)[number]) {
@@ -148,12 +215,17 @@ function handleKeydown(e: KeyboardEvent) {
               </svg>
             </div>
             <div class="flex-1 min-w-0">
-              <div class="chat-bubble-guide">
-                {{ msg.text }}
+              <div class="chat-bubble-guide" :class="{ 'chat-bubble-pending': msg.pending }">
+                <span v-if="msg.pending" class="typing-dots" aria-hidden="true">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </span>
+                <span>{{ msg.text }}</span>
               </div>
               <!-- Action button -->
               <motion.button
-                v-if="msg.action"
+                v-if="msg.action && !msg.pending"
                 @click="handleAction(msg)"
                 class="mt-2 inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-tibet-red to-rose-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-md shadow-tibet-red/20"
                 :whileHover="{ scale: 1.04 }"
@@ -182,31 +254,39 @@ function handleKeydown(e: KeyboardEvent) {
           v-for="reply in quickReplies"
           :key="reply.label"
           @click="handleQuickReply(reply)"
+          :disabled="interactionLocked"
           class="quick-reply-chip"
+          :class="{ 'opacity-50 cursor-not-allowed': interactionLocked }"
         >
           {{ reply.label }}
         </button>
       </div>
 
       <!-- Input area -->
-      <div class="chat-input-area">
-        <input
-          v-model="inputText"
-          @keydown="handleKeydown"
-          type="text"
-          placeholder="输入你的问题..."
-          class="chat-input"
-        />
-        <button
-          @click="sendMessage(inputText)"
-          :disabled="!inputText.trim()"
-          class="chat-send-btn"
-          :class="{ 'opacity-30 cursor-not-allowed': !inputText.trim() }"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-          </svg>
-        </button>
+      <div class="chat-input-shell">
+        <div class="chat-input-area">
+          <input
+            v-model="inputText"
+            @keydown="handleKeydown"
+            type="text"
+            :disabled="isSending"
+            placeholder="只聊西藏路线、景点、高原适应..."
+            class="chat-input"
+          />
+          <button
+            @click="sendMessage(inputText)"
+            :disabled="!canSend"
+            class="chat-send-btn"
+            :class="{ 'opacity-30 cursor-not-allowed': !canSend }"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+            </svg>
+          </button>
+        </div>
+        <p v-if="cooldownRemaining > 0" class="chat-cooldown">
+          请等 {{ cooldownRemaining }} 秒后继续问我西藏行程
+        </p>
       </div>
     </motion.div>
   </AnimatePresence>
@@ -262,7 +342,7 @@ function handleKeydown(e: KeyboardEvent) {
   }
 
   .chat-input-area {
-    padding: 10px 12px;
+    padding: 10px 12px 6px;
   }
 }
 
@@ -319,6 +399,40 @@ function handleKeydown(e: KeyboardEvent) {
   word-break: break-word;
 }
 
+.chat-bubble-pending {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #6B7280;
+}
+
+.typing-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.typing-dots span {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #D97706;
+  animation: typing-dot 1s ease-in-out infinite;
+}
+
+.typing-dots span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.typing-dots span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes typing-dot {
+  0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
+  40% { transform: translateY(-3px); opacity: 1; }
+}
+
 .chat-bubble-user {
   display: inline-block;
   max-width: 85%;
@@ -360,14 +474,28 @@ function handleKeydown(e: KeyboardEvent) {
   transform: translateY(-1px);
 }
 
+.quick-reply-chip:disabled {
+  transform: none;
+}
+
 /* ===== Input ===== */
+.chat-input-shell {
+  border-top: 1px solid #F3F4F6;
+  flex-shrink: 0;
+}
+
 .chat-input-area {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 16px;
-  border-top: 1px solid #F3F4F6;
-  flex-shrink: 0;
+  padding: 10px 16px 6px;
+}
+
+.chat-cooldown {
+  min-height: 18px;
+  padding: 0 18px 8px;
+  font-size: 11px;
+  color: #92400E;
 }
 
 .chat-input {
@@ -385,6 +513,11 @@ function handleKeydown(e: KeyboardEvent) {
 .chat-input:focus {
   border-color: #F59E0B;
   background: white;
+}
+
+.chat-input:disabled {
+  cursor: not-allowed;
+  color: #9CA3AF;
 }
 
 .chat-input::placeholder {

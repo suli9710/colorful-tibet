@@ -45,7 +45,8 @@ public final class ApiSecurityPaths {
     private static final Set<String> PUBLIC_POST_PATHS = Set.of(
             "/api/auth/login",
             "/api/auth/register",
-            "/api/auth/logout");
+            "/api/auth/logout",
+            "/api/guide/chat");
 
     private static final String[] ADMIN_API_PATHS = {
             "/api/admin/**",

@@ -3,6 +3,8 @@ import com.tibet.tourism.common.logging.IpLocationService;
 import com.tibet.tourism.common.security.CsrfTokenService;
 import com.tibet.tourism.common.security.JwtUtils;
 import com.tibet.tourism.common.security.LoginAttemptService;
+import com.tibet.tourism.common.security.antibot.AntibotProperties;
+import com.tibet.tourism.common.security.antibot.RecaptchaService;
 import com.tibet.tourism.common.validation.InputSanitizer;
 import com.tibet.tourism.modules.auth.domain.AuthFailureException;
 import com.tibet.tourism.modules.auth.domain.AuthForbiddenException;
@@ -18,6 +20,7 @@ import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.OptionalDouble;
 import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,7 +44,9 @@ public class AuthApplicationService {
     private static final Logger logger = LoggerFactory.getLogger(AuthApplicationService.class);
     private static final String GENERIC_LOGIN_ERROR = "Invalid username or password";
     private static final String RATE_LIMIT_ERROR = "Too many requests, please try again later";
+    private static final String STEP_UP_ERROR = "Additional verification required";
     private static final String REGISTRATION_FAILED = "Registration failed, please check your input";
+    private static final String RECAPTCHA_HEADER = "X-Recaptcha-Token";
     private static final Pattern SAFE_USERNAME = Pattern.compile("^[A-Za-z0-9_-]{3,32}$");
 
     private final AuthenticationManager authenticationManager;
@@ -52,6 +57,8 @@ public class AuthApplicationService {
     private final IpLocationService ipLocationService;
     private final LoginAttemptService loginAttemptService;
     private final TotpService totpService;
+    private final RecaptchaService recaptchaService;
+    private final AntibotProperties antibotProperties;
     private final String superAdminUsername;
     private final String superAdminTotpSecret;
     private final boolean requireStrongSecrets;
@@ -66,6 +73,8 @@ public class AuthApplicationService {
             IpLocationService ipLocationService,
             LoginAttemptService loginAttemptService,
             TotpService totpService,
+            RecaptchaService recaptchaService,
+            AntibotProperties antibotProperties,
             @Value("${app.super-admin-username:lzh}") String superAdminUsername,
             @Value("${app.security.super-admin-totp-secret:}") String superAdminTotpSecret,
             @Value("${app.security.require-strong-secrets:false}") boolean requireStrongSecrets,
@@ -78,6 +87,8 @@ public class AuthApplicationService {
         this.ipLocationService = ipLocationService;
         this.loginAttemptService = loginAttemptService;
         this.totpService = totpService;
+        this.recaptchaService = recaptchaService;
+        this.antibotProperties = antibotProperties;
         this.superAdminUsername = superAdminUsername;
         this.superAdminTotpSecret = superAdminTotpSecret;
         this.requireStrongSecrets = requireStrongSecrets;
@@ -108,11 +119,13 @@ public class AuthApplicationService {
 
     public LoginResult login(LoginRequest loginRequest, HttpServletRequest request) {
         String username = loginRequest.getUsername().trim();
+        String clientIp = resolveClientIp(request);
 
-        long remainingLock = loginAttemptService.remainingLockSeconds(username);
-        if (remainingLock > 0) {
-            logger.warn("Blocked login attempt for locked account: username={}, remainingLock={}s", username, remainingLock);
-            throw new AuthRateLimitException(RATE_LIMIT_ERROR);
+        LoginAttemptService.LoginAttemptDecision throttle = loginAttemptService.evaluate(username, clientIp);
+        if (!throttle.allowed()) {
+            logger.warn("Blocked login attempt by throttle: username={}, reason={}, retryAfter={}s",
+                    username, throttle.reason(), throttle.retryAfterSeconds());
+            throw new AuthRateLimitException(RATE_LIMIT_ERROR, throttle.retryAfterSeconds());
         }
 
         Authentication authentication;
@@ -121,9 +134,9 @@ public class AuthApplicationService {
                     new UsernamePasswordAuthenticationToken(username, loginRequest.getPassword()));
         } catch (AuthenticationException exception) {
             logger.warn("Login failed for username={}", username);
-            long lockSeconds = loginAttemptService.recordFailure(username);
-            if (lockSeconds > 0) {
-                throw new AuthRateLimitException(RATE_LIMIT_ERROR);
+            LoginAttemptService.LoginAttemptDecision failure = loginAttemptService.recordFailure(username, clientIp);
+            if (!failure.allowed()) {
+                throw new AuthRateLimitException(RATE_LIMIT_ERROR, failure.retryAfterSeconds());
             }
             throw new AuthFailureException(GENERIC_LOGIN_ERROR);
         }
@@ -131,9 +144,10 @@ public class AuthApplicationService {
         UserDetails userDetails = (UserDetails) authentication.getPrincipal();
         User user = userRepository.findByUsername(userDetails.getUsername()).orElseThrow();
 
-        enforceSuperAdminControls(user, loginRequest);
+        enforceSuperAdminControls(user, loginRequest, clientIp);
+        enforceAccountStepUpIfNeeded(user, throttle, request, clientIp);
 
-        loginAttemptService.reset(username);
+        loginAttemptService.reset(username, clientIp);
         SecurityContextHolder.getContext().setAuthentication(authentication);
 
         String jwt = jwtUtils.generateJwtToken(authentication);
@@ -196,18 +210,61 @@ public class AuthApplicationService {
         }
     }
 
-    private void enforceSuperAdminControls(User user, LoginRequest loginRequest) {
+    private String resolveClientIp(HttpServletRequest request) {
+        try {
+            String clientIp = ipLocationService.getClientIpAddress(request);
+            return StringUtils.hasText(clientIp) ? clientIp : "unknown";
+        } catch (Exception e) {
+            logger.debug("Failed to resolve client IP for login throttle", e);
+            return "unknown";
+        }
+    }
+
+    private void enforceAccountStepUpIfNeeded(User user,
+                                              LoginAttemptService.LoginAttemptDecision throttle,
+                                              HttpServletRequest request,
+                                              String clientIp) {
+        if (!throttle.stepUpRequired() || superAdminUsername.equalsIgnoreCase(user.getUsername())) {
+            return;
+        }
+        if (!isRecaptchaConfigured()) {
+            logger.warn("Login account step-up skipped because reCAPTCHA is not configured: username={}, failures={}",
+                    user.getUsername(), throttle.accountFailures());
+            return;
+        }
+
+        String token = request.getHeader(RECAPTCHA_HEADER);
+        OptionalDouble score = recaptchaService.verify(token, clientIp);
+        double minScore = antibotProperties.getRecaptcha().getMinScore();
+        if (score.isEmpty() || score.getAsDouble() < minScore) {
+            logger.warn("Login account step-up rejected: username={}, recaptchaScore={}, minScore={}",
+                    user.getUsername(), score.isPresent() ? score.getAsDouble() : null, minScore);
+            throw new AuthForbiddenException(STEP_UP_ERROR);
+        }
+    }
+
+    private boolean isRecaptchaConfigured() {
+        if (antibotProperties == null || !antibotProperties.isEnabled()) {
+            return false;
+        }
+        AntibotProperties.Recaptcha recaptcha = antibotProperties.getRecaptcha();
+        return recaptcha != null
+                && recaptcha.isEnabled()
+                && StringUtils.hasText(recaptcha.getSecretKey());
+    }
+
+    private void enforceSuperAdminControls(User user, LoginRequest loginRequest, String clientIp) {
         if (!superAdminUsername.equalsIgnoreCase(user.getUsername())) {
             return;
         }
 
-        enforceSuperAdminTotp(user, loginRequest);
+        enforceSuperAdminTotp(user, loginRequest, clientIp);
         if (ensureSuperAdminRole(user)) {
             userRepository.saveAndFlush(user);
         }
     }
 
-    private void enforceSuperAdminTotp(User user, LoginRequest loginRequest) {
+    private void enforceSuperAdminTotp(User user, LoginRequest loginRequest, String clientIp) {
         if (!StringUtils.hasText(superAdminTotpSecret)) {
             logger.error("Super-admin TOTP secret is not configured: username={}", user.getUsername());
             throw new AuthForbiddenException(GENERIC_LOGIN_ERROR);
@@ -216,9 +273,9 @@ public class AuthApplicationService {
         String provided = loginRequest.getSecondaryPassword();
         if (!StringUtils.hasText(provided) || !totpService.isValidCode(superAdminTotpSecret, provided)) {
             logger.warn("Rejected super-admin login with invalid TOTP code: username={}", user.getUsername());
-            long lockSeconds = loginAttemptService.recordFailure(user.getUsername());
-            if (lockSeconds > 0) {
-                throw new AuthRateLimitException(RATE_LIMIT_ERROR);
+            LoginAttemptService.LoginAttemptDecision failure = loginAttemptService.recordFailure(user.getUsername(), clientIp);
+            if (!failure.allowed()) {
+                throw new AuthRateLimitException(RATE_LIMIT_ERROR, failure.retryAfterSeconds());
             }
             throw new AuthForbiddenException(GENERIC_LOGIN_ERROR);
         }

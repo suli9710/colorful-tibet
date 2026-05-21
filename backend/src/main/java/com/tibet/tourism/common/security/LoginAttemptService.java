@@ -1,5 +1,8 @@
 package com.tibet.tourism.common.security;
 import java.util.Arrays;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.util.HexFormat;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.Map;
@@ -17,6 +20,9 @@ public class LoginAttemptService {
 
     private static final Logger logger = LoggerFactory.getLogger(LoginAttemptService.class);
     private static final String REDIS_PREFIX = "brute-force:";
+    private static final String PAIR_SCOPE = "pair:";
+    private static final String IP_SCOPE = "ip:";
+    private static final String NETWORK_SCOPE = "network:";
     private static final long MAX_LOCK_SECONDS = 7 * 24 * 60 * 60;
     private static final int MAX_INMEMORY_ENTRIES = 10_000;
 
@@ -28,6 +34,18 @@ public class LoginAttemptService {
 
     @Value("${app.security.brute-force.max-attempts:5}")
     private int maxAttempts;
+
+    @Value("${app.security.brute-force.account-step-up-at:${app.security.brute-force.max-attempts:5}}")
+    private int accountStepUpAt;
+
+    @Value("${app.security.brute-force.pair-max-attempts:${app.security.brute-force.max-attempts:5}}")
+    private int pairMaxAttempts;
+
+    @Value("${app.security.brute-force.ip-max-attempts:30}")
+    private int ipMaxAttempts;
+
+    @Value("${app.security.brute-force.network-max-attempts:120}")
+    private int networkMaxAttempts;
 
     @Value("${app.security.brute-force.redis-enabled:true}")
     private boolean redisEnabled;
@@ -54,77 +72,149 @@ public class LoginAttemptService {
     }
 
     public boolean isLocked(String username) {
-        if (!enabled || username == null || username.isBlank() || isExempt(username)) {
-            return false;
-        }
-        String key = normalizeKey(username);
-
-        AttemptRecord record = getRecord(key);
-        if (record == null || record.failures < maxAttempts) {
-            return false;
-        }
-
-        long lockSeconds = lockSecondsFor(record.failures);
-        long elapsed = (System.currentTimeMillis() - record.lastFailureAt) / 1000;
-        return elapsed < lockSeconds;
+        return remainingLockSeconds(username) > 0;
     }
 
     public long remainingLockSeconds(String username) {
+        return 0;
+    }
+
+    public LoginAttemptDecision evaluate(String username, String clientIp) {
         if (!enabled || username == null || username.isBlank() || isExempt(username)) {
-            return 0;
-        }
-        String key = normalizeKey(username);
-
-        AttemptRecord record = getRecord(key);
-        if (record == null || record.failures < maxAttempts) {
-            return 0;
+            return LoginAttemptDecision.allowed(false, 0);
         }
 
-        long lockSeconds = lockSecondsFor(record.failures);
-        long elapsed = (System.currentTimeMillis() - record.lastFailureAt) / 1000;
-        return Math.max(0, lockSeconds - elapsed);
+        String accountKey = accountKey(username);
+        AttemptRecord accountRecord = getRecord(accountKey);
+        int accountFailures = accountRecord == null ? 0 : accountRecord.failures;
+        boolean stepUpRequired = accountFailures >= safeThreshold(accountStepUpAt);
+
+        LoginAttemptDecision blocked = blockedDecision(clientIp, accountKey);
+        if (blocked != null) {
+            return blocked.withAccountState(stepUpRequired, accountFailures);
+        }
+
+        return LoginAttemptDecision.allowed(stepUpRequired, accountFailures);
+    }
+
+    public long remainingLockSeconds(String username, String clientIp) {
+        return evaluate(username, clientIp).retryAfterSeconds();
+    }
+
+    public boolean accountStepUpRequired(String username) {
+        if (!enabled || username == null || username.isBlank() || isExempt(username)) {
+            return false;
+        }
+        AttemptRecord record = getRecord(accountKey(username));
+        return record != null && record.failures >= safeThreshold(accountStepUpAt);
     }
 
     public int failureCount(String username) {
         if (!enabled || username == null || username.isBlank()) {
             return 0;
         }
-        AttemptRecord record = getRecord(normalizeKey(username));
+        AttemptRecord record = getRecord(accountKey(username));
         return record == null ? 0 : record.failures;
     }
 
     public long recordFailure(String username) {
+        LoginAttemptDecision decision = recordFailure(username, "unknown");
+        return decision.allowed() ? 0 : decision.retryAfterSeconds();
+    }
+
+    public LoginAttemptDecision recordFailure(String username, String clientIp) {
         if (!enabled || username == null || username.isBlank() || isExempt(username)) {
-            return 0;
+            return LoginAttemptDecision.allowed(false, 0);
         }
-        String key = normalizeKey(username);
         long now = System.currentTimeMillis();
 
-        AttemptRecord redisRecord = readFromRedis(key);
+        String accountKey = accountKey(username);
+        AttemptRecord accountRecord = incrementRecord(accountKey, now);
+        AttemptRecord pairRecord = incrementRecord(pairKey(username, clientIp), now);
+        AttemptRecord ipRecord = incrementRecord(ipKey(clientIp), now);
+        AttemptRecord networkRecord = incrementRecord(networkKey(clientIp), now);
 
-        AttemptRecord newRecord = memory.compute(key, (k, existing) -> {
-            AttemptRecord base = mergeMaxFailures(redisRecord, existing);
-            int newFailures = (base == null) ? 1 : base.failures + 1;
-            return new AttemptRecord(newFailures, now);
-        });
-
-        syncToRedis(key, newRecord);
         evictStaleInMemory(now);
 
-        if (newRecord.failures >= maxAttempts) {
-            long lockSeconds = lockSecondsFor(newRecord.failures);
-            logger.warn("Account locked: username={}, failures={}, lockSeconds={}", username, newRecord.failures, lockSeconds);
-            return lockSeconds;
+        LoginAttemptDecision blocked = strongestBlockedDecision(
+                lockState("pair", pairRecord, safeThreshold(pairMaxAttempts)),
+                lockState("ip", ipRecord, safeThreshold(ipMaxAttempts)),
+                lockState("network", networkRecord, safeThreshold(networkMaxAttempts)));
+        boolean stepUpRequired = accountRecord.failures >= safeThreshold(accountStepUpAt);
+
+        if (blocked != null) {
+            logger.warn("Login throttled: username={}, reason={}, accountFailures={}, retryAfterSeconds={}",
+                    username, blocked.reason(), accountRecord.failures, blocked.retryAfterSeconds());
+            return blocked.withAccountState(stepUpRequired, accountRecord.failures);
         }
-        return 0;
+        if (stepUpRequired) {
+            logger.warn("Login account step-up required: username={}, accountFailures={}",
+                    username, accountRecord.failures);
+        }
+        return LoginAttemptDecision.allowed(stepUpRequired, accountRecord.failures);
     }
 
     public void reset(String username) {
         if (!enabled || username == null || username.isBlank()) {
             return;
         }
-        String key = normalizeKey(username);
-        deleteRecord(key);
+        deleteRecord(accountKey(username));
+    }
+
+    public void reset(String username, String clientIp) {
+        if (!enabled || username == null || username.isBlank()) {
+            return;
+        }
+        deleteRecord(accountKey(username));
+        deleteRecord(pairKey(username, clientIp));
+    }
+
+    private LoginAttemptDecision blockedDecision(String clientIp, String accountKey) {
+        LoginAttemptDecision blocked = strongestBlockedDecision(
+                lockState("ip", getRecord(ipKey(clientIp)), safeThreshold(ipMaxAttempts)),
+                lockState("network", getRecord(networkKey(clientIp)), safeThreshold(networkMaxAttempts)));
+        if (blocked != null) {
+            return blocked;
+        }
+
+        String username = accountKey;
+        return strongestBlockedDecision(
+                lockState("pair", getRecord(pairKeyFromAccountKey(username, clientIp)), safeThreshold(pairMaxAttempts)));
+    }
+
+    private LoginAttemptDecision strongestBlockedDecision(LoginAttemptDecision... decisions) {
+        LoginAttemptDecision strongest = null;
+        for (LoginAttemptDecision decision : decisions) {
+            if (decision == null || decision.allowed()) {
+                continue;
+            }
+            if (strongest == null || decision.retryAfterSeconds() > strongest.retryAfterSeconds()) {
+                strongest = decision;
+            }
+        }
+        return strongest;
+    }
+
+    private LoginAttemptDecision lockState(String reason, AttemptRecord record, int threshold) {
+        if (record == null || record.failures < threshold) {
+            return null;
+        }
+        long retryAfter = remainingSeconds(record, threshold);
+        if (retryAfter <= 0) {
+            return null;
+        }
+        return LoginAttemptDecision.blocked(reason, retryAfter, 0, false);
+    }
+
+    private AttemptRecord incrementRecord(String key, long now) {
+        AttemptRecord redisRecord = readFromRedis(key);
+        AttemptRecord newRecord = memory.compute(key, (k, existing) -> {
+            AttemptRecord base = mergeMaxFailures(redisRecord, existing);
+            int newFailures = (base == null) ? 1 : base.failures + 1;
+            return new AttemptRecord(newFailures, now);
+        });
+        syncToRedis(key, newRecord);
+        return newRecord;
     }
 
     private AttemptRecord getRecord(String key) {
@@ -197,8 +287,66 @@ public class LoginAttemptService {
         return a.failures >= b.failures ? a : b;
     }
 
-    private String normalizeKey(String username) {
+    private String accountKey(String username) {
         return username.trim().toLowerCase();
+    }
+
+    private String pairKey(String username, String clientIp) {
+        return pairKeyFromAccountKey(accountKey(username), clientIp);
+    }
+
+    private String pairKeyFromAccountKey(String accountKey, String clientIp) {
+        return PAIR_SCOPE + accountKey + ":" + shortHash(normalizeClientIp(clientIp));
+    }
+
+    private String ipKey(String clientIp) {
+        return IP_SCOPE + shortHash(normalizeClientIp(clientIp));
+    }
+
+    private String networkKey(String clientIp) {
+        return NETWORK_SCOPE + shortHash(networkPrefix(normalizeClientIp(clientIp)));
+    }
+
+    private String normalizeClientIp(String clientIp) {
+        if (!StringUtils.hasText(clientIp)) {
+            return "unknown";
+        }
+        String normalized = clientIp.trim();
+        if (normalized.contains(",")) {
+            normalized = normalized.split(",")[0].trim();
+        }
+        if ("0:0:0:0:0:0:0:1".equals(normalized)) {
+            return "127.0.0.1";
+        }
+        return normalized.length() > 128 ? shortHash(normalized) : normalized;
+    }
+
+    private String networkPrefix(String clientIp) {
+        String[] parts = clientIp.split("\\.");
+        if (parts.length == 4 && isIpv4Part(parts[0]) && isIpv4Part(parts[1])
+                && isIpv4Part(parts[2]) && isIpv4Part(parts[3])) {
+            return parts[0] + "." + parts[1] + "." + parts[2] + ".0/24";
+        }
+        return clientIp;
+    }
+
+    private boolean isIpv4Part(String value) {
+        try {
+            int parsed = Integer.parseInt(value);
+            return parsed >= 0 && parsed <= 255;
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
+
+    private String shortHash(String value) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hashed = digest.digest((value == null ? "" : value).getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hashed, 0, 8);
+        } catch (Exception e) {
+            return "unknown";
+        }
     }
 
     private static final long[] LOCK_PROGRESSION = {
@@ -209,8 +357,18 @@ public class LoginAttemptService {
         7 * 86400    // excess 4: 7天
     };
 
-    private long lockSecondsFor(int failures) {
-        int excess = failures - maxAttempts;
+    private int safeThreshold(int threshold) {
+        return Math.max(1, threshold);
+    }
+
+    private long remainingSeconds(AttemptRecord record, int threshold) {
+        long lockSeconds = lockSecondsFor(record.failures, threshold);
+        long elapsed = (System.currentTimeMillis() - record.lastFailureAt) / 1000;
+        return Math.max(0, lockSeconds - elapsed);
+    }
+
+    private long lockSecondsFor(int failures, int threshold) {
+        int excess = failures - threshold;
         if (excess < 0) {
             return 0;
         }
@@ -286,6 +444,32 @@ public class LoginAttemptService {
     private record AttemptRecord(int failures, long lastFailureAt) {
         String toRedisValue() {
             return failures + ":" + lastFailureAt;
+        }
+    }
+
+    public record LoginAttemptDecision(
+            boolean allowed,
+            boolean stepUpRequired,
+            String reason,
+            long retryAfterSeconds,
+            int accountFailures) {
+        static LoginAttemptDecision allowed(boolean stepUpRequired, int accountFailures) {
+            return new LoginAttemptDecision(true, stepUpRequired, "", 0, accountFailures);
+        }
+
+        static LoginAttemptDecision blocked(String reason, long retryAfterSeconds,
+                                            int accountFailures, boolean stepUpRequired) {
+            return new LoginAttemptDecision(false, stepUpRequired, reason,
+                    Math.max(1, retryAfterSeconds), accountFailures);
+        }
+
+        LoginAttemptDecision withAccountState(boolean stepUpRequired, int accountFailures) {
+            return new LoginAttemptDecision(
+                    allowed,
+                    stepUpRequired,
+                    reason,
+                    retryAfterSeconds,
+                    accountFailures);
         }
     }
 }

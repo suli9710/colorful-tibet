@@ -104,15 +104,17 @@ app:
     public-docs-enabled: ${PUBLIC_DOCS_ENABLED:true}
     public-metrics-enabled: ${PUBLIC_METRICS_ENABLED:false}
     require-strong-secrets: ${REQUIRE_STRONG_SECRETS:false}
-    csrf-signing-secret: ${CSRF_SIGNING_SECRET:dev-only-csrf-signing-secret-change-me-before-shared-deployment-2026-05-colorful-tibet}
+    csrf-signing-secret: ${CSRF_SIGNING_SECRET:}
     pii-encryption-key: ${PII_ENCRYPTION_KEY:}
     cookie-secure: ${COOKIE_SECURE:false}
     trust-proxy-headers: ${TRUST_PROXY_HEADERS:false}
+    trusted-proxy-cidrs: ${TRUSTED_PROXY_CIDRS:}
     super-admin-totp-secret: ${SUPER_ADMIN_TOTP_SECRET:}
     rate-limit:
       enabled: ${RATE_LIMIT_ENABLED:true}
       redis-enabled: ${RATE_LIMIT_REDIS_ENABLED:true}
       trust-proxy-headers: ${TRUST_PROXY_HEADERS:false}
+      trusted-proxy-cidrs: ${RATE_LIMIT_TRUSTED_PROXY_CIDRS:${TRUSTED_PROXY_CIDRS:}}
       register:
         requests: ${RATE_LIMIT_REGISTER_REQUESTS:5}
         window-seconds: ${RATE_LIMIT_REGISTER_WINDOW_SECONDS:3600}

@@ -5,6 +5,7 @@ import { getDeviceFingerprint } from '../utils/deviceFingerprint'
 const apiBaseURL = import.meta.env.VITE_API_BASE_URL || '/api'
 const DEFAULT_TIMEOUT_MS = 15000
 const LONG_TIMEOUT_MS = 180000
+const GUIDE_CHAT_TIMEOUT_MS = 60000
 const UPLOAD_TIMEOUT_MS = 60000
 const PRICE_TIMEOUT_MS = 300000
 const GET_CACHE_TTL_MS = 15000
@@ -63,10 +64,13 @@ function withSpecialTimeout(url: string, config: any = {}) {
     || requestUrl.includes('/upload-image')
     || requestUrl.includes('/upload-avatar')
   const isAiGenerate = requestUrl.includes('/routes/generate')
+  const isGuideChat = requestUrl.includes('/guide/chat')
   const isPriceFetch = requestUrl.includes('/prices/')
 
   if (isAiGenerate && (!nextConfig.timeout || nextConfig.timeout === DEFAULT_TIMEOUT_MS)) {
     nextConfig.timeout = LONG_TIMEOUT_MS
+  } else if (isGuideChat && (!nextConfig.timeout || nextConfig.timeout === DEFAULT_TIMEOUT_MS)) {
+    nextConfig.timeout = GUIDE_CHAT_TIMEOUT_MS
   } else if (isPriceFetch && (!nextConfig.timeout || nextConfig.timeout === DEFAULT_TIMEOUT_MS)) {
     nextConfig.timeout = PRICE_TIMEOUT_MS
   } else if (isUpload && (!nextConfig.timeout || nextConfig.timeout === DEFAULT_TIMEOUT_MS)) {
@@ -243,6 +247,9 @@ export const endpoints = {
     register: '/auth/register',
     me: '/auth/me',
     meStats: '/auth/me/stats'
+  },
+  guide: {
+    chat: '/guide/chat'
   },
   routes: {
     generate: '/routes/generate',

@@ -126,6 +126,7 @@ import { useI18n } from 'vue-i18n'
 import { motion, useReducedMotion } from 'motion-v'
 import api, { clearTokenCache } from '../api'
 import { useAuthStore } from '../stores/auth'
+import { getRecaptchaToken, isRecaptchaV3Enabled } from '../utils/recaptcha'
 import {
   authCardAnimate,
   authCardInitial,
@@ -187,6 +188,15 @@ function parseLockSeconds(message: string): number {
   return match ? parseInt(match[1], 10) : 0
 }
 
+function parseRetryAfter(value: unknown): number {
+  const retryAfter = Array.isArray(value) ? value[0] : value
+  if (typeof retryAfter !== 'string' && typeof retryAfter !== 'number') {
+    return 0
+  }
+  const parsed = Number.parseInt(String(retryAfter), 10)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0
+}
+
 const handleLogin = async () => {
   errorMessage.value = ''
   loading.value = true
@@ -196,7 +206,10 @@ const handleLogin = async () => {
       password: form.value.password,
       ...(requiresSecondaryPassword.value ? { secondaryPassword: form.value.secondaryPassword } : {})
     }
-    const { data: user } = await api.post('/auth/login', payload)
+    const recaptchaToken = isRecaptchaV3Enabled() ? await getRecaptchaToken('login') : ''
+    const { data: user } = await api.post('/auth/login', payload, {
+      headers: recaptchaToken ? { 'X-Recaptcha-Token': recaptchaToken } : {}
+    })
 
     clearTokenCache()
     auth.login(user)
@@ -211,7 +224,7 @@ const handleLogin = async () => {
     const msg = error.response?.data?.message || error.response?.data?.error || t('login.loginFailed')
     errorMessage.value = msg
 
-    const lockSeconds = parseLockSeconds(msg)
+    const lockSeconds = parseRetryAfter(error.response?.headers?.['retry-after']) || parseLockSeconds(msg)
     if (lockSeconds > 0) {
       startCountdown(lockSeconds)
     }
