@@ -122,6 +122,60 @@ class AiRouteServiceTest {
         assertEquals(Boolean.TRUE, body.get("stream"));
     }
 
+    @Test
+    void streamRequestBodyUsesResponsesShapeForResponsesEndpoint() {
+        AiRouteService service = new AiRouteService(
+                WebClient.builder(),
+                "https://ark.cn-beijing.volces.com/api/v3/responses",
+                "test-api-key",
+                "ep-20260516173036-4dpgm",
+                30,
+                "",
+                30
+        );
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> body = (Map<String, Object>) ReflectionTestUtils.invokeMethod(
+                service,
+                "buildStreamRequestBody",
+                "Generate a route"
+        );
+
+        assertNotNull(body);
+        assertTrue(body.containsKey("input"));
+        assertFalse(body.containsKey("messages"));
+        assertEquals(Map.of("type", "disabled"), body.get("thinking"));
+        assertEquals(2400, body.get("max_output_tokens"));
+        assertEquals(Boolean.TRUE, body.get("stream"));
+        assertEquals("ep-20260516173036-4dpgm", body.get("model"));
+    }
+
+    @Test
+    void extractsTextFromResponsesOutputContent() {
+        AiRouteService service = new AiRouteService(
+                WebClient.builder(),
+                "https://ark.cn-beijing.volces.com/api/v3/responses",
+                "test-api-key",
+                "ep-20260516173036-4dpgm",
+                30,
+                "",
+                30
+        );
+        Map<String, Object> response = Map.of(
+                "output", List.of(Map.of(
+                        "type", "message",
+                        "content", List.of(Map.of(
+                                "type", "output_text",
+                                "text", "# Test route"
+                        ))
+                ))
+        );
+
+        String text = ReflectionTestUtils.invokeMethod(service, "extractResponseText", response);
+
+        assertEquals("# Test route", text);
+    }
+
     private static final class CapturingSseEmitter extends SseEmitter {
         private final List<String> payloads = new CopyOnWriteArrayList<>();
         private final CountDownLatch completed = new CountDownLatch(1);

@@ -99,11 +99,7 @@ public class AiRouteService {
         if (mainApiUrl == null || mainApiUrl.isBlank()) {
             return "";
         }
-        String normalized = mainApiUrl.trim();
-        if (normalized.toLowerCase(Locale.ROOT).contains("/v3/responses")) {
-            return normalized.replace("/v3/responses", "/v3/chat/completions");
-        }
-        return normalized;
+        return mainApiUrl.trim();
     }
 
     private Map<String, Object> buildStreamRequestBody(String prompt) {
