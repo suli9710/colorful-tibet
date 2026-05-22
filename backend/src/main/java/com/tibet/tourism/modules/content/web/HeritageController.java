@@ -175,12 +175,16 @@ public class HeritageController {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(Map.of("error", "只能删除自己的评论"));
         }
-        heritageCommentRepository.delete(comment);
+        HeritageItem item = comment.getHeritageItem();
+        if (item == null || item.getId() == null || !item.getId().equals(heritageId)) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", "Comment not found"));
+        }
 
-        heritageItemRepository.findById(heritageId).ifPresent(item -> {
-            item.setCommentCount(Math.max(0, item.getCommentCount() - 1));
-            heritageItemRepository.save(item);
-        });
+        heritageCommentRepository.delete(comment);
+        int currentCount = item.getCommentCount() == null ? 0 : item.getCommentCount();
+        item.setCommentCount(Math.max(0, currentCount - 1));
+        heritageItemRepository.save(item);
 
         return ResponseEntity.noContent().build();
     }

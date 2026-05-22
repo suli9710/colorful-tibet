@@ -1,12 +1,9 @@
 package com.tibet.tourism.common.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
@@ -28,7 +25,7 @@ class LoginAttemptServiceTest {
     }
 
     @Test
-    void accountFailuresDoNotHardLockUsername() {
+    void accountFailuresBelowThresholdDoNotHardLockUsername() {
         for (int i = 0; i < 2; i++) {
             LoginAttemptService.LoginAttemptDecision decision =
                     service.recordFailure("user1", "203.0.113." + i);
@@ -42,7 +39,7 @@ class LoginAttemptServiceTest {
     }
 
     @Test
-    void accountThresholdRequiresStepUpButStillDoesNotHardLockAccount() {
+    void accountStepUpThresholdStillAllowsUntilHardLockThreshold() {
         service.recordFailure("user2", "203.0.113.1");
         service.recordFailure("user2", "203.0.113.2");
         LoginAttemptService.LoginAttemptDecision thirdFailure =
@@ -59,7 +56,36 @@ class LoginAttemptServiceTest {
     }
 
     @Test
+    void accountMaxAttemptsHardLocksUsernameAcrossDistributedSources() {
+        for (int i = 1; i < 5; i++) {
+            LoginAttemptService.LoginAttemptDecision decision =
+                    service.recordFailure("locked-user", "198.51." + i + ".10");
+            assertThat(decision.allowed()).isTrue();
+        }
+
+        LoginAttemptService.LoginAttemptDecision fifthFailure =
+                service.recordFailure("locked-user", "198.51.5.10");
+
+        assertThat(fifthFailure.allowed()).isFalse();
+        assertThat(fifthFailure.reason()).isEqualTo("account");
+        assertThat(fifthFailure.stepUpRequired()).isTrue();
+        assertThat(fifthFailure.accountFailures()).isEqualTo(5);
+        assertThat(fifthFailure.retryAfterSeconds()).isPositive();
+        assertThat(service.isLocked("locked-user")).isTrue();
+        assertThat(service.remainingLockSeconds("locked-user")).isPositive();
+
+        LoginAttemptService.LoginAttemptDecision fromNewIp =
+                service.evaluate("locked-user", "203.0.200.10");
+        assertThat(fromNewIp.allowed()).isFalse();
+        assertThat(fromNewIp.reason()).isEqualTo("account");
+        assertThat(fromNewIp.stepUpRequired()).isTrue();
+        assertThat(fromNewIp.accountFailures()).isEqualTo(5);
+        assertThat(service.remainingLockSeconds("locked-user", "203.0.201.10")).isPositive();
+    }
+
+    @Test
     void pairLimitBlocksSameIpAndUsernameOnly() {
+        ReflectionTestUtils.setField(service, "maxAttempts", 10);
         ReflectionTestUtils.setField(service, "ipMaxAttempts", 10);
         ReflectionTestUtils.setField(service, "networkMaxAttempts", 20);
 
@@ -143,13 +169,18 @@ class LoginAttemptServiceTest {
     }
 
     @Test
-    void superAdminIsNotAccountLockedByUsernameOnly() {
+    void superAdminNameIsStillAccountLockedByUsernameUnlessExempt() {
         for (int i = 0; i < 5; i++) {
-            service.recordFailure("lzh", "203.0.113." + i);
+            service.recordFailure("lzh", "203.0." + i + ".10");
         }
-        assertThat(service.isLocked("lzh")).isFalse();
-        assertThat(service.remainingLockSeconds("lzh")).isZero();
+
+        assertThat(service.isLocked("lzh")).isTrue();
+        assertThat(service.remainingLockSeconds("lzh")).isPositive();
         assertThat(service.accountStepUpRequired("lzh")).isTrue();
+
+        LoginAttemptService.LoginAttemptDecision fromNewIp = service.evaluate("lzh", "203.0.200.10");
+        assertThat(fromNewIp.allowed()).isFalse();
+        assertThat(fromNewIp.reason()).isEqualTo("account");
     }
 
     @Test
@@ -178,15 +209,22 @@ class LoginAttemptServiceTest {
 
     @Test
     @SuppressWarnings("unchecked")
-    void redisStringPayloadStillCountsTowardAccountRisk() {
+    void redisStringPayloadAtThresholdLocksAccount() {
         StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
         ValueOperations<String, String> operations = mock(ValueOperations.class);
         when(redisTemplate.opsForValue()).thenReturn(operations);
-        when(operations.get("brute-force:stringuser")).thenReturn("4:" + System.currentTimeMillis());
+        when(operations.get("brute-force:stringuser")).thenReturn("5:" + System.currentTimeMillis());
 
         service = serviceWithRedis(redisTemplate);
 
-        assertThat(service.recordFailure("StringUser", "203.0.113.80").stepUpRequired()).isTrue();
+        LoginAttemptService.LoginAttemptDecision decision =
+                service.evaluate("StringUser", "203.0.113.80");
+
+        assertThat(decision.allowed()).isFalse();
+        assertThat(decision.reason()).isEqualTo("account");
+        assertThat(decision.stepUpRequired()).isTrue();
+        assertThat(decision.retryAfterSeconds()).isPositive();
+        assertThat(service.remainingLockSeconds("StringUser")).isPositive();
     }
 
     @Test

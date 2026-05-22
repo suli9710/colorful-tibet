@@ -35,7 +35,7 @@ spring:
       request-timeout: 120000  # 120秒异步请求超时，适应AI生成时间
   datasource:
     url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:colorful_tibet}?useUnicode=true&characterEncoding=utf8&sslMode=${MYSQL_SSL_MODE:VERIFY_CA}&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=false
-    username: ${MYSQL_USERNAME:root}
+    username: ${MYSQL_USERNAME:colorful_tibet_app}
     password: ${MYSQL_PASSWORD:}
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:

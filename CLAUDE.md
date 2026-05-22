@@ -35,3 +35,17 @@
 ## Verification
 - Run `npm run typecheck`, `npm run build`, and `mvn -q test` before handing off production-facing changes.
 - For Docker/deployment edits, also inspect `backend/Dockerfile`, `frontend/Dockerfile`, `docker-compose.yml`, and `docker-compose.prod.yml` together.
+
+## Agent skills
+
+### Issue tracker
+
+Issues and PRDs are tracked in GitHub Issues for `suli9710/colorful-tibet`; use the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Triage uses the repository security label vocabulary: `security`, `bug`, `high`, `medium`, `low`, `validated`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+This repo uses a single-context domain docs layout: root `CONTEXT.md` plus `docs/adr/`. See `docs/agents/domain.md`.
