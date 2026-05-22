@@ -33,6 +33,9 @@ public class User {
     @Column(length = 64)
     private String allowedLoginFingerprintHash;
 
+    @Column(name = "session_version", nullable = false)
+    private Long sessionVersion = 0L;
+
     @Enumerated(EnumType.STRING)
     private Role role = Role.USER;
 
@@ -131,6 +134,18 @@ public class User {
 
     public void setAllowedLoginFingerprintHash(String allowedLoginFingerprintHash) {
         this.allowedLoginFingerprintHash = allowedLoginFingerprintHash;
+    }
+
+    public Long getSessionVersion() {
+        return sessionVersion == null ? 0L : sessionVersion;
+    }
+
+    public void setSessionVersion(Long sessionVersion) {
+        this.sessionVersion = sessionVersion == null ? 0L : sessionVersion;
+    }
+
+    public void incrementSessionVersion() {
+        setSessionVersion(getSessionVersion() + 1);
     }
 
     public LocalDateTime getLastLoginAt() {

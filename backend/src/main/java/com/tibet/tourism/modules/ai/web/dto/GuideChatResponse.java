@@ -9,6 +9,7 @@ public class GuideChatResponse {
     private String actionLabel;
     private boolean limited;
     private Integer retryAfterSeconds;
+    private boolean challengeRequired;
 
     public GuideChatResponse() {
     }
@@ -82,5 +83,13 @@ public class GuideChatResponse {
 
     public void setRetryAfterSeconds(Integer retryAfterSeconds) {
         this.retryAfterSeconds = retryAfterSeconds;
+    }
+
+    public boolean isChallengeRequired() {
+        return challengeRequired;
+    }
+
+    public void setChallengeRequired(boolean challengeRequired) {
+        this.challengeRequired = challengeRequired;
     }
 }

@@ -68,6 +68,25 @@ public class AiGuideChatService {
                 timeout.getSeconds());
     }
 
+    public GuideChatResponse localOnlyChat(GuideChatRequest request, String locale) {
+        String safeMessage = InputSanitizer.promptData(request.getMessage(), 500);
+        String action = resolveAction(safeMessage);
+        String actionLabel = action == null ? null : "Open route planner";
+
+        if (safeMessage.isBlank()) {
+            return new GuideChatResponse(
+                    "I can help with Tibet travel routes, sights, seasons, altitude, etiquette, food, and lodging.",
+                    "local-fallback",
+                    true,
+                    null,
+                    null);
+        }
+        if (!isAllowedTopic(safeMessage)) {
+            return new GuideChatResponse(offTopicResponse(), "local-guardrail", true, null, null);
+        }
+        return fallbackResponse(safeMessage, action, actionLabel);
+    }
+
     public GuideChatResponse chat(GuideChatRequest request, String locale) {
         String safeMessage = InputSanitizer.promptData(request.getMessage(), 500);
         String normalizedLocale = normalizeLocale(locale);

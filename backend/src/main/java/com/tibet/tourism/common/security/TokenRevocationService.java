@@ -11,7 +11,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -22,7 +22,7 @@ public class TokenRevocationService {
     private static final String REDIS_PREFIX = "jwt-revoked:";
     private static final int MAX_IN_MEMORY_REVOKED_TOKENS = 20_000;
 
-    private final RedisTemplate<String, Object> redisTemplate;
+    private final StringRedisTemplate redisTemplate;
     private final JwtUtils jwtUtils;
     private final Map<String, Long> revokedTokenExpirations = new ConcurrentHashMap<>();
 
@@ -30,7 +30,7 @@ public class TokenRevocationService {
     private boolean redisEnabled;
 
     public TokenRevocationService(
-            ObjectProvider<RedisTemplate<String, Object>> redisTemplateProvider,
+            ObjectProvider<StringRedisTemplate> redisTemplateProvider,
             JwtUtils jwtUtils) {
         this.redisTemplate = redisTemplateProvider.getIfAvailable();
         this.jwtUtils = jwtUtils;
@@ -81,7 +81,7 @@ public class TokenRevocationService {
 
         if (redisEnabled && redisTemplate != null) {
             try {
-                Object value = redisTemplate.opsForValue().get(REDIS_PREFIX + tokenHash);
+                String value = redisTemplate.opsForValue().get(REDIS_PREFIX + tokenHash);
                 if (value != null) {
                     Long ttlSeconds = redisTemplate.getExpire(REDIS_PREFIX + tokenHash, TimeUnit.SECONDS);
                     if (ttlSeconds != null && ttlSeconds > 0) {

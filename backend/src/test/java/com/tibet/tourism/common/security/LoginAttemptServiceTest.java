@@ -1,19 +1,16 @@
 package com.tibet.tourism.common.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -24,7 +21,7 @@ class LoginAttemptServiceTest {
     @BeforeEach
     @SuppressWarnings("unchecked")
     void setUp() {
-        ObjectProvider<RedisTemplate<String, Object>> provider = mock(ObjectProvider.class);
+        ObjectProvider<StringRedisTemplate> provider = mock(ObjectProvider.class);
         when(provider.getIfAvailable()).thenReturn(null);
         service = new LoginAttemptService(provider, "");
         configure(service, false);
@@ -158,7 +155,7 @@ class LoginAttemptServiceTest {
     @Test
     @SuppressWarnings("unchecked")
     void exemptUsernamesAreCaseInsensitive() {
-        ObjectProvider<RedisTemplate<String, Object>> provider = mock(ObjectProvider.class);
+        ObjectProvider<StringRedisTemplate> provider = mock(ObjectProvider.class);
         when(provider.getIfAvailable()).thenReturn(null);
         service = new LoginAttemptService(provider, "SuperAdmin,BackupAdmin");
         configure(service, false);
@@ -181,37 +178,9 @@ class LoginAttemptServiceTest {
 
     @Test
     @SuppressWarnings("unchecked")
-    void redisJacksonMapPayloadStillCountsTowardAccountRisk() {
-        RedisTemplate<String, Object> redisTemplate = mock(RedisTemplate.class);
-        ValueOperations<String, Object> operations = mock(ValueOperations.class);
-        when(redisTemplate.opsForValue()).thenReturn(operations);
-
-        Map<String, Object> redisPayload = new LinkedHashMap<>();
-        redisPayload.put("failures", 4);
-        redisPayload.put("lastFailureAt", System.currentTimeMillis());
-        when(operations.get("brute-force:mapuser")).thenReturn(redisPayload);
-
-        service = serviceWithRedis(redisTemplate);
-
-        LoginAttemptService.LoginAttemptDecision decision =
-                service.recordFailure("MapUser", "203.0.113.70");
-
-        assertThat(decision.allowed()).isTrue();
-        assertThat(decision.stepUpRequired()).isTrue();
-        assertThat(service.failureCount("MapUser")).isEqualTo(5);
-        verify(operations).set(
-                eq("brute-force:mapuser"),
-                argThat(value -> value instanceof String text && text.startsWith("5:")),
-                eq(7L * 24 * 60 * 60),
-                eq(TimeUnit.SECONDS)
-        );
-    }
-
-    @Test
-    @SuppressWarnings("unchecked")
     void redisStringPayloadStillCountsTowardAccountRisk() {
-        RedisTemplate<String, Object> redisTemplate = mock(RedisTemplate.class);
-        ValueOperations<String, Object> operations = mock(ValueOperations.class);
+        StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
+        ValueOperations<String, String> operations = mock(ValueOperations.class);
         when(redisTemplate.opsForValue()).thenReturn(operations);
         when(operations.get("brute-force:stringuser")).thenReturn("4:" + System.currentTimeMillis());
 
@@ -223,8 +192,8 @@ class LoginAttemptServiceTest {
     @Test
     @SuppressWarnings("unchecked")
     void keepsInMemoryFallbackWhenRedisReadFailsAfterSuccessfulSave() {
-        RedisTemplate<String, Object> redisTemplate = mock(RedisTemplate.class);
-        ValueOperations<String, Object> operations = mock(ValueOperations.class);
+        StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
+        ValueOperations<String, String> operations = mock(ValueOperations.class);
         when(redisTemplate.opsForValue()).thenReturn(operations);
         when(operations.get("brute-force:redisdown")).thenThrow(new RuntimeException("redis down"));
 
@@ -245,8 +214,8 @@ class LoginAttemptServiceTest {
     }
 
     @SuppressWarnings("unchecked")
-    private LoginAttemptService serviceWithRedis(RedisTemplate<String, Object> redisTemplate) {
-        ObjectProvider<RedisTemplate<String, Object>> provider = mock(ObjectProvider.class);
+    private LoginAttemptService serviceWithRedis(StringRedisTemplate redisTemplate) {
+        ObjectProvider<StringRedisTemplate> provider = mock(ObjectProvider.class);
         when(provider.getIfAvailable()).thenReturn(redisTemplate);
         LoginAttemptService redisService = new LoginAttemptService(provider, "");
         configure(redisService, true);

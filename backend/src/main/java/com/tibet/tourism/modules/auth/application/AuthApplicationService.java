@@ -150,7 +150,7 @@ public class AuthApplicationService {
         loginAttemptService.reset(username, clientIp);
         SecurityContextHolder.getContext().setAuthentication(authentication);
 
-        String jwt = jwtUtils.generateJwtToken(authentication);
+        String jwt = jwtUtils.generateJwtToken(authentication, user.getSessionVersion());
         updateLoginLocation(user, request);
         String csrfToken = csrfTokenService.generateToken(jwt);
 
@@ -288,6 +288,7 @@ public class AuthApplicationService {
         logger.warn("Promoting configured super-admin account to ADMIN during verified login: username={}",
                 user.getUsername());
         user.setRole(User.Role.ADMIN);
+        user.incrementSessionVersion();
         return true;
     }
 

@@ -14,7 +14,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -25,29 +25,47 @@ public class GuideChatUsageService {
     private static final String WINDOW_KEY_PREFIX = "ai:guide:window:";
     private static final int MAX_TRACKED_CLIENTS = 10_000;
 
-    private final RedisTemplate<String, Object> redisTemplate;
+    private final StringRedisTemplate redisTemplate;
     private final Map<String, UsageBucket> fallbackUsage = new ConcurrentHashMap<>();
 
-    @Value("${app.security.ai-guide.daily-limit:${AI_GUIDE_DAILY_LIMIT_PER_CLIENT:20}}")
-    private int dailyLimit;
+    @Value("${app.security.guide-chat.anonymous-enabled:${GUIDE_CHAT_ANONYMOUS_ENABLED:true}}")
+    private boolean anonymousEnabled;
 
-    @Value("${app.security.ai-guide.window-limit:${AI_GUIDE_WINDOW_LIMIT_PER_CLIENT:8}}")
+    @Value("${app.security.guide-chat.anonymous-daily-quota-per-ip:${GUIDE_CHAT_ANONYMOUS_DAILY_QUOTA_PER_IP:5}}")
+    private int anonymousDailyLimit;
+
+    @Value("${app.security.guide-chat.authenticated-daily-quota-per-user:${GUIDE_CHAT_AUTHENTICATED_DAILY_QUOTA_PER_USER:30}}")
+    private int authenticatedDailyLimit;
+
+    @Value("${app.security.guide-chat.require-recaptcha-after:${GUIDE_CHAT_REQUIRE_RECAPTCHA_AFTER:2}}")
+    private int requireRecaptchaAfter;
+
+    @Value("${app.security.guide-chat.window-limit:${app.security.ai-guide.window-limit:${AI_GUIDE_WINDOW_LIMIT_PER_CLIENT:8}}}")
     private int windowLimit;
 
-    @Value("${app.security.ai-guide.window-seconds:${AI_GUIDE_WINDOW_SECONDS:600}}")
+    @Value("${app.security.guide-chat.window-seconds:${app.security.ai-guide.window-seconds:${AI_GUIDE_WINDOW_SECONDS:600}}}")
     private int windowSeconds;
 
-    public GuideChatUsageService(ObjectProvider<RedisTemplate<String, Object>> redisTemplateProvider) {
+    public GuideChatUsageService(ObjectProvider<StringRedisTemplate> redisTemplateProvider) {
         this.redisTemplate = redisTemplateProvider.getIfAvailable();
     }
 
     public Decision tryAcquire(String clientKey) {
-        String identity = shortHash(clientKey == null || clientKey.isBlank() ? "unknown" : clientKey);
+        return tryAcquire(ClientIdentity.anonymous(clientKey), false);
+    }
+
+    public Decision tryAcquire(ClientIdentity client, boolean recaptchaVerified) {
+        ClientIdentity safeClient = client == null ? ClientIdentity.anonymous("unknown") : client;
+        if (!safeClient.authenticated() && !anonymousEnabled) {
+            return Decision.blocked("anonymous-disabled", 0, 3600);
+        }
+
+        String identity = safeClient.redisScope() + ":" + shortHash(safeClient.key());
         String dateKey = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE);
 
         if (redisTemplate != null) {
             try {
-                Decision redisDecision = tryAcquireWithRedis(identity, dateKey);
+                Decision redisDecision = tryAcquireWithRedis(identity, dateKey, safeClient.authenticated(), recaptchaVerified);
                 if (redisDecision != null) {
                     return redisDecision;
                 }
@@ -56,16 +74,24 @@ public class GuideChatUsageService {
             }
         }
 
-        return tryAcquireInMemory(identity, dateKey);
+        return tryAcquireInMemory(identity, dateKey, safeClient.authenticated(), recaptchaVerified);
     }
 
-    private Decision tryAcquireWithRedis(String identity, String dateKey) {
-        int safeDailyLimit = Math.max(1, dailyLimit);
+    private Decision tryAcquireWithRedis(String identity, String dateKey, boolean authenticated, boolean recaptchaVerified) {
+        int safeDailyLimit = dailyLimitFor(authenticated);
         int safeWindowLimit = Math.max(1, windowLimit);
         int safeWindowSeconds = Math.max(30, windowSeconds);
 
         String dailyKey = DAILY_KEY_PREFIX + dateKey + ":" + identity;
         String windowKey = WINDOW_KEY_PREFIX + identity;
+
+        int currentDaily = parseCount(redisTemplate.opsForValue().get(dailyKey));
+        if (currentDaily >= safeDailyLimit) {
+            return Decision.blocked("daily", 0, secondsUntilTomorrow());
+        }
+        if (requiresRecaptcha(authenticated, recaptchaVerified, currentDaily)) {
+            return Decision.challenge("captcha", Math.max(1, safeWindowSeconds));
+        }
 
         Long dailyCount = redisTemplate.opsForValue().increment(dailyKey);
         if (dailyCount != null && dailyCount == 1L) {
@@ -97,10 +123,39 @@ public class GuideChatUsageService {
         return Decision.allowed(remaining, retryAfter);
     }
 
-    private Decision tryAcquireInMemory(String identity, String dateKey) {
+    private Decision tryAcquireInMemory(String identity, String dateKey, boolean authenticated, boolean recaptchaVerified) {
         cleanupIfNeeded();
         UsageBucket bucket = fallbackUsage.computeIfAbsent(identity, ignored -> new UsageBucket(dateKey));
-        return bucket.tryAcquire(dateKey, Math.max(1, dailyLimit), Math.max(1, windowLimit), Math.max(30, windowSeconds));
+        return bucket.tryAcquire(
+                dateKey,
+                dailyLimitFor(authenticated),
+                Math.max(1, windowLimit),
+                Math.max(30, windowSeconds),
+                authenticated,
+                Math.max(0, requireRecaptchaAfter),
+                recaptchaVerified);
+    }
+
+    private int dailyLimitFor(boolean authenticated) {
+        return Math.max(1, authenticated ? authenticatedDailyLimit : anonymousDailyLimit);
+    }
+
+    private boolean requiresRecaptcha(boolean authenticated, boolean recaptchaVerified, int currentDaily) {
+        return !authenticated
+                && !recaptchaVerified
+                && requireRecaptchaAfter >= 0
+                && currentDaily >= Math.max(0, requireRecaptchaAfter);
+    }
+
+    private int parseCount(String value) {
+        if (value == null || value.isBlank()) {
+            return 0;
+        }
+        try {
+            return Math.max(0, Integer.parseInt(value));
+        } catch (NumberFormatException ex) {
+            return 0;
+        }
     }
 
     private void cleanupIfNeeded() {
@@ -124,20 +179,38 @@ public class GuideChatUsageService {
     private String shortHash(String value) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hashed = digest.digest(value.getBytes(StandardCharsets.UTF_8));
+            byte[] hashed = digest.digest((value == null ? "" : value).getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(hashed, 0, 12);
         } catch (Exception e) {
             return "unknown";
         }
     }
 
-    public record Decision(boolean allowed, String reason, int remaining, int retryAfterSeconds) {
+    public record ClientIdentity(boolean authenticated, String key) {
+        public static ClientIdentity anonymous(String key) {
+            return new ClientIdentity(false, key);
+        }
+
+        public static ClientIdentity authenticated(Long userId) {
+            return new ClientIdentity(true, userId == null ? "unknown" : userId.toString());
+        }
+
+        String redisScope() {
+            return authenticated ? "user" : "anon";
+        }
+    }
+
+    public record Decision(boolean allowed, boolean challengeRequired, String reason, int remaining, int retryAfterSeconds) {
         static Decision allowed(int remaining, int retryAfterSeconds) {
-            return new Decision(true, "", remaining, retryAfterSeconds);
+            return new Decision(true, false, "", remaining, retryAfterSeconds);
         }
 
         static Decision blocked(String reason, int remaining, int retryAfterSeconds) {
-            return new Decision(false, reason, remaining, Math.max(1, retryAfterSeconds));
+            return new Decision(false, false, reason, remaining, Math.max(1, retryAfterSeconds));
+        }
+
+        static Decision challenge(String reason, int retryAfterSeconds) {
+            return new Decision(false, true, reason, 0, Math.max(1, retryAfterSeconds));
         }
     }
 
@@ -155,7 +228,8 @@ public class GuideChatUsageService {
             this.lastSeenAt = now;
         }
 
-        synchronized Decision tryAcquire(String currentDateKey, int dailyLimit, int windowLimit, int windowSeconds) {
+        synchronized Decision tryAcquire(String currentDateKey, int dailyLimit, int windowLimit, int windowSeconds,
+                                         boolean authenticated, int requireRecaptchaAfter, boolean recaptchaVerified) {
             long now = System.currentTimeMillis();
             lastSeenAt = now;
 
@@ -175,6 +249,9 @@ public class GuideChatUsageService {
             int retryAfter = Math.max(1, (int) ((windowStartedAt + windowMillis - now + 999) / 1000));
             if (dailyCount >= dailyLimit) {
                 return Decision.blocked("daily", 0, retryAfter);
+            }
+            if (!authenticated && !recaptchaVerified && dailyCount >= requireRecaptchaAfter) {
+                return Decision.challenge("captcha", retryAfter);
             }
             if (windowCount >= windowLimit) {
                 return Decision.blocked("window", 0, retryAfter);

@@ -23,14 +23,17 @@ public class AuthTokenFilter extends OncePerRequestFilter {
     private final JwtUtils jwtUtils;
     private final UserDetailsService userDetailsService;
     private final TokenRevocationService tokenRevocationService;
+    private final UserSessionVersionService userSessionVersionService;
 
     public AuthTokenFilter(
             JwtUtils jwtUtils,
             UserDetailsService userDetailsService,
-            TokenRevocationService tokenRevocationService) {
+            TokenRevocationService tokenRevocationService,
+            UserSessionVersionService userSessionVersionService) {
         this.jwtUtils = jwtUtils;
         this.userDetailsService = userDetailsService;
         this.tokenRevocationService = tokenRevocationService;
+        this.userSessionVersionService = userSessionVersionService;
     }
 
     @Override
@@ -50,6 +53,8 @@ public class AuthTokenFilter extends OncePerRequestFilter {
                 logger.warn("Rejected revoked JWT for path: {}", path);
             } else if (!jwtUtils.validateJwtToken(jwt)) {
                 logger.warn("JWT validation failed for path: {}", path);
+            } else if (userSessionVersionService != null && !userSessionVersionService.tokenMatchesCurrentSession(jwt)) {
+                logger.warn("Rejected stale JWT session version for path: {}", path);
             } else {
                 String username = jwtUtils.getUserNameFromJwtToken(jwt);
                 if (userDetailsService != null) {

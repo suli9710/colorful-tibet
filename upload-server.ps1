@@ -155,6 +155,39 @@ if ! grep -Eq '^SUPER_ADMIN_TOTP_SECRET=[A-Z2-7]{32,}$' "$PROJECT_DIR/.env"; the
   exit 1
 fi
 
+if grep -Eiq '^SPRING_JPA_HIBERNATE_DDL_AUTO=update$' "$PROJECT_DIR/.env"; then
+  echo "Refusing deployment: production must not use SPRING_JPA_HIBERNATE_DDL_AUTO=update." >&2
+  exit 1
+fi
+
+if ! grep -Eq '^PII_ACTIVE_KID=[A-Za-z0-9_.-]+$' "$PROJECT_DIR/.env"; then
+  echo "Refusing deployment: PII_ACTIVE_KID must be configured with a simple key id." >&2
+  exit 1
+fi
+
+ACTIVE_PII_KID=$(grep -E '^PII_ACTIVE_KID=' "$PROJECT_DIR/.env" | tail -n 1 | cut -d= -f2-)
+PII_KEYS_VALUE=$(grep -E '^PII_KEYS=' "$PROJECT_DIR/.env" | tail -n 1 | cut -d= -f2- || true)
+if [ -z "$PII_KEYS_VALUE" ]; then
+  echo "Refusing deployment: PII_KEYS must be configured as kid:base64-32-byte-key entries." >&2
+  exit 1
+fi
+
+if printf '%s' "$PII_KEYS_VALUE" | grep -Eiq 'change-me|changeme|replace-with|placeholder'; then
+  echo "Refusing deployment: PII_KEYS must not contain placeholder values." >&2
+  exit 1
+fi
+
+PII_ACTIVE_KEY=$(printf '%s' "$PII_KEYS_VALUE" | tr ',' '\n' | awk -F: -v kid="$ACTIVE_PII_KID" '$1 == kid {print $2; exit}')
+if [ -z "$PII_ACTIVE_KEY" ]; then
+  echo "Refusing deployment: PII_ACTIVE_KID must match an entry in PII_KEYS." >&2
+  exit 1
+fi
+
+if [ "$(printf '%s' "$PII_ACTIVE_KEY" | base64 -d 2>/dev/null | wc -c | tr -d ' ')" != "32" ]; then
+  echo "Refusing deployment: active PII key must decode to exactly 32 bytes." >&2
+  exit 1
+fi
+
 echo "Prebuilding release before stopping current containers..."
 tar -xzf "$ARCHIVE" -C "$RELEASE_DIR"
 cp "$PROJECT_DIR/.env" "$RELEASE_DIR/.env"

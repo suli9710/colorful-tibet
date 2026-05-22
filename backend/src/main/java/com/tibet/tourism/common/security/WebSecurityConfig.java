@@ -49,6 +49,9 @@ public class WebSecurityConfig {
     @Autowired
     private TokenRevocationService tokenRevocationService;
 
+    @Autowired
+    private UserSessionVersionService userSessionVersionService;
+
     @Value("${app.security.public-docs-enabled:false}")
     private boolean publicDocsEnabled;
 
@@ -57,7 +60,7 @@ public class WebSecurityConfig {
 
     @Bean
     public AuthTokenFilter authenticationJwtTokenFilter() {
-        return new AuthTokenFilter(jwtUtils, userDetailsService, tokenRevocationService);
+        return new AuthTokenFilter(jwtUtils, userDetailsService, tokenRevocationService, userSessionVersionService);
     }
 
     @Bean

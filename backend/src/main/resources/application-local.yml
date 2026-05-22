@@ -105,7 +105,10 @@ app:
     public-metrics-enabled: ${PUBLIC_METRICS_ENABLED:false}
     require-strong-secrets: ${REQUIRE_STRONG_SECRETS:false}
     csrf-signing-secret: ${CSRF_SIGNING_SECRET:}
+    pii-keys: ${PII_KEYS:}
+    pii-active-kid: ${PII_ACTIVE_KID:}
     pii-encryption-key: ${PII_ENCRYPTION_KEY:}
+    pii-migration-enabled: ${PII_MIGRATION_ENABLED:false}
     cookie-secure: ${COOKIE_SECURE:false}
     trust-proxy-headers: ${TRUST_PROXY_HEADERS:false}
     trusted-proxy-cidrs: ${TRUSTED_PROXY_CIDRS:}
@@ -118,6 +121,12 @@ app:
       register:
         requests: ${RATE_LIMIT_REGISTER_REQUESTS:5}
         window-seconds: ${RATE_LIMIT_REGISTER_WINDOW_SECONDS:3600}
+    guide-chat:
+      anonymous-enabled: ${GUIDE_CHAT_ANONYMOUS_ENABLED:true}
+      anonymous-daily-quota-per-ip: ${GUIDE_CHAT_ANONYMOUS_DAILY_QUOTA_PER_IP:5}
+      authenticated-daily-quota-per-user: ${GUIDE_CHAT_AUTHENTICATED_DAILY_QUOTA_PER_USER:30}
+      require-recaptcha-after: ${GUIDE_CHAT_REQUIRE_RECAPTCHA_AFTER:2}
+      anonymous-remote-ai-enabled: ${GUIDE_CHAT_ANON_REMOTE_AI_ENABLED:false}
   payments:
     mock-callback-enabled: ${PAYMENT_MOCK_CALLBACK_ENABLED:true}
     mock-callback-secret: ${PAYMENT_CALLBACK_SECRET:dev-payment-callback-secret}

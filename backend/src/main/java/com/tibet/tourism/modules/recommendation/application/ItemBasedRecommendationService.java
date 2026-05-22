@@ -1,4 +1,6 @@
 package com.tibet.tourism.modules.recommendation.application;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tibet.tourism.modules.spot.domain.ScenicSpot;
 import com.tibet.tourism.modules.spot.infra.ScenicSpotRepository;
 import com.tibet.tourism.modules.user.domain.User;
@@ -17,7 +19,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 /**
@@ -38,6 +40,7 @@ public class ItemBasedRecommendationService {
     private static final long SIMILARITY_MATRIX_TTL_MS = 24 * 60 * 60 * 1000L;
     private static final String REDIS_MATRIX_KEY = "recommend:item-similarity:matrix";
     private static final long REDIS_MATRIX_TTL_HOURS = 48;
+    private static final TypeReference<Map<String, Object>> JSON_OBJECT = new TypeReference<>() {};
 
     @Value("${app.recommendation.item-similarity.max-spots:2000}")
     private int maxSpotsForPrecompute;
@@ -52,7 +55,10 @@ public class ItemBasedRecommendationService {
     private UserVisitHistoryRepository historyRepository;
 
     @Autowired(required = false)
-    private RedisTemplate<String, Object> redisTemplate;
+    private StringRedisTemplate redisTemplate;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     private volatile boolean redisCacheWarningLogged = false;
 
@@ -119,7 +125,7 @@ public class ItemBasedRecommendationService {
     }
 
     public boolean loadSimilarityMatrixFromCache() {
-        Object cachedValue = getRedisValue(REDIS_MATRIX_KEY, "get item similarity matrix");
+        String cachedValue = getRedisValue(REDIS_MATRIX_KEY, "get item similarity matrix");
         Map<Long, Map<Long, Double>> cachedMatrix = toSimilarityMatrix(cachedValue);
         if (cachedMatrix == null || cachedMatrix.isEmpty()) {
             return false;
@@ -388,13 +394,20 @@ public class ItemBasedRecommendationService {
         payload.put("updatedAt", updatedAt);
         payload.put("matrix", matrix);
         try {
-            redisTemplate.opsForValue().set(REDIS_MATRIX_KEY, payload, REDIS_MATRIX_TTL_HOURS, TimeUnit.HOURS);
+            redisTemplate.opsForValue().set(
+                    REDIS_MATRIX_KEY,
+                    objectMapper.writeValueAsString(payload),
+                    REDIS_MATRIX_TTL_HOURS,
+                    TimeUnit.HOURS);
         } catch (RuntimeException ex) {
             logRedisCacheFailure("set item similarity matrix", ex);
+        } catch (Exception ex) {
+            logRedisCacheFailure("set item similarity matrix",
+                    new IllegalStateException("Failed to serialize item similarity matrix", ex));
         }
     }
 
-    private Object getRedisValue(String key, String operation) {
+    private String getRedisValue(String key, String operation) {
         if (redisTemplate == null) {
             return null;
         }
@@ -416,12 +429,20 @@ public class ItemBasedRecommendationService {
         }
     }
 
-    private Map<Long, Map<Long, Double>> toSimilarityMatrix(Object value) {
-        if (!(value instanceof Map<?, ?> source)) {
+    private Map<Long, Map<Long, Double>> toSimilarityMatrix(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        Map<String, Object> source;
+        try {
+            source = objectMapper.readValue(value, JSON_OBJECT);
+        } catch (Exception ex) {
+            logRedisCacheFailure("parse item similarity matrix",
+                    new IllegalStateException("Invalid item similarity matrix payload", ex));
             return null;
         }
 
-        Object matrixValue = source.containsKey("matrix") ? source.get("matrix") : value;
+        Object matrixValue = source.containsKey("matrix") ? source.get("matrix") : source;
         if (!(matrixValue instanceof Map<?, ?> matrixSource)) {
             return null;
         }
@@ -446,8 +467,14 @@ public class ItemBasedRecommendationService {
         return matrix;
     }
 
-    private Optional<Long> extractUpdatedAt(Object value) {
-        if (!(value instanceof Map<?, ?> source)) {
+    private Optional<Long> extractUpdatedAt(String value) {
+        if (value == null || value.isBlank()) {
+            return Optional.empty();
+        }
+        Map<String, Object> source;
+        try {
+            source = objectMapper.readValue(value, JSON_OBJECT);
+        } catch (Exception ex) {
             return Optional.empty();
         }
         return Optional.ofNullable(toLong(source.get("updatedAt")));

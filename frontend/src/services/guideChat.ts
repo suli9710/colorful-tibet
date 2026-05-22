@@ -1,5 +1,6 @@
 import axios from 'axios'
 import api, { endpoints } from '../api'
+import { getRecaptchaToken, isRecaptchaV3Enabled } from '../utils/recaptcha'
 
 export interface ChatMessage {
   id: number
@@ -11,6 +12,7 @@ export interface ChatMessage {
   fallback?: boolean
   limited?: boolean
   retryAfterSeconds?: number
+  challengeRequired?: boolean
 }
 
 export interface GuideChatHistoryItem {
@@ -26,6 +28,7 @@ interface GuideChatApiResponse {
   actionLabel?: string
   limited?: boolean
   retryAfterSeconds?: number
+  challengeRequired?: boolean
 }
 
 interface IntentRule {
@@ -179,7 +182,8 @@ function limitedGuideMessage(data?: GuideChatApiResponse, retryHeader?: unknown)
     {
       fallback: true,
       limited: true,
-      retryAfterSeconds
+      retryAfterSeconds,
+      challengeRequired: Boolean(data?.challengeRequired)
     }
   )
 }
@@ -204,7 +208,12 @@ export function processUserMessage(text: string): ChatMessage[] {
   return [createUserMessage(text), localGuideMessage(text)]
 }
 
-export async function requestGuideChat(text: string, history: GuideChatHistoryItem[]): Promise<ChatMessage> {
+export async function requestGuideChat(
+  text: string,
+  history: GuideChatHistoryItem[],
+  recaptchaToken = '',
+  retriedChallenge = false
+): Promise<ChatMessage> {
   const trimmed = text.trim()
   const locale = localStorage.getItem('locale') || 'zh'
 
@@ -213,7 +222,9 @@ export async function requestGuideChat(text: string, history: GuideChatHistoryIt
       message: trimmed,
       history: history.slice(-8),
       locale
-    })
+    }, recaptchaToken
+      ? { headers: { 'X-Recaptcha-Token': recaptchaToken } }
+      : undefined)
 
     const data = response.data
     const content = data.content?.trim()
@@ -226,9 +237,19 @@ export async function requestGuideChat(text: string, history: GuideChatHistoryIt
       fallback: Boolean(data.fallback),
       limited: Boolean(data.limited),
       retryAfterSeconds: data.retryAfterSeconds,
+      challengeRequired: Boolean(data.challengeRequired),
       ...(action ? { action, actionLabel: data.actionLabel || '去规划路线' } : {})
     })
   } catch (error) {
+    if (axios.isAxiosError<GuideChatApiResponse>(error) && error.response?.status === 428) {
+      if (!retriedChallenge && isRecaptchaV3Enabled()) {
+        const token = await getRecaptchaToken('guide_chat')
+        if (token) {
+          return requestGuideChat(trimmed, history, token, true)
+        }
+      }
+      return limitedGuideMessage(error.response.data, error.response.headers?.['retry-after'])
+    }
     if (axios.isAxiosError<GuideChatApiResponse>(error) && error.response?.status === 429) {
       return limitedGuideMessage(error.response.data, error.response.headers?.['retry-after'])
     }

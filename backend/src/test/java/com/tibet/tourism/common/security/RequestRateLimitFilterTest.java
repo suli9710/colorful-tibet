@@ -1,12 +1,11 @@
 package com.tibet.tourism.common.security;
-import com.tibet.tourism.modules.user.domain.User;
 import jakarta.servlet.http.Cookie;
 import java.lang.reflect.Field;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -18,24 +17,24 @@ class RequestRateLimitFilterTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        ObjectProvider<RedisTemplate<String, Object>> provider = new ObjectProvider<>() {
+        ObjectProvider<StringRedisTemplate> provider = new ObjectProvider<>() {
             @Override
-            public RedisTemplate<String, Object> getObject() {
+            public StringRedisTemplate getObject() {
                 return null;
             }
 
             @Override
-            public RedisTemplate<String, Object> getObject(Object... args) {
+            public StringRedisTemplate getObject(Object... args) {
                 return null;
             }
 
             @Override
-            public RedisTemplate<String, Object> getIfAvailable() {
+            public StringRedisTemplate getIfAvailable() {
                 return null;
             }
 
             @Override
-            public RedisTemplate<String, Object> getIfUnique() {
+            public StringRedisTemplate getIfUnique() {
                 return null;
             }
         };

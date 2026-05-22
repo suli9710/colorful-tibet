@@ -1,6 +1,7 @@
 package com.tibet.tourism.modules.auth.web;
 import com.tibet.tourism.common.security.CookieAuthConstants;
 import com.tibet.tourism.common.security.TokenRevocationService;
+import com.tibet.tourism.common.security.UserSessionVersionService;
 import com.tibet.tourism.modules.auth.application.AuthApplicationService;
 import com.tibet.tourism.modules.auth.application.LoginResult;
 import com.tibet.tourism.modules.auth.domain.AuthFailureException;
@@ -33,14 +34,17 @@ public class AuthController {
 
     private final AuthApplicationService authApplicationService;
     private final TokenRevocationService tokenRevocationService;
+    private final UserSessionVersionService userSessionVersionService;
     private final boolean secureCookies;
 
     public AuthController(
             AuthApplicationService authApplicationService,
             TokenRevocationService tokenRevocationService,
+            UserSessionVersionService userSessionVersionService,
             @Value("${app.security.cookie-secure:true}") boolean secureCookies) {
         this.authApplicationService = authApplicationService;
         this.tokenRevocationService = tokenRevocationService;
+        this.userSessionVersionService = userSessionVersionService;
         this.secureCookies = secureCookies;
     }
 
@@ -70,6 +74,7 @@ public class AuthController {
         String token = resolveToken(request);
         if (StringUtils.hasText(token)) {
             tokenRevocationService.revoke(token);
+            userSessionVersionService.invalidateTokenSubject(token);
         }
         return ResponseEntity.noContent()
                 .header(HttpHeaders.SET_COOKIE, authCookie("", Duration.ZERO).toString())

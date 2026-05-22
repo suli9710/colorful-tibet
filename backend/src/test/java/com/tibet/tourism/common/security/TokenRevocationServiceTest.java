@@ -7,7 +7,8 @@ import static org.mockito.Mockito.when;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.mock.env.MockEnvironment;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -45,6 +46,21 @@ class TokenRevocationServiceTest {
         assertThat(service.isRevoked(token)).isFalse();
     }
 
+    @Test
+    @SuppressWarnings("unchecked")
+    void redisFailureFallsBackToLocalRevocationState() {
+        StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
+        ValueOperations<String, String> operations = mock(ValueOperations.class);
+        when(redisTemplate.opsForValue()).thenReturn(operations);
+        when(operations.get(org.mockito.ArgumentMatchers.anyString())).thenThrow(new RuntimeException("redis down"));
+        TokenRevocationService service = new TokenRevocationService(provider(redisTemplate), jwtUtils);
+        String token = jwtUtils.generateJwtToken(authentication("traveler"));
+
+        service.revoke(token);
+
+        assertThat(service.isRevoked(token)).isTrue();
+    }
+
     private Authentication authentication(String username) {
         var principal = org.springframework.security.core.userdetails.User
                 .withUsername(username)
@@ -54,8 +70,8 @@ class TokenRevocationServiceTest {
         return new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());
     }
 
-    private ObjectProvider<RedisTemplate<String, Object>> provider(RedisTemplate<String, Object> redisTemplate) {
-        ObjectProvider<RedisTemplate<String, Object>> provider = mock(ObjectProvider.class);
+    private ObjectProvider<StringRedisTemplate> provider(StringRedisTemplate redisTemplate) {
+        ObjectProvider<StringRedisTemplate> provider = mock(ObjectProvider.class);
         when(provider.getIfAvailable()).thenReturn(redisTemplate);
         return provider;
     }

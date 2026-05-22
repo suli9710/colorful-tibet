@@ -8,7 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -18,7 +18,7 @@ public class AiQuotaService {
     private static final String QUOTA_KEY_PREFIX = "ai:quota:daily:";
     private static final String CACHE_KEY_PREFIX = "ai:cache:route:";
 
-    private final RedisTemplate<String, Object> redisTemplate;
+    private final StringRedisTemplate redisTemplate;
 
     @Value("${app.security.ai-quota.daily-limit:${AI_DAILY_QUOTA_PER_USER:20}}")
     private int dailyLimit;
@@ -30,7 +30,7 @@ public class AiQuotaService {
     private final ConcurrentHashMap<String, CacheEntry> fallbackCache = new ConcurrentHashMap<>();
     private volatile String fallbackDateKey = "";
 
-    public AiQuotaService(ObjectProvider<RedisTemplate<String, Object>> redisTemplateProvider) {
+    public AiQuotaService(ObjectProvider<StringRedisTemplate> redisTemplateProvider) {
         this.redisTemplate = redisTemplateProvider.getIfAvailable();
     }
 
@@ -43,7 +43,7 @@ public class AiQuotaService {
 
         if (redisTemplate != null) {
             try {
-                Object val = redisTemplate.opsForValue().get(key);
+                String val = redisTemplate.opsForValue().get(key);
                 int count = parseInt(val);
                 return count >= dailyLimit;
             } catch (Exception e) {
@@ -85,7 +85,7 @@ public class AiQuotaService {
         int used = 0;
         if (redisTemplate != null) {
             try {
-                Object val = redisTemplate.opsForValue().get(key);
+                String val = redisTemplate.opsForValue().get(key);
                 used = parseInt(val);
             } catch (Exception e) {
                 log.warn("Redis quota remaining check failed, using in-memory fallback: {}", e.getMessage());
@@ -100,7 +100,7 @@ public class AiQuotaService {
     public String getCachedRoute(String cacheKey) {
         if (redisTemplate != null) {
             try {
-                Object val = redisTemplate.opsForValue().get(CACHE_KEY_PREFIX + cacheKey);
+                String val = redisTemplate.opsForValue().get(CACHE_KEY_PREFIX + cacheKey);
                 return val == null ? null : val.toString();
             } catch (Exception e) {
                 log.warn("Redis cache read failed: {}", e.getMessage());

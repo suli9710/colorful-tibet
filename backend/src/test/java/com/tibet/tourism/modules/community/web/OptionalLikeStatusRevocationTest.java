@@ -17,6 +17,7 @@ import com.tibet.tourism.common.security.JwtAuthSupport;
 import com.tibet.tourism.common.security.JwtUtils;
 import com.tibet.tourism.common.security.TokenRevocationService;
 import com.tibet.tourism.common.security.TrustedProxyIpResolver;
+import com.tibet.tourism.common.security.UserSessionVersionService;
 import com.tibet.tourism.modules.auth.application.AuthApplicationService;
 import com.tibet.tourism.modules.auth.application.LoginResult;
 import com.tibet.tourism.modules.auth.web.AuthController;
@@ -67,6 +68,9 @@ class OptionalLikeStatusRevocationTest {
     private TokenRevocationService tokenRevocationService;
 
     @MockBean
+    private UserSessionVersionService userSessionVersionService;
+
+    @MockBean
     private UserRepository userRepository;
 
     @MockBean
@@ -91,6 +95,7 @@ class OptionalLikeStatusRevocationTest {
         when(jwtUtils.validateJwtToken(TOKEN)).thenReturn(true);
         when(jwtUtils.getUserNameFromJwtToken(TOKEN)).thenReturn("alice");
         when(userRepository.findByUsername("alice")).thenReturn(Optional.of(user));
+        when(userSessionVersionService.resolveCurrentUser(TOKEN)).thenReturn(Optional.of(user));
         when(tokenRevocationService.isRevoked(TOKEN)).thenAnswer(invocation -> revoked.get());
         doAnswer(invocation -> {
             revoked.set(true);
@@ -118,7 +123,7 @@ class OptionalLikeStatusRevocationTest {
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + TOKEN))
                 .andExpect(status().isNoContent());
 
-        clearInvocations(jwtUtils, tokenRevocationService, userRepository, qaService);
+        clearInvocations(jwtUtils, tokenRevocationService, userRepository, userSessionVersionService, qaService);
 
         mockMvc.perform(get("/api/community/questions/42/like-status")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + TOKEN))
@@ -127,6 +132,7 @@ class OptionalLikeStatusRevocationTest {
 
         verify(jwtUtils).validateJwtToken(TOKEN);
         verify(tokenRevocationService).isRevoked(TOKEN);
+        verify(userSessionVersionService, never()).resolveCurrentUser(TOKEN);
         verify(jwtUtils, never()).getUserNameFromJwtToken(TOKEN);
         verify(userRepository, never()).findByUsername(any());
         verify(qaService, never()).isLikedByUser(anyLong(), anyLong());

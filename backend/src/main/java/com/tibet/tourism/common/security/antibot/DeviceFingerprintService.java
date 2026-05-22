@@ -5,7 +5,7 @@ import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -16,10 +16,10 @@ public class DeviceFingerprintService {
     private static final String FP_KEY_PREFIX = "antibot:device-fp:";
     private static final String USER_KEY_PREFIX = "antibot:user-fp:";
 
-    private final RedisTemplate<String, Object> redisTemplate;
+    private final StringRedisTemplate redisTemplate;
     private final AntibotProperties properties;
 
-    public DeviceFingerprintService(ObjectProvider<RedisTemplate<String, Object>> redisProvider,
+    public DeviceFingerprintService(ObjectProvider<StringRedisTemplate> redisProvider,
                                     AntibotProperties properties) {
         this.redisTemplate = redisProvider.getIfAvailable();
         this.properties = properties;
@@ -48,8 +48,8 @@ public class DeviceFingerprintService {
             redisTemplate.opsForSet().add(userKey, fingerprint);
             redisTemplate.expire(userKey, ttl, TimeUnit.SECONDS);
 
-            Set<Object> usersOnFp = redisTemplate.opsForSet().members(fpKey);
-            Set<Object> fpsOnUser = redisTemplate.opsForSet().members(userKey);
+            Set<String> usersOnFp = redisTemplate.opsForSet().members(fpKey);
+            Set<String> fpsOnUser = redisTemplate.opsForSet().members(userKey);
 
             int userCount = usersOnFp != null ? usersOnFp.size() : 0;
             int fpCount = fpsOnUser != null ? fpsOnUser.size() : 0;
