@@ -75,7 +75,11 @@ public class LoginAttemptService {
     }
 
     public long remainingLockSeconds(String username) {
-        return 0;
+        if (!enabled || username == null || username.isBlank() || isExempt(username)) {
+            return 0;
+        }
+        AttemptRecord record = getRecord(accountKey(username));
+        return record == null ? 0 : remainingSeconds(record, safeThreshold(maxAttempts));
     }
 
     public LoginAttemptDecision evaluate(String username, String clientIp) {
@@ -88,7 +92,9 @@ public class LoginAttemptService {
         int accountFailures = accountRecord == null ? 0 : accountRecord.failures;
         boolean stepUpRequired = accountFailures >= safeThreshold(accountStepUpAt);
 
-        LoginAttemptDecision blocked = blockedDecision(clientIp, accountKey);
+        LoginAttemptDecision blocked = strongestBlockedDecision(
+                lockState("account", accountRecord, safeThreshold(maxAttempts)),
+                blockedDecision(clientIp, accountKey));
         if (blocked != null) {
             return blocked.withAccountState(stepUpRequired, accountFailures);
         }
@@ -136,6 +142,7 @@ public class LoginAttemptService {
         evictStaleInMemory(now);
 
         LoginAttemptDecision blocked = strongestBlockedDecision(
+                lockState("account", accountRecord, safeThreshold(maxAttempts)),
                 lockState("pair", pairRecord, safeThreshold(pairMaxAttempts)),
                 lockState("ip", ipRecord, safeThreshold(ipMaxAttempts)),
                 lockState("network", networkRecord, safeThreshold(networkMaxAttempts)));

@@ -5,9 +5,10 @@ services:
     ports:
       - "127.0.0.1:${MYSQL_HOST_PORT:-3307}:3306"
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD:-root123456}
-      MYSQL_ROOT_HOST: "${MYSQL_ROOT_HOST:-%}"
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required; set a local-only random root password}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-colorful_tibet}
+      MYSQL_USER: ${MYSQL_USERNAME:-colorful_tibet_app}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD is required; set a local-only app database password}
     volumes:
       - mysql_data:/var/lib/mysql
     restart: unless-stopped
@@ -35,8 +36,8 @@ services:
       - MYSQL_HOST=mysql
       - MYSQL_PORT=3306
       - MYSQL_DATABASE=${MYSQL_DATABASE:-colorful_tibet}
-      - MYSQL_USERNAME=${MYSQL_USERNAME:-root}
-      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-root123456}
+      - MYSQL_USERNAME=${MYSQL_USERNAME:-colorful_tibet_app}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:?MYSQL_PASSWORD is required; set a local-only app database password}
       - ARK_API_KEY
       - ARK_API_URL
       - ARK_STREAM_API_URL
