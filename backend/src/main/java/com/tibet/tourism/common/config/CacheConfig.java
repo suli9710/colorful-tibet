@@ -1,5 +1,5 @@
 package com.tibet.tourism.common.config;
-import com.fasterxml.jackson.databind.ObjectMapper;
+
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
@@ -17,7 +17,6 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.data.redis.cache.RedisCacheConfiguration;
 import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
-import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializationContext.SerializationPair;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
@@ -99,11 +98,7 @@ public class CacheConfig implements CachingConfigurer {
                 .disableCachingNullValues()
                 .prefixCacheNameWith("colorful-tibet:cache:")
                 .serializeKeysWith(SerializationPair.fromSerializer(new StringRedisSerializer()))
-                .serializeValuesWith(SerializationPair.fromSerializer(new GenericJackson2JsonRedisSerializer(redisObjectMapper())));
-    }
-
-    private ObjectMapper redisObjectMapper() {
-        return RedisObjectMapperFactory.create();
+                .serializeValuesWith(SerializationPair.fromSerializer(new StringRedisSerializer()));
     }
 
     private void logCacheError(String operation, RuntimeException exception, Cache cache, Object key) {

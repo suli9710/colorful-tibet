@@ -41,6 +41,9 @@ class UploadResourceSecurityHeadersTest {
     private TokenRevocationService tokenRevocationService;
 
     @MockBean
+    private UserSessionVersionService userSessionVersionService;
+
+    @MockBean
     private UserRepository userRepository;
 
     @Test

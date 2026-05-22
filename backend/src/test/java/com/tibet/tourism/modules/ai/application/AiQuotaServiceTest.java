@@ -8,7 +8,7 @@ import static org.mockito.Mockito.when;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -16,8 +16,8 @@ class AiQuotaServiceTest {
 
     @Test
     void redisReadFailureUsesMirroredFallbackQuota() {
-        RedisTemplate<String, Object> redisTemplate = redisTemplate();
-        ValueOperations<String, Object> valueOperations = valueOperations();
+        StringRedisTemplate redisTemplate = redisTemplate();
+        ValueOperations<String, String> valueOperations = valueOperations();
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
         when(valueOperations.increment(anyString())).thenReturn(1L, 2L);
 
@@ -46,44 +46,44 @@ class AiQuotaServiceTest {
     }
 
     @SuppressWarnings("unchecked")
-    private static RedisTemplate<String, Object> redisTemplate() {
-        return mock(RedisTemplate.class);
+    private static StringRedisTemplate redisTemplate() {
+        return mock(StringRedisTemplate.class);
     }
 
     @SuppressWarnings("unchecked")
-    private static ValueOperations<String, Object> valueOperations() {
+    private static ValueOperations<String, String> valueOperations() {
         return mock(ValueOperations.class);
     }
 
-    private static ObjectProvider<RedisTemplate<String, Object>> provider(RedisTemplate<String, Object> redisTemplate) {
+    private static ObjectProvider<StringRedisTemplate> provider(StringRedisTemplate redisTemplate) {
         return new ObjectProvider<>() {
             @Override
-            public RedisTemplate<String, Object> getObject(Object... args) {
+            public StringRedisTemplate getObject(Object... args) {
                 return redisTemplate;
             }
 
             @Override
-            public RedisTemplate<String, Object> getIfAvailable() {
+            public StringRedisTemplate getIfAvailable() {
                 return redisTemplate;
             }
 
             @Override
-            public RedisTemplate<String, Object> getIfUnique() {
+            public StringRedisTemplate getIfUnique() {
                 return redisTemplate;
             }
 
             @Override
-            public RedisTemplate<String, Object> getObject() {
+            public StringRedisTemplate getObject() {
                 return redisTemplate;
             }
 
             @Override
-            public Stream<RedisTemplate<String, Object>> stream() {
+            public Stream<StringRedisTemplate> stream() {
                 return redisTemplate == null ? Stream.empty() : Stream.of(redisTemplate);
             }
 
             @Override
-            public Stream<RedisTemplate<String, Object>> orderedStream() {
+            public Stream<StringRedisTemplate> orderedStream() {
                 return stream();
             }
         };

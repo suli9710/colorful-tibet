@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.test.util.ReflectionTestUtils;
 
 class GuideChatUsageServiceTest {
@@ -38,33 +38,65 @@ class GuideChatUsageServiceTest {
         assertThat(blocked.retryAfterSeconds()).isPositive();
     }
 
+    @Test
+    void anonymousRequestsRequireCaptchaAfterConfiguredThreshold() {
+        GuideChatUsageService service = newService(5, 10, 60);
+        ReflectionTestUtils.setField(service, "requireRecaptchaAfter", 2);
+
+        assertThat(service.tryAcquire(GuideChatUsageService.ClientIdentity.anonymous("client-a"), false).allowed()).isTrue();
+        assertThat(service.tryAcquire(GuideChatUsageService.ClientIdentity.anonymous("client-a"), false).allowed()).isTrue();
+
+        GuideChatUsageService.Decision challenge =
+                service.tryAcquire(GuideChatUsageService.ClientIdentity.anonymous("client-a"), false);
+
+        assertThat(challenge.allowed()).isFalse();
+        assertThat(challenge.challengeRequired()).isTrue();
+        assertThat(challenge.reason()).isEqualTo("captcha");
+        assertThat(service.tryAcquire(GuideChatUsageService.ClientIdentity.anonymous("client-a"), true).allowed()).isTrue();
+    }
+
+    @Test
+    void authenticatedClientsUseSeparateDailyQuotaAndDoNotRequireCaptcha() {
+        GuideChatUsageService service = newService(1, 10, 60);
+        ReflectionTestUtils.setField(service, "authenticatedDailyLimit", 3);
+        ReflectionTestUtils.setField(service, "requireRecaptchaAfter", 0);
+
+        assertThat(service.tryAcquire(GuideChatUsageService.ClientIdentity.authenticated(7L), false).allowed()).isTrue();
+        assertThat(service.tryAcquire(GuideChatUsageService.ClientIdentity.authenticated(7L), false).allowed()).isTrue();
+        assertThat(service.tryAcquire(GuideChatUsageService.ClientIdentity.authenticated(7L), false).allowed()).isTrue();
+        assertThat(service.tryAcquire(GuideChatUsageService.ClientIdentity.authenticated(7L), false).allowed()).isFalse();
+    }
+
     private GuideChatUsageService newService(int dailyLimit, int windowLimit, int windowSeconds) {
         GuideChatUsageService service = new GuideChatUsageService(nullRedisProvider());
-        ReflectionTestUtils.setField(service, "dailyLimit", dailyLimit);
+        ReflectionTestUtils.setField(service, "anonymousDailyLimit", dailyLimit);
+        ReflectionTestUtils.setField(service, "authenticatedDailyLimit", dailyLimit);
         ReflectionTestUtils.setField(service, "windowLimit", windowLimit);
         ReflectionTestUtils.setField(service, "windowSeconds", windowSeconds);
+        ReflectionTestUtils.setField(service, "anonymousEnabled", true);
+        ReflectionTestUtils.setField(service, "requireRecaptchaAfter", Integer.MAX_VALUE);
         return service;
     }
 
-    private ObjectProvider<RedisTemplate<String, Object>> nullRedisProvider() {
+    private ObjectProvider<StringRedisTemplate> nullRedisProvider() {
         return new ObjectProvider<>() {
             @Override
-            public RedisTemplate<String, Object> getObject() {
+            public StringRedisTemplate getObject() {
                 return null;
             }
 
             @Override
-            public RedisTemplate<String, Object> getObject(Object... args) {
+            public StringRedisTemplate getObject(Object... args) {
                 return null;
             }
 
             @Override
-            public RedisTemplate<String, Object> getIfAvailable() {
+            public StringRedisTemplate getIfAvailable() {
                 return null;
             }
 
             @Override
-            public RedisTemplate<String, Object> getIfUnique() {
+            public StringRedisTemplate getIfUnique() {
                 return null;
             }
         };

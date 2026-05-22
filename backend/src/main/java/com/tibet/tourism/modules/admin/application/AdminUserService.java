@@ -72,7 +72,10 @@ public class AdminUserService {
                 return new RoleUpdateResult(false, 403, "只有超级管理员可以调整管理员角色");
             }
 
-            user.setRole(requestedRole);
+            if (user.getRole() != requestedRole) {
+                user.setRole(requestedRole);
+                user.incrementSessionVersion();
+            }
             userRepository.save(user);
             return new RoleUpdateResult(true, 200, "角色更新成功");
         } catch (IllegalArgumentException e) {

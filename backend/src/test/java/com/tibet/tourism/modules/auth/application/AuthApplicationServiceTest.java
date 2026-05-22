@@ -3,6 +3,7 @@ package com.tibet.tourism.modules.auth.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -72,7 +73,7 @@ class AuthApplicationServiceTest {
                 .thenReturn(new LoginAttemptService.LoginAttemptDecision(true, false, "", 0, 0));
         when(loginAttemptService.recordFailure(anyString(), anyString()))
                 .thenReturn(new LoginAttemptService.LoginAttemptDecision(true, false, "", 0, 1));
-        when(jwtUtils.generateJwtToken(any(Authentication.class))).thenReturn("jwt-token");
+        when(jwtUtils.generateJwtToken(any(Authentication.class), anyLong())).thenReturn("jwt-token");
         when(csrfTokenService.generateToken("jwt-token")).thenReturn("csrf-token");
         when(ipLocationService.getClientIpAddress(any(HttpServletRequest.class))).thenReturn("127.0.0.1");
         when(ipLocationService.getCityByIp("127.0.0.1")).thenReturn("拉萨");

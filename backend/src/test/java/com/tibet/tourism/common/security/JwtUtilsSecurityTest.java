@@ -1,7 +1,9 @@
 package com.tibet.tourism.common.security;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.env.MockEnvironment;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.util.ReflectionTestUtils;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -76,6 +78,23 @@ class JwtUtilsSecurityTest {
         JwtUtils jwtUtils = jwtUtils("a".repeat(64), 86_400_000, true);
 
         assertThatCode(jwtUtils::validateJwtConfiguration).doesNotThrowAnyException();
+    }
+
+    @Test
+    void generatedTokenCarriesSessionVersionClaim() {
+        JwtUtils jwtUtils = jwtUtils("b".repeat(64), 86_400_000, false);
+        jwtUtils.validateJwtConfiguration();
+        var principal = org.springframework.security.core.userdetails.User
+                .withUsername("traveler")
+                .password("encoded")
+                .roles("USER")
+                .build();
+        var authentication = new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());
+
+        String token = jwtUtils.generateJwtToken(authentication, 7L);
+
+        assertThat(jwtUtils.validateJwtToken(token)).isTrue();
+        assertThat(jwtUtils.getSessionVersionFromJwtToken(token)).isEqualTo(7L);
     }
 
     private JwtUtils jwtUtils(String secret, int expirationMs, boolean requireStrongSecrets, String... activeProfiles) {

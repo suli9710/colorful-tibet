@@ -1,10 +1,12 @@
 package com.tibet.tourism.modules.recommendation.application.strategy;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -16,7 +18,10 @@ public class RecommendationCacheService {
     private static final long TAG_PROFILE_CACHE_TTL_MINUTES = 60;
     private static final int LOCAL_CACHE_SIZE_LIMIT = 1000;
 
-    private final RedisTemplate<String, Object> redisTemplate;
+    private static final TypeReference<Map<String, Double>> STRING_DOUBLE_MAP = new TypeReference<>() {};
+
+    private final StringRedisTemplate redisTemplate;
+    private final ObjectMapper objectMapper;
 
     private final Map<Long, Map<Long, Double>> localSimilarityCache = Collections.synchronizedMap(
             new LinkedHashMap<Long, Map<Long, Double>>(16, 0.75f, true) {
@@ -36,8 +41,10 @@ public class RecommendationCacheService {
 
     private volatile boolean redisCacheWarningLogged = false;
 
-    public RecommendationCacheService(@Autowired(required = false) RedisTemplate<String, Object> redisTemplate) {
+    public RecommendationCacheService(@Autowired(required = false) StringRedisTemplate redisTemplate,
+                                      ObjectMapper objectMapper) {
         this.redisTemplate = redisTemplate;
+        this.objectMapper = objectMapper;
     }
 
     public Map<String, Double> getTagProfile(Long userId) {
@@ -75,7 +82,7 @@ public class RecommendationCacheService {
         return "recommend:tagprofile:" + userId;
     }
 
-    private Object getRedisValue(String key, String operation) {
+    private String getRedisValue(String key, String operation) {
         if (redisTemplate == null) return null;
         try {
             return redisTemplate.opsForValue().get(key);
@@ -88,9 +95,11 @@ public class RecommendationCacheService {
     private void setRedisValue(String key, Object value, long ttlMinutes, String operation) {
         if (redisTemplate == null) return;
         try {
-            redisTemplate.opsForValue().set(key, value, ttlMinutes, TimeUnit.MINUTES);
+            redisTemplate.opsForValue().set(key, objectMapper.writeValueAsString(value), ttlMinutes, TimeUnit.MINUTES);
         } catch (RuntimeException ex) {
             logRedisCacheFailure(operation, ex);
+        } catch (Exception ex) {
+            logRedisCacheFailure(operation, new IllegalStateException("Failed to serialize recommendation cache", ex));
         }
     }
 
@@ -113,22 +122,36 @@ public class RecommendationCacheService {
         }
     }
 
-    private Map<String, Double> toStringDoubleMap(Object value) {
-        if (!(value instanceof Map<?, ?> source)) return null;
+    private Map<String, Double> toStringDoubleMap(String value) {
+        if (value == null || value.isBlank()) return null;
+        Map<String, Double> source;
+        try {
+            source = objectMapper.readValue(value, STRING_DOUBLE_MAP);
+        } catch (Exception ex) {
+            logRedisCacheFailure("parse tag profile", new IllegalStateException("Invalid recommendation cache payload", ex));
+            return null;
+        }
         Map<String, Double> result = new HashMap<>();
-        for (Map.Entry<?, ?> entry : source.entrySet()) {
+        for (Map.Entry<String, Double> entry : source.entrySet()) {
             Double score = toDouble(entry.getValue());
             if (entry.getKey() != null && score != null) {
-                result.put(entry.getKey().toString(), score);
+                result.put(entry.getKey(), score);
             }
         }
         return result;
     }
 
-    private Map<Long, Double> toLongDoubleMap(Object value) {
-        if (!(value instanceof Map<?, ?> source)) return null;
+    private Map<Long, Double> toLongDoubleMap(String value) {
+        if (value == null || value.isBlank()) return null;
+        Map<String, Double> source;
+        try {
+            source = objectMapper.readValue(value, STRING_DOUBLE_MAP);
+        } catch (Exception ex) {
+            logRedisCacheFailure("parse similarity", new IllegalStateException("Invalid recommendation cache payload", ex));
+            return null;
+        }
         Map<Long, Double> result = new HashMap<>();
-        for (Map.Entry<?, ?> entry : source.entrySet()) {
+        for (Map.Entry<String, Double> entry : source.entrySet()) {
             Long id = toLong(entry.getKey());
             Double score = toDouble(entry.getValue());
             if (id != null && score != null) {

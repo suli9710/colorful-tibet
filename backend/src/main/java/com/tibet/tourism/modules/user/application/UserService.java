@@ -52,6 +52,7 @@ public class UserService {
         validatePassword(newPassword);
         user.setPassword(passwordEncoder.encode(newPassword)); // BCrypt哈希
         user.setMustChangePassword(false);
+        user.incrementSessionVersion();
         userRepository.save(user);
     }
 

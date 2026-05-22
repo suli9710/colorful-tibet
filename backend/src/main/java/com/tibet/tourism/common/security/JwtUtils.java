@@ -29,6 +29,7 @@ public class JwtUtils {
             "dev-only-jwt-secret-change-me-before-any-shared-deployment-2026";
     private static final String DEV_SECRET_MARKER = "dev-only";
     private static final String CHANGE_ME_MARKER = "change-me";
+    private static final String SESSION_VERSION_CLAIM = "sv";
 
     @Value("${jwt.secret}")
     private String jwtSecret;
@@ -79,10 +80,15 @@ public class JwtUtils {
     }
 
     public String generateJwtToken(Authentication authentication) {
+        return generateJwtToken(authentication, 0L);
+    }
+
+    public String generateJwtToken(Authentication authentication, long sessionVersion) {
         UserDetails userPrincipal = (UserDetails) authentication.getPrincipal();
 
         return Jwts.builder()
                 .subject(userPrincipal.getUsername())
+                .claim(SESSION_VERSION_CLAIM, Math.max(0L, sessionVersion))
                 .id(UUID.randomUUID().toString())
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + jwtExpirationMs))
@@ -96,6 +102,21 @@ public class JwtUtils {
 
     public Date getExpirationDateFromJwtToken(String token) {
         return parseClaims(token).getPayload().getExpiration();
+    }
+
+    public long getSessionVersionFromJwtToken(String token) {
+        Object value = parseClaims(token).getPayload().get(SESSION_VERSION_CLAIM);
+        if (value instanceof Number number) {
+            return Math.max(0L, number.longValue());
+        }
+        if (value instanceof String text) {
+            try {
+                return Math.max(0L, Long.parseLong(text));
+            } catch (NumberFormatException ex) {
+                return 0L;
+            }
+        }
+        return 0L;
     }
 
     public boolean validateJwtToken(String authToken) {

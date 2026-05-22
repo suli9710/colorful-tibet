@@ -5,13 +5,12 @@ import java.security.MessageDigest;
 import java.util.HexFormat;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
-import java.util.Map;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -26,7 +25,7 @@ public class LoginAttemptService {
     private static final long MAX_LOCK_SECONDS = 7 * 24 * 60 * 60;
     private static final int MAX_INMEMORY_ENTRIES = 10_000;
 
-    private final RedisTemplate<String, Object> redisTemplate;
+    private final StringRedisTemplate redisTemplate;
     private final ConcurrentHashMap<String, AttemptRecord> memory = new ConcurrentHashMap<>();
 
     @Value("${app.security.brute-force.enabled:true}")
@@ -53,7 +52,7 @@ public class LoginAttemptService {
     private final Set<String> exemptUsernames;
 
     public LoginAttemptService(
-            ObjectProvider<RedisTemplate<String, Object>> redisTemplateProvider,
+            ObjectProvider<StringRedisTemplate> redisTemplateProvider,
             @Value("${app.security.brute-force.exempt-usernames:}") String exemptUsernamesConfig) {
         this.redisTemplate = redisTemplateProvider.getIfAvailable();
         Set<String> exempt = new java.util.HashSet<>();
@@ -220,18 +219,17 @@ public class LoginAttemptService {
     private AttemptRecord getRecord(String key) {
         if (redisEnabled && redisTemplate != null) {
             try {
-                Object value = redisTemplate.opsForValue().get(REDIS_PREFIX + key);
+                String value = redisTemplate.opsForValue().get(REDIS_PREFIX + key);
                 if (value == null) {
                     memory.remove(key);
                     return null;
                 }
 
-                AttemptRecord redisRecord = toAttemptRecord(value);
+                AttemptRecord redisRecord = fromRedisValue(value);
                 if (redisRecord != null) {
                     return mergeMaxFailures(redisRecord, memory.get(key));
                 }
-                logger.debug("Ignoring unreadable brute-force Redis payload for key={}, type={}",
-                        key, value.getClass().getName());
+                logger.debug("Ignoring unreadable brute-force Redis payload for key={}", key);
             } catch (Exception e) {
                 logger.debug("Redis unavailable for brute-force check; falling back to in-memory: {}", e.getMessage());
             }
@@ -242,9 +240,9 @@ public class LoginAttemptService {
     private AttemptRecord readFromRedis(String key) {
         if (redisEnabled && redisTemplate != null) {
             try {
-                Object value = redisTemplate.opsForValue().get(REDIS_PREFIX + key);
+                String value = redisTemplate.opsForValue().get(REDIS_PREFIX + key);
                 if (value != null) {
-                    return toAttemptRecord(value);
+                    return fromRedisValue(value);
                 }
             } catch (Exception e) {
                 logger.debug("Redis read failed for brute-force key={}: {}", key, e.getMessage());
@@ -376,21 +374,6 @@ public class LoginAttemptService {
             return LOCK_PROGRESSION[excess];
         }
         return LOCK_PROGRESSION[LOCK_PROGRESSION.length - 1];
-    }
-
-    private AttemptRecord toAttemptRecord(Object value) {
-        if (value instanceof AttemptRecord record) {
-            return record;
-        }
-        if (value instanceof String text) {
-            return fromRedisValue(text);
-        }
-        if (value instanceof Map<?, ?> source) {
-            Integer failures = toInteger(source.get("failures"));
-            Long lastFailureAt = toLong(source.get("lastFailureAt"));
-            return newAttemptRecord(failures, lastFailureAt);
-        }
-        return null;
     }
 
     private AttemptRecord fromRedisValue(String value) {

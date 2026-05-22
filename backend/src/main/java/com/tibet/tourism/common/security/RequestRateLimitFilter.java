@@ -19,7 +19,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.core.annotation.Order;
 import org.springframework.core.Ordered;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -45,11 +45,11 @@ public class RequestRateLimitFilter extends OncePerRequestFilter {
             Long.class);
 
     private final Map<String, RateWindow> windows = new ConcurrentHashMap<>();
-    private final RedisTemplate<String, Object> redisTemplate;
+    private final StringRedisTemplate redisTemplate;
     private final TrustedProxyIpResolver trustedProxyIpResolver;
     private final AtomicLong lastCleanupAt = new AtomicLong(0);
 
-    public RequestRateLimitFilter(ObjectProvider<RedisTemplate<String, Object>> redisTemplateProvider,
+    public RequestRateLimitFilter(ObjectProvider<StringRedisTemplate> redisTemplateProvider,
                                   TrustedProxyIpResolver trustedProxyIpResolver) {
         this.redisTemplate = redisTemplateProvider.getIfAvailable();
         this.trustedProxyIpResolver = trustedProxyIpResolver;

@@ -25,6 +25,8 @@ app:
     public-docs-enabled: false
     require-strong-secrets: false
     csrf-signing-secret: test-csrf-signing-secret-for-unit-tests-only-1234567890-abcdef-abcdef-abcdef
+    pii-keys: kid-test:MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
+    pii-active-kid: kid-test
     pii-encryption-key: test-pii-encryption-key-for-unit-tests-only-1234567890-abcdef-abcdef
     rate-limit:
       redis-enabled: false

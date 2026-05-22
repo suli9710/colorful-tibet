@@ -1,6 +1,5 @@
 package com.tibet.tourism.common.security;
 import com.tibet.tourism.modules.user.domain.User;
-import com.tibet.tourism.modules.user.infra.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Optional;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -12,16 +11,16 @@ import org.springframework.web.util.WebUtils;
 public class JwtAuthSupport {
 
     private final JwtUtils jwtUtils;
-    private final UserRepository userRepository;
     private final TokenRevocationService tokenRevocationService;
+    private final UserSessionVersionService userSessionVersionService;
 
     public JwtAuthSupport(
             JwtUtils jwtUtils,
-            UserRepository userRepository,
-            TokenRevocationService tokenRevocationService) {
+            TokenRevocationService tokenRevocationService,
+            UserSessionVersionService userSessionVersionService) {
         this.jwtUtils = jwtUtils;
-        this.userRepository = userRepository;
         this.tokenRevocationService = tokenRevocationService;
+        this.userSessionVersionService = userSessionVersionService;
     }
 
     public User resolveCurrentUser(HttpServletRequest request) {
@@ -35,9 +34,8 @@ public class JwtAuthSupport {
         if (tokenRevocationService.isRevoked(token)) {
             throw new IllegalStateException("Revoked JWT token");
         }
-        String username = jwtUtils.getUserNameFromJwtToken(token);
-        return userRepository.findByUsername(username)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+        return userSessionVersionService.resolveCurrentUser(token)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found or session is stale"));
     }
 
     public Long resolveCurrentUserId(HttpServletRequest request) {
@@ -55,8 +53,7 @@ public class JwtAuthSupport {
         if (tokenRevocationService.isRevoked(token)) {
             return Optional.empty();
         }
-        String username = jwtUtils.getUserNameFromJwtToken(token);
-        return userRepository.findByUsername(username);
+        return userSessionVersionService.resolveCurrentUser(token);
     }
 
     public String resolveToken(HttpServletRequest request) {
