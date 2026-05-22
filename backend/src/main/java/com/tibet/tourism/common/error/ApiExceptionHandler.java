@@ -1,5 +1,6 @@
 package com.tibet.tourism.common.error;
 import jakarta.validation.ConstraintViolationException;
+import java.util.Locale;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import org.slf4j.Logger;
@@ -7,12 +8,14 @@ import org.slf4j.LoggerFactory;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 @RestControllerAdvice
@@ -41,6 +44,11 @@ public class ApiExceptionHandler {
     @ExceptionHandler(MissingServletRequestParameterException.class)
     public ResponseEntity<Map<String, String>> handleMissingParameter(MissingServletRequestParameterException exception) {
         return ResponseEntity.badRequest().body(Map.of("error", "缺少必要参数: " + exception.getParameterName()));
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<Map<String, String>> handleUnreadableMessage(HttpMessageNotReadableException exception) {
+        return ResponseEntity.badRequest().body(Map.of("error", "请求体格式不正确"));
     }
 
     @ExceptionHandler(AuthenticationRequiredException.class)
@@ -98,9 +106,57 @@ public class ApiExceptionHandler {
                 .body(Map.of("error", "数据已被其他操作修改，请刷新后重试"));
     }
 
+    @ExceptionHandler(AsyncRequestNotUsableException.class)
+    public void handleAsyncRequestNotUsable(AsyncRequestNotUsableException exception) {
+        logClientDisconnect(exception);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, String>> handleUnexpected(Exception exception) {
+        if (isClientDisconnect(exception)) {
+            logClientDisconnect(exception);
+            return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+        }
         logger.error("Unhandled API exception", exception);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "服务器处理失败，请稍后重试"));
+    }
+
+    static boolean isClientDisconnect(Throwable throwable) {
+        Throwable current = throwable;
+        while (current != null) {
+            String className = current.getClass().getName();
+            if ("org.apache.catalina.connector.ClientAbortException".equals(className)) {
+                return true;
+            }
+
+            String message = current.getMessage();
+            if (message != null) {
+                String normalized = message.toLowerCase(Locale.ROOT);
+                if (normalized.contains("broken pipe")
+                        || normalized.contains("connection reset")
+                        || normalized.contains("clientabortexception")
+                        || normalized.contains("client aborted")) {
+                    return true;
+                }
+            }
+            current = current.getCause();
+        }
+        return false;
+    }
+
+    private void logClientDisconnect(Throwable throwable) {
+        if (logger.isDebugEnabled()) {
+            logger.debug("Client disconnected before API response completed: {}", rootCauseMessage(throwable));
+        }
+    }
+
+    private static String rootCauseMessage(Throwable throwable) {
+        Throwable current = throwable;
+        Throwable root = throwable;
+        while (current != null) {
+            root = current;
+            current = current.getCause();
+        }
+        return root == null ? "" : root.getMessage();
     }
 }
