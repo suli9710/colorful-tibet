@@ -1,14 +1,14 @@
 <template>
-  <div class="min-h-screen bg-stone-50 py-12 pt-24">
+  <div class="min-h-screen bg-stone-50 py-8 pt-24 sm:py-12">
     <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
       <motion.div
-        class="text-center mb-12"
+        class="text-center mb-8 sm:mb-12"
         :initial="revealInitial"
         :animate="revealInView"
         :transition="revealTransition"
       >
-        <h1 class="text-4xl font-bold text-stone-800 mb-4">{{ t('favorites.title') }}</h1>
-        <p class="text-lg text-stone-600">{{ t('favorites.subtitle') }}</p>
+        <h1 class="text-3xl font-bold text-stone-800 mb-3 sm:text-4xl sm:mb-4">{{ t('favorites.title') }}</h1>
+        <p class="text-base text-stone-600 sm:text-lg">{{ t('favorites.subtitle') }}</p>
       </motion.div>
 
       <div v-if="loading" class="flex justify-center h-64">
@@ -26,18 +26,18 @@
         <motion.div
           v-for="(fav, index) in favorites"
           :key="fav.id"
-          class="bg-white rounded-lg shadow p-6 hover:shadow-md transition-shadow"
+          class="bg-white rounded-lg shadow p-4 hover:shadow-md transition-shadow sm:p-6"
           :initial="cardInitial"
           :whileInView="cardInView"
           :inViewOptions="inViewOnce"
           :transition="cardTransition(index)"
           :whileHover="{ y: -2, scale: 1.01 }"
         >
-          <div class="flex items-start justify-between">
-            <div class="flex-1">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0 flex-1">
               <h3 class="text-lg font-bold text-stone-800">{{ fav.route?.name || t('favorites.unknownRoute') }}</h3>
-              <p class="text-sm text-stone-500 mt-1">{{ fav.route?.description?.substring(0, 100) }}...</p>
-              <div class="flex items-center gap-4 mt-3 text-sm text-stone-600">
+              <p class="break-words text-sm text-stone-500 mt-1">{{ fav.route?.description?.substring(0, 100) }}...</p>
+              <div class="flex flex-wrap items-center gap-2 mt-3 text-sm text-stone-600 sm:gap-4">
                 <span>{{ t('admin.daysValue', { count: fav.route?.days || 0 }) }}</span>
                 <span class="text-red-600 font-semibold">¥{{ fav.route?.price }}</span>
                 <span :class="{
@@ -50,7 +50,7 @@
             </div>
             <motion.button
               @click="removeFavorite(fav.route?.id)"
-              class="text-red-500 hover:text-red-700"
+              class="shrink-0 text-red-500 hover:text-red-700"
               :title="t('favorites.remove')"
               :whileHover="{ scale: 1.2 }"
               :whilePress="{ scale: 0.9 }"
@@ -63,7 +63,7 @@
         </motion.div>
       </div>
 
-      <div v-if="totalPages > 1" class="flex justify-center mt-8 gap-2">
+      <div v-if="totalPages > 1" class="flex justify-center mt-8 gap-2 overflow-x-auto pb-1">
         <button v-for="page in totalPages" :key="page" @click="fetchFavorites(page - 1)"
           :class="currentPage === page - 1 ? 'bg-red-600 text-white' : 'bg-white text-stone-600 hover:bg-stone-100'"
           class="px-4 py-2 rounded-lg border transition-colors">{{ page }}</button>

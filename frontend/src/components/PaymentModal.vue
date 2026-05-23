@@ -16,7 +16,7 @@
       <div class="px-6 py-6 flex flex-col items-center">
         <div class="bg-gray-50 rounded-xl p-3 border border-gray-100">
           <img
-            src="/images/payment-qr.jpg"
+            :src="paymentQrSrc"
             :alt="$t('payment.qrAlt')"
             class="w-56 h-56 object-contain rounded-lg"
           />
@@ -84,6 +84,7 @@ const emit = defineEmits<{
   paid: [recaptchaToken?: string]
 }>()
 
+const paymentQrSrc = '/images/payment-qr.jpg'
 const captchaContainer = ref<HTMLElement | null>(null)
 const captchaToken = ref('')
 const captchaError = ref(false)

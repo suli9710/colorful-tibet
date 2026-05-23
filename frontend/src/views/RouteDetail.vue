@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-tibet-white py-24">
+  <div class="min-h-screen bg-tibet-white py-12 pt-24 sm:py-24">
     <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
       <div v-if="loading" class="text-center py-12">
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-tibet-gold mx-auto"></div>
@@ -11,17 +11,17 @@
         :transition="revealTransition"
       >
         <!-- Header -->
-        <div class="mb-8">
+        <div class="mb-6 sm:mb-8">
           <button @click="router.back()" class="text-gray-500 hover:text-gray-900 mb-4 flex items-center">
             ← {{ t('routeDetail.backToList') }}
           </button>
-          <h1 class="text-3xl font-bold text-gray-900 mb-4">{{ routeData.title }}</h1>
-          <div class="flex items-center justify-between text-sm text-gray-500">
-            <div class="flex items-center gap-4">
+          <h1 class="break-words text-2xl font-bold text-gray-900 mb-4 sm:text-3xl">{{ routeData.title }}</h1>
+          <div class="flex flex-col gap-3 text-sm text-gray-500 sm:flex-row sm:items-center sm:justify-between">
+            <div class="flex flex-wrap items-center gap-3 sm:gap-4">
               <span>{{ t('routeDetail.author') }}：{{ routeAuthorName(routeData) }}</span>
               <span>{{ t('routeDetail.publishedAt') }}：{{ formatDate(routeData.createdAt) }}</span>
             </div>
-            <div class="flex gap-2">
+            <div class="flex flex-wrap gap-2">
               <span class="px-2 py-1 bg-blue-50 text-blue-600 rounded-lg">{{ routeData.days }}{{ t('routeDetail.days') }}</span>
               <span class="px-2 py-1 bg-gray-100 rounded-lg">{{ routeData.budget }}</span>
               <span class="px-2 py-1 bg-gray-100 rounded-lg">{{ routeData.preference }}</span>
@@ -30,14 +30,14 @@
         </div>
 
         <!-- Content -->
-        <div class="glass-card rounded-3xl p-8 mb-8">
-          <div class="prose prose-lg max-w-none prose-headings:text-tibet-dark prose-p:text-tibet-brown/80 prose-strong:text-tibet-gold">
+        <div class="glass-card rounded-2xl p-4 mb-6 sm:rounded-3xl sm:p-8 sm:mb-8">
+          <div class="prose max-w-none overflow-x-auto prose-headings:text-tibet-dark prose-p:text-tibet-brown/80 prose-strong:text-tibet-gold sm:prose-lg">
             <div v-html="renderedContent"></div>
           </div>
         </div>
 
         <!-- Actions -->
-        <div class="flex justify-center gap-6 mb-12">
+        <div class="flex justify-center gap-3 mb-8 sm:gap-6 sm:mb-12">
           <button 
             @click="toggleLike" 
             class="flex items-center gap-2 px-6 py-3 rounded-full transition-all duration-300 shadow-sm hover:shadow-md"
@@ -54,7 +54,7 @@
         </div>
 
         <!-- Comments -->
-        <div class="glass-card rounded-3xl p-8">
+        <div class="glass-card rounded-2xl p-4 sm:rounded-3xl sm:p-8">
           <h3 class="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
             {{ t('routeDetail.comments') }} <span class="text-sm font-normal text-gray-500">({{ comments.length }})</span>
           </h3>
@@ -81,9 +81,9 @@
           <!-- Comment List -->
           <div class="space-y-6">
             <div v-for="comment in comments" :key="comment.id" class="border-b border-tibet-gold/20 last:border-0 pb-6 last:pb-0">
-              <div class="flex justify-between items-start mb-2">
+              <div class="flex flex-col gap-1 mb-2 sm:flex-row sm:items-start sm:justify-between">
                 <span class="font-medium text-gray-900">{{ comment.user?.username || t('routeDetail.anonymous') }}</span>
-                <div class="flex items-center gap-3">
+                <div class="flex flex-wrap items-center gap-3">
                   <span class="text-xs text-gray-500">{{ formatDate(comment.createdAt) }}</span>
                   <button
                     v-if="isOwnComment(comment)"

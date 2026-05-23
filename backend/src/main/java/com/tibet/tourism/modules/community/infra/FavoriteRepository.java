@@ -14,5 +14,6 @@ public interface FavoriteRepository extends JpaRepository<Favorite, Long> {
     Optional<Favorite> findByUserAndRoute(User user, TravelRoute route);
     boolean existsByUserAndRoute(User user, TravelRoute route);
     void deleteByUserAndRoute(User user, TravelRoute route);
+    void deleteByUser(User user);
     long countByRoute(TravelRoute route);
 }

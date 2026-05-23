@@ -243,6 +243,30 @@
             </div>
           </div>
 
+          <div v-if="priceBatchJob" class="border-b border-emerald-100 bg-emerald-50/60 px-4 py-4 sm:px-6">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div class="min-w-0">
+                <p class="text-sm font-semibold text-emerald-800">爬虫更新进度</p>
+                <p class="mt-1 truncate text-xs text-emerald-700/80">
+                  {{ priceBatchStatusText }}
+                </p>
+              </div>
+              <div class="text-sm font-bold text-emerald-800">{{ priceBatchProgressPercent }}%</div>
+            </div>
+            <div class="mt-3 h-2 overflow-hidden rounded-full bg-white">
+              <div
+                class="h-full rounded-full bg-emerald-500 transition-all duration-500"
+                :style="{ width: `${priceBatchProgressPercent}%` }"
+              ></div>
+            </div>
+            <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-emerald-700/80">
+              <span>已处理 {{ priceBatchJob.processed || 0 }}/{{ priceBatchJob.total || 0 }}</span>
+              <span>成功 {{ priceBatchJob.success || 0 }}</span>
+              <span>失败 {{ priceBatchJob.failed || 0 }}</span>
+              <span>跳过 {{ priceBatchJob.skipped || 0 }}</span>
+            </div>
+          </div>
+
           <template v-if="showSpots">
             <!-- Loading State -->
             <div v-if="loadingSpots" class="p-12 text-center">
@@ -372,7 +396,7 @@
                   <button v-if="u.locked" @click="unlockUser(u)" class="text-green-600 hover:text-green-900">{{ t('admin.unlock') }}</button>
                   <button v-if="u.role !== 'ADMIN' && !u.locked" @click="updateRole(u.id, 'ADMIN')" class="text-blue-600 hover:text-blue-900">{{ t('admin.setAdmin') }}</button>
                   <button v-else-if="u.username !== 'lzh' && !u.locked" @click="updateRole(u.id, 'USER')" class="text-orange-600 hover:text-orange-900">{{ t('admin.unsetAdmin') }}</button>
-                  <button v-if="isSuperAdmin && u.username !== 'lzh'" @click="deleteUser(u)" class="text-red-600 hover:text-red-900">{{ t('common.delete') }}</button>
+                  <button v-if="canDeleteUser(u)" @click="deleteUser(u)" class="text-red-600 hover:text-red-900">{{ t('common.delete') }}</button>
                   <span v-if="u.username === 'lzh'" class="text-gray-400">{{ t('admin.notOperable') }}</span>
                 </div>
               </div>
@@ -422,7 +446,7 @@
                     <button v-if="u.locked" @click="unlockUser(u)" class="text-green-600 hover:text-green-900 mr-4">{{ t('admin.unlock') }}</button>
                     <button v-if="u.role !== 'ADMIN' && !u.locked" @click="updateRole(u.id, 'ADMIN')" class="text-blue-600 hover:text-blue-900 mr-4">{{ t('admin.setAdmin') }}</button>
                     <button v-else-if="u.username !== 'lzh' && !u.locked" @click="updateRole(u.id, 'USER')" class="text-orange-600 hover:text-orange-900 mr-4">{{ t('admin.unsetAdmin') }}</button>
-                    <button v-if="isSuperAdmin && u.username !== 'lzh'" @click="deleteUser(u)" class="text-red-600 hover:text-red-900">{{ t('common.delete') }}</button>
+                    <button v-if="canDeleteUser(u)" @click="deleteUser(u)" class="text-red-600 hover:text-red-900">{{ t('common.delete') }}</button>
                     <span v-if="u.username === 'lzh'" class="text-gray-400 cursor-not-allowed">{{ t('admin.notOperable') }}</span>
                     </td>
                   </tr>
@@ -763,7 +787,7 @@
           @close="closeRouteModal"
         >
             <h2 class="text-xl font-bold mb-4">{{ t('admin.editOrCreateRoute', { mode: editingRoute.id ? t('common.edit') : t('common.create') }) }}</h2>
-            <div class="grid grid-cols-2 gap-3">
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div><label class="block text-sm font-medium mb-1">{{ t('admin.titleLabel') }} *</label><input v-model="routeForm.title" class="w-full border rounded px-3 py-2"></div>
               <div><label class="block text-sm font-medium mb-1">{{ t('admin.days') }}</label><input v-model.number="routeForm.days" type="number" class="w-full border rounded px-3 py-2"></div>
               <div><label class="block text-sm font-medium mb-1">{{ t('admin.budget') }}</label>
@@ -787,9 +811,9 @@
               </div>
               <div><label class="block text-sm font-medium mb-1">{{ t('admin.temperature') }}</label><input v-model="routeForm.temperature" class="w-full border rounded px-3 py-2" :placeholder="t('admin.temperaturePlaceholder')"></div>
               <div><label class="block text-sm font-medium mb-1">{{ t('admin.geography') }}</label><input v-model="routeForm.geography" class="w-full border rounded px-3 py-2" :placeholder="t('admin.geographyPlaceholder')"></div>
-              <div class="col-span-2"><label class="block text-sm font-medium mb-1">{{ t('admin.content') }}</label><textarea v-model="routeForm.content" rows="6" class="w-full border rounded px-3 py-2"></textarea></div>
+              <div class="sm:col-span-2"><label class="block text-sm font-medium mb-1">{{ t('admin.content') }}</label><textarea v-model="routeForm.content" rows="6" class="w-full border rounded px-3 py-2"></textarea></div>
             </div>
-            <div class="flex space-x-3 mt-6">
+            <div class="mt-6 flex flex-col gap-3 sm:flex-row">
               <button @click="saveRoute" class="flex-1 bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600">{{ t('common.save') }}</button>
               <button @click="closeRouteModal" class="flex-1 bg-stone-200 py-2 rounded-lg">{{ t('common.cancel') }}</button>
             </div>
@@ -803,19 +827,19 @@
           @close="closeHotelModal"
         >
             <h2 class="text-xl font-bold mb-4">{{ t('admin.editOrCreateHotel', { mode: editingHotel.id ? t('common.edit') : t('common.create') }) }}</h2>
-            <div class="grid grid-cols-2 gap-3">
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div><label class="block text-sm font-medium mb-1">{{ t('admin.name') }} *</label><input v-model="hotelForm.name" class="w-full border rounded px-3 py-2"></div>
               <div><label class="block text-sm font-medium mb-1">{{ t('admin.location') }}</label><input v-model="hotelForm.location" class="w-full border rounded px-3 py-2"></div>
               <div><label class="block text-sm font-medium mb-1">{{ t('admin.phone') }}</label><input v-model="hotelForm.phone" class="w-full border rounded px-3 py-2"></div>
               <div><label class="block text-sm font-medium mb-1">{{ t('admin.priceRange') }}</label><input v-model="hotelForm.priceRange" class="w-full border rounded px-3 py-2" placeholder="¥500 - ¥1500"></div>
               <div><label class="block text-sm font-medium mb-1">{{ t('admin.rating') }}</label><input v-model.number="hotelForm.rating" type="number" step="0.1" class="w-full border rounded px-3 py-2"></div>
-              <div class="col-span-2">
+              <div class="sm:col-span-2">
                 <label class="block text-sm font-medium mb-1">{{ t('admin.image') }}</label>
                 <ImageUploadField v-model="hotelForm.imageUrl" :upload-endpoint="endpoints.admin.uploadImage" />
               </div>
-              <div class="col-span-2"><label class="block text-sm font-medium mb-1">{{ t('admin.facilities') }}</label><input v-model="hotelForm.facilities" class="w-full border rounded px-3 py-2" :placeholder="t('admin.facilitiesPlaceholder')"></div>
+              <div class="sm:col-span-2"><label class="block text-sm font-medium mb-1">{{ t('admin.facilities') }}</label><input v-model="hotelForm.facilities" class="w-full border rounded px-3 py-2" :placeholder="t('admin.facilitiesPlaceholder')"></div>
             </div>
-            <div class="flex space-x-3 mt-6">
+            <div class="mt-6 flex flex-col gap-3 sm:flex-row">
               <button @click="saveHotel" class="flex-1 bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600">{{ t('common.save') }}</button>
               <button @click="closeHotelModal" class="flex-1 bg-stone-200 py-2 rounded-lg">{{ t('common.cancel') }}</button>
             </div>
@@ -830,7 +854,7 @@
       panel-class="max-w-3xl rounded-2xl bg-white p-4 sm:p-8 max-h-[90dvh] overflow-y-auto"
       @close="closeNewsModal"
     >
-        <h2 class="text-2xl font-bold mb-6 text-stone-800">{{ editingNews.id ? t('admin.editNewsTitle') : t('admin.createNewsTitle') }}</h2>
+        <h2 class="text-xl font-bold mb-5 text-stone-800 sm:text-2xl sm:mb-6">{{ editingNews.id ? t('admin.editNewsTitle') : t('admin.createNewsTitle') }}</h2>
         
         <div class="mb-6">
           <label class="block text-sm font-medium text-stone-700 mb-2">{{ t('admin.titleLabel') }} <span class="text-red-500">*</span></label>
@@ -870,7 +894,7 @@
                  placeholder="0">
         </div>
 
-        <div class="flex space-x-4">
+        <div class="flex flex-col gap-3 sm:flex-row sm:space-x-4">
           <button @click="saveNews" :disabled="updatingNews || !newsForm.title || !newsForm.content || !newsForm.category"
                   class="flex-1 bg-blue-500 text-white py-3 rounded-lg hover:bg-blue-600 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed">
             {{ updatingNews ? t('admin.saving') : (editingNews.id ? t('admin.saveEditing') : t('admin.createNewsTitle')) }}
@@ -889,7 +913,7 @@
       panel-class="max-w-2xl rounded-2xl bg-white p-4 sm:p-8 max-h-[88dvh] overflow-y-auto"
       @close="closeEditModal"
     >
-        <h2 class="text-2xl font-bold mb-6 text-stone-800">{{ t('admin.editSpotInfo') }}</h2>
+        <h2 class="text-xl font-bold mb-5 text-stone-800 sm:text-2xl sm:mb-6">{{ t('admin.editSpotInfo') }}</h2>
         
         <div class="mb-6">
           <label class="block text-sm font-medium text-stone-700 mb-2">{{ t('admin.spotName') }}</label>
@@ -898,7 +922,7 @@
 
         <div class="mb-6">
           <label class="block text-sm font-medium text-stone-700 mb-2">{{ t('admin.currentCover') }}</label>
-          <div class="relative h-64 bg-gray-200 rounded-lg overflow-hidden mb-4">
+          <div class="relative h-44 bg-gray-200 rounded-lg overflow-hidden mb-4 sm:h-64">
             <img v-if="editingSpot.imageUrl" :src="editingSpot.imageUrl" :alt="editingSpot.name" class="w-full h-full object-cover">
             <div v-else class="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-500 to-purple-600 text-white text-6xl font-bold">
               {{ editingSpot.name?.charAt(0) }}
@@ -936,7 +960,7 @@
           <p class="text-xs text-stone-500 mt-2">{{ t('admin.currentWordCount', { count: newDescription.length }) }}</p>
         </div>
 
-        <div class="flex space-x-4">
+        <div class="flex flex-col gap-3 sm:flex-row sm:space-x-4">
           <button @click="updateSpotImage" :disabled="updating"
                   class="flex-1 bg-blue-500 text-white py-3 rounded-lg hover:bg-blue-600 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed">
             {{ updating ? t('admin.saving') : t('admin.saveEditing') }}
@@ -1044,6 +1068,7 @@ const formatDateTime = (dateStr: string) => {
   if (!dateStr) return '-'
   const date = new Date(dateStr)
   return date.toLocaleString(activeDateLocale.value, {
+    timeZone: 'Asia/Shanghai',
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -1141,6 +1166,7 @@ const spots = ref<any[]>([])
 const loadingSpots = ref(false)
 const fetchingPriceId = ref<number | null>(null)
 const batchFetching = ref(false)
+const priceBatchJob = ref<any | null>(null)
 const spotsError = ref('')
 const showSpots = ref(false)
 const showAllSpots = ref(false)
@@ -1170,6 +1196,22 @@ const updatingNews = ref(false)
 // Computed property to control displayed spots
 const displayedSpots = computed(() => {
   return showAllSpots.value ? spots.value : spots.value.slice(0, 6)
+})
+
+const priceBatchProgressPercent = computed(() => {
+  const job = priceBatchJob.value
+  if (!job) return 0
+  if (job.total <= 0) return job.status === 'COMPLETED' ? 100 : 0
+  return Math.min(100, Math.round(((job.processed || 0) / job.total) * 100))
+})
+
+const priceBatchStatusText = computed(() => {
+  const job = priceBatchJob.value
+  if (!job) return ''
+  if (job.status === 'COMPLETED') return '爬虫价格更新已完成'
+  if (job.status === 'FAILED') return job.errorMessage || t('admin.batchFetchFailed')
+  if (job.currentSpot) return `正在更新：${job.currentSpot}`
+  return '正在准备爬虫任务...'
 })
 
 const adminPageParams = { page: 0, size: 100 }
@@ -1328,10 +1370,25 @@ const fetchSpotPrice = async (spot: any) => {
 const batchFetchPrices = async () => {
   if (!confirm(t('admin.confirmBatchFetch'))) return
   batchFetching.value = true
+  priceBatchJob.value = null
   try {
-    const response = await api.post(endpoints.prices.batchUpdate + '?force=true')
-    const data = response.data
-    alert(t('admin.batchFetchDone', { updated: data.successCount || 0, failed: data.failCount || 0 }))
+    const response = await api.post(endpoints.prices.batchUpdateJob + '?force=true')
+    priceBatchJob.value = response.data
+
+    while (priceBatchJob.value?.jobId && priceBatchJob.value.status === 'RUNNING') {
+      await new Promise(resolve => window.setTimeout(resolve, 1200))
+      const statusResponse = await api.get(endpoints.prices.batchUpdateJobStatus(priceBatchJob.value.jobId))
+      priceBatchJob.value = statusResponse.data
+    }
+
+    if (priceBatchJob.value?.status === 'FAILED') {
+      throw new Error(priceBatchJob.value.errorMessage || 'Batch price update failed')
+    }
+
+    alert(t('admin.batchFetchDone', {
+      updated: priceBatchJob.value?.success || 0,
+      failed: priceBatchJob.value?.failed || 0
+    }))
     await fetchSpots()
   } catch (error: any) {
     console.error('Failed to batch fetch prices:', error)
@@ -1606,9 +1663,11 @@ const getCategoryClass = (category: string) => {
 }
 
 // 判断当前用户是否是超级管理员（lzh）
-const isSuperAdmin = computed(() => {
-  return currentUser.value?.username === 'lzh'
-})
+const canDeleteUser = (user: any) => {
+  return user?.role === 'USER'
+    && user?.username !== 'lzh'
+    && user?.username !== currentUser.value?.username
+}
 
 // 加载当前用户信息
 const loadCurrentUser = async () => {

@@ -411,14 +411,14 @@ const getAvatarUrl = () => {
 <template>
   <div class="min-h-screen bg-tibet-white">
     <motion.main
-      class="max-w-7xl mx-auto px-4 py-8"
+      class="max-w-7xl mx-auto px-3 py-6 sm:px-4 sm:py-8"
       :initial="revealInitial"
       :animate="revealInView"
       :transition="revealTransition"
     >
       <!-- User Info Card -->
       <motion.section
-        class="glass-card rounded-3xl p-8 mb-8 shadow-xl border border-white/50"
+        class="glass-card rounded-2xl p-5 mb-6 shadow-xl border border-white/50 sm:rounded-3xl sm:p-8 sm:mb-8"
         :initial="cardInitial"
         :animate="cardInView"
         :transition="cardTransition(0, 0.04)"
@@ -427,7 +427,7 @@ const getAvatarUrl = () => {
           <div class="relative group">
             <motion.div
               @click="handleAvatarClick"
-              class="w-24 h-24 rounded-full flex items-center justify-center text-3xl text-white font-bold shadow-lg cursor-pointer overflow-hidden transition-all hover:ring-4 hover:ring-tibet-gold/60/50"
+              class="w-20 h-20 rounded-full flex items-center justify-center text-2xl text-white font-bold shadow-lg cursor-pointer overflow-hidden transition-all hover:ring-4 hover:ring-tibet-gold/60/50 sm:h-24 sm:w-24 sm:text-3xl"
               :whileHover="{ scale: 1.04, rotate: -1 }"
               :whileTap="{ scale: 0.96 }"
               :class="getAvatarUrl() ? '' : 'bg-gradient-to-br from-blue-500 to-purple-600'"
@@ -459,7 +459,7 @@ const getAvatarUrl = () => {
           </div>
           <div class="flex-1 text-center md:text-left">
             <div class="flex items-center justify-center md:justify-start gap-2 mb-2">
-              <h1 class="text-3xl font-bold text-tibet-dark">
+              <h1 class="min-w-0 break-words text-2xl font-bold text-tibet-dark sm:text-3xl">
                 {{ userInfo?.nickname || userInfo?.username || user?.username }}
               </h1>
               <motion.button
@@ -478,9 +478,9 @@ const getAvatarUrl = () => {
               {{ userInfo?.role === 'ADMIN' ? t('profile.admin') : t('profile.member') }} · 
               {{ t('profile.registeredAt') }} {{ userInfo?.createdAt ? formatDate(userInfo.createdAt) : '' }}
             </p>
-            <div class="flex flex-wrap gap-4 justify-center md:justify-start mb-4">
+            <div class="flex flex-wrap gap-2 justify-center md:justify-start mb-4 sm:gap-4">
               <motion.div
-                class="flex items-center gap-2 px-4 py-2 bg-white/50 rounded-xl"
+                class="flex min-w-[9rem] items-center justify-center gap-2 px-3 py-2 bg-white/50 rounded-xl sm:min-w-0 sm:px-4"
                 :initial="{ opacity: 0, y: 10 }"
                 :animate="{ opacity: 1, y: 0 }"
                 :transition="cardTransition(0, 0.16)"
@@ -494,7 +494,7 @@ const getAvatarUrl = () => {
                 </span>
               </motion.div>
               <motion.div
-                class="flex items-center gap-2 px-4 py-2 bg-white/50 rounded-xl"
+                class="flex min-w-[9rem] items-center justify-center gap-2 px-3 py-2 bg-white/50 rounded-xl sm:min-w-0 sm:px-4"
                 :initial="{ opacity: 0, y: 10 }"
                 :animate="{ opacity: 1, y: 0 }"
                 :transition="cardTransition(1, 0.16)"
@@ -508,7 +508,7 @@ const getAvatarUrl = () => {
                 </span>
               </motion.div>
               <motion.div
-                class="flex items-center gap-2 px-4 py-2 bg-white/50 rounded-xl"
+                class="flex min-w-[9rem] items-center justify-center gap-2 px-3 py-2 bg-white/50 rounded-xl sm:min-w-0 sm:px-4"
                 :initial="{ opacity: 0, y: 10 }"
                 :animate="{ opacity: 1, y: 0 }"
                 :transition="cardTransition(2, 0.16)"
@@ -538,7 +538,7 @@ const getAvatarUrl = () => {
       <MotionModal
         :show="showNicknameModal"
         modal-key="nickname-modal"
-        panel-class="glass rounded-3xl p-8 max-w-md mx-4 border border-white/50"
+        panel-class="glass rounded-3xl p-5 sm:p-8 max-w-md mx-4 border border-white/50"
         backdrop-class="bg-black/50"
         @close="showNicknameModal = false"
       >
@@ -583,7 +583,7 @@ const getAvatarUrl = () => {
       <MotionModal
         :show="showPasswordModal"
         modal-key="password-modal"
-        panel-class="glass rounded-3xl p-8 max-w-md mx-4 border border-white/50"
+        panel-class="glass rounded-3xl p-5 sm:p-8 max-w-md mx-4 border border-white/50"
         backdrop-class="bg-black/50"
         @close="showPasswordModal = false"
       >
@@ -644,18 +644,18 @@ const getAvatarUrl = () => {
 
       <!-- Tabs -->
       <motion.section
-        class="glass-card rounded-2xl p-6 mb-8 shadow-xl border border-white/50"
+        class="glass-card rounded-2xl p-4 mb-8 shadow-xl border border-white/50 sm:p-6"
         :initial="cardInitial"
         :animate="cardInView"
         :transition="cardTransition(1, 0.08)"
       >
         <LayoutGroup>
-        <div class="flex gap-4 border-b border-tibet-gold/25 mb-6 overflow-x-auto">
+        <div class="-mx-4 flex gap-2 overflow-x-auto border-b border-tibet-gold/25 px-4 pb-1 mb-5 sm:mx-0 sm:gap-4 sm:px-0 sm:pb-0 sm:mb-6">
           <motion.button
             v-for="tab in profileTabs"
             :key="tab.id"
             @click="activeTab = tab.id"
-            class="relative px-6 py-3 font-medium whitespace-nowrap transition-colors"
+            class="relative shrink-0 px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors sm:px-6 sm:text-base"
             :class="activeTab === tab.id ? 'text-tibet-gold' : 'text-tibet-brown/70 hover:text-tibet-dark/80'"
             :whileHover="{ y: -1 }"
             :whileTap="{ scale: 0.96 }"
@@ -708,7 +708,7 @@ const getAvatarUrl = () => {
               v-for="(route, index) in myRoutes"
               :key="route.id"
               layout
-              class="glass-card rounded-2xl p-6 hover:shadow-2xl transition-all duration-500 ease-out border border-white/20 group"
+              class="glass-card rounded-2xl p-4 hover:shadow-2xl transition-all duration-500 ease-out border border-white/20 group sm:p-6"
               :initial="cardInitial"
               :animate="cardInView"
               :exit="cardExit"
@@ -718,7 +718,7 @@ const getAvatarUrl = () => {
               <div class="flex justify-between items-start mb-4">
                 <h3 
                   @click="router.push(`/community/${route.id}`)"
-                  class="text-xl font-bold text-gray-900 group-hover:text-tibet-gold transition-colors duration-300 line-clamp-2 flex-1 cursor-pointer"
+                  class="min-w-0 flex-1 text-lg font-bold text-gray-900 group-hover:text-tibet-gold transition-colors duration-300 line-clamp-2 cursor-pointer sm:text-xl"
                 >
                   {{ route.title }}
                 </h3>
@@ -735,14 +735,14 @@ const getAvatarUrl = () => {
                 </motion.button>
               </div>
               
-              <div class="flex gap-2 mb-4 text-sm text-gray-600">
+              <div class="flex flex-wrap gap-2 mb-4 text-sm text-gray-600">
                 <span class="px-3 py-1.5 bg-gray-100 rounded-lg">{{ route.days }}{{ t('profile.days') }}</span>
                 <span class="px-3 py-1.5 bg-gray-100 rounded-lg">{{ route.budget }}</span>
                 <span class="px-3 py-1.5 bg-gray-100 rounded-lg">{{ route.preference }}</span>
               </div>
               
-              <div class="flex justify-between items-center text-sm text-gray-500 pt-4 border-t border-tibet-gold/20">
-                <div class="flex items-center gap-4">
+              <div class="flex flex-col gap-3 text-sm text-gray-500 pt-4 border-t border-tibet-gold/20 sm:flex-row sm:items-center sm:justify-between">
+                <div class="flex flex-wrap items-center gap-3 sm:gap-4">
                   <span class="flex items-center gap-1.5">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -783,27 +783,27 @@ const getAvatarUrl = () => {
               v-for="(booking, index) in bookings"
               :key="booking.id"
               layout
-              class="glass-card rounded-2xl p-6 flex flex-col md:flex-row justify-between items-center transition-all hover:shadow-lg border border-white/20"
+              class="glass-card rounded-2xl p-4 flex flex-col md:flex-row justify-between items-start md:items-center transition-all hover:shadow-lg border border-white/20 sm:p-6"
               :initial="cardInitial"
               :animate="cardInView"
               :exit="cardExit"
               :transition="cardTransition(index)"
               :whileHover="{ y: -3, scale: 1.006 }"
             >
-              <div class="flex items-center space-x-4 mb-4 md:mb-0 w-full md:w-auto">
+              <div class="flex w-full min-w-0 items-start gap-3 mb-4 md:mb-0 md:w-auto sm:items-center sm:gap-4">
                 <div class="h-16 w-16 rounded-xl bg-gray-100 overflow-hidden flex-shrink-0">
                   <img :src="booking.spot?.imageUrl" class="w-full h-full object-cover" alt="">
                 </div>
-                <div>
-                  <h3 class="text-lg font-bold text-gray-900 mb-1">{{ booking.spot?.name }}</h3>
-                  <div class="flex items-center text-gray-500 text-sm space-x-4">
+                <div class="min-w-0">
+                  <h3 class="truncate text-lg font-bold text-gray-900 mb-1">{{ booking.spot?.name }}</h3>
+                  <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-gray-500 text-sm">
                     <span>{{ t('profile.visitDate') }} {{ booking.visitDate }}</span>
                     <span>🎫 {{ booking.ticketCount }}{{ t('profile.tickets') }}</span>
                   </div>
                 </div>
               </div>
               
-              <div class="flex items-center space-x-6 w-full md:w-auto justify-between md:justify-end">
+              <div class="flex w-full flex-wrap items-center justify-between gap-3 md:w-auto md:justify-end md:gap-6">
                 <div class="text-right">
                   <div class="text-xl font-bold text-tibet-gold mb-1">¥{{ booking.totalPrice }}</div>
                   <span :class="{
@@ -852,31 +852,31 @@ const getAvatarUrl = () => {
               v-for="(booking, index) in hotelBookings"
               :key="booking.id"
               layout
-              class="glass-card rounded-2xl p-6 flex flex-col md:flex-row justify-between items-center transition-all hover:shadow-lg border border-white/20"
+              class="glass-card rounded-2xl p-4 flex flex-col md:flex-row justify-between items-start md:items-center transition-all hover:shadow-lg border border-white/20 sm:p-6"
               :initial="cardInitial"
               :animate="cardInView"
               :exit="cardExit"
               :transition="cardTransition(index)"
               :whileHover="{ y: -3, scale: 1.006 }"
             >
-              <div class="flex items-center space-x-4 mb-4 md:mb-0 w-full md:w-auto">
+              <div class="flex w-full min-w-0 items-start gap-3 mb-4 md:mb-0 md:w-auto sm:items-center sm:gap-4">
                 <div class="h-16 w-16 rounded-xl bg-gray-100 overflow-hidden flex-shrink-0">
                   <img :src="resolveHotelBookingImage(booking)" class="w-full h-full object-cover" alt="" @error="applyHotelImageFallback">
                 </div>
-                <div>
-                  <h3 class="text-lg font-bold text-gray-900 mb-1">{{ booking.hotel?.name || '-' }}</h3>
-                  <div class="flex items-center text-gray-500 text-sm space-x-4">
+                <div class="min-w-0">
+                  <h3 class="truncate text-lg font-bold text-gray-900 mb-1">{{ booking.hotel?.name || '-' }}</h3>
+                  <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-gray-500 text-sm">
                     <span>{{ t('profile.room') }} {{ booking.roomName }}</span>
                     <span>{{ t('profile.nights') }} {{ booking.nights }}</span>
                   </div>
-                  <div class="flex items-center text-gray-500 text-sm space-x-4 mt-1">
+                  <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-gray-500 text-sm mt-1">
                     <span>{{ t('profile.checkIn') }} {{ booking.checkInDate }}</span>
                     <span>{{ t('profile.checkOut') }} {{ booking.checkOutDate }}</span>
                   </div>
                 </div>
               </div>
               
-              <div class="flex items-center space-x-6 w-full md:w-auto justify-between md:justify-end">
+              <div class="flex w-full flex-wrap items-center justify-between gap-3 md:w-auto md:justify-end md:gap-6">
                 <div class="text-right">
                   <div class="text-xl font-bold text-tibet-gold mb-1">¥{{ booking.totalPrice }}</div>
                   <span :class="{
@@ -928,7 +928,7 @@ const getAvatarUrl = () => {
                 <motion.div
                   v-for="(comment, index) in spotComments"
                   :key="comment.id"
-                  class="glass-card rounded-2xl p-6 border border-white/20 hover:shadow-lg transition-all"
+                  class="glass-card rounded-2xl p-4 border border-white/20 hover:shadow-lg transition-all sm:p-6"
                   :initial="cardInitial"
                   :animate="cardInView"
                   :exit="cardExit"
@@ -936,8 +936,8 @@ const getAvatarUrl = () => {
                   :whileHover="{ y: -3, scale: 1.006 }"
                 >
                   <div class="flex items-start gap-4">
-                    <div class="flex-1">
-                      <div class="flex items-center gap-2 mb-2">
+                    <div class="min-w-0 flex-1">
+                      <div class="flex flex-wrap items-center gap-2 mb-2">
                         <router-link 
                           :to="`/spots/${comment.spot?.id}`"
                           class="font-bold text-tibet-gold hover:text-tibet-gold/80"
@@ -952,9 +952,9 @@ const getAvatarUrl = () => {
                       </div>
                       <p class="text-gray-700 mb-2">{{ comment.content }}</p>
                       <div v-if="comment.imageUrl" class="mb-2">
-                        <img :src="comment.imageUrl" alt="评论图片" class="max-w-xs rounded-lg">
+                        <img :src="comment.imageUrl" alt="评论图片" class="max-w-full rounded-lg sm:max-w-xs">
                       </div>
-                      <div class="flex items-center gap-4 text-sm text-gray-500">
+                      <div class="flex flex-wrap items-center gap-4 text-sm text-gray-500">
                         <span>👍 {{ comment.likeCount || 0 }}</span>
                         <span>{{ formatDate(comment.createdAt) }}</span>
                         <button
@@ -977,7 +977,7 @@ const getAvatarUrl = () => {
                 <motion.div
                   v-for="(comment, index) in routeComments"
                   :key="comment.id"
-                  class="glass-card rounded-2xl p-6 border border-white/20 hover:shadow-lg transition-all"
+                  class="glass-card rounded-2xl p-4 border border-white/20 hover:shadow-lg transition-all sm:p-6"
                   :initial="cardInitial"
                   :animate="cardInView"
                   :exit="cardExit"
@@ -985,7 +985,7 @@ const getAvatarUrl = () => {
                   :whileHover="{ y: -3, scale: 1.006 }"
                 >
                   <div class="flex items-start gap-4">
-                    <div class="flex-1">
+                    <div class="min-w-0 flex-1">
                       <div class="flex items-center gap-2 mb-2">
                         <router-link 
                           :to="`/community/${comment.route?.id}`"
@@ -995,7 +995,7 @@ const getAvatarUrl = () => {
                         </router-link>
                       </div>
                       <p class="text-gray-700 mb-2">{{ comment.content }}</p>
-                      <div class="flex items-center gap-4 text-sm text-gray-500">
+                      <div class="flex flex-wrap items-center gap-4 text-sm text-gray-500">
                         <span>{{ formatDate(comment.createdAt) }}</span>
                         <button
                           @click="deleteRouteComment(comment)"

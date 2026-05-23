@@ -1,5 +1,5 @@
 <template>
-  <footer class="relative bg-[#1A1520] text-white mt-20 overflow-hidden tibet-footer-pattern">
+  <footer class="relative bg-[#1A1520] text-white mt-20 overflow-hidden tibet-footer-pattern mobile-safe-bottom">
     <!-- Mountain silhouette top edge -->
     <div class="relative h-16 -mt-16 overflow-hidden pointer-events-none z-10">
       <svg viewBox="0 0 1440 80" preserveAspectRatio="none" class="w-full h-full">

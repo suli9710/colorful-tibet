@@ -2,9 +2,9 @@
   <div class="order-center-page tibet-page-shell min-h-screen relative overflow-hidden">
     <div class="absolute inset-0 pointer-events-none opacity-40 tibet-cloud-pattern"></div>
 
-    <main class="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-28 pb-16">
+    <main class="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-24 pb-12 sm:pt-28 sm:pb-16">
       <motion.header
-        class="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between"
+        class="mb-6 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between sm:mb-8"
         :initial="{ opacity: 0, y: 18 }"
         :animate="{ opacity: 1, y: 0 }"
         :transition="{ duration: 0.42, ease: [0.16, 1, 0.3, 1] }"
@@ -14,16 +14,16 @@
             <ReceiptText class="h-3.5 w-3.5" />
             统一旅行履约
           </div>
-          <h1 class="mt-4 text-3xl font-bold text-tibet-dark md:text-4xl">订单中心</h1>
+          <h1 class="mt-4 text-2xl font-bold text-tibet-dark sm:text-3xl md:text-4xl">订单中心</h1>
           <p class="mt-2 max-w-2xl text-sm leading-6 text-tibet-brown/65">
             集中查看景点、酒店和行程节点预订，处理取消、退款、凭证和发票。
           </p>
         </div>
 
-        <div class="flex flex-wrap items-center gap-2">
+        <div class="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
           <router-link
             to="/route-planner"
-            class="inline-flex items-center gap-2 rounded-xl border border-tibet-gold/25 bg-white/75 px-4 py-2.5 text-sm font-semibold text-tibet-brown transition hover:bg-amber-50"
+            class="inline-flex items-center justify-center gap-2 rounded-xl border border-tibet-gold/25 bg-white/75 px-3 py-2.5 text-sm font-semibold text-tibet-brown transition hover:bg-amber-50 sm:px-4"
           >
             <Sparkles class="h-4 w-4" />
             继续规划
@@ -34,7 +34,7 @@
             :disabled="loading"
             :whileHover="{ y: -1, scale: 1.01 }"
             :whileTap="{ scale: 0.98 }"
-            class="inline-flex items-center gap-2 rounded-xl bg-tibet-red px-4 py-2.5 text-sm font-semibold text-tibet-yellow shadow-md shadow-tibet-red/20 disabled:opacity-50"
+            class="inline-flex items-center justify-center gap-2 rounded-xl bg-tibet-red px-3 py-2.5 text-sm font-semibold text-tibet-yellow shadow-md shadow-tibet-red/20 disabled:opacity-50 sm:px-4"
           >
             <RefreshCw class="h-4 w-4" :class="{ 'animate-spin': loading }" />
             刷新订单
@@ -59,7 +59,7 @@
 
       <section class="mb-6 rounded-2xl border border-white/60 bg-white/70 p-3 shadow-sm shadow-slate-900/3">
         <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div class="flex gap-1 overflow-x-auto">
+          <div class="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1 sm:mx-0 sm:px-0 sm:pb-0">
             <button
               v-for="tab in statusTabs"
               :key="tab.key"
@@ -146,7 +146,7 @@
                 <p class="mt-1 text-xs font-medium" :class="paymentMeta(order.paymentStatus).textClass">
                   {{ paymentMeta(order.paymentStatus).label }}
                 </p>
-                <div class="mt-3 flex items-center gap-2 sm:justify-end">
+                <div class="mt-3 flex flex-wrap items-center gap-2 sm:justify-end">
                   <button
                     type="button"
                     class="inline-flex items-center gap-1.5 rounded-lg border border-tibet-gold/20 bg-white/80 px-2.5 py-1.5 text-xs font-semibold text-tibet-brown transition hover:bg-amber-50"
@@ -189,15 +189,15 @@
           </div>
         </section>
 
-        <aside v-if="selectedOrder" class="lg:sticky lg:top-28">
+        <aside v-if="selectedOrder" class="min-w-0 lg:sticky lg:top-28">
           <section class="overflow-hidden rounded-3xl border border-white/65 bg-white/82 shadow-lg shadow-slate-900/5">
             <div class="border-b border-tibet-gold/10 bg-white/55 px-5 py-4">
-              <div class="flex items-start justify-between gap-3">
+              <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div class="min-w-0">
                   <p class="text-xs font-semibold text-tibet-brown/45">{{ selectedOrder.orderNo }}</p>
                   <h2 class="mt-1 text-xl font-bold text-tibet-dark">{{ selectedOrder.productSummary || '旅行订单' }}</h2>
                 </div>
-                <div class="flex shrink-0 items-center gap-2">
+                <div class="flex shrink-0 flex-wrap items-center gap-2">
                   <span class="rounded-full border px-3 py-1 text-xs font-semibold" :class="statusMeta(selectedOrder.status).className">
                     {{ statusMeta(selectedOrder.status).label }}
                   </span>
@@ -235,7 +235,7 @@
                   <span class="text-xs text-tibet-brown/45">{{ selectedOrder.items?.length || 0 }} 项</span>
                 </div>
                 <div class="space-y-3">
-                  <div v-for="item in selectedOrder.items" :key="item.id" class="flex gap-3">
+                  <div v-for="item in selectedOrder.items" :key="item.id" class="flex flex-col gap-2 sm:flex-row sm:gap-3">
                     <span class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-tibet-gold/10 text-tibet-gold">
                       <component :is="itemIcon(item.productType)" class="h-4 w-4" />
                     </span>
@@ -248,7 +248,7 @@
                         {{ item.skuName || '标准票/服务' }} · {{ formatServiceDate(item) }} · 数量 {{ item.quantity || 1 }}
                       </p>
                     </div>
-                    <p class="shrink-0 text-sm font-bold tabular-nums text-tibet-dark">{{ formatCurrency(item.subtotal, selectedOrder.currency) }}</p>
+                    <p class="shrink-0 text-sm font-bold tabular-nums text-tibet-dark sm:text-right">{{ formatCurrency(item.subtotal, selectedOrder.currency) }}</p>
                   </div>
                 </div>
               </section>

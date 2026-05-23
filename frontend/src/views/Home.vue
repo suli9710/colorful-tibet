@@ -1,7 +1,7 @@
 <template>
   <div class="min-h-screen tibet-page-shell">
     <!-- Hero Section: Multi-layer Parallax -->
-    <div class="relative flex h-[calc(100svh-5rem)] min-h-[600px] items-center justify-center overflow-hidden -mt-20 sm:min-h-[680px] md:h-[calc(100vh-6rem)] md:-mt-24">
+    <div class="relative flex h-[calc(100svh-5rem)] min-h-[520px] items-center justify-center overflow-hidden -mt-20 sm:min-h-[680px] md:h-[calc(100vh-6rem)] md:-mt-24">
       <!-- Layer 0: Sky gradient base -->
       <div class="absolute inset-0 z-0 bg-gradient-to-b from-tibet-dark via-tibet-brown/60 to-tibet-dark/40"></div>
 
@@ -48,13 +48,13 @@
               {{ heroSlides[currentSlide].tag }}
             </div>
             <h1
-              class="mb-5 text-4xl font-bold text-white sm:text-5xl md:mb-6 md:text-7xl font-display"
+              class="mb-5 text-3xl font-bold leading-tight text-white sm:text-5xl md:mb-6 md:text-7xl font-display"
               style="text-shadow: 0 2px 24px rgba(0,0,0,0.3);"
             >
               {{ heroSlides[currentSlide].title }}
             </h1>
             <p
-              class="mx-auto mb-8 max-w-2xl text-base font-light leading-relaxed text-white/85 sm:text-xl md:mb-10 md:text-2xl"
+              class="mx-auto mb-8 max-w-2xl text-sm font-light leading-relaxed text-white/85 sm:text-xl md:mb-10 md:text-2xl"
               style="text-shadow: 0 1px 12px rgba(0,0,0,0.2);"
             >
               {{ heroSlides[currentSlide].subtitle }}

@@ -22,7 +22,7 @@ const accentClass = computed<Record<ToastType, string>>(() => ({
 <template>
   <Teleport to="body">
     <div
-      class="fixed right-4 top-24 z-[120] flex w-[calc(100vw-2rem)] max-w-sm flex-col gap-3 sm:right-6"
+      class="mobile-toast-host fixed right-4 top-24 z-[120] flex w-[calc(100vw-2rem)] max-w-sm flex-col gap-3 sm:right-6"
       aria-live="polite"
       aria-atomic="true"
     >
@@ -60,3 +60,15 @@ const accentClass = computed<Record<ToastType, string>>(() => ({
     </div>
   </Teleport>
 </template>
+
+<style scoped>
+@media (max-width: 640px) {
+  .mobile-toast-host {
+    left: 1rem;
+    right: 1rem;
+    top: 5.5rem;
+    width: auto;
+    max-width: none;
+  }
+}
+</style>

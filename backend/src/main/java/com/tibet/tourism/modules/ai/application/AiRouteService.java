@@ -9,11 +9,16 @@ import com.tibet.tourism.modules.user.domain.User;
 import jakarta.annotation.PostConstruct;
 import java.io.IOException;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -23,14 +28,26 @@ import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 @Service
 public class AiRouteService {
 
     private static final Logger log = LoggerFactory.getLogger(AiRouteService.class);
-    private static final Map<String, Object> THINKING_ENABLED = Map.of("type", "enabled");
-    private static final String REASONING_EFFORT = "medium";
-    private static final int ROUTE_MAX_OUTPUT_TOKENS = 5200;
+    private static final int ROUTE_BASE_OUTPUT_TOKENS = 5200;
+    private static final int ROUTE_OUTPUT_TOKENS_PER_EXTRA_DAY = 1100;
+    private static final int ROUTE_OUTPUT_TOKENS_BASE_DAYS = 5;
+    private static final int ROUTE_MAX_OUTPUT_TOKENS = 24000;
+    private static final Pattern ROUTE_RESTART_TITLE_PATTERN = Pattern.compile(
+            "(?m)(?:^|[\\r\\n，,。；;])\\s*#\\s+\\S[^\\r\\n]*");
+    private static final Pattern ROUTE_OVERVIEW_HEADING_PATTERN = Pattern.compile(
+            "(?m)^\\s*#{0,3}\\s*(?:路线概览|Route Overview|Overview)\\s*$");
+    private static final Pattern ROUTE_DAILY_HEADING_PATTERN = Pattern.compile(
+            "(?m)^\\s*#{1,3}\\s*(?:每日行程|Daily Itinerary|Itinerary)\\s*$",
+            Pattern.CASE_INSENSITIVE);
+    private static final Pattern ROUTE_DAY_HEADING_PATTERN = Pattern.compile(
+            "^(?:#{1,6}\\s*)?(?:第\\s*([一二三四五六七八九十百0-9]+)\\s*天|Day\\s*(\\d+)|D\\s*(\\d+)).*$",
+            Pattern.CASE_INSENSITIVE);
     private static final Map<String, String> BUDGET_LABELS = Map.of(
             "economy", "经济型",
             "comfort", "舒适型",
@@ -106,11 +123,32 @@ public class AiRouteService {
     }
 
     private Map<String, Object> buildStreamRequestBody(String prompt) {
-        return buildAiRequestBody(prompt, streamApiUrl, true);
+        return buildStreamRequestBody(prompt, 15);
     }
 
-    public void streamRoute(int days, String budgetKey, String preferenceKey,
-                            User currentUser, String locale, SseEmitter emitter) {
+    private Map<String, Object> buildStreamRequestBody(String prompt, int days) {
+        return buildAiRequestBody(prompt, streamApiUrl, true, days);
+    }
+
+    public interface RouteStreamListener {
+        default void onMeta(Map<String, Object> meta) {
+        }
+
+        default void onDelta(String text) {
+        }
+
+        default void onReplace(String content) {
+        }
+
+        default void onDone(String content) {
+        }
+
+        default void onError(String message) {
+        }
+    }
+
+    public String streamRouteToListener(int days, String budgetKey, String preferenceKey,
+                                        User currentUser, String locale, RouteStreamListener listener) {
         int safeDays = normalizeDays(days);
         String normalizedBudgetKey = normalizeKey(budgetKey);
         String normalizedPreferenceKey = normalizeKey(preferenceKey);
@@ -119,9 +157,9 @@ public class AiRouteService {
         String displayBudgetLabel = localizedBudgetLabel(normalizedBudgetKey, locale);
         String displayPreferenceLabel = localizedPreferenceLabel(normalizedPreferenceKey, locale);
         String prompt = buildPrompt(safeDays, budgetLabel, preferenceLabel, currentUser, locale);
-        Map<String, Object> streamBody = buildStreamRequestBody(prompt);
+        Map<String, Object> streamBody = buildStreamRequestBody(prompt, safeDays);
 
-        sendEmitterEvent(emitter, "meta", Map.of(
+        listener.onMeta(Map.of(
                 "model", blankToPlaceholder(model),
                 "days", String.valueOf(safeDays),
                 "budget", displayBudgetLabel,
@@ -131,8 +169,7 @@ public class AiRouteService {
         String configIssue = configIssue(streamApiUrl);
         if (configIssue != null) {
             log.warn("AI stream unavailable, using fallback route: {}", configIssue);
-            streamFallbackRoute(emitter, safeDays, budgetLabel, preferenceLabel);
-            return;
+            return emitFallbackRoute(listener, safeDays, budgetLabel, preferenceLabel, false);
         }
 
         log.info("AI stream request: model={}, url={}, promptLength={}",
@@ -160,92 +197,163 @@ public class AiRouteService {
         AtomicInteger streamLineCounter = new AtomicInteger();
         AtomicInteger streamDeltaCounter = new AtomicInteger();
         StringBuilder jsonBuffer = new StringBuilder();
+        StringBuilder contentBuffer = new StringBuilder();
 
-        streamFlux.subscribe(
-                chunk -> {
-                    jsonBuffer.append(chunk);
-                    String buffer = jsonBuffer.toString();
-                    int pos = 0;
-                    int depth = 0;
-                    int start = -1;
-                    boolean inString = false;
-                    boolean escaped = false;
+        try {
+            streamFlux
+                    .doOnNext(chunk -> processStreamChunk(
+                            chunk,
+                            jsonBuffer,
+                            listener,
+                            streamLineCounter,
+                            streamDeltaCounter,
+                            contentBuffer))
+                    .blockLast(streamTimeout.plusSeconds(5));
 
-                    for (int i = 0; i < buffer.length(); i++) {
-                        char c = buffer.charAt(i);
+            processRemainingStreamBuffer(jsonBuffer, listener, streamLineCounter, streamDeltaCounter, contentBuffer);
 
-                        if (inString) {
-                            if (escaped) {
-                                escaped = false;
-                            } else if (c == '\\') {
-                                escaped = true;
-                            } else if (c == '"') {
-                                inString = false;
-                            }
-                            continue;
-                        }
+            String rawContent = contentBuffer.toString();
+            String finalContent = normalizeMarkdownRoute(rawContent, safeDays, budgetLabel, preferenceLabel, locale);
+            if (finalContent.isBlank()) {
+                return emitFallbackRoute(listener, safeDays, budgetLabel, preferenceLabel, !rawContent.isBlank());
+            }
+            if (!finalContent.equals(rawContent.trim())) {
+                listener.onReplace(finalContent);
+            }
+            listener.onDone(finalContent);
+            return finalContent;
+        } catch (Exception error) {
+            processRemainingStreamBuffer(jsonBuffer, listener, streamLineCounter, streamDeltaCounter, contentBuffer);
+            log.warn("AI stream failed, using fallback route: {}", extractErrorMessage(error));
+            log.debug("AI stream failure details", error);
+            return emitFallbackRoute(listener, safeDays, budgetLabel, preferenceLabel, contentBuffer.length() > 0);
+        }
+    }
 
-                        if (c == '"') {
-                            inString = true;
-                            continue;
-                        }
-
-                        if (c == '{') {
-                            if (depth == 0) start = i;
-                            depth++;
-                        } else if (c == '}') {
-                            depth--;
-                            if (depth == 0 && start >= 0) {
-                                String jsonStr = buffer.substring(start, i + 1);
-                                try {
-                                    processStreamEvent(jsonStr, emitter, streamLineCounter, streamDeltaCounter);
-                                } catch (IOException e) {
-                                    log.warn("Failed to send SSE event from json chunk: {}", previewText(jsonStr, 200), e);
-                                }
-                                pos = i + 1;
-                                start = -1;
-                            } else if (depth < 0) {
-                                depth = 0; // malformed, recover
-                            }
-                        }
-                    }
-
-                    jsonBuffer.setLength(0);
-                    jsonBuffer.append(buffer.substring(pos));
-                },
-                error -> {
-                    if (jsonBuffer.length() > 0) {
-                        try {
-                            processStreamEvent(jsonBuffer.toString(), emitter, streamLineCounter, streamDeltaCounter);
-                        } catch (IOException e) {
-                            log.warn("Failed to send SSE event from remaining buffer: {}", previewText(jsonBuffer.toString(), 200), e);
-                        }
-                    }
-                    log.warn("AI stream failed, using fallback route: {}", extractErrorMessage(error));
-                    log.debug("AI stream failure details", error);
-                    streamFallbackRoute(emitter, safeDays, budgetLabel, preferenceLabel);
-                },
-                () -> {
-                    if (jsonBuffer.length() > 0) {
-                        try {
-                            processStreamEvent(jsonBuffer.toString(), emitter, streamLineCounter, streamDeltaCounter);
-                        } catch (IOException e) {
-                            log.warn("Failed to send SSE event from final buffer: {}", previewText(jsonBuffer.toString(), 200), e);
-                        }
-                    }
-                    sendEmitterEvent(emitter, "done", Map.of());
-                    emitter.complete();
-                }
-        );
-
+    public void streamRoute(int days, String budgetKey, String preferenceKey,
+                            User currentUser, String locale, SseEmitter emitter) {
         emitter.onTimeout(() -> log.warn("SSE emitter timed out after {}s", streamTimeout.getSeconds()));
         emitter.onError(throwable -> log.warn("SSE emitter error (client may have disconnected): {}",
                 throwable.getMessage() != null ? throwable.getMessage() : throwable.getClass().getSimpleName()));
+
+        RouteStreamListener listener = new RouteStreamListener() {
+            @Override
+            public void onMeta(Map<String, Object> meta) {
+                sendEmitterEvent(emitter, "meta", meta);
+            }
+
+            @Override
+            public void onDelta(String text) {
+                sendEmitterEvent(emitter, "delta", Map.of("text", text));
+            }
+
+            @Override
+            public void onReplace(String content) {
+                sendEmitterEvent(emitter, "replace", Map.of("text", content, "content", content));
+            }
+
+            @Override
+            public void onDone(String content) {
+                sendEmitterEvent(emitter, "done", Map.of("content", content));
+                emitter.complete();
+            }
+
+            @Override
+            public void onError(String message) {
+                sendEmitterEvent(emitter, "error", Map.of("message", message));
+                emitter.complete();
+            }
+        };
+
+        Mono.fromRunnable(() -> {
+                    try {
+                        streamRouteToListener(days, budgetKey, preferenceKey, currentUser, locale, listener);
+                    } catch (Exception e) {
+                        log.warn("AI stream failed before completion: {}", extractErrorMessage(e));
+                        listener.onError("AI stream failed");
+                    }
+                })
+                .subscribeOn(Schedulers.boundedElastic())
+                .subscribe();
+    }
+
+    private void processStreamChunk(String chunk,
+                                    StringBuilder jsonBuffer,
+                                    RouteStreamListener listener,
+                                    AtomicInteger streamLineCounter,
+                                    AtomicInteger streamDeltaCounter,
+                                    StringBuilder contentBuffer) {
+        jsonBuffer.append(chunk);
+        String buffer = jsonBuffer.toString();
+        int pos = 0;
+        int depth = 0;
+        int start = -1;
+        boolean inString = false;
+        boolean escaped = false;
+
+        for (int i = 0; i < buffer.length(); i++) {
+            char c = buffer.charAt(i);
+
+            if (inString) {
+                if (escaped) {
+                    escaped = false;
+                } else if (c == '\\') {
+                    escaped = true;
+                } else if (c == '"') {
+                    inString = false;
+                }
+                continue;
+            }
+
+            if (c == '"') {
+                inString = true;
+                continue;
+            }
+
+            if (c == '{') {
+                if (depth == 0) {
+                    start = i;
+                }
+                depth++;
+            } else if (c == '}') {
+                depth--;
+                if (depth == 0 && start >= 0) {
+                    String jsonStr = buffer.substring(start, i + 1);
+                    processStreamEvent(jsonStr, listener, streamLineCounter, streamDeltaCounter, contentBuffer);
+                    pos = i + 1;
+                    start = -1;
+                } else if (depth < 0) {
+                    depth = 0;
+                }
+            }
+        }
+
+        jsonBuffer.setLength(0);
+        jsonBuffer.append(buffer.substring(pos));
+    }
+
+    private void processRemainingStreamBuffer(StringBuilder jsonBuffer,
+                                              RouteStreamListener listener,
+                                              AtomicInteger streamLineCounter,
+                                              AtomicInteger streamDeltaCounter,
+                                              StringBuilder contentBuffer) {
+        if (jsonBuffer.length() == 0) {
+            return;
+        }
+        processStreamEvent(jsonBuffer.toString(), listener, streamLineCounter, streamDeltaCounter, contentBuffer);
+        jsonBuffer.setLength(0);
     }
 
     private void processStreamEvent(String jsonStr, SseEmitter emitter,
                                     AtomicInteger streamLineCounter,
                                     AtomicInteger streamDeltaCounter) throws IOException {
+        processStreamEvent(jsonStr, emitterEventListener(emitter), streamLineCounter, streamDeltaCounter, null);
+    }
+
+    private void processStreamEvent(String jsonStr, RouteStreamListener listener,
+                                    AtomicInteger streamLineCounter,
+                                    AtomicInteger streamDeltaCounter,
+                                    StringBuilder contentBuffer) {
         if (jsonStr == null || jsonStr.isBlank()) {
             return;
         }
@@ -275,7 +383,7 @@ public class AiRouteService {
             if (streamDeltaCount <= 3) {
                 log.info("AI stream delta #{}: {}", streamDeltaCount, previewText(deltaText, 200));
             }
-            sendEmitterEvent(emitter, "delta", Map.of("text", deltaText));
+            appendStreamDelta(listener, contentBuffer, deltaText);
             return;
         }
 
@@ -291,7 +399,7 @@ public class AiRouteService {
                     if (streamDeltaCount <= 3) {
                         log.info("AI stream delta #{}: {}", streamDeltaCount, previewText(text, 200));
                     }
-                    sendEmitterEvent(emitter, "delta", Map.of("text", text));
+                    appendStreamDelta(listener, contentBuffer, text);
                     return;
                 }
             }
@@ -304,7 +412,7 @@ public class AiRouteService {
             if (streamDeltaCount <= 3) {
                 log.info("AI stream delta #{} (text field): {}", streamDeltaCount, previewText(text, 200));
             }
-            sendEmitterEvent(emitter, "delta", Map.of("text", text));
+            appendStreamDelta(listener, contentBuffer, text);
             return;
         }
 
@@ -312,6 +420,13 @@ public class AiRouteService {
         if (streamLineCount <= 5) {
             log.info("AI stream non-delta event keys: {}", event.keySet());
         }
+    }
+
+    private void appendStreamDelta(RouteStreamListener listener, StringBuilder contentBuffer, String text) {
+        if (contentBuffer != null) {
+            contentBuffer.append(text);
+        }
+        listener.onDelta(text);
     }
 
     private boolean isOutputTextDelta(Map<String, Object> event) {
@@ -330,6 +445,31 @@ public class AiRouteService {
                 || normalized.contains("text");
     }
 
+    private RouteStreamListener emitterEventListener(SseEmitter emitter) {
+        return new RouteStreamListener() {
+            @Override
+            public void onDelta(String text) {
+                sendEmitterEvent(emitter, "delta", Map.of("text", text == null ? "" : text));
+            }
+
+            @Override
+            public void onReplace(String content) {
+                String safeContent = content == null ? "" : content;
+                sendEmitterEvent(emitter, "replace", Map.of("text", safeContent, "content", safeContent));
+            }
+
+            @Override
+            public void onDone(String content) {
+                sendEmitterEvent(emitter, "done", Map.of("content", content == null ? "" : content));
+            }
+
+            @Override
+            public void onError(String message) {
+                sendEmitterEvent(emitter, "error", Map.of("message", message == null ? "AI stream failed" : message));
+            }
+        };
+    }
+
     private void sendEmitterEvent(SseEmitter emitter, String type, Map<String, Object> payload) {
         try {
             Map<String, Object> event = new HashMap<>(payload);
@@ -340,10 +480,20 @@ public class AiRouteService {
         }
     }
 
-    private void streamFallbackRoute(SseEmitter emitter, int days, String budgetLabel, String preferenceLabel) {
+    private String emitFallbackRoute(RouteStreamListener listener, int days, String budgetLabel,
+                                     String preferenceLabel, boolean replaceExistingContent) {
         String fallbackContent = buildFallbackMarkdown(days, budgetLabel, preferenceLabel);
-        sendEmitterEvent(emitter, "delta", Map.of("text", fallbackContent));
-        sendEmitterEvent(emitter, "done", Map.of("fallback", true));
+        if (replaceExistingContent) {
+            listener.onReplace(fallbackContent);
+        } else {
+            listener.onDelta(fallbackContent);
+        }
+        listener.onDone(fallbackContent);
+        return fallbackContent;
+    }
+
+    private void streamFallbackRoute(SseEmitter emitter, int days, String budgetLabel, String preferenceLabel) {
+        emitFallbackRoute(emitterEventListener(emitter), days, budgetLabel, preferenceLabel, false);
         emitter.complete();
     }
 
@@ -363,7 +513,7 @@ public class AiRouteService {
             return fallbackRouteResponse(safeDays, budgetLabel, preferenceLabel, displayBudgetLabel, displayPreferenceLabel);
         }
 
-        Map<String, Object> requestBody = buildRequestBody(prompt);
+        Map<String, Object> requestBody = buildRequestBody(prompt, safeDays);
         log.info("AI route request prepared: model={}, promptLength={}, promptPreview={}",
                 blankToPlaceholder(model),
                 prompt.length(),
@@ -448,21 +598,20 @@ public class AiRouteService {
         return value == null || value.isBlank() ? "<empty>" : value;
     }
 
-    private Map<String, Object> buildRequestBody(String prompt) {
-        return buildAiRequestBody(prompt, apiUrl, false);
+    private Map<String, Object> buildRequestBody(String prompt, int days) {
+        return buildAiRequestBody(prompt, apiUrl, false, days);
     }
 
-    private Map<String, Object> buildAiRequestBody(String prompt, String endpointUrl, boolean stream) {
+    private Map<String, Object> buildAiRequestBody(String prompt, String endpointUrl, boolean stream, int days) {
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("model", model);
+        int outputTokens = routeMaxOutputTokens(days);
 
         if (isChatCompletionsEndpoint(endpointUrl)) {
             requestBody.put("messages", List.of(Map.of("role", "user", "content", prompt)));
-            requestBody.put("thinking", THINKING_ENABLED);
-            requestBody.put("reasoning_effort", REASONING_EFFORT);
             requestBody.put("temperature", 0.65);
             requestBody.put("top_p", 0.9);
-            requestBody.put("max_tokens", ROUTE_MAX_OUTPUT_TOKENS);
+            requestBody.put("max_tokens", outputTokens);
             requestBody.put("stream", stream);
             return requestBody;
         }
@@ -478,13 +627,18 @@ public class AiRouteService {
                         )
                 )
         ));
-        requestBody.put("thinking", THINKING_ENABLED);
-        requestBody.put("reasoning_effort", REASONING_EFFORT);
         requestBody.put("temperature", 0.65);
         requestBody.put("top_p", 0.9);
-        requestBody.put("max_output_tokens", ROUTE_MAX_OUTPUT_TOKENS);
+        requestBody.put("max_output_tokens", outputTokens);
         requestBody.put("stream", stream);
         return requestBody;
+    }
+
+    private int routeMaxOutputTokens(int days) {
+        int safeDays = normalizeDays(days);
+        int extraDays = Math.max(0, safeDays - ROUTE_OUTPUT_TOKENS_BASE_DAYS);
+        return Math.min(ROUTE_MAX_OUTPUT_TOKENS,
+                ROUTE_BASE_OUTPUT_TOKENS + extraDays * ROUTE_OUTPUT_TOKENS_PER_EXTRA_DAY);
     }
 
     private boolean isChatCompletionsEndpoint(String endpointUrl) {
@@ -535,7 +689,7 @@ public class AiRouteService {
                 preferenceGuidance = "偏好自然风光：行程核心是湖泊、雪山、草原、峡谷。每天必须安排至少1个自然景观目的地。推荐方向：羊卓雍措、纳木错、巴松措、雅鲁藏布大峡谷、南迦巴瓦峰、珠峰大本营、米堆冰川、然乌湖、色林错、当惹雍错。在最佳光线时段（日出后2小时、日落前2小时）安排核心观景点。";
                 break;
             case "人文历史":
-                preferenceGuidance = "偏好人文字史：行程核心是寺庙、宫殿、遗址、非遗体验。每天必须安排至少1个人文景点。推荐方向：布达拉宫、大昭寺、色拉寺（辩经）、甘丹寺、扎什伦布寺、萨迦寺、古格王朝遗址、江孜宗山、昌珠寺、桑耶寺。注重历史背景讲解和深度文化体验，可在寺庙停留2小时以上。";
+                preferenceGuidance = "偏好人文历史：行程核心是寺庙、宫殿、遗址、非遗体验。每天必须安排至少1个人文景点。推荐方向：布达拉宫、大昭寺、色拉寺（辩经）、甘丹寺、扎什伦布寺、萨迦寺、古格王朝遗址、江孜宗山、昌珠寺、桑耶寺。注重历史背景讲解和深度文化体验，可在寺庙停留2小时以上。";
                 break;
             case "深度摄影":
                 preferenceGuidance = "偏好深度摄影：行程围绕最佳拍摄机位和时间展开。日出前30分钟到达拍摄点，日落后30分钟再离开。推荐机位：药王山拍布达拉宫日出、羊卓雍措全景台、纳木错扎西半岛、色季拉山口拍南迦巴瓦、加乌拉山口拍珠峰群峰、札达土林日落、古格王朝星空。每天车程预留充足拍摄停留时间，不走马观花。";
@@ -560,10 +714,20 @@ public class AiRouteService {
             routingGuidance = "长线行程，拉萨2-3天+林芝方向4-5天+日喀则方向3-4天，或挑战阿里环线（需9天以上单独安排）。景点之间按地理顺序排列，不折返。";
         }
 
+        String lengthGuidance;
+        if (days <= 5) {
+            lengthGuidance = "1-5天行程约1800-2600字";
+        } else if (days <= 10) {
+            lengthGuidance = "6-10天行程约2600-4200字";
+        } else {
+            lengthGuidance = "11-15天行程约4200-6500字";
+        }
+
         return String.format(""
-                + "【重要指令】你是西藏旅行规划师。可以先在内部推理路线取舍，但最终只输出下方 Markdown 格式的旅行计划，不要输出思考过程、开场白、解释、分析或客套话。你的回复从第一行 # 标题开始，到「进藏必读」结束，中间不得有任何额外内容。\n"
-                + "【长度控制】输出要有真实旅行方案的密度，总字数控制在1800-2600字；每天6-8条要点；每条要点优先写清时间、地点、车程、体验和注意事项，避免空泛短句。\n"
-                + "【深度要求】每一天都必须包含真实景点名、建议时间段、游玩时长、交通方式/车程、餐食或住宿建议、预算体现、海拔/体力提醒；禁止只写“游览某地”“自由活动”“体验当地风情”。\n"
+                + "【重要指令】你是会讲故事的西藏领队，熟悉高原节奏、路况、寺院礼仪、拍照机位和当地吃住。语气要亲切、轻快、有画面感，像一路带着游客边走边提醒；但必须专业克制，不卖萌、不夸张、不使用 emoji。可以先在内部推理路线取舍，但最终只输出下方 Markdown 格式的旅行计划，不要输出思考过程、开场白、解释、分析或客套话。你的回复从第一行 # 标题开始，到「进藏必读」结束，中间不得有任何额外内容。\n"
+                + "【长度控制】输出要有真实旅行方案的密度，%s；每天固定8条要点；每条要点优先写清时间、地点、车程、体验和注意事项，避免空泛短句。\n"
+                + "【语气要求】写得像靠谱领队在现场带队：可以使用“今天别急着冲，先让身体跟上高原的节奏”“如果天气给面子，傍晚把相机留给湖面金光”这类自然、有温度的表达；不要像说明书，也不要堆砌宣传词。\n"
+                + "【深度要求】每一天都必须包含真实景点名、建议时间段、游玩时长、交通方式/车程、路况提醒、餐食建议、住宿区域与价格区间、预算体现、海拔/体力提醒、文化故事或拍照细节；禁止只写“游览某地”“自由活动”“体验当地风情”。\n"
                 + "【取舍要求】在内部比较路线方向、海拔适应、车程、天气备选和用户偏好后再给方案；不要把比较过程写出来，只输出最优可执行路线。\n\n"
                 + "%s\n\n"
                 + "%s\n\n"
@@ -581,7 +745,7 @@ public class AiRouteService {
                 + "2.【离开拉萨】第2天起必须离开拉萨市区，前往西藏其他地区的具体景点。每一天的目的地必须是拉萨以外的真实景点，严禁连续两天都在拉萨市区。\n"
                 + "3.【具体景点】每一天必须写出具体的景点名称（如羊卓雍措、巴松措、扎什伦布寺、雅鲁藏布大峡谷、纳木错等），不能笼统地说「游览」或「参观」。\n"
                 + "4.【地理合理】相邻天数的目的地必须在同一地理方向上。西藏景点之间车程长（日均不超过350公里或6小时），路线不得出现折返或跳跃。\n"
-                + "5.【偏好驱动】每一天的活动选择必须紧密围绕旅行偏好展开。如果偏好自然风光，每天至少1个自然景观；如果偏好人文字史，每天至少1个人文景点。\n"
+                + "5.【偏好驱动】每一天的活动选择必须紧密围绕旅行偏好展开。如果偏好自然风光，每天至少1个自然景观；如果偏好人文历史，每天至少1个人文景点。\n"
                 + "6.【预算体现】住宿等级、交通方式（公共交通/拼车/包车/专车）、餐饮档次必须在每天安排中体现预算差异。\n"
                 + "7.【可执行性】每天的时间安排必须合理（含车程时间），上午、下午的活动不能有时间冲突。高海拔地区（4500米以上）不宜安排过夜。\n\n"
                 + "═══════════════════════════════════\n"
@@ -589,28 +753,30 @@ public class AiRouteService {
                 + "═══════════════════════════════════\n\n"
                 + "# [富有诗意的路线标题]\n\n"
                 + "## 路线概览\n"
-                + "用2句话概括路线核心、主要目的地和适合人群。\n\n"
+                + "用2句话概括路线核心、主要目的地和适合人群，语气像领队开场，轻快但别写成广告。\n\n"
                 + "## 行程亮点\n"
                 + "- 仅列出3-4个最独特体验\n"
-                + "- 每条一句话，必须包含具体景点\n\n"
+                + "- 每条一句话，必须包含具体景点、体验画面或拍照/文化看点\n\n"
                 + "## 每日行程\n\n"
                 + "### 第1天：拉萨 —— 高原初适应\n"
-                + "- **清晨/上午**：时间段 + 真实景点 + 游玩时长 + 到达方式\n"
-                + "- **午餐/转场**：餐食建议 + 车程/路况 + 途中停靠点\n"
-                + "- **下午**：核心景点深度玩法 + 推荐机位/讲解重点\n"
-                + "- **傍晚**：日落/散步/轻体验安排 + 体力控制\n"
-                + "- **晚上/住宿**：美食 + 酒店类型 + 价格区间 + 所在区域\n"
-                + "- **当日理由**：说明这一天为什么这样排，体现偏好和高原适应\n"
-                + "- **贴心提示**：海拔、证件、穿衣、补给或备选方案\n\n"
+                + "- **清晨/上午**：时间段 + 真实景点 + 游玩时长 + 到达方式，写得像现场提醒，例如先慢下来适应高原\n"
+                + "- **午餐/转场**：餐食建议 + 车程/路况 + 途中停靠点，说明为什么这样走顺路\n"
+                + "- **下午**：核心景点深度玩法 + 历史故事/讲解重点 + 不赶场的体验方式\n"
+                + "- **傍晚**：日落/散步/轻体验安排 + 推荐拍照位置 + 体力控制\n"
+                + "- **晚上/住宿**：美食 + 酒店类型 + 价格区间 + 所在区域 + 选择理由\n"
+                + "- **在地彩蛋**：1个文化细节、甜茶馆/藏餐推荐、拍照机位或小众停靠点\n"
+                + "- **当日理由**：说明这一天为什么这样排，体现偏好、高原适应和路线顺序\n"
+                + "- **贴心提示**：海拔、证件、穿衣、补给、天气或备选方案\n\n"
                 + "### 第2天：[城市/地区] —— [当日主题，如「羊卓雍措环湖之旅」]\n"
-                + "[同上结构，每天6-8条要点，避免空泛长段落]\n\n"
-                + "[逐日输出至第%d天，每天必须包含清晨/上午、午餐/转场、下午、傍晚、晚上住宿、当日理由、贴心提示]\n\n"
+                + "[同上8条固定结构。每天都要具体到景点、车程、时长、吃住、预算、文化故事或拍照彩蛋，避免空泛长段落]\n\n"
+                + "[逐日输出至第%d天，每天必须包含清晨/上午、午餐/转场、下午、傍晚、晚上/住宿、在地彩蛋、当日理由、贴心提示]\n\n"
                 + "## 预算预估\n"
                 + "按%s标准，用3条以内列出交通、住宿餐饮、门票其他的人均估算。\n\n"
                 + "## 进藏必读\n"
                 + "列出4-5条最关键实用信息：高原反应、边防证、穿衣防晒、通讯现金、尊重风俗。\n\n"
                 + "【再次强调】直接从 # 标题开始回复，不要输出任何其他内容。"
                 + "",
+                lengthGuidance,
                 languageInstruction,
                 userContext,
                 days, budget, budgetGuidance,
@@ -768,6 +934,27 @@ public class AiRouteService {
         }
 
         String canonical = validateMarkdownRoute(sanitized, days, budgetLabel, preferenceLabel);
+        return canonical == null ? buildFallbackMarkdown(days, budgetLabel, preferenceLabel) : canonical;
+    }
+
+    public String normalizeCachedRoute(String rawContent, int days, String budgetKey, String preferenceKey, String locale) {
+        if (rawContent == null) {
+            return "";
+        }
+
+        int safeDays = normalizeDays(days);
+        String normalizedBudgetKey = normalizeKey(budgetKey);
+        String normalizedPreferenceKey = normalizeKey(preferenceKey);
+        String budgetLabel = BUDGET_LABELS.getOrDefault(normalizedBudgetKey, BUDGET_LABELS.get("comfort"));
+        String preferenceLabel = PREFERENCE_LABELS.getOrDefault(normalizedPreferenceKey, PREFERENCE_LABELS.get("natural"));
+        String sanitized = sanitizeResponseText(rawContent);
+        if (sanitized.isBlank()) {
+            return "";
+        }
+        if (isTibetanLocale(locale)) {
+            return sanitized;
+        }
+        String canonical = validateMarkdownRoute(sanitized, safeDays, budgetLabel, preferenceLabel);
         return canonical == null ? "" : canonical;
     }
 
@@ -794,7 +981,7 @@ public class AiRouteService {
         if (!result.startsWith("#") && result.contains("\n#")) {
             result = result.substring(result.indexOf("\n#") + 1);
         }
-        return result.trim();
+        return stripRepeatedRouteRestart(result).trim();
     }
 
     private String validateMarkdownRoute(String content, int days, String budgetLabel, String preferenceLabel) {
@@ -804,17 +991,18 @@ public class AiRouteService {
         }
 
         String[] lines = normalized.split("\\R");
-        StringBuilder body = new StringBuilder();
+        List<String> bodyLines = new ArrayList<>();
+        Set<Integer> seenDayNumbers = new HashSet<>();
         boolean hasTitle = false;
-        boolean hasDailySections = false;
-        int dailyHeadingCount = 0;
-        boolean containsRequiredSections = false;
+        boolean inDailySection = false;
+        boolean skippingDuplicateDay = false;
+        boolean containsRequiredSections = containsRequiredMarkdownSections(normalized);
 
         for (String line : lines) {
             String trimmed = line.trim();
             if (trimmed.isEmpty()) {
-                if (body.length() > 0 && body.charAt(body.length() - 1) != '\n') {
-                    body.append('\n');
+                if (!skippingDuplicateDay && !bodyLines.isEmpty() && !bodyLines.get(bodyLines.size() - 1).isEmpty()) {
+                    bodyLines.add("");
                 }
                 continue;
             }
@@ -822,29 +1010,185 @@ public class AiRouteService {
             if (!hasTitle && isHeadingLine(trimmed)) {
                 hasTitle = true;
             }
-            if (isDailySectionLine(trimmed)) {
-                dailyHeadingCount++;
+
+            if (isDailyContainerHeading(trimmed)) {
+                inDailySection = true;
+                skippingDuplicateDay = false;
+                bodyLines.add(trimmed);
+                continue;
             }
-            if (containsRequiredKeywords(trimmed)) {
-                containsRequiredSections = true;
+
+            Integer dayNumber = extractRouteDayNumber(trimmed);
+            if (dayNumber != null && inDailySection) {
+                if (dayNumber < 1 || dayNumber > days || seenDayNumbers.contains(dayNumber)) {
+                    skippingDuplicateDay = true;
+                    continue;
+                }
+                seenDayNumbers.add(dayNumber);
+                skippingDuplicateDay = false;
+                bodyLines.add(trimmed);
+                continue;
             }
-            body.append(trimmed).append('\n');
+
+            if (skippingDuplicateDay) {
+                if (isMajorMarkdownHeading(trimmed)) {
+                    skippingDuplicateDay = false;
+                } else {
+                    continue;
+                }
+            }
+
+            if (isMajorMarkdownHeading(trimmed) && !isDailyContainerHeading(trimmed)) {
+                inDailySection = false;
+            }
+
+            bodyLines.add(trimmed);
         }
 
-        // Also check the entire content body for required keywords (fallback check)
-        if (!containsRequiredSections) {
-            containsRequiredSections = containsRequiredKeywords(normalized);
-        }
-        hasDailySections = dailyHeadingCount >= Math.min(days, 2);
-        log.info("AI route validation: title={}, dailySections={}(count={}), requiredSections={}, days={}",
-                hasTitle, hasDailySections, dailyHeadingCount, containsRequiredSections, days);
+        boolean hasDailySections = hasRequestedDaySet(seenDayNumbers, days);
+        log.info("AI route validation: title={}, dailySections={}(uniqueCount={}), requiredSections={}, days={}",
+                hasTitle, hasDailySections, seenDayNumbers.size(), containsRequiredSections, days);
         if (!hasTitle || !hasDailySections || !containsRequiredSections) {
-            log.warn("AI route markdown validation failed: title={}, dailySections={}, requiredSections={}, dayCount={}, contentPreview={}",
-                    hasTitle, hasDailySections, containsRequiredSections, dailyHeadingCount, previewText(normalized, 300));
-            return buildFallbackMarkdown(days, budgetLabel, preferenceLabel);
+            log.warn("AI route markdown validation failed: title={}, dailySections={}, requiredSections={}, uniqueDayCount={}, contentPreview={}",
+                    hasTitle, hasDailySections, containsRequiredSections, seenDayNumbers.size(), previewText(normalized, 300));
+            return null;
         }
 
-        return body.toString().trim();
+        return String.join("\n", bodyLines).trim();
+    }
+
+    private String stripRepeatedRouteRestart(String content) {
+        if (content == null || content.isBlank()) {
+            return "";
+        }
+
+        int secondTitleIndex = findRepeatedMatchIndex(ROUTE_RESTART_TITLE_PATTERN, content, 1);
+        int secondOverviewIndex = findRepeatedMatchIndex(ROUTE_OVERVIEW_HEADING_PATTERN, content, 1);
+        int secondDailyIndex = findRepeatedMatchIndex(ROUTE_DAILY_HEADING_PATTERN, content, 1);
+
+        int restartIndex = minPositive(secondTitleIndex, secondOverviewIndex, secondDailyIndex);
+        if (restartIndex <= 0) {
+            return content;
+        }
+        return content.substring(0, restartIndex).trim();
+    }
+
+    private int findRepeatedMatchIndex(Pattern pattern, String content, int firstMatchToSkip) {
+        Matcher matcher = pattern.matcher(content);
+        int matchCount = 0;
+        while (matcher.find()) {
+            int start = matcher.start();
+            while (start < matcher.end() && !isRouteRestartStartChar(content.charAt(start))) {
+                start++;
+            }
+            if (start >= matcher.end()) {
+                start = matcher.start();
+            }
+            if (matchCount++ >= firstMatchToSkip) {
+                return start;
+            }
+        }
+        return -1;
+    }
+
+    private boolean isRouteRestartStartChar(char value) {
+        return value == '#' || value == '路' || value == 'R' || value == 'O' || value == 'D' || value == 'I';
+    }
+
+    private int minPositive(int... values) {
+        int result = -1;
+        for (int value : values) {
+            if (value > 0 && (result < 0 || value < result)) {
+                result = value;
+            }
+        }
+        return result;
+    }
+
+    private boolean containsRequiredMarkdownSections(String text) {
+        String normalized = text.replace(" ", "");
+        return (normalized.contains("路线概览") || normalized.toLowerCase(Locale.ROOT).contains("overview"))
+                && (normalized.contains("行程亮点") || normalized.toLowerCase(Locale.ROOT).contains("highlights"))
+                && (normalized.contains("每日行程") || normalized.toLowerCase(Locale.ROOT).contains("itinerary"))
+                && (normalized.contains("预算预估") || normalized.toLowerCase(Locale.ROOT).contains("budget"))
+                && (normalized.contains("进藏必读") || normalized.toLowerCase(Locale.ROOT).contains("essentials"));
+    }
+
+    private boolean isDailyContainerHeading(String text) {
+        if (text == null) {
+            return false;
+        }
+        String normalized = text.trim().toLowerCase(Locale.ROOT);
+        return normalized.matches("^#{1,6}\\s*(每日行程|daily itinerary|itinerary)\\s*$");
+    }
+
+    private boolean isMajorMarkdownHeading(String text) {
+        if (text == null) {
+            return false;
+        }
+        return text.trim().matches("^#{1,2}\\s+.*$");
+    }
+
+    private Integer extractRouteDayNumber(String text) {
+        if (text == null || text.isBlank()) {
+            return null;
+        }
+        Matcher matcher = ROUTE_DAY_HEADING_PATTERN.matcher(text.trim());
+        if (!matcher.matches()) {
+            return null;
+        }
+        for (int i = 1; i <= 3; i++) {
+            String value = matcher.group(i);
+            if (value != null && !value.isBlank()) {
+                return parseRouteDayNumber(value);
+            }
+        }
+        return null;
+    }
+
+    private Integer parseRouteDayNumber(String value) {
+        String normalized = value == null ? "" : value.trim();
+        if (normalized.isBlank()) {
+            return null;
+        }
+        if (normalized.matches("\\d+")) {
+            return Integer.parseInt(normalized);
+        }
+
+        Map<Character, Integer> digits = Map.of(
+                '一', 1,
+                '二', 2,
+                '三', 3,
+                '四', 4,
+                '五', 5,
+                '六', 6,
+                '七', 7,
+                '八', 8,
+                '九', 9
+        );
+        if (normalized.length() == 1 && digits.containsKey(normalized.charAt(0))) {
+            return digits.get(normalized.charAt(0));
+        }
+        int tenIndex = normalized.indexOf('十');
+        if (tenIndex >= 0) {
+            int tens = tenIndex == 0 ? 1 : digits.getOrDefault(normalized.charAt(tenIndex - 1), 0);
+            int ones = tenIndex == normalized.length() - 1 ? 0 : digits.getOrDefault(normalized.charAt(tenIndex + 1), 0);
+            int parsed = tens * 10 + ones;
+            return parsed > 0 ? parsed : null;
+        }
+        return null;
+    }
+
+    private boolean hasRequestedDaySet(Set<Integer> dayNumbers, int days) {
+        if (dayNumbers.size() != days) {
+            return false;
+        }
+        for (int day = 1; day <= days; day++) {
+            if (!dayNumbers.contains(day)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private boolean isHeadingLine(String text) {
@@ -856,7 +1200,7 @@ public class AiRouteService {
     }
 
     private boolean isDailySectionLine(String text) {
-        return text.matches("^(?:#|##|###)?\\s*(?:第[一二三四五六七八九十0-9]+天|Day\\s*\\d+).*$");
+        return extractRouteDayNumber(text) != null;
     }
 
     private boolean containsRequiredKeywords(String text) {

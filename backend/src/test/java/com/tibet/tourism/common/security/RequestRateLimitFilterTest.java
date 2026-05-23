@@ -116,6 +116,25 @@ class RequestRateLimitFilterTest {
     }
 
     @Test
+    @DisplayName("AI route job polling uses default read limit")
+    void aiJobPollingUsesDefaultLimit() throws Exception {
+        for (int i = 0; i < 3; i++) {
+            MockHttpServletResponse response = doFilter(apiRequest("GET", "/api/routes/generate/jobs/job-1"));
+            assertThat(response.getStatus()).isEqualTo(200);
+            assertThat(response.getHeader("X-RateLimit-Limit")).isEqualTo("10");
+        }
+    }
+
+    @Test
+    @DisplayName("AI route job stream uses default read limit")
+    void aiJobStreamUsesDefaultLimit() throws Exception {
+        MockHttpServletResponse response = doFilter(apiRequest("GET", "/api/routes/generate/jobs/job-1/stream"));
+
+        assertThat(response.getStatus()).isEqualTo(200);
+        assertThat(response.getHeader("X-RateLimit-Limit")).isEqualTo("10");
+    }
+
+    @Test
     @DisplayName("AI guide chat uses stricter limit")
     void aiGuideChatUsesStricterLimit() throws Exception {
         for (int i = 0; i < 2; i++) {

@@ -6,15 +6,15 @@
       <div class="absolute inset-0 opacity-35 tibet-hero-pattern"></div>
       <!-- 经幡色彩带 -->
       <div class="absolute bottom-0 left-0 right-0 h-1 tibet-prayer-flag opacity-80 z-20"></div>
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 relative z-10">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-24 relative z-10">
         <div class="max-w-2xl">
           <!-- 法轮装饰徽章 -->
           <span class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-tibet-white/10 backdrop-blur border border-tibet-gold/30 text-tibet-yellow text-sm mb-8">
             <svg class="w-4 h-4" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" stroke="currentColor" stroke-width="10" fill="none"/><circle cx="50" cy="50" r="12" fill="currentColor"/><line x1="50" y1="10" x2="50" y2="38" stroke="currentColor" stroke-width="6"/><line x1="50" y1="62" x2="50" y2="90" stroke="currentColor" stroke-width="6"/><line x1="10" y1="50" x2="38" y2="50" stroke="currentColor" stroke-width="6"/><line x1="62" y1="50" x2="90" y2="50" stroke="currentColor" stroke-width="6"/></svg>
             {{ t('hotel.badge') }}
           </span>
-          <h1 class="text-4xl md:text-6xl font-bold mb-6 leading-tight tibetan-font">{{ t('hotel.listTitle') }}</h1>
-          <p class="text-lg text-tibet-white/70 leading-relaxed max-w-xl">{{ t('hotel.listSubtitle') }}</p>
+          <h1 class="mb-5 text-3xl font-bold leading-tight sm:mb-6 sm:text-4xl md:text-6xl tibetan-font">{{ t('hotel.listTitle') }}</h1>
+          <p class="max-w-xl text-base leading-relaxed text-tibet-white/70 sm:text-lg">{{ t('hotel.listSubtitle') }}</p>
         </div>
       </div>
       <div class="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-tibet-white/20 to-transparent"></div>
@@ -22,7 +22,7 @@
 
     <!-- Filter Bar — 藏式金边 -->
     <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-8 relative z-20">
-      <div class="tibet-panel rounded-2xl p-5 flex flex-col sm:flex-row gap-3">
+      <div class="tibet-panel flex flex-col gap-3 rounded-2xl p-4 sm:flex-row sm:p-5">
         <div class="flex-1 relative">
           <svg class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-tibet-gold/60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
           <input v-model="keyword" type="text" :placeholder="t('hotel.searchPlaceholder')" class="w-full pl-12 pr-4 py-3 bg-tibet-white rounded-xl border-none outline-none focus:ring-2 focus:ring-tibet-red/20 transition-all text-tibet-dark placeholder-tibet-brown/30" />
@@ -45,12 +45,12 @@
     </section>
 
     <!-- Hotel List -->
-    <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      <div class="space-y-16">
+    <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-12">
+      <div class="space-y-12 sm:space-y-16">
         <div v-for="group in hotelsByRegionVisible" :key="group.region">
           <!-- Region Header — 藏式标题 -->
           <motion.div
-            class="flex items-center gap-6 mb-8"
+            class="mb-6 flex items-center gap-3 sm:mb-8 sm:gap-6"
             :initial="revealInitial"
             :whileInView="revealInView"
             :inViewOptions="inViewOnce"
@@ -58,7 +58,7 @@
           >
             <div class="flex-1 h-px bg-gradient-to-r from-transparent via-tibet-gold/50 to-transparent"></div>
             <div class="text-center shrink-0">
-              <h2 class="tibet-heading text-2xl md:text-3xl font-bold text-tibet-dark tibetan-font">
+              <h2 class="tibet-heading text-xl font-bold text-tibet-dark sm:text-2xl md:text-3xl tibetan-font">
                 {{ t('hotel.regionalHotels', { region: group.regionLabel }) }}
               </h2>
               <p class="text-sm text-tibet-brown/50 mt-1">{{ t('hotel.hotelsCount', { count: group.hotels.length }) }}</p>
@@ -67,7 +67,7 @@
           </motion.div>
 
           <!-- Hotel Cards -->
-          <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+          <div class="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4 xl:gap-6">
             <AnimatePresence mode="popLayout">
             <motion.article
                      v-for="(hotel, index) in group.hotels"
@@ -82,7 +82,7 @@
                      :whileHover="{ y: -5, scale: 1.012 }"
                      :whilePress="{ scale: 0.996 }">
               <!-- Image -->
-              <div class="relative h-52 overflow-hidden bg-tibet-brown/10">
+              <div class="relative h-48 overflow-hidden bg-tibet-brown/10 sm:h-52">
                 <img
                   :src="resolveHotelCoverImage(hotel.coverImage)"
                   :alt="hotel.name"
@@ -103,7 +103,7 @@
               </div>
 
               <!-- Content -->
-              <div class="p-5 space-y-3 bg-white">
+              <div class="space-y-3 bg-white p-4 sm:p-5">
                 <div>
                   <h3 class="text-lg font-bold text-tibet-dark group-hover:text-tibet-red transition-colors line-clamp-1">{{ hotel.name }}</h3>
                   <p class="text-xs text-tibet-brown/50 mt-0.5 flex items-center gap-1">
@@ -126,7 +126,7 @@
                 </div>
 
                 <!-- Price & Actions -->
-                <div class="flex items-end justify-between pt-3 border-t border-tibet-gold/20">
+                <div class="flex flex-wrap items-end justify-between gap-3 border-t border-tibet-gold/20 pt-3">
                   <div>
                     <div class="flex items-baseline gap-0.5">
                       <span class="text-xs text-tibet-brown/40">¥</span>

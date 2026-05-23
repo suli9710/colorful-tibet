@@ -350,7 +350,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="relative w-full h-[600px] bg-white rounded-2xl shadow-lg border border-tibet-gold/25">
+  <div class="relative h-[360px] w-full rounded-2xl border border-tibet-gold/25 bg-white shadow-lg sm:h-[520px] lg:h-[600px]">
     <div ref="chartRef" class="w-full h-full"></div>
     <div
       v-if="chartError"
@@ -360,7 +360,7 @@ onUnmounted(() => {
         <p class="text-lg font-semibold">{{ t('spotDetail.mapLoadFailed') }}</p>
       </div>
     </div>
-    <div class="absolute left-4 bottom-4 bg-white/90 backdrop-blur-sm rounded-lg shadow-lg border border-tibet-gold/25 p-4 min-w-[200px]">
+    <div class="absolute inset-x-3 bottom-3 rounded-lg border border-tibet-gold/25 bg-white/90 p-3 shadow-lg backdrop-blur-sm sm:inset-x-auto sm:left-4 sm:bottom-4 sm:min-w-[200px] sm:p-4">
       <div class="flex items-center justify-between mb-2">
         <span class="text-sm font-medium text-gray-700">{{ t('heatmap.zoomLevel') }}</span>
         <span class="text-sm font-bold text-blue-600">{{ zoomLevel.toFixed(1) }}x</span>

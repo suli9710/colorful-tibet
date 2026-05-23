@@ -18,4 +18,6 @@ public interface PlatformOrderRepository extends JpaRepository<PlatformOrder, Lo
     List<PlatformOrder> findByUserIdOrderByCreatedAtDesc(Long userId);
 
     List<PlatformOrder> findByStatusAndExpiresAtBefore(PlatformOrder.Status status, LocalDateTime expiresAt);
+
+    void deleteByUserId(Long userId);
 }

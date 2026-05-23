@@ -119,7 +119,7 @@ public class RequestRateLimitFilter extends OncePerRequestFilter {
         }
 
         long now = System.currentTimeMillis();
-        LimitRule rule = resolveRule(path);
+        LimitRule rule = resolveRule(path, request.getMethod());
         RateDecision decision = tryAcquire(request, rule, now);
 
         response.setHeader("X-RateLimit-Limit", String.valueOf(rule.maxRequests()));
@@ -186,13 +186,16 @@ public class RequestRateLimitFilter extends OncePerRequestFilter {
         windows.entrySet().removeIf(entry -> now - entry.getValue().lastSeenAt() > Duration.ofMinutes(30).toMillis());
     }
 
-    private LimitRule resolveRule(String path) {
+    private LimitRule resolveRule(String path, String method) {
         String normalized = path.toLowerCase();
         if (normalized.startsWith("/api/auth/register")) {
             return new LimitRule("register", registerRequests, Duration.ofSeconds(registerWindowSeconds).toMillis());
         }
         if (normalized.startsWith("/api/auth/login")) {
             return new LimitRule("auth", authRequests, Duration.ofSeconds(authWindowSeconds).toMillis());
+        }
+        if ("GET".equalsIgnoreCase(method) && normalized.startsWith("/api/routes/generate/jobs/")) {
+            return new LimitRule("default", defaultRequests, Duration.ofSeconds(defaultWindowSeconds).toMillis());
         }
         if (normalized.startsWith("/api/routes/generate")) {
             return new LimitRule("ai", aiRequests, Duration.ofSeconds(aiWindowSeconds).toMillis());

@@ -125,7 +125,7 @@ watch([visible, isIdle], ([v, idle]) => {
 
 <template>
   <AnimatePresence>
-    <div v-if="visible" key="ai-guide-container" class="fixed bottom-4 right-3 z-[90] flex max-w-[calc(100vw-1.5rem)] flex-col items-end gap-2 sm:bottom-6 sm:right-6">
+    <div v-if="visible" key="ai-guide-container" class="ai-guide-container fixed bottom-4 right-3 z-[90] flex max-w-[calc(100vw-1.5rem)] flex-col items-end gap-2 sm:bottom-6 sm:right-6">
       <!-- Chat Panel (idle only) -->
       <GuideChatPanel :visible="chatOpen && isIdle" @close="handleChatClose" />
 
@@ -341,5 +341,28 @@ watch([visible, isIdle], ([v, idle]) => {
   0%, 100% { opacity: 0; transform: translateY(0) scale(0.5); }
   40% { opacity: 0.9; transform: translateY(-4px) scale(1.1); }
   70% { opacity: 0.3; transform: translateY(-2px) scale(0.8); }
+}
+</style>
+
+<style scoped>
+@media (max-width: 767px) {
+  .ai-guide-container {
+    bottom: calc(6rem + env(safe-area-inset-bottom));
+  }
+
+  .live2d-char-btn {
+    width: 92px;
+    height: 100px;
+  }
+
+  .live2d-char-btn :deep(.live2d-character-wrapper) {
+    transform: scale(0.62);
+    transform-origin: center bottom;
+  }
+
+  .speech-bubble {
+    max-width: min(17rem, calc(100vw - 2rem));
+    padding: 8px 12px;
+  }
 }
 </style>

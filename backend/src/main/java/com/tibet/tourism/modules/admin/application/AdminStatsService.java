@@ -16,6 +16,7 @@ import java.math.BigDecimal;
 import java.time.format.DateTimeFormatter;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
+import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -26,6 +27,8 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class AdminStatsService {
+
+    private static final ZoneId BEIJING_ZONE = ZoneId.of("Asia/Shanghai");
 
     private final UserRepository userRepository;
     private final ScenicSpotRepository scenicSpotRepository;
@@ -71,7 +74,7 @@ public class AdminStatsService {
 
         List<Booking> recentScenicBookings = bookingRepository.findTop5ByStatusOrderByCreatedAtDesc(Booking.Status.CONFIRMED);
         List<HotelBooking> recentHotelBookings = hotelBookingRepository.findTop5ByStatusAndDeletedAtIsNullOrderByCreatedAtDesc(HotelBooking.Status.CONFIRMED);
-        LocalDateTime trendStartAt = YearMonth.now().minusMonths(5).atDay(1).atStartOfDay();
+        LocalDateTime trendStartAt = YearMonth.now(BEIJING_ZONE).minusMonths(5).atDay(1).atStartOfDay();
         List<Booking> confirmedScenicBookings = bookingRepository
                 .findByStatusAndCreatedAtAfterOrderByCreatedAtAsc(Booking.Status.CONFIRMED, trendStartAt);
         List<HotelBooking> confirmedHotelBookings = hotelBookingRepository
@@ -95,7 +98,7 @@ public class AdminStatsService {
         stats.put("userGrowthTrend", buildUserGrowthTrend());
         stats.put("newsPublishTrend", buildNewsPublishTrend());
         stats.put("visitorCityDistribution", buildVisitorCityDistribution());
-        stats.put("updatedAt", LocalDateTime.now());
+        stats.put("updatedAt", LocalDateTime.now(BEIJING_ZONE));
 
         return stats;
     }
@@ -114,7 +117,7 @@ public class AdminStatsService {
     private List<Map<String, Object>> buildMonthlyBookingTrend(List<Booking> scenicBookings, List<HotelBooking> hotelBookings) {
         Map<String, long[]> buckets = new LinkedHashMap<>();
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM");
-        YearMonth startMonth = YearMonth.now().minusMonths(5);
+        YearMonth startMonth = YearMonth.now(BEIJING_ZONE).minusMonths(5);
 
         for (int i = 0; i < 6; i++) {
             buckets.put(startMonth.plusMonths(i).format(formatter), new long[2]);
@@ -162,7 +165,7 @@ public class AdminStatsService {
     }
 
     private List<Map<String, Object>> buildUserGrowthTrend() {
-        LocalDateTime trendStartAt = YearMonth.now().minusMonths(5).atDay(1).atStartOfDay();
+        LocalDateTime trendStartAt = YearMonth.now(BEIJING_ZONE).minusMonths(5).atDay(1).atStartOfDay();
         return userRepository.findByCreatedAtAfterOrderByCreatedAtAsc(trendStartAt).stream()
                 .filter(user -> user.getCreatedAt() != null)
                 .collect(Collectors.groupingBy(
@@ -175,7 +178,7 @@ public class AdminStatsService {
     }
 
     private List<Map<String, Object>> buildNewsPublishTrend() {
-        LocalDateTime trendStartAt = YearMonth.now().minusMonths(5).atDay(1).atStartOfDay();
+        LocalDateTime trendStartAt = YearMonth.now(BEIJING_ZONE).minusMonths(5).atDay(1).atStartOfDay();
         return newsRepository.findByCreatedAtAfterOrderByCreatedAtAsc(trendStartAt).stream()
                 .filter(news -> news.getCreatedAt() != null)
                 .collect(Collectors.groupingBy(

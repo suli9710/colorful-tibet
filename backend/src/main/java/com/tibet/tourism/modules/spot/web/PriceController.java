@@ -1,6 +1,7 @@
 package com.tibet.tourism.modules.spot.web;
 import com.tibet.tourism.common.error.ResourceNotFoundException;
 import com.tibet.tourism.modules.spot.application.PriceFetchService;
+import com.tibet.tourism.modules.spot.application.PriceBatchUpdateJobService;
 import com.tibet.tourism.modules.spot.application.PriceUpdateService;
 import com.tibet.tourism.modules.spot.domain.ScenicSpot;
 import com.tibet.tourism.modules.spot.infra.ScenicSpotRepository;
@@ -27,6 +28,9 @@ public class PriceController {
 
     @Autowired
     private PriceUpdateService priceUpdateService;
+
+    @Autowired
+    private PriceBatchUpdateJobService priceBatchUpdateJobService;
 
     @Autowired
     private ScenicSpotRepository scenicSpotRepository;
@@ -97,6 +101,28 @@ public class PriceController {
         } catch (Exception e) {
             logger.error("Batch price update failed, force={}", force, e);
             return ResponseEntity.badRequest().body(Map.of("error", "价格查询失败，请稍后重试"));
+        }
+    }
+
+    @PostMapping("/batch-update/jobs")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> startBatchUpdateJob(
+            @RequestParam(required = false, defaultValue = "false") boolean force) {
+        try {
+            return ResponseEntity.ok(priceBatchUpdateJobService.startJob(force));
+        } catch (Exception e) {
+            logger.error("Batch price update job start failed, force={}", force, e);
+            return ResponseEntity.badRequest().body(Map.of("error", "浠锋牸鏌ヨ澶辫触锛岃绋嶅悗閲嶈瘯"));
+        }
+    }
+
+    @GetMapping("/batch-update/jobs/{jobId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> getBatchUpdateJob(@PathVariable String jobId) {
+        try {
+            return ResponseEntity.ok(priceBatchUpdateJobService.getJob(jobId));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.notFound().build();
         }
     }
 }

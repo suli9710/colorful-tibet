@@ -1,23 +1,23 @@
 <template>
-  <div class="min-h-screen tibet-page-shell py-24">
+  <div class="min-h-screen tibet-page-shell py-16 sm:py-24">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <!-- Header -->
       <motion.div
-        class="text-center mb-12"
+        class="mb-10 text-center sm:mb-12"
         :initial="revealInitial"
         :whileInView="revealInView"
         :inViewOptions="inViewOnce"
         :transition="revealTransition"
       >
-        <h1 class="tibet-heading inline-flex justify-center text-4xl font-bold text-tibet-dark mb-4">{{ t('community.title') }}</h1>
-        <p class="text-lg text-tibet-brown/70">{{ t('community.subtitle') }}</p>
+        <h1 class="tibet-heading inline-flex justify-center text-3xl font-bold text-tibet-dark mb-4 sm:text-4xl">{{ t('community.title') }}</h1>
+        <p class="text-base text-tibet-brown/70 sm:text-lg">{{ t('community.subtitle') }}</p>
       </motion.div>
 
       <!-- Tabs -->
-      <div class="flex justify-center mb-8">
+      <div class="-mx-4 mb-8 overflow-x-auto px-4 pb-2 sm:mx-0 sm:flex sm:justify-center sm:overflow-visible sm:px-0 sm:pb-0">
         <LayoutGroup>
         <motion.div
-          class="tibet-panel rounded-2xl p-1.5 inline-flex gap-1"
+          class="tibet-panel inline-flex min-w-max gap-1 rounded-2xl p-1.5"
           :initial="revealInitial"
           :whileInView="revealInView"
           :inViewOptions="inViewOnce"
@@ -66,25 +66,25 @@
       <!-- ==================== ROUTE SHARING TAB ==================== -->
       <template v-if="activeTab === 'routes'">
         <motion.div
-          class="tibet-panel rounded-2xl p-6 mb-8 flex flex-wrap gap-4 items-center justify-between"
+          class="tibet-panel mb-8 flex flex-col gap-4 rounded-2xl p-4 sm:p-6 lg:flex-row lg:items-center lg:justify-between"
           :initial="revealInitial"
           :whileInView="revealInView"
           :inViewOptions="inViewOnce"
           :transition="revealTransition"
         >
-          <div class="flex flex-wrap gap-4">
-            <select v-model="routeFilters.days" @change="loadRoutes" class="px-4 py-2 rounded-xl bg-white/50 border border-tibet-gold/25 focus:border-tibet-gold outline-none text-sm">
+          <div class="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">
+            <select v-model="routeFilters.days" @change="loadRoutes" class="shrink-0 px-4 py-2 rounded-xl bg-white/50 border border-tibet-gold/25 focus:border-tibet-gold outline-none text-sm">
               <option value="">{{ t('community.allDays') }}</option>
               <option value="3">3{{ t('community.days') }}</option>
               <option value="5">5{{ t('community.days') }}</option>
               <option value="7">7{{ t('community.days') }}</option>
               <option value="10">10{{ t('community.days') }}+</option>
             </select>
-            <select v-model="routeFilters.budget" @change="loadRoutes" class="px-4 py-2 rounded-xl bg-white/50 border border-tibet-gold/25 focus:border-tibet-gold outline-none text-sm">
+            <select v-model="routeFilters.budget" @change="loadRoutes" class="shrink-0 px-4 py-2 rounded-xl bg-white/50 border border-tibet-gold/25 focus:border-tibet-gold outline-none text-sm">
               <option value="">{{ t('community.allBudget') }}</option>
               <option v-for="opt in budgetOptions" :key="opt.key" :value="opt.key">{{ opt.label }}</option>
             </select>
-            <select v-model="routeFilters.preference" @change="loadRoutes" class="px-4 py-2 rounded-xl bg-white/50 border border-tibet-gold/25 focus:border-tibet-gold outline-none text-sm">
+            <select v-model="routeFilters.preference" @change="loadRoutes" class="shrink-0 px-4 py-2 rounded-xl bg-white/50 border border-tibet-gold/25 focus:border-tibet-gold outline-none text-sm">
               <option value="">{{ t('community.allPreference') }}</option>
               <option v-for="opt in preferenceOptions" :key="opt.key" :value="opt.key">{{ opt.label }}</option>
             </select>
@@ -172,24 +172,24 @@
       <!-- ==================== Q&A TAB ==================== -->
       <template v-if="activeTab === 'qa'">
         <motion.div
-          class="tibet-panel rounded-2xl p-6 mb-8 flex flex-wrap gap-4 items-center justify-between"
+          class="tibet-panel mb-8 flex flex-col gap-4 rounded-2xl p-4 sm:p-6 lg:flex-row lg:items-center lg:justify-between"
           :initial="revealInitial"
           :whileInView="revealInView"
           :inViewOptions="inViewOnce"
           :transition="revealTransition"
         >
-          <div class="flex flex-wrap gap-3 items-center">
+          <div class="min-w-0 space-y-3">
             <!-- Tag filter -->
-            <div class="flex flex-wrap gap-1.5">
+            <div class="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">
               <button
                 @click="qaFilters.tag = ''; loadQuestions()"
-                class="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+                class="shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
                 :class="!qaFilters.tag ? 'bg-tibet-gold text-white shadow-sm' : 'bg-white/60 text-gray-500 hover:bg-white hover:text-gray-700 border border-tibet-gold/20'"
               >{{ t('common.all') }}</button>
               <button
                 v-for="tag in tagOptions" :key="tag.value"
                 @click="qaFilters.tag = qaFilters.tag === tag.value ? '' : tag.value; loadQuestions()"
-                class="px-3 py-1.5 rounded-lg text-xs font-medium transition-all border"
+                class="shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border"
                 :class="qaFilters.tag === tag.value ? 'text-white shadow-sm border-transparent' : 'bg-white/60 text-gray-500 hover:bg-white hover:text-gray-700 border-tibet-gold/20'"
                 :style="qaFilters.tag === tag.value ? { backgroundColor: tag.color, borderColor: tag.color } : {}"
               >{{ tag.value }}</button>

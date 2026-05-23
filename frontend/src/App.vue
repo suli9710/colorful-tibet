@@ -3,6 +3,7 @@
 import NavBar from './components/NavBar.vue'
 import Footer from './components/Footer.vue'
 import AiRouteFloatingBall from './components/AiRouteFloatingBall.vue'
+import MobileBottomNav from './components/MobileBottomNav.vue'
 import ToastHost from './components/ToastHost.vue'
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
@@ -85,7 +86,7 @@ onBeforeUnmount(() => {
     </AnimatePresence>
 
     <NavBar />
-    <main class="flex-grow pt-20 md:pt-24">
+    <main class="mobile-shell-main flex-grow pt-20 md:pt-24">
       <router-view v-slot="{ Component, route }">
         <keep-alive include="RoutePlanner">
           <component
@@ -109,6 +110,7 @@ onBeforeUnmount(() => {
     </main>
     <Footer />
     <AiRouteFloatingBall />
+    <MobileBottomNav />
     <ToastHost />
   </div>
   </MotionConfig>

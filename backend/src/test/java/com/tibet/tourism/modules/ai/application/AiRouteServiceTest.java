@@ -118,9 +118,9 @@ class AiRouteServiceTest {
         assertNotNull(body);
         assertTrue(body.containsKey("messages"));
         assertFalse(body.containsKey("input"));
-        assertEquals(Map.of("type", "enabled"), body.get("thinking"));
-        assertEquals("medium", body.get("reasoning_effort"));
-        assertEquals(5200, body.get("max_tokens"));
+        assertFalse(body.containsKey("thinking"));
+        assertFalse(body.containsKey("reasoning_effort"));
+        assertEquals(16200, body.get("max_tokens"));
         assertEquals(Boolean.TRUE, body.get("stream"));
     }
 
@@ -146,11 +146,115 @@ class AiRouteServiceTest {
         assertNotNull(body);
         assertTrue(body.containsKey("input"));
         assertFalse(body.containsKey("messages"));
-        assertEquals(Map.of("type", "enabled"), body.get("thinking"));
-        assertEquals("medium", body.get("reasoning_effort"));
-        assertEquals(5200, body.get("max_output_tokens"));
+        assertFalse(body.containsKey("thinking"));
+        assertFalse(body.containsKey("reasoning_effort"));
+        assertEquals(16200, body.get("max_output_tokens"));
         assertEquals(Boolean.TRUE, body.get("stream"));
         assertEquals("ep-20260516173036-4dpgm", body.get("model"));
+    }
+
+    @Test
+    void validatesRequestedDayCountBeforeAcceptingRouteContent() {
+        AiRouteService service = new AiRouteService(
+                WebClient.builder(),
+                "https://ark.cn-beijing.volces.com/api/v3/responses",
+                "test-api-key",
+                "ep-20260516173036-4dpgm",
+                30,
+                "",
+                30
+        );
+        String incomplete = """
+                # 西藏15天路线
+                ## 路线概览
+                这是一条包含预算、住宿和贴心提示的路线。
+                ## 每日行程
+                ### 第1天：拉萨
+                - 上午：布达拉宫。
+                - 下午：八廓街。
+                - 晚上/住宿：拉萨。
+                ### 第2天：拉萨
+                - 上午：大昭寺。
+                - 下午：色拉寺。
+                - 晚上/住宿：拉萨。
+                ### 第3天：羊湖
+                - 上午：前往羊卓雍措。
+                - 下午：返回拉萨。
+                - 晚上/住宿：拉萨。
+                ## 进藏必读
+                - 预算和高原适应提示。
+                """;
+
+        String normalized = ReflectionTestUtils.invokeMethod(
+                service,
+                "normalizeMarkdownRoute",
+                incomplete,
+                15,
+                "舒适型",
+                "自然风光",
+                "zh"
+        );
+
+        assertNotNull(normalized);
+        assertTrue(normalized.contains("15"));
+        assertTrue(normalized.length() > incomplete.length());
+    }
+
+    @Test
+    void removesRepeatedRouteRestartBeforeValidatingDayCount() {
+        AiRouteService service = new AiRouteService(
+                WebClient.builder(),
+                "https://ark.cn-beijing.volces.com/api/v3/responses",
+                "test-api-key",
+                "ep-20260516173036-4dpgm",
+                30,
+                "",
+                30
+        );
+        String duplicated = completeChineseRoute(4) + "\n\n，" + completeChineseRoute(4);
+
+        String normalized = ReflectionTestUtils.invokeMethod(
+                service,
+                "normalizeMarkdownRoute",
+                duplicated,
+                4,
+                "豪华型",
+                "自然风光",
+                "zh"
+        );
+
+        assertNotNull(normalized);
+        assertFalse(normalized.contains("基准路线"));
+        assertEquals(1, countOccurrences(normalized, "# 林芝寻踪：4天光影路线"));
+        assertEquals(1, countOccurrences(normalized, "### 第1天："));
+        assertEquals(1, countOccurrences(normalized, "### 第4天："));
+    }
+
+    @Test
+    void fallsBackWhenUniqueDailySectionsDoNotMatchRequestedDays() {
+        AiRouteService service = new AiRouteService(
+                WebClient.builder(),
+                "https://ark.cn-beijing.volces.com/api/v3/responses",
+                "test-api-key",
+                "ep-20260516173036-4dpgm",
+                30,
+                "",
+                30
+        );
+
+        String normalized = ReflectionTestUtils.invokeMethod(
+                service,
+                "normalizeMarkdownRoute",
+                completeChineseRoute(4),
+                5,
+                "豪华型",
+                "自然风光",
+                "zh"
+        );
+
+        assertNotNull(normalized);
+        assertTrue(normalized.contains("基准路线"));
+        assertTrue(normalized.contains("5天"));
     }
 
     @Test
@@ -219,6 +323,44 @@ class AiRouteServiceTest {
         String text = ReflectionTestUtils.invokeMethod(service, "extractResponseText", response);
 
         assertEquals("# Test route", text);
+    }
+
+    private static String completeChineseRoute(int days) {
+        StringBuilder builder = new StringBuilder();
+        builder.append("# 林芝寻踪：").append(days).append("天光影路线\n\n");
+        builder.append("## 路线概览\n");
+        builder.append("这是一条兼顾预算、住宿、车程和贴心提示的路线，先在拉萨适应，再顺路进入林芝方向。\n\n");
+        builder.append("## 行程亮点\n");
+        builder.append("- 巴松措湖心岛晨雾和湖面金光\n");
+        builder.append("- 鲁朗林海与藏式村落慢游\n");
+        builder.append("- 雅鲁藏布大峡谷与南迦巴瓦观景\n\n");
+        builder.append("## 每日行程\n\n");
+        for (int day = 1; day <= days; day++) {
+            builder.append("### 第").append(day).append("天：拉萨 — 林芝方向体验\n");
+            builder.append("- **清晨/上午**：8:00 出发，游玩真实景点约2小时，专车转场，注意慢走适应高原。\n");
+            builder.append("- **午餐/转场**：安排藏餐或石锅鸡，人均150元，车程约2小时，路况以高速和柏油路为主。\n");
+            builder.append("- **下午**：深入湖泊、林海或峡谷景观，预留拍照时间，听一段在地文化故事。\n");
+            builder.append("- **傍晚**：选择观景台等日落，天气给面子就把相机留给金光。\n");
+            builder.append("- **晚上/住宿**：入住景区或镇区供氧酒店，价格约1200-1800元/晚。\n");
+            builder.append("- **在地彩蛋**：甜茶馆、藏式手作或小众机位，控制体力不赶场。\n");
+            builder.append("- **当日理由**：顺着同一地理方向推进，兼顾自然风光、高原适应和路线效率。\n");
+            builder.append("- **贴心提示**：海拔约3000-3700米，带身份证、防晒、保暖衣物和便携氧气。\n\n");
+        }
+        builder.append("## 预算预估\n");
+        builder.append("- 按豪华型标准，交通、住宿餐饮、门票体验合计人均约8000-12000元。\n\n");
+        builder.append("## 进藏必读\n");
+        builder.append("- 第一天不要洗澡和奔跑，注意高原反应、边防证、穿衣防晒、通讯现金和尊重风俗。\n");
+        return builder.toString();
+    }
+
+    private static int countOccurrences(String text, String needle) {
+        int count = 0;
+        int index = 0;
+        while ((index = text.indexOf(needle, index)) >= 0) {
+            count++;
+            index += needle.length();
+        }
+        return count;
     }
 
     private static final class CapturingSseEmitter extends SseEmitter {

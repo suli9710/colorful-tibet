@@ -1,18 +1,23 @@
 package com.tibet.tourism.common.config;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.net.URI;
 import java.util.Arrays;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.lang.NonNull;
+import org.springframework.util.StringUtils;
 import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+import reactor.netty.http.client.HttpClient;
+import reactor.netty.transport.ProxyProvider;
 
 @Configuration
 public class WebMvcConfig implements WebMvcConfigurer {
@@ -24,6 +29,12 @@ public class WebMvcConfig implements WebMvcConfigurer {
 
     @Value("${app.cors.allowed-origins:}")
     private String allowedOrigins;
+
+    @Value("${app.outbound-proxy.url:${OUTBOUND_HTTP_PROXY:}}")
+    private String outboundProxyUrl;
+
+    @Value("${app.outbound-proxy.non-proxy-hosts:${OUTBOUND_HTTP_PROXY_NON_PROXY_HOSTS:localhost|127.*|10.*|172\\.(1[6-9]|2[0-9]|3[0-1])\\..*|192\\.168\\..*|mysql|redis|scrapling|backend|frontend|zipkin}}")
+    private String outboundProxyNonProxyHosts;
 
     @Override
     public void addCorsMappings(CorsRegistry registry) {
@@ -67,7 +78,46 @@ public class WebMvcConfig implements WebMvcConfigurer {
         ExchangeStrategies strategies = ExchangeStrategies.builder()
             .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(2 * 1024 * 1024))
             .build();
-        return WebClient.builder().exchangeStrategies(strategies);
+
+        WebClient.Builder builder = WebClient.builder().exchangeStrategies(strategies);
+        HttpClient httpClient = outboundProxyHttpClient();
+        if (httpClient != null) {
+            builder.clientConnector(new ReactorClientHttpConnector(httpClient));
+        }
+        return builder;
+    }
+
+    private HttpClient outboundProxyHttpClient() {
+        if (!StringUtils.hasText(outboundProxyUrl)) {
+            return null;
+        }
+
+        try {
+            URI proxyUri = URI.create(outboundProxyUrl.contains("://")
+                    ? outboundProxyUrl
+                    : "http://" + outboundProxyUrl);
+            String host = proxyUri.getHost();
+            int port = proxyUri.getPort() > 0 ? proxyUri.getPort() : 80;
+            if (!StringUtils.hasText(host)) {
+                logger.warn("Ignoring outbound proxy URL because host is missing");
+                return null;
+            }
+            if (StringUtils.hasText(proxyUri.getScheme()) && !"http".equalsIgnoreCase(proxyUri.getScheme())) {
+                logger.warn("Ignoring outbound proxy URL because only HTTP proxies are supported for WebClient");
+                return null;
+            }
+
+            logger.info("Configuring WebClient outbound proxy: host={}, port={}, nonProxyHosts={}",
+                    host, port, outboundProxyNonProxyHosts);
+            return HttpClient.create()
+                    .proxy(proxy -> proxy.type(ProxyProvider.Proxy.HTTP)
+                            .host(host)
+                            .port(port)
+                            .nonProxyHosts(outboundProxyNonProxyHosts));
+        } catch (IllegalArgumentException exception) {
+            logger.warn("Ignoring invalid outbound proxy URL");
+            return null;
+        }
     }
 
     private String[] parseCsvProperty(String value) {

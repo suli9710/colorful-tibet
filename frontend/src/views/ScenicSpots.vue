@@ -1,29 +1,29 @@
 <template>
-  <div class="min-h-screen tibet-page-shell py-24">
+  <div class="min-h-screen tibet-page-shell py-16 sm:py-24">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <!-- Header -->
       <motion.div
-        class="text-center mb-16"
+        class="mb-10 text-center sm:mb-16"
         :initial="revealInitial"
         :whileInView="revealInView"
         :inViewOptions="inViewOnce"
         :transition="revealTransition"
       >
-        <h1 class="tibet-heading inline-flex justify-center text-4xl font-bold text-tibet-dark mb-4 tibetan-font">{{ t('spots.title') }}</h1>
-        <p class="text-lg text-tibet-brown/70 max-w-2xl mx-auto tibetan-font">
+        <h1 class="tibet-heading inline-flex justify-center text-3xl font-bold text-tibet-dark mb-4 sm:text-4xl tibetan-font">{{ t('spots.title') }}</h1>
+        <p class="mx-auto max-w-2xl text-base text-tibet-brown/70 sm:text-lg tibetan-font">
           {{ t('spots.subtitle') }}
         </p>
       </motion.div>
 
       <!-- Filters -->
       <motion.div
-        class="flex justify-center mb-12 will-change-transform"
+        class="-mx-4 mb-10 overflow-x-auto px-4 pb-2 sm:mx-0 sm:flex sm:justify-center sm:overflow-visible sm:px-0 sm:pb-0 sm:mb-12 will-change-transform"
         :initial="revealInitial"
         :whileInView="revealInView"
         :inViewOptions="inViewOnce"
         :transition="revealTransition"
       >
-        <div class="tibet-panel p-1.5 rounded-full flex space-x-2">
+        <div class="tibet-panel flex w-max min-w-full space-x-2 rounded-full p-1.5 sm:min-w-0">
           <motion.button 
             v-for="cat in categories" 
             :key="cat.value"
@@ -32,7 +32,7 @@
             :whileHover="{ y: -2, scale: 1.04 }"
             :whilePress="{ scale: 0.94 }"
             :class="[
-              'px-6 py-2.5 rounded-full text-sm font-medium transition-all duration-300 ease-out-expo relative overflow-hidden will-change-transform tibetan-font',
+              'shrink-0 px-5 py-2.5 rounded-full text-sm font-medium transition-all duration-300 ease-out-expo relative overflow-hidden will-change-transform tibetan-font',
               selectedCategory === cat.value 
                 ? 'bg-tibet-dark text-white shadow-md transform scale-105' 
                 : 'text-tibet-brown/80 hover:bg-tibet-gold/5 hover:text-tibet-dark hover:scale-105'
@@ -123,7 +123,7 @@
              :whilePress="{ scale: 0.996 }">
           
           <!-- Image Container -->
-          <div class="relative h-72 overflow-hidden bg-gray-200">
+          <div class="relative h-56 overflow-hidden bg-gray-200 sm:h-72">
             <img v-if="hasSpotImage(spot)"
                  :src="spot.imageUrl"
                  :alt="spot.name"
@@ -147,8 +147,8 @@
           </div>
           
           <!-- Content -->
-          <div class="p-8">
-            <div class="flex justify-between items-start mb-4">
+          <div class="p-5 sm:p-8">
+            <div class="mb-4 flex items-start justify-between gap-3">
               <h3 class="text-xl font-bold text-tibet-dark group-hover:text-tibet-gold transition-colors duration-300 ease-out-expo flex-1 tibetan-font">
                 {{ spot.name }}
               </h3>
@@ -160,8 +160,8 @@
             </p>
             
             <!-- Tags & Action -->
-            <div class="flex items-center justify-between pt-6 border-t border-tibet-gold/20">
-              <div class="flex space-x-2 overflow-hidden">
+            <div class="flex flex-wrap items-center justify-between gap-3 border-t border-tibet-gold/20 pt-5 sm:pt-6">
+              <div class="flex min-w-0 flex-wrap gap-2">
                 <span v-for="tag in spot.tags?.slice(0, 2)" :key="tag.id" 
                       class="px-3 py-1 bg-tibet-gold/5 text-tibet-brown/80 rounded-full text-xs font-medium whitespace-nowrap transform group-hover:scale-105 transition-transform duration-300 ease-out-expo will-change-transform">
                   {{ tag.tag }}
