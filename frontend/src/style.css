@@ -50,6 +50,13 @@
 }
 
 @media (max-width: 640px) {
+  html,
+  body,
+  #app {
+    max-width: 100%;
+    overflow-x: clip;
+  }
+
   .overflow-x-auto {
     -webkit-overflow-scrolling: touch;
     touch-action: pan-x;
@@ -59,6 +66,44 @@
   select,
   textarea {
     font-size: 16px;
+  }
+
+  img,
+  svg,
+  canvas,
+  video {
+    max-width: 100%;
+  }
+
+  table {
+    width: 100%;
+  }
+
+  .overflow-x-auto > table,
+  .overflow-x-auto > div > table {
+    min-width: 640px;
+  }
+
+  .mobile-shell-main {
+    padding-bottom: calc(5.75rem + env(safe-area-inset-bottom));
+  }
+
+  .mobile-safe-bottom {
+    padding-bottom: calc(5.75rem + env(safe-area-inset-bottom));
+  }
+
+  .mobile-card-pad {
+    padding: 1.25rem;
+  }
+
+  .mobile-touch-target {
+    min-height: 44px;
+  }
+
+  .prose,
+  .route-result-prose {
+    max-width: 100%;
+    overflow-wrap: anywhere;
   }
 }
 

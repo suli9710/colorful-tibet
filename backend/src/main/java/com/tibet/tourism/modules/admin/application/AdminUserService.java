@@ -1,12 +1,21 @@
 package com.tibet.tourism.modules.admin.application;
+
+import com.tibet.tourism.modules.ai.infra.AiRouteRecordRepository;
 import com.tibet.tourism.modules.community.infra.CommentLikeRepository;
 import com.tibet.tourism.modules.community.infra.CommentRepository;
+import com.tibet.tourism.modules.community.infra.FavoriteRepository;
+import com.tibet.tourism.modules.community.infra.QuestionLikeRepository;
 import com.tibet.tourism.modules.community.infra.RouteCommentRepository;
 import com.tibet.tourism.modules.community.infra.RouteLikeRepository;
 import com.tibet.tourism.modules.community.infra.SharedRouteRepository;
-import com.tibet.tourism.modules.hotel.domain.Hotel;
+import com.tibet.tourism.modules.community.infra.TravelAnswerRepository;
+import com.tibet.tourism.modules.community.infra.TravelQuestionRepository;
 import com.tibet.tourism.modules.hotel.infra.HotelBookingRepository;
 import com.tibet.tourism.modules.order.infra.BookingRepository;
+import com.tibet.tourism.modules.order.infra.OrderAuditLogRepository;
+import com.tibet.tourism.modules.order.infra.PlatformOrderRepository;
+import com.tibet.tourism.modules.route.infra.ItineraryRepository;
+import com.tibet.tourism.modules.route.infra.TibetTravelKitRepository;
 import com.tibet.tourism.modules.user.domain.User;
 import com.tibet.tourism.modules.user.infra.UserRepository;
 import com.tibet.tourism.modules.user.infra.UserVisitHistoryRepository;
@@ -24,8 +33,17 @@ public class AdminUserService {
     private final RouteCommentRepository routeCommentRepository;
     private final CommentRepository commentRepository;
     private final SharedRouteRepository sharedRouteRepository;
+    private final FavoriteRepository favoriteRepository;
+    private final QuestionLikeRepository questionLikeRepository;
+    private final TravelAnswerRepository travelAnswerRepository;
+    private final TravelQuestionRepository travelQuestionRepository;
     private final BookingRepository bookingRepository;
+    private final PlatformOrderRepository platformOrderRepository;
+    private final OrderAuditLogRepository orderAuditLogRepository;
     private final HotelBookingRepository hotelBookingRepository;
+    private final AiRouteRecordRepository aiRouteRecordRepository;
+    private final TibetTravelKitRepository tibetTravelKitRepository;
+    private final ItineraryRepository itineraryRepository;
     private final UserVisitHistoryRepository userVisitHistoryRepository;
 
     @Value("${app.super-admin-username:lzh}")
@@ -37,8 +55,17 @@ public class AdminUserService {
                             RouteCommentRepository routeCommentRepository,
                             CommentRepository commentRepository,
                             SharedRouteRepository sharedRouteRepository,
+                            FavoriteRepository favoriteRepository,
+                            QuestionLikeRepository questionLikeRepository,
+                            TravelAnswerRepository travelAnswerRepository,
+                            TravelQuestionRepository travelQuestionRepository,
                             BookingRepository bookingRepository,
+                            PlatformOrderRepository platformOrderRepository,
+                            OrderAuditLogRepository orderAuditLogRepository,
                             HotelBookingRepository hotelBookingRepository,
+                            AiRouteRecordRepository aiRouteRecordRepository,
+                            TibetTravelKitRepository tibetTravelKitRepository,
+                            ItineraryRepository itineraryRepository,
                             UserVisitHistoryRepository userVisitHistoryRepository) {
         this.userRepository = userRepository;
         this.commentLikeRepository = commentLikeRepository;
@@ -46,12 +73,22 @@ public class AdminUserService {
         this.routeCommentRepository = routeCommentRepository;
         this.commentRepository = commentRepository;
         this.sharedRouteRepository = sharedRouteRepository;
+        this.favoriteRepository = favoriteRepository;
+        this.questionLikeRepository = questionLikeRepository;
+        this.travelAnswerRepository = travelAnswerRepository;
+        this.travelQuestionRepository = travelQuestionRepository;
         this.bookingRepository = bookingRepository;
+        this.platformOrderRepository = platformOrderRepository;
+        this.orderAuditLogRepository = orderAuditLogRepository;
         this.hotelBookingRepository = hotelBookingRepository;
+        this.aiRouteRecordRepository = aiRouteRecordRepository;
+        this.tibetTravelKitRepository = tibetTravelKitRepository;
+        this.itineraryRepository = itineraryRepository;
         this.userVisitHistoryRepository = userVisitHistoryRepository;
     }
 
     public record RoleUpdateResult(boolean success, int status, String message) {}
+    public record DeleteUserResult(boolean success, int status, String message) {}
 
     public RoleUpdateResult updateRole(User user, String role, Authentication authentication) {
         if (role == null) {
@@ -84,27 +121,51 @@ public class AdminUserService {
     }
 
     @Transactional
-    public String deleteUser(User targetUser, Authentication authentication) {
-        String operatorUsername = authentication == null ? "anonymous" : authentication.getName();
+    public DeleteUserResult deleteUser(User targetUser, Authentication authentication) {
+        String operatorUsername = authentication == null ? "" : authentication.getName();
 
-        if (authentication == null || !superAdminUsername.equals(operatorUsername)) {
-            return "只有超级管理员可以删除用户账户";
+        if (authentication == null) {
+            return new DeleteUserResult(false, 401, "未登录，不能删除用户");
         }
-
+        if (!superAdminUsername.equals(operatorUsername)) {
+            return new DeleteUserResult(false, 403, "只有超级管理员可以删除用户");
+        }
         if (superAdminUsername.equals(targetUser.getUsername())) {
-            return "不能删除超级管理员账户";
+            return new DeleteUserResult(false, 400, "不能删除超级管理员账号");
+        }
+        if (operatorUsername.equals(targetUser.getUsername())) {
+            return new DeleteUserResult(false, 400, "不能删除当前登录账号");
+        }
+        if (targetUser.getRole() != User.Role.USER) {
+            return new DeleteUserResult(false, 403, "只能删除普通用户账号");
         }
 
         Long userId = targetUser.getId();
+        commentLikeRepository.deleteByCommentUserId(userId);
         commentLikeRepository.deleteByUserId(userId);
+        routeLikeRepository.deleteByRouteAuthorId(userId);
+        routeCommentRepository.deleteByRouteAuthorId(userId);
         routeLikeRepository.deleteByUser(targetUser);
         routeCommentRepository.deleteByUser(targetUser);
+        favoriteRepository.deleteByUser(targetUser);
+        questionLikeRepository.deleteByQuestionAuthorId(userId);
+        questionLikeRepository.deleteByUser(targetUser);
+        travelAnswerRepository.deleteByQuestionAuthorId(userId);
+        travelAnswerRepository.deleteByUser(targetUser);
+        travelQuestionRepository.deleteByAuthor(targetUser);
         commentRepository.deleteByUser(targetUser);
         sharedRouteRepository.deleteByAuthor(targetUser);
+        aiRouteRecordRepository.deleteByUserId(userId);
+        orderAuditLogRepository.clearActorUserByUserId(userId);
+        platformOrderRepository.deleteByUserId(userId);
         bookingRepository.deleteByUserId(userId);
         hotelBookingRepository.deleteByUserId(userId);
+        tibetTravelKitRepository.deleteByItineraryUserId(userId);
+        tibetTravelKitRepository.deleteByUserId(userId);
+        itineraryRepository.clearParentReferencesToUserItineraries(userId);
+        itineraryRepository.deleteByUserId(userId);
         userVisitHistoryRepository.deleteByUserId(userId);
         userRepository.delete(targetUser);
-        return null;
+        return new DeleteUserResult(true, 200, "用户删除成功");
     }
 }

@@ -1,4 +1,4 @@
-import type { Ref } from 'vue'
+import { unref, type Ref } from 'vue'
 
 const DEFAULT_STORAGE_KEY = 'colorful-tibet:route-planner:draft'
 const DEFAULT_DRAFT_VERSION = 1
@@ -13,6 +13,7 @@ export interface RoutePlannerDraft {
   version: number
   form: RoutePlannerFormState
   result: string
+  jobId: string
   statusMessage: string
   errorMessage: string
   completed: boolean
@@ -22,6 +23,7 @@ export interface RoutePlannerDraft {
 interface RoutePlannerDraftState {
   form: Ref<RoutePlannerFormState>
   result: Ref<string>
+  jobId?: Ref<string>
   statusMessage: Ref<string>
   errorMessage: Ref<string>
   loading: Ref<boolean>
@@ -30,7 +32,7 @@ interface RoutePlannerDraftState {
 
 interface RoutePlannerDraftOptions {
   defaultForm: RoutePlannerFormState
-  storageKey?: string
+  storageKey?: string | Ref<string> | (() => string)
   version?: number
   getRestoredStatusMessage?: (draft: RoutePlannerDraft) => string
   onRestoreResult?: (result: string, draft: RoutePlannerDraft) => void
@@ -56,7 +58,12 @@ export function useRoutePlannerDraft(
   state: RoutePlannerDraftState,
   options: RoutePlannerDraftOptions
 ) {
-  const storageKey = options.storageKey || DEFAULT_STORAGE_KEY
+  const resolveStorageKey = () => {
+    if (typeof options.storageKey === 'function') {
+      return options.storageKey() || DEFAULT_STORAGE_KEY
+    }
+    return unref(options.storageKey) || DEFAULT_STORAGE_KEY
+  }
   const version = options.version || DEFAULT_DRAFT_VERSION
 
   const persistRouteDraft = (overrides: Partial<RoutePlannerDraft> = {}) => {
@@ -66,6 +73,7 @@ export function useRoutePlannerDraft(
       version,
       form: { ...state.form.value },
       result: state.result.value,
+      jobId: state.jobId?.value || '',
       statusMessage: state.statusMessage.value,
       errorMessage: state.errorMessage.value,
       completed: !state.loading.value && !state.streaming.value && !!state.result.value && !state.errorMessage.value,
@@ -74,7 +82,7 @@ export function useRoutePlannerDraft(
     }
 
     try {
-      localStorage.setItem(storageKey, JSON.stringify(payload))
+      localStorage.setItem(resolveStorageKey(), JSON.stringify(payload))
     } catch (error) {
       options.onPersistError?.(error)
     }
@@ -83,6 +91,7 @@ export function useRoutePlannerDraft(
   const restoreRouteDraft = () => {
     if (!hasBrowserStorage()) return
 
+    const storageKey = resolveStorageKey()
     const rawDraft = localStorage.getItem(storageKey)
     if (!rawDraft) return
 
@@ -94,6 +103,7 @@ export function useRoutePlannerDraft(
         version,
         form: normalizeDraftForm(draft.form, options.defaultForm),
         result: typeof draft.result === 'string' ? draft.result : '',
+        jobId: typeof draft.jobId === 'string' ? draft.jobId : '',
         statusMessage: typeof draft.statusMessage === 'string' ? draft.statusMessage : '',
         errorMessage: typeof draft.errorMessage === 'string' ? draft.errorMessage : '',
         completed: Boolean(draft.completed),
@@ -101,6 +111,9 @@ export function useRoutePlannerDraft(
       }
 
       state.form.value = restoredDraft.form
+      if (state.jobId) {
+        state.jobId.value = restoredDraft.jobId
+      }
 
       if (!restoredDraft.result) return restoredDraft
 
@@ -118,7 +131,7 @@ export function useRoutePlannerDraft(
 
   const clearRouteDraft = () => {
     if (!hasBrowserStorage()) return
-    localStorage.removeItem(storageKey)
+    localStorage.removeItem(resolveStorageKey())
   }
 
   return {

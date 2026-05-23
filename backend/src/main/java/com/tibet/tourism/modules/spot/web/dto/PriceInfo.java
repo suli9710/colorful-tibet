@@ -1,11 +1,14 @@
 package com.tibet.tourism.modules.spot.web.dto;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 /**
  * 价格信息DTO
  */
 public class PriceInfo {
+    private static final ZoneId BEIJING_ZONE = ZoneId.of("Asia/Shanghai");
+
     private BigDecimal basePrice;           // 基础票价
     private BigDecimal peakSeasonPrice;     // 旺季价格
     private BigDecimal offSeasonPrice;      // 淡季价格
@@ -15,7 +18,7 @@ public class PriceInfo {
     private String rawData;                 // 原始数据（用于调试）
 
     public PriceInfo() {
-        this.fetchTime = LocalDateTime.now();
+        this.fetchTime = LocalDateTime.now(BEIJING_ZONE);
     }
 
     public PriceInfo(BigDecimal basePrice, String source) {

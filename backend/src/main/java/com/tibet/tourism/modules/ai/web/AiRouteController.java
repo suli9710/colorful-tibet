@@ -2,6 +2,10 @@ package com.tibet.tourism.modules.ai.web;
 
 import com.tibet.tourism.common.security.JwtAuthSupport;
 import com.tibet.tourism.modules.ai.application.AiQuotaService;
+import com.tibet.tourism.modules.ai.application.AiRouteGenerationJobService;
+import com.tibet.tourism.modules.ai.application.AiRouteJobSnapshot;
+import com.tibet.tourism.modules.ai.application.AiRouteQuotaExceededException;
+import com.tibet.tourism.modules.ai.application.AiRouteRecordService;
 import com.tibet.tourism.modules.ai.application.AiRouteService;
 import com.tibet.tourism.modules.ai.web.dto.AiRouteGenerateRequest;
 import com.tibet.tourism.modules.ai.web.dto.AiRouteGenerateResponse;
@@ -15,6 +19,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -30,11 +36,19 @@ public class AiRouteController {
 
     private final AiRouteService aiRouteService;
     private final AiQuotaService aiQuotaService;
+    private final AiRouteGenerationJobService aiRouteGenerationJobService;
+    private final AiRouteRecordService aiRouteRecordService;
     private final JwtAuthSupport jwtAuthSupport;
 
-    public AiRouteController(AiRouteService aiRouteService, AiQuotaService aiQuotaService, JwtAuthSupport jwtAuthSupport) {
+    public AiRouteController(AiRouteService aiRouteService,
+                             AiQuotaService aiQuotaService,
+                             AiRouteGenerationJobService aiRouteGenerationJobService,
+                             AiRouteRecordService aiRouteRecordService,
+                             JwtAuthSupport jwtAuthSupport) {
         this.aiRouteService = aiRouteService;
         this.aiQuotaService = aiQuotaService;
+        this.aiRouteGenerationJobService = aiRouteGenerationJobService;
+        this.aiRouteRecordService = aiRouteRecordService;
         this.jwtAuthSupport = jwtAuthSupport;
     }
 
@@ -45,29 +59,40 @@ public class AiRouteController {
             AiRouteGenerateRequest safeRequest = request == null ? new AiRouteGenerateRequest() : request;
             User currentUser = jwtAuthSupport.resolveCurrentUser(httpServletRequest);
 
-            if (aiQuotaService.isQuotaExceeded(currentUser.getId())) {
-                int remaining = aiQuotaService.getRemainingQuota(currentUser.getId());
-                return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
-                        .body(Map.of("error", "今日 AI 路线生成次数已用完，请明天再试", "remaining", remaining));
-            }
-
             int days = safeRequest.getDays() == null ? 5 : safeRequest.getDays();
             String locale = resolveLocale(safeRequest.getLocale(), httpServletRequest);
             String cacheKey = aiQuotaService.buildCacheKey(
                     currentUser.getId(), days, safeRequest.getBudget(), safeRequest.getPreference(), locale);
 
             String cached = aiQuotaService.getCachedRoute(cacheKey);
-            if (cached != null) {
-                return ResponseEntity.ok(Map.of("content", cached, "cached", true));
+            if (cached != null && !cached.isBlank()) {
+                String normalizedCached = aiRouteService.normalizeCachedRoute(
+                        cached, days, safeRequest.getBudget(), safeRequest.getPreference(), locale);
+                if (!normalizedCached.isBlank()) {
+                    if (!normalizedCached.equals(cached.trim())) {
+                        aiQuotaService.cacheRoute(cacheKey, normalizedCached);
+                    }
+                    aiRouteRecordService.recordCompletedRoute(
+                            currentUser, null, days, safeRequest.getBudget(), safeRequest.getPreference(), locale, normalizedCached);
+                    return ResponseEntity.ok(Map.of("content", normalizedCached, "cached", true));
+                }
+                logger.warn("Ignoring invalid cached AI route content for sync endpoint: userId={}, days={}",
+                        currentUser.getId(), days);
             }
 
-            aiQuotaService.incrementQuota(currentUser.getId());
+            AiQuotaService.QuotaConsumptionResult quota = aiQuotaService.tryConsumeQuota(currentUser.getId());
+            if (!quota.allowed()) {
+                return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                        .body(Map.of("error", "今日 AI 路线生成次数已用完，请明天再试", "remaining", quota.remaining()));
+            }
 
             AiRouteGenerateResponse result = aiRouteService.generateRoute(
                     days, safeRequest.getBudget(), safeRequest.getPreference(), currentUser, locale);
 
             if (result.getContent() != null && !result.getContent().isBlank()) {
                 aiQuotaService.cacheRoute(cacheKey, result.getContent());
+                aiRouteRecordService.recordCompletedRoute(
+                        currentUser, null, days, safeRequest.getBudget(), safeRequest.getPreference(), locale, result.getContent());
             }
 
             return ResponseEntity.ok(result);
@@ -80,6 +105,69 @@ public class AiRouteController {
         }
     }
 
+    @GetMapping("/ai/latest")
+    public ResponseEntity<?> getLatestAiRoute(HttpServletRequest httpServletRequest) {
+        User currentUser = jwtAuthSupport.resolveCurrentUser(httpServletRequest);
+        return aiRouteRecordService.latestFor(currentUser)
+                .<ResponseEntity<?>>map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.noContent().build());
+    }
+
+    @GetMapping("/ai/saved")
+    public ResponseEntity<?> getSavedAiRoutes(HttpServletRequest httpServletRequest) {
+        User currentUser = jwtAuthSupport.resolveCurrentUser(httpServletRequest);
+        return ResponseEntity.ok(aiRouteRecordService.savedFor(currentUser));
+    }
+
+    @PostMapping("/ai/{id}/save")
+    public ResponseEntity<?> saveAiRoute(@PathVariable Long id,
+                                         HttpServletRequest httpServletRequest) {
+        User currentUser = jwtAuthSupport.resolveCurrentUser(httpServletRequest);
+        return ResponseEntity.ok(aiRouteRecordService.saveForUser(id, currentUser));
+    }
+
+    @PostMapping("/generate/jobs")
+    public ResponseEntity<?> startGenerateRouteJob(@Valid @RequestBody(required = false) AiRouteGenerateRequest request,
+                                                   HttpServletRequest httpServletRequest) {
+        try {
+            AiRouteGenerateRequest safeRequest = request == null ? new AiRouteGenerateRequest() : request;
+            User currentUser = jwtAuthSupport.resolveCurrentUser(httpServletRequest);
+            String locale = resolveLocale(safeRequest.getLocale(), httpServletRequest);
+            AiRouteJobSnapshot snapshot = aiRouteGenerationJobService.startJob(safeRequest, currentUser, locale);
+            return ResponseEntity.ok(snapshot);
+        } catch (AiRouteQuotaExceededException e) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                    .body(Map.of("error", "今日 AI 路线生成次数已用完，请明天再试", "remaining", e.getRemaining()));
+        } catch (Exception e) {
+            logger.error("AI route job start failed", e);
+            return ResponseEntity.internalServerError().body(Map.of("error", "AI route generation failed"));
+        }
+    }
+
+    @GetMapping("/generate/jobs/{jobId}")
+    public ResponseEntity<?> getGenerateRouteJob(@PathVariable String jobId,
+                                                 HttpServletRequest httpServletRequest) {
+        try {
+            User currentUser = jwtAuthSupport.resolveCurrentUser(httpServletRequest);
+            return ResponseEntity.ok(aiRouteGenerationJobService.getJob(jobId, currentUser));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    @GetMapping(value = "/generate/jobs/{jobId}/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public ResponseEntity<SseEmitter> streamGenerateRouteJob(@PathVariable String jobId,
+                                                             HttpServletRequest httpServletRequest) {
+        try {
+            User currentUser = jwtAuthSupport.resolveCurrentUser(httpServletRequest);
+            return ResponseEntity.ok()
+                    .contentType(MediaType.TEXT_EVENT_STREAM)
+                    .body(aiRouteGenerationJobService.streamJob(jobId, currentUser));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
     @PostMapping(value = "/generate/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public ResponseEntity<SseEmitter> generateRouteStream(
             @Valid @RequestBody(required = false) AiRouteGenerateRequest request,
@@ -88,13 +176,12 @@ public class AiRouteController {
         AiRouteGenerateRequest safeRequest = request == null ? new AiRouteGenerateRequest() : request;
         User currentUser = jwtAuthSupport.resolveCurrentUser(httpServletRequest);
 
-        if (aiQuotaService.isQuotaExceeded(currentUser.getId())) {
+        AiQuotaService.QuotaConsumptionResult quota = aiQuotaService.tryConsumeQuota(currentUser.getId());
+        if (!quota.allowed()) {
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                     .contentType(MediaType.TEXT_EVENT_STREAM)
                     .body(completedErrorEmitter("今日 AI 路线生成次数已用完，请明天再试"));
         }
-
-        aiQuotaService.incrementQuota(currentUser.getId());
 
         SseEmitter emitter = new SseEmitter(180_000L);
 

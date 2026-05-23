@@ -1,8 +1,8 @@
 <template>
-  <div ref="panelEl" class="bg-white rounded-2xl shadow overflow-hidden border border-stone-100">
-    <div class="px-6 py-5 border-b border-stone-200 flex items-center justify-between">
+  <div ref="panelEl" class="min-w-0 bg-white rounded-2xl shadow overflow-hidden border border-stone-100">
+    <div class="px-4 py-4 border-b border-stone-200 flex flex-col gap-2 sm:px-6 sm:py-5 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <h3 class="text-xl font-bold text-stone-800">{{ t('admin.analytics.title') }}</h3>
+        <h3 class="text-lg font-bold text-stone-800 sm:text-xl">{{ t('admin.analytics.title') }}</h3>
         <p class="text-sm text-stone-500 mt-1">{{ t('admin.analytics.subtitle') }}</p>
       </div>
       <div class="text-xs text-stone-400">
@@ -19,62 +19,62 @@
       <p class="font-medium">{{ error }}</p>
     </div>
 
-    <div v-else class="p-6 space-y-6">
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div v-for="card in summaryCards" :key="card.label" class="rounded-2xl bg-stone-50 p-4 border border-stone-100">
+    <div v-else class="p-4 space-y-4 sm:p-6 sm:space-y-6">
+      <div class="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
+        <div v-for="card in summaryCards" :key="card.label" class="rounded-2xl bg-stone-50 p-3 border border-stone-100 sm:p-4">
           <p class="text-sm text-stone-500">{{ card.label }}</p>
-          <p class="mt-2 text-2xl font-bold text-stone-900">{{ card.value }}</p>
+          <p class="mt-2 text-xl font-bold text-stone-900 sm:text-2xl">{{ card.value }}</p>
           <p class="text-xs text-stone-400 mt-1">{{ card.hint }}</p>
         </div>
       </div>
 
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div class="rounded-2xl border border-stone-100 p-4">
-          <div class="flex items-center justify-between mb-3">
+      <div class="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-6">
+        <div class="min-w-0 rounded-2xl border border-stone-100 p-3 sm:p-4">
+          <div class="flex flex-col gap-1 mb-3 sm:flex-row sm:items-center sm:justify-between">
             <h4 class="font-semibold text-stone-800">{{ t('admin.analytics.charts.orderRevenueTrend') }}</h4>
             <span class="text-xs text-stone-400">{{ t('admin.analytics.charts.lastSixMonths') }}</span>
           </div>
-          <div ref="trendChartEl" class="w-full h-80"></div>
+          <div ref="trendChartEl" class="h-64 w-full sm:h-80"></div>
         </div>
 
-        <div class="rounded-2xl border border-stone-100 p-4">
-          <div class="flex items-center justify-between mb-3">
+        <div class="min-w-0 rounded-2xl border border-stone-100 p-3 sm:p-4">
+          <div class="flex flex-col gap-1 mb-3 sm:flex-row sm:items-center sm:justify-between">
             <h4 class="font-semibold text-stone-800">{{ t('admin.analytics.charts.categoryShare') }}</h4>
             <span class="text-xs text-stone-400">{{ t('admin.analytics.charts.currentSpotData') }}</span>
           </div>
-          <div ref="categoryChartEl" class="w-full h-80"></div>
+          <div ref="categoryChartEl" class="h-64 w-full sm:h-80"></div>
         </div>
 
-        <div class="rounded-2xl border border-stone-100 p-4">
-          <div class="flex items-center justify-between mb-3">
+        <div class="min-w-0 rounded-2xl border border-stone-100 p-3 sm:p-4">
+          <div class="flex flex-col gap-1 mb-3 sm:flex-row sm:items-center sm:justify-between">
             <h4 class="font-semibold text-stone-800">{{ t('admin.analytics.charts.touristCityDistribution') }}</h4>
             <span class="text-xs text-stone-400">{{ t('admin.analytics.charts.registeredCityDistribution') }}</span>
           </div>
-          <div ref="touristChartEl" class="w-full h-80"></div>
+          <div ref="touristChartEl" class="h-64 w-full sm:h-80"></div>
         </div>
 
-        <div class="rounded-2xl border border-stone-100 p-4">
-          <div class="flex items-center justify-between mb-3">
+        <div class="min-w-0 rounded-2xl border border-stone-100 p-3 sm:p-4">
+          <div class="flex flex-col gap-1 mb-3 sm:flex-row sm:items-center sm:justify-between">
             <h4 class="font-semibold text-stone-800">{{ t('admin.analytics.charts.popularSpotVisits') }}</h4>
             <span class="text-xs text-stone-400">{{ t('admin.analytics.charts.topEight') }}</span>
           </div>
-          <div ref="spotChartEl" class="w-full h-80"></div>
+          <div ref="spotChartEl" class="h-64 w-full sm:h-80"></div>
         </div>
 
-        <div class="rounded-2xl border border-stone-100 p-4">
-          <div class="flex items-center justify-between mb-3">
+        <div class="min-w-0 rounded-2xl border border-stone-100 p-3 sm:p-4">
+          <div class="flex flex-col gap-1 mb-3 sm:flex-row sm:items-center sm:justify-between">
             <h4 class="font-semibold text-stone-800">{{ t('admin.analytics.charts.userGrowthTrend') }}</h4>
             <span class="text-xs text-stone-400">{{ t('admin.analytics.charts.lastSixMonths') }}</span>
           </div>
-          <div ref="userGrowthChartEl" class="w-full h-80"></div>
+          <div ref="userGrowthChartEl" class="h-64 w-full sm:h-80"></div>
         </div>
 
-        <div class="rounded-2xl border border-stone-100 p-4">
-          <div class="flex items-center justify-between mb-3">
+        <div class="min-w-0 rounded-2xl border border-stone-100 p-3 sm:p-4">
+          <div class="flex flex-col gap-1 mb-3 sm:flex-row sm:items-center sm:justify-between">
             <h4 class="font-semibold text-stone-800">{{ t('admin.analytics.charts.newsPublishTrend') }}</h4>
             <span class="text-xs text-stone-400">{{ t('admin.analytics.charts.lastSixMonths') }}</span>
           </div>
-          <div ref="newsChartEl" class="w-full h-80"></div>
+          <div ref="newsChartEl" class="h-64 w-full sm:h-80"></div>
         </div>
       </div>
     </div>
@@ -203,7 +203,9 @@ const summaryCards = computed(() => {
 
 const formatDateTime = (value?: string) => {
   if (!value) return '-'
-  return new Date(value).toLocaleString(locale.value === 'bo' ? 'bo-CN' : 'zh-CN')
+  return new Date(value).toLocaleString(locale.value === 'bo' ? 'bo-CN' : 'zh-CN', {
+    timeZone: 'Asia/Shanghai'
+  })
 }
 
 const disposeCharts = () => {

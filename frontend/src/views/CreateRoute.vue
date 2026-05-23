@@ -1,21 +1,21 @@
 <template>
-  <div class="min-h-screen bg-tibet-white py-24">
+  <div class="min-h-screen bg-tibet-white py-12 pt-24 sm:py-24">
     <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
       <MotionBlock
-        class="text-center mb-12"
+        class="text-center mb-8 sm:mb-12"
       >
-        <h1 class="text-4xl font-bold text-tibet-dark mb-4">{{ t('createRoute.title') }}</h1>
-        <p class="text-lg text-tibet-brown/70">
+        <h1 class="text-3xl font-bold text-tibet-dark mb-3 sm:text-4xl sm:mb-4">{{ t('createRoute.title') }}</h1>
+        <p class="text-base text-tibet-brown/70 sm:text-lg">
           {{ t('createRoute.subtitle') }}
         </p>
       </MotionBlock>
 
       <MotionBlock
-        class="glass-card rounded-3xl p-8 md:p-12 mb-12 shadow-xl border border-white/50"
+        class="glass-card rounded-2xl p-4 sm:p-8 md:p-12 mb-8 sm:mb-12 shadow-xl border border-white/50"
         variant="card"
         :delay="0.08"
       >
-        <form @submit.prevent="submitRoute" class="space-y-8">
+        <form @submit.prevent="submitRoute" class="space-y-6 sm:space-y-8">
           <MotionBlock :delay="0.16">
             <label class="block text-sm font-medium text-tibet-dark/80 mb-2">
               {{ t('createRoute.routeTitle') }} <span class="text-red-500">*</span>
@@ -110,7 +110,7 @@
           </MotionBlock>
 
           <MotionBlock
-            class="flex justify-end gap-4 pt-4 border-t border-tibet-gold/25"
+            class="flex flex-col-reverse justify-end gap-3 pt-4 border-t border-tibet-gold/25 sm:flex-row sm:gap-4"
             :index="5"
             :delay="0.16"
           >
@@ -126,7 +126,7 @@
             <motion.button
               type="submit" 
               :disabled="submitting"
-              class="px-6 py-3 rounded-xl bg-tibet-gold hover:bg-tibet-gold/80 text-white font-medium transition-colors shadow-lg shadow-tibet-gold/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+              class="justify-center px-6 py-3 rounded-xl bg-tibet-gold hover:bg-tibet-gold/80 text-white font-medium transition-colors shadow-lg shadow-tibet-gold/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
               :whileHover="submitting ? {} : { y: -2, scale: 1.01 }"
               :whileTap="submitting ? {} : { scale: 0.98 }"
             >

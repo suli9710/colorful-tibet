@@ -16,6 +16,8 @@ import com.tibet.tourism.common.security.CsrfTokenService;
 import com.tibet.tourism.common.security.JwtAuthSupport;
 import com.tibet.tourism.common.security.TrustedProxyIpResolver;
 import com.tibet.tourism.modules.ai.application.AiQuotaService;
+import com.tibet.tourism.modules.ai.application.AiRouteGenerationJobService;
+import com.tibet.tourism.modules.ai.application.AiRouteRecordService;
 import com.tibet.tourism.modules.ai.application.AiRouteService;
 import com.tibet.tourism.modules.user.domain.User;
 import jakarta.servlet.http.HttpServletRequest;
@@ -43,6 +45,12 @@ class AiRouteControllerStreamTest {
     private AiQuotaService aiQuotaService;
 
     @MockBean
+    private AiRouteGenerationJobService aiRouteGenerationJobService;
+
+    @MockBean
+    private AiRouteRecordService aiRouteRecordService;
+
+    @MockBean
     private JwtAuthSupport jwtAuthSupport;
 
     @MockBean
@@ -57,7 +65,7 @@ class AiRouteControllerStreamTest {
         user.setId(42L);
 
         when(jwtAuthSupport.resolveCurrentUser(any(HttpServletRequest.class))).thenReturn(user);
-        when(aiQuotaService.isQuotaExceeded(42L)).thenReturn(false);
+        when(aiQuotaService.tryConsumeQuota(42L)).thenReturn(new AiQuotaService.QuotaConsumptionResult(true, 19));
         doAnswer(invocation -> {
             SseEmitter emitter = invocation.getArgument(5);
             emitter.send(SseEmitter.event().data("{\"type\":\"done\"}"));

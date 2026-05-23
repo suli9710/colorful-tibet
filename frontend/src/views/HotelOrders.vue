@@ -1,18 +1,18 @@
 <template>
   <div class="min-h-screen bg-tibet-white">
-    <section class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16 space-y-6">
+    <section class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-16 space-y-5 sm:space-y-6">
       <motion.div
-        class="bg-white rounded-3xl shadow-xl border border-tibet-gold/20 p-8"
+        class="bg-white rounded-2xl shadow-xl border border-tibet-gold/20 p-5 sm:rounded-3xl sm:p-8"
         :initial="revealInitial"
         :animate="revealInView"
         :transition="revealTransition"
       >
-        <h1 class="text-3xl font-bold text-gray-900 mb-4">{{ t('hotel.ordersTitle') }}</h1>
+        <h1 class="text-2xl font-bold text-gray-900 mb-3 sm:text-3xl sm:mb-4">{{ t('hotel.ordersTitle') }}</h1>
         <p class="text-gray-600">{{ t('hotel.ordersSubtitle') }}</p>
       </motion.div>
 
       <motion.div
-        class="bg-white rounded-3xl shadow-xl border border-tibet-gold/20 p-8"
+        class="bg-white rounded-2xl shadow-xl border border-tibet-gold/20 p-4 sm:rounded-3xl sm:p-8"
         :initial="cardInitial"
         :animate="cardInView"
         :transition="cardTransition(0, 0.1)"
@@ -23,23 +23,23 @@
           <motion.div
             v-for="(order, index) in sortedOrders"
             :key="order.id"
-            class="rounded-2xl border border-tibet-gold/20 p-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4"
+            class="rounded-2xl border border-tibet-gold/20 p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4 sm:p-5"
             :initial="cardInitial"
             :whileInView="cardInView"
             :inViewOptions="inViewOnce"
             :transition="cardTransition(index)"
           >
-            <div class="flex items-center gap-4 min-w-0">
-              <div class="h-20 w-28 rounded-2xl overflow-hidden bg-gray-100 flex-shrink-0">
+            <div class="flex w-full min-w-0 items-start gap-3 sm:items-center sm:gap-4">
+              <div class="h-20 w-24 rounded-2xl overflow-hidden bg-gray-100 flex-shrink-0 sm:w-28">
                 <img :src="resolveHotelBookingImage(order)" class="w-full h-full object-cover" :alt="order.hotelName" @error="applyHotelImageFallback">
               </div>
-              <div class="min-w-0">
+              <div class="min-w-0 flex-1">
                 <h2 class="text-lg font-semibold text-gray-900 truncate">{{ displayHotelName(order) }} · {{ order.roomName || '-' }}</h2>
                 <p class="text-sm text-gray-500 mt-1">{{ order.checkInDate }} {{ t('hotel.dateConnector') }} {{ order.checkOutDate }} · {{ order.guests }}{{ t('hotel.guests') }}</p>
                 <p class="text-sm text-gray-500 mt-1">{{ t('hotel.booker') }}：{{ order.guestName }} · {{ order.phone }}</p>
               </div>
             </div>
-            <div class="text-right">
+            <div class="w-full text-left md:w-auto md:text-right">
               <p class="text-xl font-bold text-blue-600">¥{{ order.totalPrice }}</p>
               <p class="text-xs text-gray-400 mt-1">{{ order.status }}</p>
             </div>

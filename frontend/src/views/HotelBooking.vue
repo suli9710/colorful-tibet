@@ -6,7 +6,7 @@
       :animate="{ opacity: 1 }"
       :transition="{ duration: 0.45, ease: motionEase }"
     >
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 relative z-10">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 sm:py-20 relative z-10">
         <motion.div
           class="max-w-3xl"
           :initial="{ opacity: 0, y: 22 }"
@@ -14,14 +14,14 @@
           :transition="{ duration: 0.5, delay: 0.08, ease: motionEase }"
         >
           <span class="inline-flex items-center px-4 py-1.5 rounded-full bg-white/15 backdrop-blur-md border border-white/20 text-sm font-medium mb-6">{{ t('hotel.badge') }}</span>
-          <h1 class="text-4xl md:text-5xl font-bold mb-4">{{ t('hotel.bookingTitle') }}</h1>
-          <p class="text-lg md:text-xl text-white/80">{{ t('hotel.bookingSubtitle') }}</p>
+          <h1 class="text-3xl font-bold mb-4 sm:text-4xl md:text-5xl">{{ t('hotel.bookingTitle') }}</h1>
+          <p class="text-base text-white/80 sm:text-lg md:text-xl">{{ t('hotel.bookingSubtitle') }}</p>
         </motion.div>
       </div>
     </motion.section>
 
     <motion.section
-      class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 -mt-10 relative z-10"
+      class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10 -mt-10 relative z-10"
       :initial="cardInitial"
       :animate="cardInView"
       :transition="cardTransition(0, 0.08)"
@@ -46,7 +46,7 @@
       >
         <div class="lg:col-span-2 space-y-6">
           <motion.div
-            class="bg-white rounded-3xl p-7 border border-tibet-gold/20 shadow-sm"
+            class="bg-white rounded-3xl p-5 border border-tibet-gold/20 shadow-sm sm:p-7"
             :initial="cardInitial"
             :animate="cardInView"
             :transition="cardTransition(0, 0.16)"
@@ -71,7 +71,7 @@
           </motion.div>
 
           <motion.div
-            class="bg-white rounded-3xl p-7 border border-tibet-gold/20 shadow-sm"
+            class="bg-white rounded-3xl p-5 border border-tibet-gold/20 shadow-sm sm:p-7"
             :initial="cardInitial"
             :animate="cardInView"
             :transition="cardTransition(1, 0.16)"
@@ -110,7 +110,7 @@
           <motion.button
             @click="submitBooking"
             :disabled="submitting"
-            class="w-full py-4 rounded-full bg-tibet-red text-tibet-yellow font-bold text-lg hover:bg-tibet-red/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            class="hidden w-full py-4 rounded-full bg-tibet-red text-tibet-yellow font-bold text-lg hover:bg-tibet-red/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed md:block"
             :initial="cardInitial"
             :animate="cardInView"
             :transition="cardTransition(2, 0.16)"
@@ -144,7 +144,7 @@
 
         <div>
           <motion.div
-            class="sticky top-24 bg-white rounded-3xl p-7 border border-tibet-gold/20 shadow-lg"
+            class="bg-white rounded-3xl p-5 border border-tibet-gold/20 shadow-lg lg:sticky lg:top-24 sm:p-7"
             :initial="cardInitial"
             :animate="cardInView"
             :transition="cardTransition(3, 0.12)"
@@ -205,6 +205,16 @@
     @close="showPaymentModal = false"
     @paid="handlePaymentConfirmed"
   />
+
+  <MobileStickyActionBar
+    :show="Boolean(hotel)"
+    :eyebrow="t('hotel.total')"
+    :title="`¥${totalPrice}`"
+    :meta="selectedRoom?.name || hotel?.name"
+    :primary-label="submitting ? t('common.submitting') : t('common.confirmBook')"
+    :primary-disabled="submitting"
+    @primary="submitBooking"
+  />
 </template>
 
 <script setup lang="ts">
@@ -217,6 +227,7 @@ import { applyHotelImageFallback, resolveHotelCoverImage } from '../data/hotelIm
 import { getCanonicalRegion, localizeApiRoom, localizeHotel } from '../data/hotelTranslations'
 import api, { endpoints } from '../api'
 import PaymentModal from '../components/PaymentModal.vue'
+import MobileStickyActionBar from '../components/MobileStickyActionBar.vue'
 import { useBehaviorTracker } from '../composables/useBehaviorTracker'
 import {
   cardInitial,

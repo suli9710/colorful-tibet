@@ -2,7 +2,7 @@
   <div class="min-h-screen tibet-bg-subtle">
     <!-- Hero -->
     <motion.section
-      class="relative h-[50vh] overflow-hidden"
+      class="relative h-[42vh] min-h-[360px] overflow-hidden sm:h-[50vh]"
       :initial="{ opacity: 0, scale: 1.02 }"
       :animate="{ opacity: 1, scale: 1 }"
       :transition="{ duration: 0.5, ease: motionEase }"
@@ -21,7 +21,7 @@
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
       </router-link>
       <motion.div
-        class="absolute bottom-0 left-0 right-0 p-8 max-w-7xl mx-auto"
+        class="absolute bottom-0 left-0 right-0 max-w-7xl mx-auto p-5 sm:p-8"
         :initial="{ opacity: 0, y: 20 }"
         :animate="{ opacity: 1, y: 0 }"
         :transition="{ duration: 0.6, delay: 0.2, ease: motionEase }"
@@ -33,8 +33,8 @@
           <span class="text-tibet-white/40 text-sm">·</span>
           <span class="text-tibet-white/70 text-sm">{{ t('hotel.detailBadge') }}</span>
         </div>
-        <h1 class="text-3xl md:text-5xl font-bold text-tibet-white mb-2">{{ hotel.name }}</h1>
-        <div class="flex items-center gap-3 text-tibet-white/60 text-sm">
+        <h1 class="text-2xl font-bold text-tibet-white mb-2 sm:text-3xl md:text-5xl">{{ hotel.name }}</h1>
+        <div class="flex flex-wrap items-center gap-2 text-tibet-white/70 text-sm sm:gap-3">
           <span class="flex items-center gap-1"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg> {{ hotel.city }} · {{ hotel.address }}</span>
           <span>·</span>
           <span class="flex items-center gap-1">★ {{ hotel.rating }} ({{ hotel.reviewCount }}{{ t('hotel.reviewCountUnit') }})</span>
@@ -43,7 +43,7 @@
     </motion.section>
 
     <!-- Content -->
-    <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+    <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <!-- Main -->
         <motion.div
@@ -54,7 +54,7 @@
           :transition="revealTransition"
         >
           <!-- Description — 藏式卡片 -->
-          <div class="tibet-card rounded-2xl p-8">
+          <div class="tibet-card rounded-2xl p-5 sm:p-8">
             <h2 class="tibet-heading text-xl font-bold text-tibet-dark mb-5">{{ t('hotel.introduction') }}</h2>
             <p class="text-tibet-brown/80 leading-relaxed">{{ hotel.description }}</p>
             <div class="flex flex-wrap gap-2 mt-5">
@@ -63,9 +63,9 @@
           </div>
 
           <!-- Amenities — 藏式方格 -->
-          <div class="tibet-card rounded-2xl p-8">
+          <div class="tibet-card rounded-2xl p-5 sm:p-8">
             <h2 class="tibet-heading text-xl font-bold text-tibet-dark mb-5">{{ t('hotel.amenities') }}</h2>
-            <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
               <div v-for="amenity in hotel.amenities" :key="amenity" class="flex items-center gap-2 px-4 py-3 rounded-xl bg-tibet-white text-tibet-brown/70 text-sm border border-tibet-gold/10 hover:border-tibet-gold/30 transition-colors">
                 <svg class="w-4 h-4 text-tibet-turquoise shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                 {{ amenity }}
@@ -74,7 +74,7 @@
           </div>
 
           <!-- Rooms — 藏式房型卡片 -->
-          <div class="tibet-card rounded-2xl p-8">
+          <div class="tibet-card rounded-2xl p-5 sm:p-8">
             <h2 class="tibet-heading text-xl font-bold text-tibet-dark mb-5">{{ t('hotel.roomSelection') }}</h2>
             <div v-if="loadingRooms" class="text-center py-4 text-stone-500">{{ t('common.loading') }}</div>
             <div v-else-if="roomTypes.length === 0" class="text-center py-4 text-stone-500">{{ t('hotel.noRoomTypes') }}</div>
@@ -85,7 +85,7 @@
                   <h3 class="text-lg font-semibold text-tibet-dark">{{ room.name }}</h3>
                   <p class="text-sm text-tibet-brown/50 mt-1">{{ room.amenities || (room.capacity ? room.capacity + t('common.peopleUnit') : '') }}</p>
                 </div>
-                <div class="flex items-center gap-5">
+                <div class="flex w-full items-center justify-between gap-4 sm:w-auto sm:justify-end sm:gap-5">
                   <div class="text-right">
                     <div class="flex items-baseline gap-0.5 justify-end">
                       <span class="text-xs text-tibet-brown/40">¥</span>
@@ -109,7 +109,7 @@
         >
           <div class="sticky top-24 space-y-6">
             <!-- Price Card — 藏式金边 -->
-            <div class="tibet-card rounded-2xl p-8">
+            <div class="tibet-card rounded-2xl p-5 sm:p-8">
               <p class="text-sm text-tibet-brown/50 mb-1">{{ t('hotel.startingPrice') }}</p>
               <div class="flex items-baseline gap-1 mb-6">
                 <span class="text-xs text-tibet-brown/40">¥</span>
@@ -157,11 +157,22 @@
     <!-- 底部经幡装饰 -->
     <div class="h-2 tibet-prayer-flag opacity-60"></div>
   </div>
+
+  <MobileStickyActionBar
+    :show="Boolean(hotel?.id)"
+    :eyebrow="t('hotel.startingPrice')"
+    :title="`¥${displayPrice}`"
+    :meta="hotel?.name"
+    :secondary-label="t('hotel.navigate')"
+    :primary-label="t('hotel.bookNow')"
+    @secondary="openHotelNavigation"
+    @primary="goToHotelBooking"
+  />
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { motion } from 'motion-v'
 import { motionEase, revealInitial, revealInView, revealTransition, inViewOnce } from '../motion/presets'
@@ -169,9 +180,11 @@ import { getHotelById, hotels, type HotelItem } from '../data/hotels'
 import { applyHotelImageFallback, resolveHotelCoverImage } from '../data/hotelImages'
 import { getCanonicalRegion, localizeApiRoom, localizeHotel } from '../data/hotelTranslations'
 import api, { endpoints } from '../api'
+import MobileStickyActionBar from '../components/MobileStickyActionBar.vue'
 
 const { t, locale } = useI18n()
 const route = useRoute()
+const router = useRouter()
 const hotelId = Number(route.params.id || 1)
 const rawHotel = ref<any>({})
 const rawRoomTypes = ref<any[]>([])
@@ -185,6 +198,20 @@ const displayPrice = computed(() => {
   if (hotel.value.priceMin) return String(hotel.value.priceMin)
   return t('common.consult')
 })
+
+const firstRoomId = computed(() => roomTypes.value[0]?.id || 1)
+
+const goToHotelBooking = () => {
+  router.push(`/hotel-booking/${hotel.value.id}?roomId=${firstRoomId.value}`)
+}
+
+const openHotelNavigation = () => {
+  window.open(
+    `https://uri.amap.com/navigation?to=${hotel.value.lng},${hotel.value.lat},${encodeURIComponent(hotel.value.name)}&mode=car&utm_source=colorful-tibet`,
+    '_blank',
+    'noopener'
+  )
+}
 
 const resolveRegion = (location: string): string => {
   return getCanonicalRegion(location)

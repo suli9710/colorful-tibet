@@ -1,4 +1,5 @@
 package com.tibet.tourism.modules.admin.web;
+
 import com.tibet.tourism.common.security.LoginAttemptService;
 import com.tibet.tourism.modules.admin.application.AdminUserService;
 import com.tibet.tourism.modules.upload.application.FileStorageService;
@@ -14,7 +15,14 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 @RestController
@@ -103,14 +111,11 @@ public class AdminUserController {
             return ResponseEntity.notFound().build();
         }
 
-        String error = adminUserService.deleteUser(userOpt.get(), authentication);
-        if (error != null) {
-            if (error.contains("超级管理员可以删除")) {
-                return ResponseEntity.status(403).body(Map.of("error", error));
-            }
-            return ResponseEntity.badRequest().body(Map.of("error", error));
+        AdminUserService.DeleteUserResult result = adminUserService.deleteUser(userOpt.get(), authentication);
+        if (result.success()) {
+            return ResponseEntity.ok(Map.of("message", result.message()));
         }
-        return ResponseEntity.ok(Map.of("message", "用户删除成功"));
+        return ResponseEntity.status(result.status()).body(Map.of("error", result.message()));
     }
 
     @PostMapping("/upload-image")

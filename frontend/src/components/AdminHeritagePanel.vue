@@ -1,7 +1,7 @@
 <template>
   <div class="mt-8 overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
     <div
-      class="flex cursor-pointer flex-col gap-3 border-b border-stone-100 bg-gradient-to-r from-stone-50 to-white px-4 py-4 transition-colors hover:bg-stone-100/50 sm:flex-row sm:items-center sm:justify-between sm:px-6"
+      class="flex cursor-pointer flex-col gap-3 border-b border-stone-100 bg-gradient-to-r from-stone-50 to-white px-4 py-4 transition-colors hover:bg-stone-100/50 lg:flex-row lg:items-center lg:justify-between sm:px-6"
       @click="showHeritage = !showHeritage"
     >
       <div class="flex min-w-0 items-center gap-3">
@@ -15,28 +15,28 @@
           <span class="text-sm font-normal text-stone-400">({{ filteredItems.length }}{{ text('common.items', '项') }})</span>
         </h3>
       </div>
-      <div class="flex flex-wrap items-center gap-2">
+      <div class="grid w-full grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center lg:w-auto">
         <input
           v-model.trim="keyword"
           type="search"
-          class="w-48 rounded-lg border border-stone-200 px-3 py-1.5 text-xs outline-none focus:border-rose-400 focus:ring-2 focus:ring-rose-100"
+          class="col-span-2 w-full rounded-lg border border-stone-200 px-3 py-2 text-sm outline-none focus:border-rose-400 focus:ring-2 focus:ring-rose-100 sm:w-56 sm:text-xs"
           :placeholder="text('admin.searchHeritage', '搜索项目/类别/地区')"
           @click.stop
         >
         <button
-          class="rounded-lg bg-stone-100 px-3 py-1.5 text-xs text-stone-600 transition-colors hover:bg-stone-200 disabled:cursor-not-allowed disabled:opacity-60"
+          class="mobile-touch-target rounded-lg bg-stone-100 px-3 py-2 text-xs text-stone-600 transition-colors hover:bg-stone-200 disabled:cursor-not-allowed disabled:opacity-60"
           :disabled="loading"
           @click.stop="fetchItems"
         >
           {{ loading ? text('common.loading', '加载中') : text('common.refresh', '刷新') }}
         </button>
         <button
-          class="rounded-lg bg-rose-500 px-3 py-1.5 text-xs text-white transition-colors hover:bg-rose-600"
+          class="mobile-touch-target rounded-lg bg-rose-500 px-3 py-2 text-xs text-white transition-colors hover:bg-rose-600"
           @click.stop="openCreateItemModal"
         >
           {{ text('admin.createHeritage', '新增非遗') }}
         </button>
-        <svg class="h-5 w-5 text-stone-400 transition-transform duration-200" :class="{ 'rotate-180': showHeritage }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg class="col-span-2 mx-auto h-5 w-5 text-stone-400 transition-transform duration-200 sm:col-span-1 sm:mx-0" :class="{ 'rotate-180': showHeritage }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
         </svg>
       </div>
@@ -75,14 +75,14 @@
                 </div>
               </div>
 
-              <div class="flex flex-shrink-0 flex-wrap gap-3 text-sm">
-                <button class="font-medium text-rose-600 hover:text-rose-800" @click="toggleRelations(item)">
+              <div class="grid flex-shrink-0 grid-cols-3 gap-2 text-center text-sm sm:flex sm:flex-wrap sm:text-left">
+                <button class="rounded-lg bg-rose-50 px-2 py-2 font-medium text-rose-600 hover:text-rose-800 sm:bg-transparent sm:px-0 sm:py-0" @click="toggleRelations(item)">
                   {{ expandedItemId === item.id ? text('common.collapse', '收起') : text('admin.manageRelations', '传承人/活动') }}
                 </button>
-                <button class="font-medium text-blue-600 hover:text-blue-800" @click="openEditItemModal(item)">
+                <button class="rounded-lg bg-blue-50 px-2 py-2 font-medium text-blue-600 hover:text-blue-800 sm:bg-transparent sm:px-0 sm:py-0" @click="openEditItemModal(item)">
                   {{ text('common.edit', '编辑') }}
                 </button>
-                <button class="font-medium text-red-600 hover:text-red-800" @click="deleteItem(item)">
+                <button class="rounded-lg bg-red-50 px-2 py-2 font-medium text-red-600 hover:text-red-800 sm:bg-transparent sm:px-0 sm:py-0" @click="deleteItem(item)">
                   {{ text('common.delete', '删除') }}
                 </button>
               </div>
@@ -100,7 +100,7 @@
               </div>
 
               <div class="mb-4 space-y-2">
-                <div v-for="inheritor in inheritors" :key="inheritor.id" class="flex items-start justify-between gap-3 rounded-lg border border-stone-100 px-3 py-2">
+                <div v-for="inheritor in inheritors" :key="inheritor.id" class="flex flex-col gap-2 rounded-lg border border-stone-100 px-3 py-2 sm:flex-row sm:items-start sm:justify-between">
                   <div class="min-w-0">
                     <div class="font-medium text-stone-800">{{ inheritor.name }}</div>
                     <div class="text-xs text-stone-500">{{ [inheritor.level, inheritor.region].filter(Boolean).join(' · ') || '-' }}</div>
@@ -125,7 +125,7 @@
                 </div>
                 <textarea v-model.trim="inheritorForm.bio" rows="2" class="rounded-lg border border-stone-200 px-3 py-2 text-sm outline-none focus:border-rose-400" :placeholder="text('admin.bio', '简介')"></textarea>
                 <textarea v-model.trim="inheritorForm.story" rows="2" class="rounded-lg border border-stone-200 px-3 py-2 text-sm outline-none focus:border-rose-400" :placeholder="text('admin.inheritorStory', '传承故事')"></textarea>
-                <div class="flex gap-2">
+                <div class="flex flex-col gap-2 sm:flex-row">
                   <button class="rounded-lg bg-rose-500 px-3 py-2 text-xs font-medium text-white hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-60" :disabled="!inheritorForm.name || savingInheritor">
                     {{ savingInheritor ? text('admin.saving', '保存中') : (editingInheritorId ? text('common.save', '保存') : text('admin.addNew', '新增')) }}
                   </button>
@@ -143,7 +143,7 @@
               </div>
 
               <div class="mb-4 space-y-2">
-                <div v-for="event in events" :key="event.id" class="flex items-start justify-between gap-3 rounded-lg border border-stone-100 px-3 py-2">
+                <div v-for="event in events" :key="event.id" class="flex flex-col gap-2 rounded-lg border border-stone-100 px-3 py-2 sm:flex-row sm:items-start sm:justify-between">
                   <div class="min-w-0">
                     <div class="font-medium text-stone-800">{{ event.title }}</div>
                     <div class="text-xs text-stone-500">{{ [event.eventDate, event.location].filter(Boolean).join(' · ') || '-' }}</div>
@@ -169,7 +169,7 @@
                 </div>
                 <input v-model.trim="eventForm.imageUrl" class="rounded-lg border border-stone-200 px-3 py-2 text-sm outline-none focus:border-rose-400" :placeholder="text('admin.imageUrl', '图片 URL')">
                 <textarea v-model.trim="eventForm.description" rows="2" class="rounded-lg border border-stone-200 px-3 py-2 text-sm outline-none focus:border-rose-400" :placeholder="text('admin.content', '内容')"></textarea>
-                <div class="flex gap-2">
+                <div class="flex flex-col gap-2 sm:flex-row">
                   <button class="rounded-lg bg-rose-500 px-3 py-2 text-xs font-medium text-white hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-60" :disabled="!eventForm.title || savingEvent">
                     {{ savingEvent ? text('admin.saving', '保存中') : (editingEventId ? text('common.save', '保存') : text('admin.addNew', '新增')) }}
                   </button>
@@ -197,7 +197,7 @@
       panel-class="max-w-3xl rounded-2xl bg-white p-4 sm:p-8 max-h-[90dvh] overflow-y-auto"
       @close="closeItemModal"
     >
-      <h2 class="mb-6 text-2xl font-bold text-stone-800">
+      <h2 class="mb-5 text-xl font-bold text-stone-800 sm:mb-6 sm:text-2xl">
         {{ editingItem?.id ? text('admin.editHeritage', '编辑非遗项目') : text('admin.createHeritage', '新增非遗') }}
       </h2>
 
@@ -252,7 +252,7 @@
         </label>
       </div>
 
-      <div class="mt-6 flex gap-4">
+      <div class="mt-6 flex flex-col gap-3 sm:flex-row sm:gap-4">
         <button
           class="flex-1 rounded-lg bg-rose-500 py-3 text-white transition-colors hover:bg-rose-600 disabled:cursor-not-allowed disabled:bg-stone-300"
           :disabled="savingItem || !itemForm.name"

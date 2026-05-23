@@ -1,30 +1,30 @@
 <template>
-  <div class="min-h-screen tibet-page-shell py-24 relative overflow-hidden">
+  <div class="min-h-screen tibet-page-shell py-12 sm:py-16 lg:py-24 relative overflow-hidden">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
       <motion.div
-        class="text-center mb-10"
+        class="text-center mb-8 sm:mb-10"
         :initial="revealInitial"
         :animate="revealInView"
         :transition="revealTransition"
       >
-        <h1 class="tibet-heading inline-flex justify-center text-4xl font-bold text-tibet-dark mb-4">{{ t('heritage.title') }}</h1>
-        <p class="text-lg text-tibet-brown/70 max-w-3xl mx-auto mb-3">
+        <h1 class="tibet-heading inline-flex justify-center text-3xl font-bold text-tibet-dark mb-3 sm:text-4xl sm:mb-4">{{ t('heritage.title') }}</h1>
+        <p class="text-sm leading-relaxed text-tibet-brown/70 max-w-3xl mx-auto mb-2 sm:text-lg sm:mb-3">
           {{ t('heritage.description') }}
         </p>
-        <p class="text-sm text-tibet-brown/50 max-w-3xl mx-auto">
+        <p class="text-xs leading-relaxed text-tibet-brown/50 max-w-3xl mx-auto sm:text-sm">
           {{ t('heritage.description2') }}
         </p>
       </motion.div>
 
       <!-- 搜索栏 -->
-      <div class="mb-8 max-w-xl mx-auto">
-        <form class="flex items-center gap-2" @submit.prevent="handleSearch">
+      <div class="mb-6 max-w-xl mx-auto sm:mb-8">
+        <form class="flex flex-col gap-2 sm:flex-row sm:items-center" @submit.prevent="handleSearch">
           <div class="relative flex-1">
             <input
               v-model="searchKeyword"
               type="text"
               :placeholder="t('heritage.searchPlaceholder', '搜索非遗项目...')"
-              class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-stone-200 bg-white/80 backdrop-blur text-sm text-stone-700 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-tibet-red/30 focus:border-tibet-red/40 transition"
+              class="w-full pl-10 pr-4 py-3 sm:py-2.5 rounded-xl border border-stone-200 bg-white/80 backdrop-blur text-sm text-stone-700 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-tibet-red/30 focus:border-tibet-red/40 transition"
             />
             <svg xmlns="http://www.w3.org/2000/svg" class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -32,7 +32,7 @@
           </div>
           <button
             type="submit"
-            class="px-4 py-2.5 rounded-xl bg-tibet-red text-white text-sm font-medium hover:bg-tibet-red/90 transition disabled:opacity-50"
+            class="mobile-touch-target px-4 py-2.5 rounded-xl bg-tibet-red text-white text-sm font-medium hover:bg-tibet-red/90 transition disabled:opacity-50"
             :disabled="searchLoading"
           >
             {{ searchLoading ? '...' : t('heritage.search', '搜索') }}
@@ -40,7 +40,7 @@
           <button
             v-if="searchKeyword"
             type="button"
-            class="px-3 py-2.5 rounded-xl border border-stone-200 text-sm text-stone-500 hover:bg-stone-50 transition"
+            class="mobile-touch-target px-3 py-2.5 rounded-xl border border-stone-200 text-sm text-stone-500 hover:bg-stone-50 transition"
             @click="searchKeyword = ''; handleSearch()"
           >
             {{ t('heritage.clearSearch', '清除') }}
@@ -50,12 +50,12 @@
 
       <motion.section
         v-if="!loading"
-        class="mb-10 grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-6"
+        class="mb-8 grid grid-cols-1 gap-4 sm:mb-10 sm:gap-6 xl:grid-cols-[minmax(0,1fr)_360px]"
         :initial="{ opacity: 0, y: 20 }"
         :animate="{ opacity: 1, y: 0 }"
         :transition="{ duration: 0.34, ease: motionEase }"
       >
-        <div class="tibet-panel rounded-2xl p-5 sm:p-6">
+        <div class="tibet-panel rounded-2xl p-4 sm:p-6">
           <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-5">
             <div>
               <p class="text-xs font-semibold uppercase tracking-[0.2em] text-tibet-red/70 mb-2">Heritage Knowledge Base</p>
@@ -75,34 +75,34 @@
             </button>
           </div>
 
-          <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
-            <div class="rounded-xl border border-stone-200 bg-white/70 px-4 py-3">
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3 mb-5">
+            <div class="rounded-xl border border-stone-200 bg-white/70 px-3 py-3 sm:px-4">
               <div class="flex items-center justify-between gap-2">
                 <p class="text-xs text-stone-500">收录项目</p>
                 <BookOpen class="h-4 w-4 text-tibet-red" />
               </div>
-              <p class="mt-2 text-2xl font-bold text-stone-900">{{ formatCompact(heritageItems.length) }}</p>
+              <p class="mt-2 text-xl font-bold text-stone-900 sm:text-2xl">{{ formatCompact(heritageItems.length) }}</p>
             </div>
-            <div class="rounded-xl border border-stone-200 bg-white/70 px-4 py-3">
+            <div class="rounded-xl border border-stone-200 bg-white/70 px-3 py-3 sm:px-4">
               <div class="flex items-center justify-between gap-2">
                 <p class="text-xs text-stone-500">累计浏览</p>
                 <Eye class="h-4 w-4 text-blue-600" />
               </div>
-              <p class="mt-2 text-2xl font-bold text-stone-900">{{ formatCompact(totalViews) }}</p>
+              <p class="mt-2 text-xl font-bold text-stone-900 sm:text-2xl">{{ formatCompact(totalViews) }}</p>
             </div>
-            <div class="rounded-xl border border-stone-200 bg-white/70 px-4 py-3">
+            <div class="rounded-xl border border-stone-200 bg-white/70 px-3 py-3 sm:px-4">
               <div class="flex items-center justify-between gap-2">
                 <p class="text-xs text-stone-500">互动量</p>
                 <MessageCircle class="h-4 w-4 text-emerald-600" />
               </div>
-              <p class="mt-2 text-2xl font-bold text-stone-900">{{ formatCompact(totalInteractions) }}</p>
+              <p class="mt-2 text-xl font-bold text-stone-900 sm:text-2xl">{{ formatCompact(totalInteractions) }}</p>
             </div>
-            <div class="rounded-xl border border-stone-200 bg-white/70 px-4 py-3">
+            <div class="rounded-xl border border-stone-200 bg-white/70 px-3 py-3 sm:px-4">
               <div class="flex items-center justify-between gap-2">
                 <p class="text-xs text-stone-500">传承人档案</p>
                 <UserRound class="h-4 w-4 text-amber-600" />
               </div>
-              <p class="mt-2 text-2xl font-bold text-stone-900">{{ formatCompact(featuredInheritors.length) }}</p>
+              <p class="mt-2 text-xl font-bold text-stone-900 sm:text-2xl">{{ formatCompact(featuredInheritors.length) }}</p>
             </div>
           </div>
 
@@ -226,7 +226,7 @@
         </div>
 
         <aside class="space-y-4">
-          <div class="tibet-panel rounded-2xl p-5">
+          <div class="tibet-panel rounded-2xl p-4 sm:p-5">
             <div class="mb-4 flex items-center justify-between gap-3">
               <div>
                 <p class="text-xs font-semibold uppercase tracking-[0.16em] text-tibet-red/60">Inheritors</p>
@@ -278,7 +278,7 @@
             </p>
           </div>
 
-          <div class="tibet-panel rounded-2xl p-5">
+          <div class="tibet-panel rounded-2xl p-4 sm:p-5">
             <div class="mb-4 flex items-center justify-between gap-3">
               <div>
                 <p class="text-xs font-semibold uppercase tracking-[0.16em] text-tibet-red/60">Calendar</p>
@@ -314,15 +314,15 @@
 
       <!-- 非遗大类一览（简洁卡片设计） -->
       <motion.section
-        class="mb-14"
+        class="mb-10 sm:mb-14"
         :initial="cardInitial"
         :whileInView="cardInView"
         :inViewOptions="inViewOnce"
         :transition="cardTransition(0, 0.05)"
       >
-        <div class="tibet-panel rounded-3xl px-5 sm:px-8 lg:px-10 py-8 lg:py-10">
+        <div class="tibet-panel rounded-3xl px-4 py-6 sm:px-8 sm:py-8 lg:px-10 lg:py-10">
           <!-- 区块标题 -->
-          <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-8">
+          <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-6 sm:mb-8">
             <div>
               <h2 class="text-xl sm:text-2xl font-bold text-stone-900 mb-1">
                 {{ t('heritage.categoriesTitle') }}
@@ -457,25 +457,25 @@
         <motion.section
           v-if="!loading && representativeItems.length"
           key="heritage-representative"
-          class="mb-12"
+          class="mb-10 sm:mb-12"
           :initial="{ opacity: 0, y: 24 }"
           :animate="{ opacity: 1, y: 0 }"
           :exit="{ opacity: 0, y: 16 }"
           :transition="{ duration: 0.36, ease: motionEase }"
         >
           <div class="flex items-center justify-between mb-4">
-            <h2 class="tibet-heading text-2xl font-bold text-tibet-dark">{{ t('heritage.representativeTitle') }}</h2>
+            <h2 class="tibet-heading text-xl font-bold text-tibet-dark sm:text-2xl">{{ t('heritage.representativeTitle') }}</h2>
             <p class="text-sm text-tibet-brown/50 hidden md:block">
               {{ t('heritage.representativeDescription') }}
             </p>
           </div>
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-4">
             <motion.button
               v-for="(item, index) in representativeItems"
               :key="item.id"
               layout
               @click="openDetail(item)"
-              class="group tibet-card-elevated rounded-2xl p-5 text-left hover:border-tibet-red/25 focus:outline-none focus:ring-2 focus:ring-tibet-gold focus:ring-offset-2 overflow-hidden"
+              class="group tibet-card-elevated rounded-2xl p-4 text-left hover:border-tibet-red/25 focus:outline-none focus:ring-2 focus:ring-tibet-gold focus:ring-offset-2 overflow-hidden sm:p-5"
               :initial="cardInitial"
               :whileInView="cardInView"
               :exit="cardExit"
@@ -484,7 +484,7 @@
               :whileHover="{ y: -6, scale: 1.015 }"
               :whileTap="{ scale: 0.985 }"
             >
-              <div class="h-36 -mx-5 -mt-5 mb-4 overflow-hidden rounded-t-2xl bg-stone-100">
+              <div class="h-36 -mx-4 -mt-4 mb-4 overflow-hidden rounded-t-2xl bg-stone-100 sm:-mx-5 sm:-mt-5">
                 <img
                   :src="resolveHeritageImage(item)"
                   :alt="item.name"
@@ -538,14 +538,14 @@
       <MotionModal
         :show="Boolean(selectedItem)"
         modal-key="heritage-detail-modal"
-        root-class="z-[120] px-4"
+        root-class="z-[120] px-3 sm:px-4"
         backdrop-class="bg-black/45 backdrop-blur-sm"
-        panel-class="max-w-3xl rounded-2xl bg-white overflow-hidden p-0"
+        panel-class="max-w-3xl rounded-2xl bg-white overflow-hidden p-0 max-h-[92dvh]"
         @close="selectedItem = null"
       >
         <template v-if="selectedItem">
           <!-- 顶部大图 -->
-          <div class="relative h-56 md:h-72 bg-stone-100">
+          <div class="relative h-44 sm:h-56 md:h-72 bg-stone-100">
             <motion.img
               :src="resolveHeritageImage(selectedItem)"
               :alt="selectedItem.name"
@@ -557,7 +557,7 @@
             />
             <motion.button
               type="button"
-              class="absolute top-4 right-4 bg-black/50 text-white p-2 rounded-full hover:bg-black/70 transition"
+              class="absolute top-3 right-3 bg-black/50 text-white p-2 rounded-full hover:bg-black/70 transition sm:top-4 sm:right-4"
               :whileHover="{ rotate: 90, scale: 1.08 }"
               :whileTap="{ scale: 0.92 }"
               @click="selectedItem = null"
@@ -576,7 +576,7 @@
               </svg>
             </motion.button>
             <motion.div
-              class="absolute bottom-4 left-4 bg-black/45 backdrop-blur px-4 py-2 rounded-xl"
+              class="absolute inset-x-3 bottom-3 bg-black/45 backdrop-blur px-3 py-2 rounded-xl sm:inset-x-auto sm:left-4 sm:bottom-4 sm:px-4"
               :initial="{ opacity: 0, y: 12 }"
               :animate="{ opacity: 1, y: 0 }"
               :transition="{ duration: 0.34, delay: 0.1, ease: motionEase }"
@@ -584,15 +584,15 @@
               <p class="text-xs text-red-100 font-medium mb-1">
                 {{ selectedItem.category || t('heritage.representativeTitle') }}
               </p>
-              <h3 class="text-xl md:text-2xl font-bold text-white">
+              <h3 class="text-lg md:text-2xl font-bold text-white line-clamp-2">
                 {{ selectedItem.name }}
               </h3>
             </motion.div>
           </div>
 
           <!-- 互动状态栏：浏览数 / 点赞 / 评论 -->
-          <div v-if="selectedItem.id < 10000" class="px-6 py-3 flex items-center justify-between border-b border-stone-100">
-            <div class="flex items-center gap-4 text-xs text-stone-400">
+          <div v-if="selectedItem.id < 10000" class="px-4 py-3 flex flex-wrap items-center justify-between gap-3 border-b border-stone-100 sm:px-6">
+            <div class="flex min-w-0 flex-wrap items-center gap-3 text-xs text-stone-400 sm:gap-4">
               <span v-if="selectedItem.viewCount" class="flex items-center gap-1">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                 {{ selectedItem.viewCount }}
@@ -622,7 +622,7 @@
 
           <!-- 文字内容区：分段更详细介绍 + 线下体验模块 -->
           <motion.div
-            class="px-6 py-5 text-sm text-stone-700 space-y-5 max-h-[65vh] overflow-y-auto"
+            class="px-4 py-4 text-sm text-stone-700 space-y-5 max-h-[calc(92dvh-11rem)] overflow-y-auto sm:px-6 sm:py-5 sm:max-h-[65vh]"
             :initial="{ opacity: 0, y: 14 }"
             :animate="{ opacity: 1, y: 0 }"
             :transition="{ duration: 0.34, delay: 0.12, ease: motionEase }"
@@ -724,7 +724,7 @@
               :animate="{ opacity: 1, y: 0 }"
               :transition="{ duration: 0.3, delay: 0.28, ease: motionEase }"
             >
-              <div class="flex items-center justify-between gap-2 mb-3">
+              <div class="flex flex-col gap-2 mb-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h4 class="text-sm font-semibold text-stone-900">
                     {{ t('heritage.offlineExperience') }}
@@ -733,15 +733,15 @@
                     {{ t('heritage.experienceDescription', { name: selectedItem.name }) }}
                   </p>
                 </div>
-                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-red-50 text-red-700 border border-red-100">
+                <span class="inline-flex w-fit items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-red-50 text-red-700 border border-red-100">
                   {{ t('heritage.totalExperienceSpots', { count: experienceSpots.length }) }}
                 </span>
               </div>
 
               <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
                 <!-- 交互式地图 -->
-                <div class="md:col-span-2 relative rounded-xl overflow-hidden border border-stone-200 min-h-[220px] bg-stone-100">
-                  <div ref="mapContainer" class="w-full h-full min-h-[220px]"></div>
+                <div class="md:col-span-2 relative rounded-xl overflow-hidden border border-stone-200 min-h-[200px] bg-stone-100 sm:min-h-[220px]">
+                  <div ref="mapContainer" class="w-full h-full min-h-[200px] sm:min-h-[220px]"></div>
                   <!-- 地图加载提示 -->
                   <AnimatePresence>
                     <!-- 地图加载提示 -->
@@ -790,7 +790,7 @@
                   </div>
                   <!-- 图例 -->
                   <div class="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/40 to-transparent z-10 pointer-events-none">
-                    <div class="flex items-center gap-2 text-[11px]">
+                    <div class="flex flex-wrap items-center gap-2 text-[11px]">
                       <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-black/35 backdrop-blur text-white">
                         <span class="inline-block w-1.5 h-1.5 rounded-full bg-emerald-300"></span>
                         {{ t('heritage.experienceShop') }}
@@ -804,11 +804,11 @@
                 </div>
 
                 <!-- 门店列表 -->
-                <div class="md:col-span-3 space-y-3 max-h-[220px] overflow-y-auto pr-1">
+                <div class="md:col-span-3 space-y-3 max-h-[260px] overflow-y-auto pr-1 md:max-h-[220px]">
                   <motion.div
                     v-for="(spot, index) in experienceSpots"
                     :key="spot.name"
-                    class="flex items-start justify-between gap-3 rounded-xl border border-stone-200 bg-stone-50/60 px-3 py-2.5 hover:bg-white hover:border-red-200 transition"
+                    class="flex flex-col gap-3 rounded-xl border border-stone-200 bg-stone-50/60 px-3 py-2.5 hover:bg-white hover:border-red-200 transition sm:flex-row sm:items-start sm:justify-between"
                     :initial="{ opacity: 0, x: 16 }"
                     :animate="{ opacity: 1, x: 0 }"
                     :transition="cardTransition(index, 0.18)"
@@ -830,7 +830,7 @@
                         {{ spot.address }}
                       </p>
                     </div>
-                    <div class="flex flex-col items-end gap-1">
+                    <div class="flex flex-wrap items-center gap-2 sm:flex-col sm:items-end sm:gap-1">
                       <a
                         class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-medium bg-red-50 text-red-700 border border-red-100 hover:bg-red-600 hover:text-white hover:border-red-600 transition"
                         :href="buildNavUrl(spot)"
@@ -930,7 +930,7 @@
                     ★
                   </button>
                 </div>
-                <div class="flex gap-2">
+                <div class="flex flex-col gap-2 sm:flex-row">
                   <input
                     v-model="newCommentContent"
                     type="text"
@@ -941,7 +941,7 @@
                   />
                   <button
                     type="button"
-                    class="px-4 py-2 rounded-lg bg-tibet-red text-white text-sm font-medium hover:bg-tibet-red/90 transition disabled:opacity-50"
+                    class="mobile-touch-target px-4 py-2 rounded-lg bg-tibet-red text-white text-sm font-medium hover:bg-tibet-red/90 transition disabled:opacity-50"
                     :disabled="submittingComment || !newCommentContent.trim()"
                     @click="submitComment"
                   >
@@ -963,8 +963,8 @@
                   :key="comment.id"
                   class="rounded-lg border border-stone-100 bg-stone-50/40 px-3 py-2"
                 >
-                  <div class="flex items-center justify-between mb-1">
-                    <div class="flex items-center gap-2">
+                  <div class="flex flex-col gap-1 mb-1 sm:flex-row sm:items-center sm:justify-between">
+                    <div class="flex min-w-0 flex-wrap items-center gap-2">
                       <div class="w-6 h-6 rounded-full bg-tibet-red/10 flex items-center justify-center text-tibet-red text-[10px] font-bold overflow-hidden">
                         <img v-if="comment.avatar" :src="comment.avatar" class="w-full h-full object-cover" />
                         <span v-else>{{ (comment.nickname || comment.username)?.charAt(0) }}</span>

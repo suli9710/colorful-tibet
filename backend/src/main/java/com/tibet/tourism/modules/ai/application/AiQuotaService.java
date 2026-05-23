@@ -2,6 +2,7 @@ package com.tibet.tourism.modules.ai.application;
 import java.time.Duration;
 import java.time.format.DateTimeFormatter;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
@@ -9,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -17,6 +19,20 @@ public class AiQuotaService {
     private static final Logger log = LoggerFactory.getLogger(AiQuotaService.class);
     private static final String QUOTA_KEY_PREFIX = "ai:quota:daily:";
     private static final String CACHE_KEY_PREFIX = "ai:cache:route:";
+    private static final long QUOTA_TTL_SECONDS = Duration.ofHours(25).toSeconds();
+    private static final DefaultRedisScript<List> CONSUME_QUOTA_SCRIPT = new DefaultRedisScript<>("""
+            local current = tonumber(redis.call('GET', KEYS[1]) or '0')
+            local limit = tonumber(ARGV[1])
+            local ttl = tonumber(ARGV[2])
+            if current >= limit then
+                return {0, 0}
+            end
+            current = redis.call('INCR', KEYS[1])
+            if current == 1 then
+                redis.call('EXPIRE', KEYS[1], ttl)
+            end
+            return {1, math.max(limit - current, 0)}
+            """, List.class);
 
     private final StringRedisTemplate redisTemplate;
 
@@ -32,6 +48,38 @@ public class AiQuotaService {
 
     public AiQuotaService(ObjectProvider<StringRedisTemplate> redisTemplateProvider) {
         this.redisTemplate = redisTemplateProvider.getIfAvailable();
+    }
+
+    public record QuotaConsumptionResult(boolean allowed, int remaining) {}
+
+    public QuotaConsumptionResult tryConsumeQuota(Long userId) {
+        if (userId == null) {
+            return new QuotaConsumptionResult(true, dailyLimit);
+        }
+        if (dailyLimit <= 0) {
+            return new QuotaConsumptionResult(false, 0);
+        }
+
+        String dateKey = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE);
+        String key = QUOTA_KEY_PREFIX + dateKey + ":" + userId;
+
+        if (redisTemplate != null) {
+            try {
+                List<?> result = redisTemplate.execute(
+                        CONSUME_QUOTA_SCRIPT,
+                        List.of(key),
+                        String.valueOf(dailyLimit),
+                        String.valueOf(QUOTA_TTL_SECONDS));
+                QuotaConsumptionResult decision = toQuotaConsumptionResult(result);
+                int used = decision.allowed() ? dailyLimit - decision.remaining() : dailyLimit;
+                mirrorFallbackQuota(dateKey, userId, used);
+                return decision;
+            } catch (Exception e) {
+                log.warn("Redis quota consume failed, using in-memory fallback: {}", e.getMessage());
+                return tryConsumeFallbackQuota(dateKey, userId);
+            }
+        }
+        return tryConsumeFallbackQuota(dateKey, userId);
     }
 
     public boolean isQuotaExceeded(Long userId) {
@@ -55,24 +103,7 @@ public class AiQuotaService {
     }
 
     public void incrementQuota(Long userId) {
-        if (userId == null) {
-            return;
-        }
-        String dateKey = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE);
-        String key = QUOTA_KEY_PREFIX + dateKey + ":" + userId;
-        incrementFallbackQuota(dateKey, userId);
-
-        if (redisTemplate != null) {
-            try {
-                Long count = redisTemplate.opsForValue().increment(key);
-                if (count != null && count == 1L) {
-                    redisTemplate.expire(key, Duration.ofHours(25));
-                }
-                return;
-            } catch (Exception e) {
-                log.warn("Redis quota increment failed: {}", e.getMessage());
-            }
-        }
+        tryConsumeQuota(userId);
     }
 
     public int getRemainingQuota(Long userId) {
@@ -148,6 +179,25 @@ public class AiQuotaService {
         }
     }
 
+    private QuotaConsumptionResult toQuotaConsumptionResult(List<?> result) {
+        if (result == null || result.size() < 2) {
+            throw new IllegalStateException("Invalid Redis quota script result");
+        }
+        boolean allowed = toLong(result.get(0)) == 1L;
+        int remaining = Math.max(0, (int) toLong(result.get(1)));
+        return new QuotaConsumptionResult(allowed, remaining);
+    }
+
+    private static long toLong(Object value) {
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        if (value == null) {
+            return 0L;
+        }
+        return Long.parseLong(value.toString());
+    }
+
     private String normalize(String val) {
         return val == null ? "" : val.trim().toLowerCase();
     }
@@ -162,9 +212,25 @@ public class AiQuotaService {
         return counter.get();
     }
 
-    private void incrementFallbackQuota(String dateKey, Long userId) {
+    private QuotaConsumptionResult tryConsumeFallbackQuota(String dateKey, Long userId) {
         resetFallbackIfNewDay(dateKey);
-        fallbackQuota.computeIfAbsent(userId.toString(), k -> new AtomicInteger(0)).incrementAndGet();
+        AtomicInteger counter = fallbackQuota.computeIfAbsent(userId.toString(), k -> new AtomicInteger(0));
+        while (true) {
+            int current = counter.get();
+            if (current >= dailyLimit) {
+                return new QuotaConsumptionResult(false, 0);
+            }
+            int next = current + 1;
+            if (counter.compareAndSet(current, next)) {
+                return new QuotaConsumptionResult(true, Math.max(0, dailyLimit - next));
+            }
+        }
+    }
+
+    private void mirrorFallbackQuota(String dateKey, Long userId, int usedCount) {
+        resetFallbackIfNewDay(dateKey);
+        fallbackQuota.computeIfAbsent(userId.toString(), k -> new AtomicInteger(0))
+                .updateAndGet(current -> Math.max(current, usedCount));
     }
 
     private void resetFallbackIfNewDay(String dateKey) {

@@ -180,6 +180,22 @@ export interface AiRouteGenerateResponse {
   prompt: string
 }
 
+export interface AiRouteRecordResponse {
+  id: number
+  jobId?: string | null
+  title: string
+  content: string
+  days: number
+  budget: string
+  preference: string
+  locale?: string | null
+  status: 'RUNNING' | 'COMPLETED' | 'FAILED'
+  manuallySaved: boolean
+  errorMessage?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
 export interface HeritageItem {
   id: number
   name: string
@@ -260,7 +276,10 @@ export const endpoints = {
     sharedLikeStatus: (id: number) => `/routes/shared/${id}/like-status`,
     sharedComments: (id: number) => `/routes/shared/${id}/comments`,
     deleteSharedComment: (routeId: number, commentId: number) => `/routes/shared/${routeId}/comments/${commentId}`,
-    myRoutes: '/routes/my-routes'
+    myRoutes: '/routes/my-routes',
+    aiLatest: '/routes/ai/latest',
+    aiSaved: '/routes/ai/saved',
+    saveAiRoute: (id: number) => `/routes/ai/${id}/save`
   },
   itineraries: {
     generate: '/itineraries/generate',
@@ -347,7 +366,9 @@ export const endpoints = {
   prices: {
     fetch: (spotId: number) => `/prices/fetch/${spotId}`,
     update: (spotId: number) => `/prices/update/${spotId}`,
-    batchUpdate: '/prices/batch-update'
+    batchUpdate: '/prices/batch-update',
+    batchUpdateJob: '/prices/batch-update/jobs',
+    batchUpdateJobStatus: (jobId: string) => `/prices/batch-update/jobs/${jobId}`
   },
   favorites: {
     list: '/favorites',

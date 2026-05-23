@@ -10,4 +10,8 @@ public interface TibetTravelKitRepository extends JpaRepository<TibetTravelKit, 
             Long userId,
             LocalDateTime now
     );
+
+    void deleteByUserId(Long userId);
+
+    void deleteByItineraryUserId(Long userId);
 }

@@ -1,6 +1,6 @@
 <template>
   <motion.div
-    class="min-h-screen flex items-center justify-center bg-cover bg-center py-12 px-4 sm:px-6 lg:px-8 relative overflow-hidden"
+    class="min-h-[calc(100dvh-5rem)] flex items-start justify-center bg-cover bg-center px-4 pb-8 pt-8 sm:items-center sm:px-6 sm:py-12 lg:px-8 relative overflow-y-auto overflow-x-hidden"
     style="background-image: url('/heritage/布达拉宫3.jpg')"
     :initial="authPageInitial"
     :animate="authPageAnimate"
@@ -22,7 +22,7 @@
 
     <!-- Sacred Gate Card -->
     <motion.div
-      class="max-w-md w-full space-y-8 relative z-10 bg-tibet-white/95 backdrop-blur-xl p-10 rounded-2xl shadow-2xl gpu-accelerated tibet-top-ornament tibet-four-corners"
+      class="max-w-md w-full space-y-6 relative z-10 bg-tibet-white/95 backdrop-blur-xl p-6 rounded-2xl shadow-2xl gpu-accelerated tibet-top-ornament tibet-four-corners sm:space-y-8 sm:p-10"
       :initial="authCardInitial"
       :animate="authCardAnimate"
       :transition="authCardTransition"
@@ -37,13 +37,13 @@
         :animate="authItemAnimate"
         :transition="authItemTransition(0.1)"
       >
-        <h2 class="text-3xl font-bold text-tibet-dark mb-2 font-display">{{ t('login.welcomeBack') }}</h2>
+        <h2 class="text-2xl font-bold text-tibet-dark mb-2 font-display sm:text-3xl">{{ t('login.welcomeBack') }}</h2>
         <div class="tibet-divider w-24 mx-auto mt-3 mb-3"></div>
         <p class="text-tibet-brown/70 text-sm">{{ t('login.subtitle') }}</p>
       </motion.div>
 
       <motion.form
-        class="mt-8 space-y-6"
+        class="mt-6 space-y-5 sm:mt-8 sm:space-y-6"
         :initial="authItemInitial"
         :animate="authItemAnimate"
         :transition="authItemTransition(0.18)"

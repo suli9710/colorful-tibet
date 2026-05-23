@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
+import fs from 'fs'
 import path from 'path'
 
 // https://vitejs.dev/config/
@@ -23,6 +24,15 @@ export default defineConfig(({ command }) => ({
       '/images': {
         target: 'http://localhost:8080',
         changeOrigin: true,
+        bypass: (req) => {
+          const pathname = req.url?.split('?')[0]
+          if (!pathname) return
+
+          const publicAsset = path.resolve(__dirname, 'public', pathname.replace(/^\/+/, ''))
+          if (fs.existsSync(publicAsset)) {
+            return pathname
+          }
+        },
       },
       '/uploads': {
         target: 'http://localhost:8080',

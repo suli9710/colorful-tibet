@@ -7,7 +7,7 @@
     <div v-else-if="spot" class="relative">
       <!-- Immersive Header Image -->
       <motion.div
-        class="relative h-[60vh] w-full overflow-hidden bg-gray-200"
+        class="relative h-[46vh] min-h-[420px] w-full overflow-hidden bg-gray-200 sm:h-[60vh]"
         :initial="{ opacity: 0, scale: 1.02 }"
         :animate="{ opacity: 1, scale: 1 }"
         :transition="{ duration: 0.5, ease: motionEase }"
@@ -27,24 +27,24 @@
         <div class="absolute inset-0 bg-gradient-to-t from-tibet-dark/80 via-transparent to-transparent"></div>
         
         <motion.div
-          class="absolute bottom-0 left-0 w-full p-8 md:p-16 text-white"
+          class="absolute bottom-0 left-0 w-full p-5 sm:p-8 md:p-16 text-white"
           :initial="{ opacity: 0, y: 24 }"
           :animate="{ opacity: 1, y: 0 }"
           :transition="{ duration: 0.6, delay: 0.2, ease: motionEase }"
         >
           <div class="max-w-7xl mx-auto">
-            <div class="flex items-center space-x-4 mb-4">
+            <div class="mb-4 flex flex-wrap items-center gap-2 sm:gap-4">
               <span class="px-4 py-1.5 bg-white/20 backdrop-blur-md rounded-full text-sm font-bold border border-white/30 tibetan-font">
                 {{ spot.category === 'NATURAL' ? t('spotDetail.natural') : t('spotDetail.cultural') }}
               </span>
-              <div class="flex space-x-2">
+              <div class="flex min-w-0 flex-wrap gap-2">
                 <span v-for="tag in spot.tags" :key="tag.id" class="px-3 py-1 bg-black/30 backdrop-blur-sm rounded-full text-xs font-medium border border-white/10">
                   #{{ tag.tag }}
                 </span>
               </div>
             </div>
-            <h1 class="text-5xl md:text-6xl font-bold mb-4 tibetan-font">{{ spot.name }}</h1>
-            <div class="flex items-center text-white/80 space-x-6">
+            <h1 class="mb-4 text-3xl font-bold leading-tight sm:text-5xl md:text-6xl tibetan-font">{{ spot.name }}</h1>
+            <div class="flex flex-wrap items-center gap-3 text-white/80 sm:gap-6">
               <span class="flex items-center tibetan-font">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
@@ -59,8 +59,8 @@
       </motion.div>
 
       <!-- Content Section -->
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 -mt-20 relative z-10">
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-12">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 -mt-12 sm:-mt-20 relative z-10">
+        <div class="grid grid-cols-1 gap-8 lg:grid-cols-3 lg:gap-12">
           <!-- Left Column: Description -->
           <motion.div
             class="lg:col-span-2 space-y-8"
@@ -69,7 +69,7 @@
             :inViewOptions="inViewOnce"
             :transition="{ duration: 0.5, delay: 0.1, ease: motionEase }"
           >
-            <div class="bg-white rounded-3xl p-8 shadow-xl border border-tibet-gold/20">
+            <div class="bg-white rounded-3xl p-5 shadow-xl border border-tibet-gold/20 sm:p-8">
               <h2 class="text-2xl font-bold text-tibet-dark mb-6 tibetan-font">{{ t('spotDetail.introduction') }}</h2>
               <p class="text-tibet-brown/80 leading-loose text-lg whitespace-pre-line tibetan-font">
                 {{ spot.description }}
@@ -77,11 +77,11 @@
             </div>
 
             <!-- Comments Section -->
-            <div class="bg-white rounded-3xl p-8 shadow-xl border border-tibet-gold/20">
+            <div class="bg-white rounded-3xl p-5 shadow-xl border border-tibet-gold/20 sm:p-8">
               <h2 class="text-2xl font-bold text-tibet-dark mb-6 tibetan-font">{{ t('spotDetail.comments') }}</h2>
               
               <!-- Comment Form -->
-              <div v-if="user" class="mb-8 p-6 bg-gray-50 rounded-2xl">
+              <div v-if="user" class="mb-8 rounded-2xl bg-gray-50 p-4 sm:p-6">
                 <h3 class="text-lg font-bold text-gray-800 mb-4 tibetan-font">{{ t('spotDetail.postComment') }}</h3>
                 <div class="flex items-center mb-4">
                   <span class="mr-4 text-gray-600 tibetan-font">{{ t('spotDetail.rating') }}:</span>
@@ -98,7 +98,7 @@
                           :placeholder="t('spotDetail.shareExperience')"></textarea>
                 <div class="mb-4">
                   <label class="block text-sm font-medium text-gray-600 mb-2 tibetan-font">{{ t('spotDetail.addPhoto') }}</label>
-                  <div class="flex items-center space-x-4">
+                  <div class="flex flex-wrap items-center gap-3 sm:gap-4">
                     <label v-if="!commentImageFile" for="comment-image-input"
                            class="inline-flex items-center px-4 py-2 rounded-full bg-white border border-tibet-gold/25 text-sm font-medium text-gray-600 cursor-pointer hover:bg-blue-50 hover:text-blue-600 transition-colors tibetan-font">
                       <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -221,7 +221,7 @@
             </div>
 
             <!-- Interactive Map -->
-            <div class="bg-white rounded-3xl p-8 shadow-xl border border-tibet-gold/20 overflow-hidden">
+            <div class="bg-white rounded-3xl p-5 shadow-xl border border-tibet-gold/20 overflow-hidden sm:p-8">
               <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
                 <div>
                   <h2 class="text-2xl font-bold text-tibet-dark tibetan-font">{{ t('spotDetail.location') }}</h2>
@@ -289,7 +289,7 @@
             :transition="{ duration: 0.5, delay: 0.25, ease: motionEase }"
           >
               <div class="sticky top-20">
-              <div class="glass-card rounded-3xl p-8 border border-white/50">
+              <div id="spot-booking-panel" class="glass-card rounded-3xl p-5 border border-white/50 sm:p-8">
                 <h2 class="text-2xl font-bold text-tibet-dark mb-6 tibetan-font">{{ t('spotDetail.bookNow') }}</h2>
                 
                 <form @submit.prevent="handleBooking" class="space-y-6">
@@ -341,6 +341,16 @@
     @close="showPaymentModal = false"
     @paid="handlePaymentConfirmed"
   />
+
+  <MobileStickyActionBar
+    :show="Boolean(spot)"
+    :eyebrow="t('spotDetail.totalAmount')"
+    :title="`¥${totalPrice}`"
+    :meta="spot?.name"
+    :primary-label="submitting ? t('spotDetail.processing') : t('spotDetail.confirmPayment')"
+    :primary-disabled="submitting"
+    @primary="scrollToBooking"
+  />
 </template>
 
 <script setup lang="ts">
@@ -351,6 +361,7 @@ import { motion } from 'motion-v'
 import { motionEase, revealInitial, revealInView, inViewOnce } from '../motion/presets'
 import api, { endpoints } from '../api'
 import PaymentModal from '../components/PaymentModal.vue'
+import MobileStickyActionBar from '../components/MobileStickyActionBar.vue'
 import { useBehaviorTracker } from '../composables/useBehaviorTracker'
 import { useAuthStore } from '../stores/auth'
 import type * as Leaflet from 'leaflet'
@@ -602,6 +613,10 @@ onBeforeUnmount(() => {
 })
 
 const showPaymentModal = ref(false)
+
+const scrollToBooking = () => {
+  document.getElementById('spot-booking-panel')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+}
 
 const handleBooking = async () => {
   if (!(await auth.ensureSession())) {

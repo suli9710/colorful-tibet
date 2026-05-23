@@ -234,11 +234,15 @@
                     <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
                     <span class="relative inline-flex rounded-full h-3 w-3 bg-tibet-turquoise"></span>
                   </span>
-                  <span class="text-sm font-semibold text-tibet-blue">{{ streaming ? t('routePlanner.aiStreamingLabel') : t('routePlanner.preparingLabel') }}</span>
+                  <span class="text-sm font-semibold text-tibet-blue">{{ routeGenerationStatusLabel }}</span>
                   <span v-if="charCount > 0" class="ml-auto text-xs text-tibet-blue/70 font-mono">{{ charCount }} {{ t('routePlanner.charCountUnit') }}</span>
                 </div>
                 <div class="h-1.5 rounded-full bg-tibet-gold/15 overflow-hidden">
-                  <div class="h-full rounded-full bg-gradient-to-r from-tibet-blue via-tibet-turquoise to-tibet-gold relative overflow-hidden animate-shimmer-stream" :class="{ 'w-full': !streaming, 'animate-pulse': streaming }"></div>
+                  <div
+                    class="h-full rounded-full bg-gradient-to-r from-tibet-blue via-tibet-turquoise to-tibet-gold relative overflow-hidden animate-shimmer-stream transition-[width] duration-700 ease-out"
+                    :style="{ width: `${routeGenerationProgressPercent}%` }"
+                    :class="{ 'animate-pulse': streaming }"
+                  ></div>
                 </div>
                 <p class="mt-2 text-xs text-tibet-brown/60">{{ t('routePlanner.waitingTime') }}</p>
               </motion.div>
@@ -306,6 +310,61 @@
             <p class="text-sm text-tibet-brown/40 max-w-sm">{{ t('routePlanner.emptyDescription') }}</p>
           </motion.div>
 
+            <!-- First-token wait state -->
+            <motion.div
+              v-if="loading && !result"
+              key="route-planner-first-token"
+              class="glass-card rounded-3xl border border-sky-100/80 p-6 shadow-xl shadow-sky-900/5 md:p-8"
+              role="status"
+              aria-live="polite"
+              :initial="{ opacity: 0, y: 24, scale: 0.98 }"
+              :animate="{ opacity: 1, y: 0, scale: 1 }"
+              :exit="{ opacity: 0, y: -12, scale: 0.98 }"
+              :transition="revealTransition"
+            >
+              <div class="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+                <div class="flex items-center gap-4">
+                  <span class="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-sky-100 text-tibet-blue">
+                    <span class="absolute inset-0 rounded-2xl bg-sky-200/70 animate-ping"></span>
+                    <Sparkles class="relative h-6 w-6" />
+                  </span>
+                  <div>
+                    <p class="text-base font-bold text-tibet-dark">{{ t('routePlanner.firstTokenTitle') }}</p>
+                    <p class="mt-1 text-sm leading-relaxed text-tibet-brown/60">{{ routeGenerationStatusLabel }}</p>
+                  </div>
+                </div>
+                <div class="text-left sm:text-right">
+                  <p class="text-xs font-semibold text-tibet-brown/45">{{ t('routePlanner.firstTokenProgressLabel') }}</p>
+                  <p class="mt-1 font-mono text-2xl font-bold text-tibet-blue">{{ routeGenerationProgressPercent }}%</p>
+                </div>
+              </div>
+
+              <div class="mt-6">
+                <div class="h-2 rounded-full bg-sky-100 overflow-hidden">
+                  <div
+                    class="h-full rounded-full bg-gradient-to-r from-tibet-blue via-tibet-turquoise to-tibet-gold relative overflow-hidden animate-shimmer-stream transition-[width] duration-700 ease-out"
+                    :style="{ width: `${routeGenerationProgressPercent}%` }"
+                  ></div>
+                </div>
+                <p class="mt-3 text-xs leading-relaxed text-tibet-brown/55">{{ t('routePlanner.firstTokenSubtitle') }}</p>
+              </div>
+
+              <div class="mt-6 grid gap-3 sm:grid-cols-3">
+                <div
+                  v-for="step in routeGenerationProgressSteps"
+                  :key="step.key"
+                  class="rounded-2xl border px-4 py-3 transition-colors"
+                  :class="step.active ? 'border-sky-200 bg-sky-50 text-tibet-blue' : 'border-tibet-gold/15 bg-white/70 text-tibet-brown/55'"
+                >
+                  <div class="flex items-center gap-2">
+                    <span class="h-2.5 w-2.5 rounded-full" :class="step.active ? 'bg-tibet-turquoise animate-pulse' : 'bg-tibet-gold/40'"></span>
+                    <p class="text-sm font-semibold">{{ step.label }}</p>
+                  </div>
+                  <p class="mt-1.5 text-xs leading-relaxed opacity-80">{{ step.description }}</p>
+                </div>
+              </div>
+            </motion.div>
+
           <!-- Result card -->
             <motion.div
               v-if="result"
@@ -330,7 +389,7 @@
                   </div>
                 </div>
                 <div class="flex flex-wrap gap-1.5">
-                  <motion.button v-if="resultShouldCollapse" @click="resultExpanded = !resultExpanded"
+                  <motion.button v-if="!isLongRoute && resultShouldCollapse" @click="resultExpanded = !resultExpanded"
                           :whileHover="{ y: -1, scale: 1.02 }"
                           :whileTap="{ scale: 0.96 }"
                           class="inline-flex items-center gap-1.5 rounded-xl border border-tibet-blue/20 bg-white/80 px-3.5 py-2 text-xs font-medium text-tibet-blue transition-all hover:bg-sky-50">
@@ -351,7 +410,10 @@
               </div>
 
               <!-- Compact summary -->
-              <div class="space-y-5 border-b border-white/60 bg-gradient-to-br from-white/70 via-amber-50/45 to-sky-50/40 p-5 md:p-6">
+              <div
+                v-if="!isLongRoute"
+                class="space-y-5 border-b border-white/60 bg-gradient-to-br from-white/70 via-amber-50/45 to-sky-50/40 p-5 md:p-6"
+              >
                 <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
                   <div v-for="stat in resultStats" :key="stat.label" class="rounded-xl border border-white/70 bg-white/70 px-3 py-2.5 shadow-sm">
                     <p class="text-[11px] font-semibold text-tibet-brown/45">{{ stat.label }}</p>
@@ -362,7 +424,7 @@
                 <div v-if="routeOverviewText" class="rounded-2xl border border-tibet-gold/15 bg-white/75 px-4 py-3">
                   <div class="mb-2 flex items-center gap-2 text-tibet-dark">
                     <Sparkles class="h-4 w-4 text-tibet-gold" />
-                    <h3 class="text-sm font-bold">路线摘要</h3>
+                      <h3 class="text-sm font-bold">{{ t('routePlanner.routeSummary') }}</h3>
                   </div>
                   <p class="text-sm leading-relaxed text-tibet-brown/70 line-clamp-3">{{ routeOverviewText }}</p>
                 </div>
@@ -376,13 +438,17 @@
               </div>
 
               <!-- Day outline -->
-              <div v-if="visibleRouteDaySections.length" class="border-b border-white/60 bg-white/45 px-5 py-5 md:px-6">
+              <div
+                v-if="visibleRouteDaySections.length"
+                class="border-b border-white/60 bg-white/45 px-5 py-5 md:px-6"
+                :class="{ 'xl:hidden': isLongRoute }"
+              >
                 <div class="mb-3 flex items-center justify-between gap-3">
                   <div class="flex items-center gap-2 text-tibet-dark">
                     <ListChecks class="h-4 w-4 text-tibet-blue" />
-                    <h3 class="text-sm font-bold">每日安排速览</h3>
+                        <h3 class="text-sm font-bold">{{ t('routePlanner.routeDailyPreview') }}</h3>
                   </div>
-                  <span v-if="hiddenDayCount > 0" class="text-xs font-medium text-tibet-brown/50">还有 {{ hiddenDayCount }} 天在全文中</span>
+                      <span v-if="hiddenDayCount > 0" class="text-xs font-medium text-tibet-brown/50">{{ t('routePlanner.routeHiddenDays', { count: hiddenDayCount }) }}</span>
                 </div>
                 <div class="grid gap-3 sm:grid-cols-2">
                   <section
@@ -397,14 +463,123 @@
                 </div>
               </div>
 
+              <!-- Long-route desktop navigation -->
+              <aside
+                v-if="isLongRoute"
+                class="hidden border-b border-white/60 bg-gradient-to-br from-white/80 via-amber-50/45 to-sky-50/35 p-4 xl:block"
+              >
+                <div class="route-long-reader rounded-2xl border border-white/70 bg-white/65 p-5">
+                  <div class="mb-4 flex items-center justify-between gap-3">
+                    <div>
+                      <p class="text-sm font-bold text-tibet-dark">{{ t('routePlanner.routeFullText') }}</p>
+                      <p class="text-xs text-tibet-brown/50">{{ t('routePlanner.routeLongReaderHint') }}</p>
+                    </div>
+                  </div>
+
+                  <div
+                    ref="routeResultReaderRef"
+                    class="prose prose-slate route-result-prose route-result-prose-compact route-long-flow flow-root max-w-none prose-headings:text-tibet-dark prose-p:text-tibet-brown/80 prose-p:leading-relaxed prose-a:text-tibet-blue prose-strong:text-tibet-dark/90 prose-li:text-tibet-brown/80 prose-h2:border-b prose-h2:border-tibet-gold/20 prose-h2:pb-2 prose-h2:mt-8 prose-h2:mb-4 prose-img:rounded-2xl prose-img:shadow-md"
+                  >
+                    <div class="not-prose route-long-nav float-left mb-4 mr-5 w-[260px] rounded-2xl border border-white/70 bg-white/75 p-4 shadow-sm">
+                      <div class="mb-3 flex items-center gap-2 text-tibet-dark">
+                        <ListChecks class="h-4 w-4 text-tibet-blue" />
+                        <h3 class="text-sm font-bold">{{ t('routePlanner.routeNavigation') }}</h3>
+                      </div>
+
+                      <div class="grid grid-cols-2 gap-2">
+                        <div v-for="stat in resultStats" :key="stat.label" class="rounded-xl border border-tibet-gold/10 bg-white/75 px-3 py-2">
+                          <p class="text-[10px] font-semibold text-tibet-brown/45">{{ stat.label }}</p>
+                          <p class="mt-1 truncate text-xs font-bold text-tibet-dark">{{ stat.value }}</p>
+                        </div>
+                      </div>
+
+                      <div v-if="routeOverviewText" class="mt-3 rounded-2xl border border-tibet-gold/15 bg-white/75 px-3 py-3">
+                        <div class="mb-2 flex items-center gap-2 text-tibet-dark">
+                          <Sparkles class="h-3.5 w-3.5 text-tibet-gold" />
+                          <h4 class="text-xs font-bold">{{ t('routePlanner.routeOverview') }}</h4>
+                        </div>
+                        <p class="line-clamp-5 text-xs leading-relaxed text-tibet-brown/65">{{ routeOverviewText }}</p>
+                      </div>
+
+                      <div v-if="routeHighlightItems.length" class="mt-3 space-y-2">
+                        <p class="text-xs font-bold text-tibet-dark">{{ t('routePlanner.routeHighlights') }}</p>
+                        <div v-for="item in routeHighlightItems" :key="item" class="flex gap-2 rounded-xl border border-tibet-gold/10 bg-white/70 px-3 py-2">
+                          <span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-tibet-gold"></span>
+                          <p class="line-clamp-2 text-[11px] leading-relaxed text-tibet-brown/65">{{ item }}</p>
+                        </div>
+                      </div>
+
+                      <div v-if="routeDaySections.length" class="mt-3 space-y-2">
+                        <div class="flex items-center justify-between gap-2">
+                          <p class="text-xs font-bold text-tibet-dark">{{ t('routePlanner.routeDailyDirectory') }}</p>
+                          <span class="text-[11px] font-medium text-tibet-brown/45">{{ t('routePlanner.routeAllDays', { count: routeDaySections.length }) }}</span>
+                        </div>
+                        <div class="max-h-[42vh] space-y-1.5 overflow-y-auto pr-1 route-day-nav">
+                          <button
+                            v-for="day in routeDaySections"
+                            :key="day.day"
+                            type="button"
+                            @click="scrollToRouteDay(day.day)"
+                            class="w-full rounded-xl border border-tibet-gold/10 bg-white/70 px-3 py-2 text-left transition hover:border-tibet-blue/25 hover:bg-sky-50"
+                          >
+                            <p class="text-[11px] font-bold text-tibet-blue">{{ day.day }}</p>
+                            <p class="mt-0.5 line-clamp-1 text-xs font-semibold text-tibet-dark">{{ day.title }}</p>
+                          </button>
+                        </div>
+                      </div>
+
+                      <div class="mt-4 grid grid-cols-2 gap-1.5">
+                        <button
+                          type="button"
+                          @click="copyResult"
+                          :disabled="copying"
+                          class="truncate rounded-xl border border-tibet-gold/20 bg-white/80 px-2 py-2 text-xs font-medium text-gray-600 transition hover:bg-gray-50 disabled:opacity-50"
+                        >
+                          {{ t('routePlanner.copyText') }}
+                        </button>
+                        <button
+                          type="button"
+                          @click="saveRoute"
+                          :disabled="saving || !result"
+                          class="truncate rounded-xl border border-tibet-gold/20 bg-white/80 px-2 py-2 text-xs font-medium text-gray-600 transition hover:bg-gray-50 disabled:opacity-50"
+                        >
+                          {{ t('routePlanner.saveRoute') }}
+                        </button>
+                        <button
+                          type="button"
+                          @click="downloadRoute"
+                          :disabled="!result"
+                          class="truncate rounded-xl border border-tibet-gold/20 bg-white/80 px-2 py-2 text-xs font-medium text-gray-600 transition hover:bg-gray-50 disabled:opacity-50"
+                        >
+                          {{ t('routePlanner.downloadMarkdown') }}
+                        </button>
+                        <button
+                          type="button"
+                          @click="shareRoute"
+                          :disabled="sharing || !result"
+                          class="truncate rounded-xl bg-tibet-blue px-2 py-2 text-xs font-semibold text-white transition hover:bg-tibet-blue/90 disabled:opacity-50"
+                        >
+                          {{ t('routePlanner.shareToCommunity') }}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div class="route-long-markdown contents" v-html="renderedResult"></div>
+                  </div>
+                </div>
+              </aside>
+
               <!-- Markdown content -->
-              <div class="px-6 pb-6 pt-5 md:px-8 md:pb-8 lg:px-10">
+              <div
+                class="px-6 pb-6 pt-5 md:px-8 md:pb-8 lg:px-10"
+                :class="{ 'xl:hidden': isLongRoute }"
+              >
                 <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <p class="text-sm font-bold text-tibet-dark">完整路线</p>
-                    <p class="text-xs text-tibet-brown/50">默认收起长内容，展开后可查看全部细节。</p>
+                    <p class="text-sm font-bold text-tibet-dark">{{ t('routePlanner.routeFullText') }}</p>
+                    <p class="text-xs text-tibet-brown/50">{{ t('routePlanner.routeShortReaderHint') }}</p>
                   </div>
-                  <motion.button v-if="resultShouldCollapse" @click="resultExpanded = !resultExpanded"
+                  <motion.button v-if="!isLongRoute && resultShouldCollapse" @click="resultExpanded = !resultExpanded"
                           :whileHover="{ y: -1, scale: 1.02 }"
                           :whileTap="{ scale: 0.96 }"
                           class="inline-flex items-center gap-1.5 rounded-xl border border-tibet-blue/20 bg-white/80 px-3.5 py-2 text-xs font-medium text-tibet-blue transition-all hover:bg-sky-50">
@@ -416,15 +591,21 @@
                 <div class="relative">
                   <div
                     class="prose prose-slate route-result-prose max-w-none prose-headings:text-tibet-dark prose-p:text-tibet-brown/80 prose-p:leading-relaxed prose-a:text-tibet-blue prose-strong:text-tibet-dark/90 prose-li:text-tibet-brown/80 prose-h2:border-b prose-h2:border-tibet-gold/20 prose-h2:pb-2 prose-h2:mt-8 prose-h2:mb-4 prose-img:rounded-2xl prose-img:shadow-md"
-                    :class="{ 'max-h-[420px] overflow-hidden': resultShouldCollapse && !resultExpanded }"
+                    :class="{
+                      'max-h-[420px] overflow-hidden': !isLongRoute && resultShouldCollapse && !resultExpanded,
+                      'route-result-prose-compact': isLongRoute
+                    }"
                     v-html="renderedResult"
                   ></div>
-                  <div v-if="resultShouldCollapse && !resultExpanded" class="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-white via-white/95 to-transparent"></div>
+                  <div v-if="!isLongRoute && resultShouldCollapse && !resultExpanded" class="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-white via-white/95 to-transparent"></div>
                 </div>
               </div>
 
               <!-- Result actions -->
-              <div class="px-6 py-4 border-t border-white/60 bg-white/30 flex flex-wrap items-center justify-end gap-2">
+              <div
+                class="px-6 py-4 border-t border-white/60 bg-white/30 flex flex-wrap items-center justify-end gap-2"
+                :class="{ 'xl:hidden': isLongRoute }"
+              >
                 <motion.button @click="generateRoute" :disabled="loading"
                         :whileHover="{ y: -1, scale: 1.02 }"
                         :whileTap="{ scale: 0.96 }"
@@ -442,6 +623,13 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
                   </svg>
                   {{ saving ? t('routePlanner.saving') : t('routePlanner.saveRoute') }}
+                </motion.button>
+                <motion.button @click="downloadRoute" :disabled="!result"
+                        :whileHover="{ y: -1, scale: 1.02 }"
+                        :whileTap="{ scale: 0.96 }"
+                        class="inline-flex items-center gap-1.5 rounded-xl border border-tibet-gold/25 bg-white/80 px-4 py-2.5 text-sm font-medium text-gray-600 transition-all hover:bg-gray-50 disabled:opacity-50">
+                  <Download class="h-4 w-4" />
+                  {{ t('routePlanner.downloadMarkdown') }}
                 </motion.button>
                 <motion.button @click="shareRoute" :disabled="sharing || !result"
                         :whileHover="{ y: -1, scale: 1.02 }"
@@ -756,6 +944,19 @@
     @close="resetPendingItineraryBooking"
     @paid="handleItineraryPaymentConfirmed"
   />
+
+  <MobileStickyActionBar
+    :show="Boolean(result)"
+    :eyebrow="t('routePlanner.routeGenerated')"
+    :title="routeResultMobileTitle"
+    :meta="routeResultMobileMeta"
+    :secondary-label="t('routePlanner.copyText')"
+    :primary-label="sharing ? t('routePlanner.sharing') : t('routePlanner.shareToCommunity')"
+    :secondary-disabled="copying"
+    :primary-disabled="sharing || !result"
+    @secondary="copyResult"
+    @primary="shareRoute"
+  />
 </template>
 
 <script setup lang="ts">
@@ -784,9 +985,15 @@ import {
   Ticket
 } from 'lucide-vue-next'
 import DOMPurify from 'dompurify'
-import { generateRouteStream } from '../api/stream'
-import api, { endpoints } from '../api'
+import {
+  getRouteGenerationJob,
+  startRouteGenerationJob,
+  streamRouteGenerationJob,
+  type RouteGenerationJobSnapshot
+} from '../api/stream'
+import api, { endpoints, type AiRouteRecordResponse } from '../api'
 import PaymentModal from '../components/PaymentModal.vue'
+import MobileStickyActionBar from '../components/MobileStickyActionBar.vue'
 import { useRoutePlannerDraft, type RoutePlannerFormState } from '../composables/useRoutePlannerDraft'
 import { useBehaviorTracker } from '../composables/useBehaviorTracker'
 import { useAuthStore } from '../stores/auth'
@@ -810,6 +1017,7 @@ const { encodeBehaviorData, reset: resetBehavior } = useBehaviorTracker()
 
 interface RouteSummarySection {
   day: string
+  dayNumber: number
   title: string
   summary: string
 }
@@ -1077,11 +1285,17 @@ const itineraryVersionLoading = ref<string | null>(null)
 const itineraryBookingItemId = ref<number | null>(null)
 const tibetTravelKitLoading = ref(false)
 const streaming = ref(false)
+const waitingForFirstToken = ref(false)
+const generationElapsedSeconds = ref(0)
 const charCount = ref(0)
 const streamAbortController = ref<AbortController | null>(null)
+const activeRouteJobId = ref('')
+const currentAiRouteRecordId = ref<number | null>(null)
+const currentAiRouteManuallySaved = ref(false)
 const result = shallowRef('')
 const renderedResult = shallowRef('')
 const resultExpanded = ref(false)
+const routeResultReaderRef = ref<HTMLElement | null>(null)
 const bookableItinerary = ref<BookableItinerary | null>(null)
 const itineraryQuote = ref<ItineraryQuote | null>(null)
 const tibetTravelKit = ref<TibetTravelKit | null>(null)
@@ -1090,9 +1304,32 @@ const errorMessage = ref('')
 const markdownRenderDebounceMs = 120
 let markdownWorker: Worker | null = null
 let markdownRenderTimer: number | null = null
+let firstTokenProgressTimer: number | null = null
 let latestRenderJobId = 0
 let latestAppliedRenderId = 0
 let latestMarkdownSnapshot = ''
+
+const stopFirstTokenProgress = () => {
+  if (firstTokenProgressTimer !== null) {
+    window.clearInterval(firstTokenProgressTimer)
+    firstTokenProgressTimer = null
+  }
+  waitingForFirstToken.value = false
+}
+
+const startFirstTokenProgress = () => {
+  stopFirstTokenProgress()
+  waitingForFirstToken.value = true
+  generationElapsedSeconds.value = 0
+  firstTokenProgressTimer = window.setInterval(() => {
+    generationElapsedSeconds.value += 1
+  }, 1000)
+}
+
+const markFirstTokenReceived = () => {
+  if (!waitingForFirstToken.value) return
+  stopFirstTokenProgress()
+}
 
 const cleanMarkdownLine = (value: string) =>
   value
@@ -1136,6 +1373,19 @@ const routeOverviewText = computed(() => {
   return stripMarkdown(result.value).slice(0, 160)
 })
 
+const routeResultMobileTitle = computed(() => {
+  if (!result.value) return ''
+  return t('routePlanner.routeTitle', {
+    days: form.value.days,
+    preference: getPreferenceText(form.value.preference)
+  })
+})
+
+const routeResultMobileMeta = computed(() => {
+  if (!result.value) return ''
+  return t('routePlanner.routeGenComplete', { chars: result.value.trim().length })
+})
+
 const routeHighlightItems = computed(() => {
   const section = getMarkdownSectionLines(result.value, ['行程亮点', '亮点', 'Highlights'])
   const items = section
@@ -1152,25 +1402,74 @@ const routeHighlightItems = computed(() => {
     .slice(0, 3)
 })
 
+const parseChineseRouteDayNumber = (value: string) => {
+  const normalized = value.trim()
+  if (/^\d+$/.test(normalized)) return Number(normalized)
+
+  const digits: Record<string, number> = {
+    一: 1,
+    二: 2,
+    三: 3,
+    四: 4,
+    五: 5,
+    六: 6,
+    七: 7,
+    八: 8,
+    九: 9
+  }
+
+  if (normalized.length === 1 && digits[normalized]) return digits[normalized]
+
+  const tenIndex = normalized.indexOf('十')
+  if (tenIndex >= 0) {
+    const tens = tenIndex === 0 ? 1 : digits[normalized[tenIndex - 1]] || 0
+    const ones = tenIndex === normalized.length - 1 ? 0 : digits[normalized[tenIndex + 1]] || 0
+    const parsed = tens * 10 + ones
+    return parsed > 0 ? parsed : null
+  }
+
+  return null
+}
+
+const getRouteDayIndex = (label: string) => {
+  const chineseMatch = label.match(/第\s*([一二三四五六七八九十0-9]+)\s*天/i)
+  if (chineseMatch) return parseChineseRouteDayNumber(chineseMatch[1])
+
+  const dayMatch = label.match(/(?:Day|D)\s*(\d+)/i)
+  if (dayMatch) return Number(dayMatch[1])
+
+  return null
+}
+
+const expectedRouteDayCount = computed(() => {
+  const days = Math.round(Number(form.value.days) || defaultForm.days)
+  return Math.min(30, Math.max(1, days))
+})
+
 const routeDaySections = computed<RouteSummarySection[]>(() => {
   const lines = result.value.split(/\r?\n/)
   const sections: RouteSummarySection[] = []
   const dayHeadingPattern = /^#{1,4}\s*(第[一二三四五六七八九十0-9]+天|Day\s*\d+)[：:\s-]*(.*)$/i
+  const seenDayNumbers = new Set<number>()
 
   let current: { day: string; title: string; lines: string[] } | null = null
 
   const flushCurrent = () => {
     if (!current) return
+    const dayNumber = getRouteDayIndex(current.day)
+    if (!dayNumber || dayNumber > expectedRouteDayCount.value || seenDayNumbers.has(dayNumber)) return
+    seenDayNumbers.add(dayNumber)
 
     const summary = current.lines
       .map(cleanMarkdownLine)
       .filter(Boolean)
-      .filter(line => !/^第[一二三四五六七八九十0-9]+天/.test(line))
+      .filter(line => !/^(第[一二三四五六七八九十0-9]+天|Day\s*\d+)/i.test(line))
       .slice(0, 2)
       .join('；')
 
     sections.push({
       day: current.day,
+      dayNumber,
       title: current.title || '当日行程',
       summary: summary || '查看完整路线了解当天细节。'
     })
@@ -1199,11 +1498,12 @@ const routeDaySections = computed<RouteSummarySection[]>(() => {
   }
 
   flushCurrent()
-  return sections
+  return sections.sort((left, right) => left.dayNumber - right.dayNumber)
 })
 
 const visibleRouteDaySections = computed(() => routeDaySections.value.slice(0, 6))
 const hiddenDayCount = computed(() => Math.max(routeDaySections.value.length - visibleRouteDaySections.value.length, 0))
+const isLongRoute = computed(() => result.value.length >= 2600 || routeDaySections.value.length >= 6)
 const resultShouldCollapse = computed(() => result.value.length > 1200 || routeDaySections.value.length > 4)
 const resultStats = computed(() => [
   { label: '天数', value: `${form.value.days} 天` },
@@ -1215,6 +1515,57 @@ const plannerSnapshotStats = computed(() => [
   { label: '天数', value: `${form.value.days}天` },
   { label: '预算', value: getBudgetShort(form.value.budget) },
   { label: '偏好', value: getPreferenceText(form.value.preference) }
+])
+const scrollToRouteDay = (dayLabel: string) => {
+  const root = routeResultReaderRef.value
+  if (!root || !dayLabel) return
+
+  const normalize = (value: string) => value.replace(/\s+/g, '').toLowerCase()
+  const targetLabel = normalize(dayLabel)
+  const headings = Array.from(root.querySelectorAll('h2, h3, h4'))
+  const target = headings.find(heading => normalize(heading.textContent || '').includes(targetLabel))
+
+  target?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+const routeGenerationStage = computed(() => {
+  if (!waitingForFirstToken.value || result.value) return 'streaming'
+  if (generationElapsedSeconds.value < 4) return 'collecting'
+  if (generationElapsedSeconds.value < 11) return 'thinking'
+  return 'composing'
+})
+const routeGenerationProgressPercent = computed(() => {
+  if (!loading.value) return 0
+  if (!waitingForFirstToken.value || result.value) return 100
+  return Math.min(88, 18 + generationElapsedSeconds.value * 5)
+})
+const routeGenerationStatusLabel = computed(() => {
+  if (waitingForFirstToken.value && !result.value) {
+    if (routeGenerationStage.value === 'collecting') return t('routePlanner.firstTokenCollecting')
+    if (routeGenerationStage.value === 'thinking') return t('routePlanner.firstTokenThinking')
+    return t('routePlanner.firstTokenComposing')
+  }
+  return streaming.value ? t('routePlanner.aiStreamingLabel') : t('routePlanner.preparingLabel')
+})
+const routeGenerationProgressSteps = computed(() => [
+  {
+    key: 'collecting',
+    label: t('routePlanner.firstTokenStepCollecting'),
+    description: t('routePlanner.firstTokenStepCollectingDesc'),
+    active: routeGenerationStage.value === 'collecting'
+  },
+  {
+    key: 'thinking',
+    label: t('routePlanner.firstTokenStepThinking'),
+    description: t('routePlanner.firstTokenStepThinkingDesc'),
+    active: routeGenerationStage.value === 'thinking'
+  },
+  {
+    key: 'composing',
+    label: t('routePlanner.firstTokenStepComposing'),
+    description: t('routePlanner.firstTokenStepComposingDesc'),
+    active: routeGenerationStage.value === 'composing'
+  }
 ])
 const planningPulseItems = computed(() => {
   if (result.value) {
@@ -1234,10 +1585,16 @@ const planningPulseItems = computed(() => {
   ]
 })
 
+const routeDraftStorageKey = computed(() => {
+  const userId = auth.user?.id
+  return userId ? `colorful-tibet:route-planner:draft:${userId}` : 'colorful-tibet:route-planner:draft:anonymous'
+})
+
 const { persistRouteDraft, restoreRouteDraft } = useRoutePlannerDraft(
   {
     form,
     result,
+    jobId: activeRouteJobId,
     statusMessage,
     errorMessage,
     loading,
@@ -1245,6 +1602,8 @@ const { persistRouteDraft, restoreRouteDraft } = useRoutePlannerDraft(
   },
   {
     defaultForm,
+    storageKey: routeDraftStorageKey,
+    version: 2,
     getRestoredStatusMessage: draft => t('routePlanner.routeGenComplete', { chars: draft.result.trim().length }),
     onRestoreResult: restoredResult => {
       charCount.value = restoredResult.length
@@ -1390,6 +1749,206 @@ const generateBookableItinerary = async (versionType = 'default') => {
   }
 }
 
+const updateGeneratedRouteContent = (markdown: string, immediate = false) => {
+  result.value = markdown
+  charCount.value = markdown.length
+  scheduleMarkdownRender(markdown, immediate)
+}
+
+const fetchLatestAiRouteRecord = async () => {
+  const response = await api.get<AiRouteRecordResponse | ''>(endpoints.routes.aiLatest, {
+    validateStatus: status => status === 200 || status === 204
+  })
+  return response.status === 204 ? null : response.data as AiRouteRecordResponse
+}
+
+const applyAiRouteRecord = (record: AiRouteRecordResponse) => {
+  currentAiRouteRecordId.value = record.id
+  currentAiRouteManuallySaved.value = Boolean(record.manuallySaved)
+  form.value = {
+    days: Number(record.days) || defaultForm.days,
+    budget: record.budget || defaultForm.budget,
+    preference: record.preference || defaultForm.preference
+  }
+
+  if (record.content?.trim()) {
+    updateGeneratedRouteContent(record.content, true)
+    resultExpanded.value = true
+  }
+
+  if (record.status === 'RUNNING' && record.jobId) {
+    activeRouteJobId.value = record.jobId
+    loading.value = true
+    streaming.value = true
+    errorMessage.value = ''
+    statusMessage.value = t('routePlanner.aiGeneratingRoute', {
+      days: record.days,
+      pref: getPreferenceText(record.preference || form.value.preference)
+    })
+    if (!record.content?.trim()) {
+      startFirstTokenProgress()
+    }
+    persistRouteDraft({ jobId: record.jobId, completed: false })
+    return true
+  }
+
+  activeRouteJobId.value = ''
+  loading.value = false
+  streaming.value = false
+  stopFirstTokenProgress()
+
+  if (record.content?.trim()) {
+    errorMessage.value = record.status === 'FAILED' ? record.errorMessage || t('routePlanner.generateFailed') : ''
+    statusMessage.value = t('routePlanner.routeGenComplete', { chars: record.content.trim().length })
+    persistRouteDraft({ jobId: '', completed: record.status === 'COMPLETED' })
+    return true
+  }
+
+  if (record.status === 'FAILED') {
+    errorMessage.value = record.errorMessage || t('routePlanner.generateFailed')
+    statusMessage.value = t('routePlanner.routeGenFailedStatus')
+    persistRouteDraft({ jobId: '', completed: false })
+    return true
+  }
+
+  return false
+}
+
+const restoreLatestRouteFromServer = async () => {
+  try {
+    const latest = await fetchLatestAiRouteRecord()
+    if (!latest) return false
+    return applyAiRouteRecord(latest)
+  } catch (error) {
+    console.warn('Failed to restore latest AI route:', error)
+    return false
+  }
+}
+
+const failRouteJob = (message: string) => {
+  stopFirstTokenProgress()
+  errorMessage.value = message
+  statusMessage.value = t('routePlanner.finalFailure')
+  streaming.value = false
+  loading.value = false
+  activeRouteJobId.value = ''
+  generationStore.cancelGeneration()
+  persistRouteDraft({ jobId: '', completed: false })
+}
+
+const finishRouteJob = async (jobId: string, content: string) => {
+  if (!activeRouteJobId.value || activeRouteJobId.value !== jobId) return
+
+  stopFirstTokenProgress()
+  const finalContent = content || result.value
+  if (finalContent.trim().length === 0) {
+    failRouteJob(t('routePlanner.aiEmptyResult'))
+    return
+  }
+
+  updateGeneratedRouteContent(finalContent, true)
+  resultExpanded.value = true
+  streaming.value = false
+  loading.value = false
+  activeRouteJobId.value = ''
+  errorMessage.value = ''
+  statusMessage.value = t('routePlanner.routeGenComplete', { chars: finalContent.trim().length })
+  generationStore.completeGeneration()
+  persistRouteDraft({ jobId: '', completed: true })
+  await generateBookableItinerary()
+}
+
+const applyRouteJobSnapshot = (snapshot: RouteGenerationJobSnapshot) => {
+  if (!snapshot || (activeRouteJobId.value && snapshot.jobId !== activeRouteJobId.value)) return
+
+  activeRouteJobId.value = snapshot.jobId
+  if (snapshot.routeRecordId) {
+    currentAiRouteRecordId.value = snapshot.routeRecordId
+  }
+  currentAiRouteManuallySaved.value = false
+  if (snapshot.content?.trim()) {
+    markFirstTokenReceived()
+    updateGeneratedRouteContent(snapshot.content, snapshot.status !== 'RUNNING')
+  }
+
+  if (snapshot.status === 'RUNNING') {
+    loading.value = true
+    streaming.value = true
+    errorMessage.value = ''
+    statusMessage.value = t('routePlanner.aiGeneratingRoute', {
+      days: snapshot.days,
+      pref: getPreferenceText(form.value.preference)
+    })
+    persistRouteDraft({ jobId: snapshot.jobId, completed: false })
+  } else if (snapshot.status === 'FAILED') {
+    failRouteJob(snapshot.errorMessage || t('routePlanner.generateFailed'))
+  } else if (snapshot.status === 'COMPLETED') {
+    void finishRouteJob(snapshot.jobId, snapshot.content || result.value)
+  }
+}
+
+const subscribeToRouteJob = async (jobId: string) => {
+  const controller = new AbortController()
+  streamAbortController.value?.abort()
+  streamAbortController.value = controller
+
+  await streamRouteGenerationJob(
+    jobId,
+    {
+      onSnapshot: applyRouteJobSnapshot,
+      onDelta: (_text, fullText) => {
+        markFirstTokenReceived()
+        updateGeneratedRouteContent(fullText)
+      },
+      onReplace: content => {
+        if (!content.trim()) return
+        markFirstTokenReceived()
+        updateGeneratedRouteContent(content, true)
+      },
+      onDone: content => void finishRouteJob(jobId, content),
+      onError: message => failRouteJob(message)
+    },
+    controller.signal
+  )
+
+  if (streamAbortController.value === controller) {
+    streamAbortController.value = null
+  }
+}
+
+const resumeRouteJobFromDraft = async () => {
+  if (!activeRouteJobId.value) return
+
+  loading.value = true
+  streaming.value = true
+  errorMessage.value = ''
+  if (!result.value) {
+    startFirstTokenProgress()
+  }
+
+  try {
+    const snapshot = await getRouteGenerationJob(activeRouteJobId.value)
+    applyRouteJobSnapshot(snapshot)
+    if (snapshot.status === 'RUNNING') {
+      await subscribeToRouteJob(snapshot.jobId)
+    }
+  } catch (error: any) {
+    console.error('Failed to resume route job:', error)
+    if (result.value.trim()) {
+      stopFirstTokenProgress()
+      loading.value = false
+      streaming.value = false
+      activeRouteJobId.value = ''
+      statusMessage.value = t('routePlanner.routeGenComplete', { chars: result.value.trim().length })
+      errorMessage.value = ''
+      generationStore.completeGeneration()
+      persistRouteDraft({ jobId: '', completed: true })
+      return
+    }
+    failRouteJob(error.message || t('routePlanner.generateFailed'))
+  }
+}
+
 const generateRoute = async () => {
   if (!(await auth.ensureSession())) {
     if (confirm(t('routePlanner.loginRequired'))) {
@@ -1400,6 +1959,8 @@ const generateRoute = async () => {
 
   loading.value = true
   streaming.value = true
+  streamAbortController.value?.abort()
+  streamAbortController.value = null
   result.value = ''
   renderedResult.value = ''
   resultExpanded.value = false
@@ -1409,60 +1970,25 @@ const generateRoute = async () => {
   charCount.value = 0
   copying.value = false
   errorMessage.value = ''
+  activeRouteJobId.value = ''
+  currentAiRouteRecordId.value = null
+  currentAiRouteManuallySaved.value = false
   statusMessage.value = t('routePlanner.aiWritingHint')
+  startFirstTokenProgress()
   scheduleMarkdownRender('', true)
-  persistRouteDraft()
+  persistRouteDraft({ jobId: '', completed: false })
   generationStore.startGeneration()
 
-  const controller = new AbortController()
-  streamAbortController.value = controller
-
   try {
-    await generateRouteStream(
-      form.value,
-      {
-        onMeta: (meta) => {
-          statusMessage.value = t('routePlanner.aiGeneratingRoute', { days: meta.days, pref: meta.preference })
-          persistRouteDraft()
-        },
-        onDelta: (_text: string, fullText: string) => {
-          result.value = fullText
-          charCount.value = fullText.length
-          scheduleMarkdownRender(fullText)
-          persistRouteDraft()
-        },
-        onDone: (fullText) => {
-          if (fullText && fullText.length > result.value.length) {
-            result.value = fullText
-          }
-          charCount.value = result.value.length
-          scheduleMarkdownRender(result.value, true)
-          streaming.value = false
-          loading.value = false
-          if (fullText && fullText.trim().length > 0) {
-            statusMessage.value = t('routePlanner.routeGenComplete', { chars: fullText.trim().length })
-            generationStore.completeGeneration()
-            void generateBookableItinerary()
-          } else {
-            errorMessage.value = t('routePlanner.aiEmptyResult')
-            statusMessage.value = t('routePlanner.routeGenFailedStatus')
-            generationStore.cancelGeneration()
-          }
-          persistRouteDraft()
-        },
-        onError: (message) => {
-          errorMessage.value = message
-          statusMessage.value = t('routePlanner.finalFailure')
-          streaming.value = false
-          loading.value = false
-          generationStore.cancelGeneration()
-          persistRouteDraft()
-        },
-      },
-      controller.signal
-    )
+    const snapshot = await startRouteGenerationJob(form.value)
+    activeRouteJobId.value = snapshot.jobId
+    applyRouteJobSnapshot(snapshot)
+    if (snapshot.status === 'RUNNING') {
+      await subscribeToRouteJob(snapshot.jobId)
+    }
   } catch (error: any) {
     console.error('Failed to generate route:', error)
+    stopFirstTokenProgress()
     let message = t('routePlanner.generateFailed')
     if (error.name === 'AbortError') {
       message = t('routePlanner.generationCancelled')
@@ -1472,12 +1998,11 @@ const generateRoute = async () => {
     errorMessage.value = message
     statusMessage.value = t('routePlanner.routeGenFailedStatus')
     generationStore.cancelGeneration()
-    persistRouteDraft()
-  } finally {
     loading.value = false
     streaming.value = false
+    activeRouteJobId.value = ''
     streamAbortController.value = null
-    persistRouteDraft()
+    persistRouteDraft({ jobId: '', completed: false })
   }
 }
 
@@ -1498,7 +2023,47 @@ const copyResult = async () => {
   }
 }
 
-const saveRoute = () => {
+const saveRoute = async () => {
+  if (!result.value || saving.value) return
+
+  if (!(await auth.ensureSession())) {
+    if (confirm(t('routePlanner.loginRequired'))) {
+      router.push('/login')
+    }
+    return
+  }
+
+  saving.value = true
+  try {
+    let recordId = currentAiRouteRecordId.value
+    if (!recordId) {
+      const latest = await fetchLatestAiRouteRecord()
+      if (latest?.content?.trim()) {
+        applyAiRouteRecord(latest)
+        recordId = latest.id
+      }
+    }
+    if (!recordId) {
+      throw new Error('AI route record is missing')
+    }
+
+    const response = await api.post<AiRouteRecordResponse>(endpoints.routes.saveAiRoute(recordId))
+    currentAiRouteRecordId.value = response.data.id
+    currentAiRouteManuallySaved.value = true
+    statusMessage.value = t('routePlanner.routeSavedPrivate')
+    errorMessage.value = ''
+    persistRouteDraft()
+  } catch (error: any) {
+    console.error('Failed to save AI route record:', error)
+    errorMessage.value = error.response?.data?.error || t('routePlanner.saveFailed')
+    persistRouteDraft()
+  } finally {
+    saving.value = false
+  }
+}
+
+const downloadRoute = () => {
+  if (!result.value) return
   const blob = new Blob([result.value], { type: 'text/markdown;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
@@ -1507,10 +2072,30 @@ const saveRoute = () => {
   document.body.appendChild(link)
   link.click()
   document.body.removeChild(link)
+  URL.revokeObjectURL(url)
 }
 
 const getPreferenceText = (key: string) => {
   return t(`routePlanner.preferenceOptions.${key}`)
+}
+
+const communityBudgetValue = (key: string) => {
+  const values: Record<string, string> = {
+    economy: '经济型',
+    comfort: '舒适型',
+    luxury: '豪华型'
+  }
+  return values[key] || key
+}
+
+const communityPreferenceValue = (key: string) => {
+  const values: Record<string, string> = {
+    natural: '自然风光',
+    cultural: '人文历史',
+    photography: '深度摄影',
+    relaxation: '休闲度假'
+  }
+  return values[key] || key
 }
 
 const shareRoute = async () => {
@@ -1529,8 +2114,8 @@ const shareRoute = async () => {
       title: t('routePlanner.routeTitle', { days: form.value.days, preference: getPreferenceText(form.value.preference) }),
       content: result.value,
       days: form.value.days,
-      budget: form.value.budget,
-      preference: form.value.preference
+      budget: communityBudgetValue(form.value.budget),
+      preference: communityPreferenceValue(form.value.preference)
     })
     alert(t('routePlanner.shareSuccess'))
     router.push('/community')
@@ -1636,24 +2221,31 @@ const downloadOfflinePackage = () => {
 
 watch(form, () => persistRouteDraft(), { deep: true })
 
-onMounted(() => {
-  restoreRouteDraft()
+onMounted(async () => {
   generationStore.acknowledgeResult()
+  const hasSession = await auth.ensureSession()
+  const restoredFromServer = hasSession ? await restoreLatestRouteFromServer() : false
+  if (!restoredFromServer) {
+    restoreRouteDraft()
+  }
+  if (activeRouteJobId.value) {
+    void resumeRouteJobFromDraft()
+  }
 })
 
 onBeforeUnmount(() => {
   if (streamAbortController.value) {
     streamAbortController.value.abort()
-    loading.value = false
-    streaming.value = false
-    errorMessage.value = ''
-    statusMessage.value = result.value ? t('routePlanner.generationCancelled') : ''
-    generationStore.cancelGeneration()
+    streamAbortController.value = null
   }
+  stopFirstTokenProgress()
 
   persistRouteDraft()
   if (markdownRenderTimer !== null) {
     window.clearTimeout(markdownRenderTimer)
+  }
+  if (firstTokenProgressTimer !== null) {
+    window.clearInterval(firstTokenProgressTimer)
   }
   markdownWorker?.terminate()
 })
@@ -1701,12 +2293,48 @@ onBeforeUnmount(() => {
 
 .route-result-prose {
   transition: max-height 0.28s ease;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.route-long-reader,
+.route-long-flow {
+  min-width: 0;
+}
+
+.route-long-flow::after {
+  display: block;
+  clear: both;
+  content: "";
+}
+
+.route-long-markdown {
+  display: contents;
+}
+
+.route-long-nav {
+  max-width: min(260px, 45%);
+}
+
+.route-day-nav {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(45, 95, 138, 0.28) transparent;
+}
+
+.route-day-nav::-webkit-scrollbar {
+  width: 6px;
+}
+
+.route-day-nav::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(45, 95, 138, 0.28);
 }
 
 .route-result-prose :deep(h1) {
   font-size: 1.45rem;
   line-height: 1.25;
   margin-bottom: 0.8rem;
+  scroll-margin-top: 6rem;
 }
 
 .route-result-prose :deep(h2) {
@@ -1714,6 +2342,7 @@ onBeforeUnmount(() => {
   line-height: 1.35;
   margin-top: 1.5rem;
   margin-bottom: 0.75rem;
+  scroll-margin-top: 6rem;
 }
 
 .route-result-prose :deep(h3) {
@@ -1721,6 +2350,7 @@ onBeforeUnmount(() => {
   line-height: 1.4;
   margin-top: 1.15rem;
   margin-bottom: 0.45rem;
+  scroll-margin-top: 6rem;
 }
 
 .route-result-prose :deep(p),
@@ -1737,10 +2367,63 @@ onBeforeUnmount(() => {
   margin-bottom: 0.85rem;
 }
 
+.route-result-prose-compact :deep(h1) {
+  font-size: 1.35rem;
+}
+
+.route-result-prose-compact :deep(h2) {
+  margin-top: 1.15rem;
+  margin-bottom: 0.55rem;
+}
+
+.route-result-prose-compact :deep(h3) {
+  margin-top: 0.9rem;
+  margin-bottom: 0.35rem;
+}
+
+.route-result-prose-compact :deep(p),
+.route-result-prose-compact :deep(li) {
+  line-height: 1.62;
+  margin-top: 0.18rem;
+  margin-bottom: 0.18rem;
+}
+
+.route-result-prose-compact :deep(ul),
+.route-result-prose-compact :deep(ol) {
+  margin-top: 0.3rem;
+  margin-bottom: 0.62rem;
+}
+
 /* ===== Responsive ===== */
 @media (max-width: 640px) {
   .route-planner-page {
     background-color: #F7F3EE;
+  }
+
+  .route-planner-page :deep(.sticky) {
+    position: static;
+  }
+
+  .route-result-prose :deep(h1) {
+    font-size: 1.18rem;
+  }
+
+  .route-result-prose :deep(h2) {
+    font-size: 1rem;
+    margin-top: 1.05rem;
+  }
+
+  .route-result-prose :deep(p),
+  .route-result-prose :deep(li) {
+    font-size: 0.88rem;
+    line-height: 1.65;
+  }
+
+  .route-result-prose :deep(table) {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    white-space: nowrap;
   }
 }
 </style>

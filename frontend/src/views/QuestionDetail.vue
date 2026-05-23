@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-tibet-white py-24">
+  <div class="min-h-screen bg-tibet-white py-12 pt-24 sm:py-24">
     <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
       <div v-if="loading" class="text-center py-12">
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-tibet-red mx-auto"></div>
@@ -17,10 +17,10 @@
         </button>
 
         <!-- Question Header -->
-        <div class="glass-card rounded-3xl p-8 mb-6">
+        <div class="glass-card rounded-2xl p-4 mb-6 sm:rounded-3xl sm:p-8">
           <div class="flex items-start justify-between gap-4 mb-4">
-            <div class="flex-1">
-              <div class="flex items-center gap-2 mb-3">
+            <div class="min-w-0 flex-1">
+              <div class="flex flex-wrap items-center gap-2 mb-3">
                 <span v-if="question.isResolved" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-600 text-xs font-semibold">
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                   {{ t('community.solved') }}
@@ -30,8 +30,8 @@
                 </span>
                 <span v-if="question.tags" v-for="tag in parseTags(question.tags)" :key="tag" class="px-2 py-1 rounded-lg text-xs font-medium text-white" :style="{ backgroundColor: getTagColor(tag) }">{{ tag }}</span>
               </div>
-              <h1 class="text-2xl font-bold text-gray-900 mb-3">{{ question.title }}</h1>
-              <div class="flex items-center gap-3 text-sm text-gray-400">
+              <h1 class="break-words text-xl font-bold text-gray-900 mb-3 sm:text-2xl">{{ question.title }}</h1>
+              <div class="flex flex-wrap items-center gap-2 text-sm text-gray-400 sm:gap-3">
                 <span>{{ question.author?.username || t('questionDetail.anonymousUser') }}</span>
                 <span>·</span>
                 <span>{{ formatDate(question.createdAt) }}</span>
@@ -40,10 +40,10 @@
               </div>
             </div>
           </div>
-          <div class="prose prose-slate max-w-none text-gray-700 leading-relaxed">{{ question.content }}</div>
+          <div class="prose prose-slate max-w-none break-words text-gray-700 leading-relaxed">{{ question.content }}</div>
 
           <!-- Question Actions -->
-          <div class="flex items-center gap-4 mt-6 pt-6 border-t border-tibet-gold/20">
+          <div class="flex flex-wrap items-center gap-3 mt-6 pt-6 border-t border-tibet-gold/20 sm:gap-4">
             <button @click="toggleLike" class="flex items-center gap-2 px-4 py-2 rounded-xl transition-all text-sm font-medium"
                     :class="isLiked ? 'bg-red-50 text-red-600' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'">
               <span>{{ isLiked ? '❤️' : '🤍' }}</span>
@@ -67,10 +67,10 @@
 
           <div v-else class="space-y-4">
             <div v-for="answer in answers" :key="answer.id"
-                 class="glass-card rounded-2xl p-6 transition-all"
+                 class="glass-card rounded-2xl p-4 transition-all sm:p-6"
                  :class="answer.isAccepted ? 'border-2 border-emerald-300 bg-emerald-50/40' : 'border border-white/20'">
-              <div class="flex items-start justify-between gap-4 mb-3">
-                <div class="flex items-center gap-2">
+              <div class="flex flex-col gap-2 mb-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                <div class="flex flex-wrap items-center gap-2">
                   <span class="font-semibold text-gray-900 text-sm">{{ answer.user?.username || t('questionDetail.anonymousUser') }}</span>
                   <span v-if="answer.isAccepted" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-600 text-xs font-medium">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
@@ -96,7 +96,7 @@
         </div>
 
         <!-- Write Answer -->
-        <div class="glass-card rounded-3xl p-8">
+        <div class="glass-card rounded-2xl p-4 sm:rounded-3xl sm:p-8">
           <h3 class="text-lg font-bold text-gray-900 mb-4">{{ t('community.writeAnswer') }}</h3>
           <textarea v-model="newAnswer" rows="4"
                     :placeholder="t('community.yourAnswer')"

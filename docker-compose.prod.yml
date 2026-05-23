@@ -77,6 +77,8 @@ services:
       - GUIDE_CHAT_REQUIRE_RECAPTCHA_AFTER=${GUIDE_CHAT_REQUIRE_RECAPTCHA_AFTER:-2}
       - GUIDE_CHAT_ANON_REMOTE_AI_ENABLED=${GUIDE_CHAT_ANON_REMOTE_AI_ENABLED:-false}
       - IP_LOCATION_URL_TEMPLATE=${IP_LOCATION_URL_TEMPLATE:-https://ipapi.co/{ip}/json/}
+      - OUTBOUND_HTTP_PROXY=${OUTBOUND_HTTP_PROXY:-}
+      - OUTBOUND_HTTP_PROXY_NON_PROXY_HOSTS=${OUTBOUND_HTTP_PROXY_NON_PROXY_HOSTS:-localhost|127.*|10.*|172.*|192.168.*|mysql|redis|scrapling|backend|frontend|zipkin}
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
