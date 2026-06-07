@@ -113,16 +113,20 @@ public class DataSeeder implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
+        logger.info("初始化藏语词典...");
+        tibetanTranslationService.initializeDefaultDictionary();
+
         if (isProdProfile() && seedDemoUsersEnabled) {
             throw new IllegalStateException("Demo user seeding is not allowed with the prod profile");
+        }
+        if (isProdProfile()) {
+            logger.info("DataSeeder skipped: prod profile active");
+            return;
         }
         if (!seedContentEnabled && !seedDemoUsersEnabled) {
             logger.info("Data seeding disabled; startup will not create demo or content records.");
             return;
         }
-
-        logger.info("初始化藏语词典...");
-        tibetanTranslationService.initializeDefaultDictionary();
 
         auditExistingDemoAccounts();
 
@@ -260,7 +264,7 @@ public class DataSeeder implements CommandLineRunner {
                     continue;
                 }
                 String[] pool = nicknamesPool[rand.nextInt(nicknamesPool.length)];
-                String nickname = pool[rand.nextInt(pool.length)];
+                String nickname = uniqueSeedNickname(pool[rand.nextInt(pool.length)], username);
                 String city = cities[rand.nextInt(cities.length)];
                 User u = new User();
                 u.setUsername(username);
@@ -291,6 +295,24 @@ public class DataSeeder implements CommandLineRunner {
         byte[] bytes = new byte[18];
         secureRandom.nextBytes(bytes);
         return java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+    }
+
+    private String uniqueSeedNickname(String baseNickname, String username) {
+        String nickname = (baseNickname == null || baseNickname.isBlank()) ? username : baseNickname;
+        if (!userRepository.existsByNickname(nickname)) {
+            return nickname;
+        }
+
+        String candidate = nickname + "-" + username;
+        if (!userRepository.existsByNickname(candidate)) {
+            return candidate;
+        }
+
+        int suffix = 2;
+        while (userRepository.existsByNickname(candidate + "-" + suffix)) {
+            suffix++;
+        }
+        return candidate + "-" + suffix;
     }
 
     private void auditExistingDemoAccounts() {

@@ -11,6 +11,13 @@
       </div>
 
       <div v-else class="space-y-6 sm:space-y-8">
+        <AdminSecurityPosturePanel
+          :posture="securityPosture"
+          :loading="loadingSecurityPosture"
+          :error="securityPostureError"
+          @refresh="fetchSecurityPosture"
+        />
+
         <AdminAnalyticsPanel :loading="loading" :chart-data="analyticsData" :error="analyticsError" />
 
         <!-- Stats Cards -->
@@ -981,9 +988,10 @@ import { useI18n } from 'vue-i18n'
 import AdminAnalyticsPanel from '../components/AdminAnalyticsPanel.vue'
 import AdminCommunityPanel from '../components/AdminCommunityPanel.vue'
 import AdminHeritagePanel from '../components/AdminHeritagePanel.vue'
+import AdminSecurityPosturePanel from '../components/AdminSecurityPosturePanel.vue'
 import ImageUploadField from '../components/ImageUploadField.vue'
 import MotionModal from '../components/motion/MotionModal.vue'
-import api, { endpoints, clearTokenCache } from '../api'
+import api, { endpoints, clearTokenCache, type SecurityPostureResponse } from '../api'
 import { useAuthStore } from '../stores/auth'
 
 interface Stats {
@@ -1018,7 +1026,26 @@ const stats = ref<Stats>({
 const loading = ref(true)
 const analyticsError = ref('')
 const analyticsData = ref<Stats | null>(null)
+const securityPosture = ref<SecurityPostureResponse | null>(null)
+const loadingSecurityPosture = ref(false)
+const securityPostureError = ref('')
 let operationalRefreshTimer: ReturnType<typeof window.setInterval> | null = null
+
+const fetchSecurityPosture = async () => {
+  loadingSecurityPosture.value = true
+  securityPostureError.value = ''
+  try {
+    const response = await api.get(endpoints.admin.securityPosture)
+    securityPosture.value = response.data
+  } catch (error: any) {
+    console.error('获取安全态势失败：', error)
+    securityPostureError.value = error.response?.data?.message
+      || error.response?.data?.error
+      || t('admin.securityPosture.loadFailed')
+  } finally {
+    loadingSecurityPosture.value = false
+  }
+}
 
 const fetchStats = async () => {
   try {
@@ -1932,6 +1959,7 @@ onMounted(async () => {
   }
 
   fetchStats()
+  fetchSecurityPosture()
   fetchUsers()
   fetchSpots()
   fetchHotelOrders()
@@ -1942,6 +1970,7 @@ onMounted(async () => {
 
   operationalRefreshTimer = window.setInterval(() => {
     void refreshOperationalData()
+    void fetchSecurityPosture()
   }, 15000)
 })
 

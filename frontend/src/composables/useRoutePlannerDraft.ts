@@ -20,6 +20,8 @@ export interface RoutePlannerDraft {
   updatedAt: number
 }
 
+const routeDraftKeys = new Set<string>()
+
 interface RoutePlannerDraftState {
   form: Ref<RoutePlannerFormState>
   result: Ref<string>
@@ -68,6 +70,8 @@ export function useRoutePlannerDraft(
 
   const persistRouteDraft = (overrides: Partial<RoutePlannerDraft> = {}) => {
     if (!hasBrowserStorage()) return
+    const storageKey = resolveStorageKey()
+    routeDraftKeys.add(storageKey)
 
     const payload: RoutePlannerDraft = {
       version,
@@ -82,7 +86,7 @@ export function useRoutePlannerDraft(
     }
 
     try {
-      localStorage.setItem(resolveStorageKey(), JSON.stringify(payload))
+      localStorage.setItem(storageKey, JSON.stringify(payload))
     } catch (error) {
       options.onPersistError?.(error)
     }
@@ -131,12 +135,28 @@ export function useRoutePlannerDraft(
 
   const clearRouteDraft = () => {
     if (!hasBrowserStorage()) return
-    localStorage.removeItem(resolveStorageKey())
+    const storageKey = resolveStorageKey()
+    routeDraftKeys.delete(storageKey)
+    localStorage.removeItem(storageKey)
   }
 
   return {
     persistRouteDraft,
     restoreRouteDraft,
     clearRouteDraft
+  }
+}
+
+export function clearAllRoutePlannerDrafts() {
+  if (!hasBrowserStorage()) return
+  for (const key of routeDraftKeys) {
+    localStorage.removeItem(key)
+  }
+  routeDraftKeys.clear()
+  for (let index = localStorage.length - 1; index >= 0; index -= 1) {
+    const key = localStorage.key(index)
+    if (key?.startsWith('colorful-tibet:route-planner:draft:')) {
+      localStorage.removeItem(key)
+    }
   }
 }

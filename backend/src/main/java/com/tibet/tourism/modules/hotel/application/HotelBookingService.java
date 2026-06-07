@@ -25,6 +25,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -33,8 +34,14 @@ import org.springframework.util.StringUtils;
 public class HotelBookingService {
 
     private static final int MAX_NIGHTS = 30;
+    private static final int PENDING_HOLD_MINUTES = 15;
     private static final Set<HotelBooking.Status> ACTIVE_BOOKING_STATUSES =
             Set.of(HotelBooking.Status.PENDING, HotelBooking.Status.CONFIRMED);
+    private enum PiiView {
+        OWNER,
+        MASKED,
+        FULL
+    }
 
     private final HotelBookingRepository hotelBookingRepository;
     private final HotelRepository hotelRepository;
@@ -102,20 +109,30 @@ public class HotelBookingService {
         booking.setTotalPrice(totalPrice);
         booking.setStatus(HotelBooking.Status.PENDING);
 
-        return hotelBookingRepository.save(booking);
+        HotelBooking saved = hotelBookingRepository.save(booking);
+        orderCenterService.createFromLegacyHotelBooking(saved);
+        return saved;
     }
 
     @Transactional(readOnly = true)
     public Page<HotelBookingResponse> getUserBookings(User user, Pageable pageable) {
         return hotelBookingRepository.findByUserIdOrderByCreatedAtDesc(user.getId(), pageable)
-                .map(booking -> toResponse(booking, false));
+                .map(booking -> toResponse(booking, PiiView.OWNER));
     }
 
     @Transactional(readOnly = true)
     public Page<HotelBookingResponse> getAllBookings(User user, Pageable pageable) {
         requireAdmin(user);
         return hotelBookingRepository.findAllByOrderByCreatedAtDesc(pageable)
-                .map(booking -> toResponse(booking, true));
+                .map(booking -> toResponse(booking, PiiView.MASKED));
+    }
+
+    @Transactional(readOnly = true)
+    public HotelBookingResponse revealBookingPii(User user, Long id) {
+        requireAdmin(user);
+        HotelBooking booking = hotelBookingRepository.findById(id)
+                .orElseThrow(() -> new NoSuchElementException("Booking not found"));
+        return toResponse(booking, PiiView.FULL);
     }
 
     @Transactional
@@ -191,11 +208,28 @@ public class HotelBookingService {
     }
 
     private void ensureRoomAvailable(RoomType roomType, LocalDate checkIn, LocalDate checkOut) {
+        expireStalePendingBookings();
         List<HotelBooking> overlapping = hotelBookingRepository.findOverlappingActiveBookingsForUpdate(
                 roomType.getId(), ACTIVE_BOOKING_STATUSES, checkIn, checkOut);
         if (!overlapping.isEmpty()) {
             throw new IllegalStateException("Room type is unavailable for the selected dates");
         }
+        Long hotelId = roomType.getHotel() == null ? null : roomType.getHotel().getId();
+        orderCenterService.ensureHotelRoomAvailable(hotelId, roomType.getId(), checkIn, checkOut);
+    }
+
+    @Scheduled(fixedDelayString = "${app.hotel-bookings.expiry-sweep-delay-ms:60000}")
+    @Transactional
+    public void expireStalePendingBookings() {
+        LocalDateTime cutoff = LocalDateTime.now().minusMinutes(PENDING_HOLD_MINUTES);
+        hotelBookingRepository.findByStatusAndDeletedAtIsNullAndCreatedAtBeforeOrderByCreatedAtAsc(
+                        HotelBooking.Status.PENDING, cutoff)
+                .forEach(booking -> {
+                    transitionStatus(booking, HotelBooking.Status.CANCELLED);
+                    hotelBookingRepository.save(booking);
+                    orderCenterService.cancelLegacyMirror(null, "LEGACY_HOTEL_BOOKING",
+                            booking.getId(), "Legacy hotel booking hold expired");
+                });
     }
 
     private void transitionStatus(HotelBooking booking, HotelBooking.Status nextStatus) {
@@ -220,8 +254,10 @@ public class HotelBookingService {
         }
     }
 
-    private HotelBookingResponse toResponse(HotelBooking booking, boolean includeFullPhone) {
+    private HotelBookingResponse toResponse(HotelBooking booking, PiiView piiView) {
         Hotel hotel = booking.getHotel();
+        boolean fullPii = piiView == PiiView.FULL;
+        boolean ownerView = piiView == PiiView.OWNER;
         return new HotelBookingResponse(
                 booking.getId(),
                 booking.getUser() == null ? null : new HotelBookingResponse.UserSummary(
@@ -241,8 +277,8 @@ public class HotelBookingService {
                 booking.getCheckInDate(),
                 booking.getCheckOutDate(),
                 booking.getGuests(),
-                booking.getGuestName(),
-                includeFullPhone ? booking.getPhone() : PiiMasker.maskPhone(booking.getPhone()),
+                fullPii || ownerView ? booking.getGuestName() : PiiMasker.maskName(booking.getGuestName()),
+                fullPii ? booking.getPhone() : PiiMasker.maskPhone(booking.getPhone()),
                 booking.getNote(),
                 booking.getSubtotal(),
                 booking.getServiceFee(),

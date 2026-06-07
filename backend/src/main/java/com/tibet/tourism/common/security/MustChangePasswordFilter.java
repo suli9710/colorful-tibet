@@ -61,7 +61,7 @@ public class MustChangePasswordFilter extends OncePerRequestFilter {
         String path = request.getServletPath();
         return path == null
                 || !path.startsWith("/api/")
-                || ApiSecurityPaths.isPublicRequest(request.getMethod(), path);
+                || "OPTIONS".equalsIgnoreCase(request.getMethod());
     }
 
     private boolean isAllowedPasswordChangePath(HttpServletRequest request) {

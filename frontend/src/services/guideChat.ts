@@ -243,9 +243,15 @@ export async function requestGuideChat(
   } catch (error) {
     if (axios.isAxiosError<GuideChatApiResponse>(error) && error.response?.status === 428) {
       if (!retriedChallenge && isRecaptchaV3Enabled()) {
-        const token = await getRecaptchaToken('guide_chat')
-        if (token) {
-          return requestGuideChat(trimmed, history, token, true)
+        try {
+          const token = await getRecaptchaToken('guide_chat')
+          if (token) {
+            return requestGuideChat(trimmed, history, token, true)
+          }
+        } catch (recaptchaError) {
+          if (import.meta.env.DEV) {
+            console.warn('Guide chat reCAPTCHA failed:', recaptchaError)
+          }
         }
       }
       return limitedGuideMessage(error.response.data, error.response.headers?.['retry-after'])

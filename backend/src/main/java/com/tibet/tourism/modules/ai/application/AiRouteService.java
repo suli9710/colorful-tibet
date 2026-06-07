@@ -1,6 +1,8 @@
 package com.tibet.tourism.modules.ai.application;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.tibet.tourism.common.security.OutboundUrlValidator;
+import com.tibet.tourism.common.security.PiiMasker;
 import com.tibet.tourism.common.validation.InputSanitizer;
 import com.tibet.tourism.modules.ai.web.dto.AiRouteGenerateResponse;
 import com.tibet.tourism.modules.hotel.domain.Hotel;
@@ -22,6 +24,7 @@ import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -82,6 +85,8 @@ public class AiRouteService {
     private final String streamApiUrl;
     private final Duration streamTimeout;
     private final ObjectMapper objectMapper;
+    @Autowired(required = false)
+    private OutboundUrlValidator outboundUrlValidator = new OutboundUrlValidator();
 
     public AiRouteService(WebClient.Builder webClientBuilder,
                           @Value("#{T(org.springframework.util.StringUtils).hasText(environment.getProperty('ark.api.url')) ? environment.getProperty('ark.api.url') : environment.getProperty('doubao.api.url', '')}") String apiUrl,
@@ -102,6 +107,8 @@ public class AiRouteService {
 
     @PostConstruct
     public void logConfigAvailability() {
+        outboundUrlValidator.validateHttpsUrl("ai.route.api-url", apiUrl);
+        outboundUrlValidator.validateHttpsUrl("ai.route.stream-api-url", streamApiUrl);
         log.info("AI route config loaded: apiUrl={}, apiKeyPresent={}, model={}, timeoutSeconds={}",
                 safeUrlForLog(apiUrl),
                 apiKey != null && !apiKey.isBlank(),
@@ -186,8 +193,10 @@ public class AiRouteService {
                         clientResponse.bodyToMono(String.class)
                                 .defaultIfEmpty("AI stream request failed")
                                 .flatMap(errorBody -> {
-                                    log.warn("AI stream upstream error: HTTP {}, body={}",
-                                            clientResponse.statusCode().value(), previewText(redactForLog(errorBody), 600));
+                                    log.warn("AI stream upstream error: HTTP {}, bodyLength={}, bodyHash={}",
+                                            clientResponse.statusCode().value(),
+                                            textLength(errorBody),
+                                            PiiMasker.shortHash(redactForLog(errorBody)));
                                     return Mono.error(new IllegalStateException(
                                             "AI stream upstream error: HTTP " + clientResponse.statusCode().value()));
                                 }))
@@ -224,8 +233,8 @@ public class AiRouteService {
             return finalContent;
         } catch (Exception error) {
             processRemainingStreamBuffer(jsonBuffer, listener, streamLineCounter, streamDeltaCounter, contentBuffer);
-            log.warn("AI stream failed, using fallback route: {}", extractErrorMessage(error));
-            log.debug("AI stream failure details", error);
+            log.warn("AI stream failed, using fallback route: {}", safeErrorSummary(error));
+            log.debug("AI stream failure details: {}", safeErrorSummary(error));
             return emitFallbackRoute(listener, safeDays, budgetLabel, preferenceLabel, contentBuffer.length() > 0);
         }
     }
@@ -269,7 +278,7 @@ public class AiRouteService {
                     try {
                         streamRouteToListener(days, budgetKey, preferenceKey, currentUser, locale, listener);
                     } catch (Exception e) {
-                        log.warn("AI stream failed before completion: {}", extractErrorMessage(e));
+                        log.warn("AI stream failed before completion: {}", safeErrorSummary(e));
                         listener.onError("AI stream failed");
                     }
                 })
@@ -359,9 +368,10 @@ public class AiRouteService {
         }
         int streamLineCount = streamLineCounter.incrementAndGet();
 
-        // Log first few raw events for debugging
+        // Log first few event summaries for debugging without raw content.
         if (streamLineCount <= 3) {
-            log.info("AI stream event #{}: {}", streamLineCount, previewText(jsonStr, 600));
+            log.info("AI stream event #{}: length={}, hash={}",
+                    streamLineCount, textLength(jsonStr), PiiMasker.shortHash(jsonStr));
         }
 
         Map<String, Object> event;
@@ -371,7 +381,8 @@ public class AiRouteService {
             event = parsed;
         } catch (JsonProcessingException e) {
             if (streamLineCount <= 5) {
-                log.warn("AI stream JSON parse failed for event #{}: {}", streamLineCount, previewText(jsonStr, 400));
+                log.warn("AI stream JSON parse failed for event #{}: length={}, hash={}",
+                        streamLineCount, textLength(jsonStr), PiiMasker.shortHash(jsonStr));
             }
             return;
         }
@@ -381,7 +392,8 @@ public class AiRouteService {
         if (deltaField instanceof String deltaText && !deltaText.isEmpty() && isOutputTextDelta(event)) {
             int streamDeltaCount = streamDeltaCounter.incrementAndGet();
             if (streamDeltaCount <= 3) {
-                log.info("AI stream delta #{}: {}", streamDeltaCount, previewText(deltaText, 200));
+                log.info("AI stream delta #{}: type={}, length={}, hash={}",
+                        streamDeltaCount, eventType(event), textLength(deltaText), PiiMasker.shortHash(deltaText));
             }
             appendStreamDelta(listener, contentBuffer, deltaText);
             return;
@@ -397,7 +409,8 @@ public class AiRouteService {
                 if (content instanceof String text && !text.isEmpty()) {
                     int streamDeltaCount = streamDeltaCounter.incrementAndGet();
                     if (streamDeltaCount <= 3) {
-                        log.info("AI stream delta #{}: {}", streamDeltaCount, previewText(text, 200));
+                        log.info("AI stream delta #{}: type=chat.completion.delta, length={}, hash={}",
+                                streamDeltaCount, textLength(text), PiiMasker.shortHash(text));
                     }
                     appendStreamDelta(listener, contentBuffer, text);
                     return;
@@ -410,7 +423,8 @@ public class AiRouteService {
         if (textField instanceof String text && !text.isEmpty() && isOutputTextDelta(event)) {
             int streamDeltaCount = streamDeltaCounter.incrementAndGet();
             if (streamDeltaCount <= 3) {
-                log.info("AI stream delta #{} (text field): {}", streamDeltaCount, previewText(text, 200));
+                log.info("AI stream delta #{}: type={}, field=text, length={}, hash={}",
+                        streamDeltaCount, eventType(event), textLength(text), PiiMasker.shortHash(text));
             }
             appendStreamDelta(listener, contentBuffer, text);
             return;
@@ -418,7 +432,7 @@ public class AiRouteService {
 
         // Log first non-delta events for debugging
         if (streamLineCount <= 5) {
-            log.info("AI stream non-delta event keys: {}", event.keySet());
+            log.info("AI stream non-delta event: type={}, keys={}", eventType(event), event.keySet());
         }
     }
 
@@ -514,10 +528,10 @@ public class AiRouteService {
         }
 
         Map<String, Object> requestBody = buildRequestBody(prompt, safeDays);
-        log.info("AI route request prepared: model={}, promptLength={}, promptPreview={}",
+        log.info("AI route request prepared: model={}, promptLength={}, promptHash={}",
                 blankToPlaceholder(model),
                 prompt.length(),
-                previewText(prompt, 240));
+                PiiMasker.shortHash(prompt));
 
         try {
             Map<?, ?> response = webClient.post()
@@ -531,7 +545,8 @@ public class AiRouteService {
                             .defaultIfEmpty("AI service request failed")
                             .flatMap(errorBody -> {
                                 String responseSummary = String.format("HTTP %s", clientResponse.statusCode().value());
-                                log.warn("AI route upstream error: {}, body={}", responseSummary, previewText(redactForLog(errorBody), 1200));
+                                log.warn("AI route upstream error: {}, bodyLength={}, bodyHash={}",
+                                        responseSummary, textLength(errorBody), PiiMasker.shortHash(redactForLog(errorBody)));
                                 return Mono.error(new IllegalStateException("AI service upstream error: " + responseSummary));
                             }))
                     .bodyToMono(Map.class)
@@ -553,8 +568,8 @@ public class AiRouteService {
             log.info("AI route content received: originalLength={}, validatedLength={}", rawContent.length(), content.length());
             return new AiRouteGenerateResponse(content, model, displayBudgetLabel, displayPreferenceLabel, safeDays, null);
         } catch (Exception e) {
-            log.warn("AI route generation failed, using fallback route: {}", extractErrorMessage(e));
-            log.debug("AI route generation failure details", e);
+            log.warn("AI route generation failed, using fallback route: {}", safeErrorSummary(e));
+            log.debug("AI route generation failure details: {}", safeErrorSummary(e));
             return fallbackRouteResponse(safeDays, budgetLabel, preferenceLabel, displayBudgetLabel, displayPreferenceLabel);
         }
     }
@@ -801,6 +816,24 @@ public class AiRouteService {
         return normalized.substring(0, maxLength) + "...";
     }
 
+    private int textLength(String text) {
+        return text == null ? 0 : text.length();
+    }
+
+    private String eventType(Map<String, Object> event) {
+        if (event == null) {
+            return "unknown";
+        }
+        Object type = event.get("type");
+        if (type instanceof String value && !value.isBlank()) {
+            return value;
+        }
+        if (event.containsKey("choices")) {
+            return "chat.completion.chunk";
+        }
+        return "unknown";
+    }
+
     private String safeUrlForLog(String value) {
         if (value == null || value.isBlank()) {
             return "<empty>";
@@ -835,6 +868,20 @@ public class AiRouteService {
         }
         String message = cause.getMessage();
         return message == null || message.isBlank() ? e.getClass().getSimpleName() : message;
+    }
+
+    private String safeErrorSummary(Throwable e) {
+        if (e == null) {
+            return "unknown";
+        }
+        Throwable cause = e;
+        while (cause.getCause() != null && cause.getCause() != cause) {
+            cause = cause.getCause();
+        }
+        String message = cause.getMessage();
+        return cause.getClass().getSimpleName()
+                + "(messageLength=" + textLength(message)
+                + ", messageHash=" + PiiMasker.shortHash(message) + ")";
     }
 
     private String extractResponseText(Map<?, ?> response) {
@@ -1049,8 +1096,9 @@ public class AiRouteService {
         log.info("AI route validation: title={}, dailySections={}(uniqueCount={}), requiredSections={}, days={}",
                 hasTitle, hasDailySections, seenDayNumbers.size(), containsRequiredSections, days);
         if (!hasTitle || !hasDailySections || !containsRequiredSections) {
-            log.warn("AI route markdown validation failed: title={}, dailySections={}, requiredSections={}, uniqueDayCount={}, contentPreview={}",
-                    hasTitle, hasDailySections, containsRequiredSections, seenDayNumbers.size(), previewText(normalized, 300));
+            log.warn("AI route markdown validation failed: title={}, dailySections={}, requiredSections={}, uniqueDayCount={}, contentLength={}, contentHash={}",
+                    hasTitle, hasDailySections, containsRequiredSections, seenDayNumbers.size(),
+                    textLength(normalized), PiiMasker.shortHash(normalized));
             return null;
         }
 

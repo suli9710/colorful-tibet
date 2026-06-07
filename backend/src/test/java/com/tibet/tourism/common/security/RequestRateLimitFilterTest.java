@@ -189,6 +189,13 @@ class RequestRateLimitFilterTest {
     }
 
     @Test
+    @DisplayName("redis script repairs legacy keys without TTL")
+    void redisScriptRepairsLegacyKeysWithoutTtl() {
+        assertThat(RequestRateLimitFilter.INCREMENT_WITH_EXPIRE_LUA)
+                .contains("redis.call('TTL', KEYS[1]) < 0");
+    }
+
+    @Test
     @DisplayName("rate limit headers are set on every response")
     void rateLimitHeadersAreSet() throws Exception {
         MockHttpServletResponse response = doFilter(apiRequest("GET", "/api/spots"));

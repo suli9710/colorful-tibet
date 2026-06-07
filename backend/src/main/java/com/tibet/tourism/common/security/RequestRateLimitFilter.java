@@ -34,14 +34,16 @@ public class RequestRateLimitFilter extends OncePerRequestFilter {
     private static final Logger logger = LoggerFactory.getLogger(RequestRateLimitFilter.class);
     private static final int MAX_TRACKED_WINDOWS = 20_000;
     private static final long CLEANUP_INTERVAL_MILLIS = Duration.ofMinutes(1).toMillis();
-    private static final RedisScript<Long> INCREMENT_WITH_EXPIRE_SCRIPT = RedisScript.of(
+    static final String INCREMENT_WITH_EXPIRE_LUA =
             """
             local current = redis.call('INCR', KEYS[1])
-            if current == 1 then
+            if current == 1 or redis.call('TTL', KEYS[1]) < 0 then
               redis.call('EXPIRE', KEYS[1], ARGV[1])
             end
             return current
-            """,
+            """;
+    private static final RedisScript<Long> INCREMENT_WITH_EXPIRE_SCRIPT = RedisScript.of(
+            INCREMENT_WITH_EXPIRE_LUA,
             Long.class);
 
     private final Map<String, RateWindow> windows = new ConcurrentHashMap<>();

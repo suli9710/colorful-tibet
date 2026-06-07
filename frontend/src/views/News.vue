@@ -110,7 +110,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { AnimatePresence, motion } from 'motion-v'
 import { useI18n } from 'vue-i18n'
 import MotionModal from '../components/motion/MotionModal.vue'
@@ -203,5 +203,9 @@ watch(locale, () => {
 
 onMounted(() => {
   fetchNews()
+})
+
+onBeforeUnmount(() => {
+  document.body.style.overflow = 'auto'
 })
 </script>

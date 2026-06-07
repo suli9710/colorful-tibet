@@ -8,10 +8,12 @@ import com.tibet.tourism.modules.auth.domain.AuthFailureException;
 import com.tibet.tourism.modules.auth.domain.AuthForbiddenException;
 import com.tibet.tourism.modules.auth.domain.AuthRateLimitException;
 import com.tibet.tourism.modules.auth.domain.DuplicateRegistrationException;
+import com.tibet.tourism.modules.auth.domain.SecondaryAuthRequiredException;
 import com.tibet.tourism.modules.auth.web.dto.LoginRequest;
 import com.tibet.tourism.modules.auth.web.dto.RegisterRequest;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import org.springframework.security.access.prepost.PreAuthorize;
 import java.time.Duration;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Value;
@@ -62,6 +64,10 @@ public class AuthController {
                 builder.header(HttpHeaders.RETRY_AFTER, String.valueOf(exception.getRetryAfterSeconds()));
             }
             return builder.body(Map.of("error", exception.getMessage()));
+        } catch (SecondaryAuthRequiredException exception) {
+            return ResponseEntity.status(449).body(Map.of(
+                    "error", exception.getMessage(),
+                    "requiresSecondaryAuth", true));
         } catch (AuthForbiddenException exception) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", exception.getMessage()));
         } catch (AuthFailureException exception) {
@@ -69,6 +75,7 @@ public class AuthController {
         }
     }
 
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/logout")
     public ResponseEntity<?> logout(HttpServletRequest request) {
         String token = resolveToken(request);

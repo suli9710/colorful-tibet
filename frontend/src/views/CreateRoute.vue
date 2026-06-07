@@ -181,11 +181,13 @@ import api from '../api'
 import MotionBlock from '../components/motion/MotionBlock.vue'
 import { motionEase } from '../motion/presets'
 import { useAuthStore } from '../stores/auth'
+import { useAuthGuard } from '../composables/useAuthGuard'
 
 const { t } = useI18n()
 
 const router = useRouter()
 const auth = useAuthStore()
+const { requireAuth } = useAuthGuard()
 
 const form = ref({
   title: '',
@@ -211,12 +213,7 @@ const preferenceOptions = computed(() => [
 ])
 
 const submitRoute = async () => {
-  if (!(await auth.ensureSession())) {
-    if (confirm(t('createRoute.loginRequired'))) {
-      router.push('/login')
-    }
-    return
-  }
+  if (!(await requireAuth())) return
 
   submitting.value = true
   try {
@@ -232,9 +229,7 @@ const submitRoute = async () => {
   } catch (error: any) {
     console.error('Failed to share route:', error)
     if (error.response && error.response.status === 401) {
-      if (confirm(t('createRoute.loginExpired'))) {
-        router.push('/login')
-      }
+      if (!(await requireAuth())) return
     } else {
       const errorMsg = error.response?.data?.error || t('createRoute.publishFailed')
       alert(errorMsg)
@@ -245,10 +240,6 @@ const submitRoute = async () => {
 }
 
 onMounted(async () => {
-  if (!(await auth.ensureSession())) {
-    if (confirm(t('createRoute.loginRequired'))) {
-      router.push('/login')
-    }
-  }
+  if (!(await requireAuth())) return
 })
 </script>

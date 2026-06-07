@@ -338,6 +338,7 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import MotionModal from '../components/motion/MotionModal.vue'
 import api from '../api'
+import { useAuthGuard } from '../composables/useAuthGuard'
 import {
   cardExit,
   cardInitial,
@@ -352,6 +353,7 @@ import {
 
 const { t } = useI18n()
 const router = useRouter()
+const { requireAuth } = useAuthGuard()
 
 const activeTab = ref<'routes' | 'qa'>('routes')
 
@@ -480,8 +482,8 @@ const submitQuestion = async () => {
     qaPage.value = 0
     loadQuestions()
   } catch (error: any) {
-    if (error.response?.status === 401 && confirm(t('routePlanner.loginRequired'))) {
-      router.push('/login')
+    if (error.response?.status === 401 && !(await requireAuth())) {
+      return
     } else {
       alert(t('community.publishFailedRetry'))
     }

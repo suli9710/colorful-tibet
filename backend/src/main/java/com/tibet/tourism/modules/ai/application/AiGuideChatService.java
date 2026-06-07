@@ -1,6 +1,8 @@
 package com.tibet.tourism.modules.ai.application;
 
 import com.tibet.tourism.common.validation.InputSanitizer;
+import com.tibet.tourism.common.security.OutboundUrlValidator;
+import com.tibet.tourism.common.security.PiiMasker;
 import com.tibet.tourism.modules.ai.web.dto.GuideChatMessage;
 import com.tibet.tourism.modules.ai.web.dto.GuideChatRequest;
 import com.tibet.tourism.modules.ai.web.dto.GuideChatResponse;
@@ -14,6 +16,7 @@ import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -45,6 +48,8 @@ public class AiGuideChatService {
     private final String apiKey;
     private final String model;
     private final Duration timeout;
+    @Autowired(required = false)
+    private OutboundUrlValidator outboundUrlValidator = new OutboundUrlValidator();
 
     public AiGuideChatService(
             WebClient.Builder webClientBuilder,
@@ -61,6 +66,7 @@ public class AiGuideChatService {
 
     @PostConstruct
     public void logConfigAvailability() {
+        outboundUrlValidator.validateHttpsUrl("ai.guide.api-url", apiUrl);
         log.info("AI guide chat config loaded: apiUrl={}, apiKeyPresent={}, model={}, timeoutSeconds={}",
                 safeUrlForLog(apiUrl),
                 apiKey != null && !apiKey.isBlank(),
@@ -109,8 +115,8 @@ public class AiGuideChatService {
 
         String prompt = buildPrompt(safeMessage, request.getHistory(), normalizedLocale);
         Map<String, Object> requestBody = buildRequestBody(prompt);
-        log.info("AI guide chat request prepared: model={}, promptLength={}, promptPreview={}",
-                blankToPlaceholder(model), prompt.length(), previewText(prompt, 180));
+        log.info("AI guide chat request prepared: model={}, promptLength={}, promptHash={}",
+                blankToPlaceholder(model), prompt.length(), PiiMasker.shortHash(prompt));
 
         try {
             Map<?, ?> response = webClient.post()
@@ -124,8 +130,8 @@ public class AiGuideChatService {
                             .defaultIfEmpty("AI guide chat request failed")
                             .flatMap(errorBody -> {
                                 String responseSummary = "HTTP " + clientResponse.statusCode().value();
-                                log.warn("AI guide chat upstream error: {}, body={}",
-                                        responseSummary, previewText(redactForLog(errorBody), 600));
+                                log.warn("AI guide chat upstream error: {}, bodyLength={}, bodyHash={}",
+                                        responseSummary, textLength(errorBody), PiiMasker.shortHash(redactForLog(errorBody)));
                                 return Mono.error(new IllegalStateException("AI guide chat upstream error: " + responseSummary));
                             }))
                     .bodyToMono(Map.class)
@@ -140,8 +146,8 @@ public class AiGuideChatService {
             log.info("AI guide chat response received: length={}", content.length());
             return new GuideChatResponse(content, model, false, action, actionLabel);
         } catch (Exception e) {
-            log.warn("AI guide chat failed, using fallback response: {}", extractErrorMessage(e));
-            log.debug("AI guide chat failure details", e);
+            log.warn("AI guide chat failed, using fallback response: {}", safeErrorSummary(e));
+            log.debug("AI guide chat failure details: {}", safeErrorSummary(e));
             return fallbackResponse(safeMessage, action, actionLabel);
         }
     }
@@ -403,6 +409,10 @@ public class AiGuideChatService {
         return normalized.substring(0, maxLength) + "...";
     }
 
+    private int textLength(String text) {
+        return text == null ? 0 : text.length();
+    }
+
     private String safeUrlForLog(String value) {
         if (value == null || value.isBlank()) {
             return "<empty>";
@@ -437,6 +447,20 @@ public class AiGuideChatService {
         }
         String message = cause.getMessage();
         return message == null || message.isBlank() ? e.getClass().getSimpleName() : message;
+    }
+
+    private String safeErrorSummary(Throwable e) {
+        if (e == null) {
+            return "unknown";
+        }
+        Throwable cause = e;
+        while (cause.getCause() != null && cause.getCause() != cause) {
+            cause = cause.getCause();
+        }
+        String message = cause.getMessage();
+        return cause.getClass().getSimpleName()
+                + "(messageLength=" + textLength(message)
+                + ", messageHash=" + PiiMasker.shortHash(message) + ")";
     }
 
     private String blankToPlaceholder(String value) {

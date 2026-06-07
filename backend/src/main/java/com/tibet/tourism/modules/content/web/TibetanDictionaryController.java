@@ -2,6 +2,8 @@ package com.tibet.tourism.modules.content.web;
 import com.tibet.tourism.modules.content.application.TibetanTranslationService;
 import com.tibet.tourism.modules.content.domain.TibetanDictionary;
 import com.tibet.tourism.modules.content.infra.TibetanDictionaryRepository;
+import com.tibet.tourism.modules.content.web.dto.DictionaryBatchAddRequest;
+import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -157,25 +159,17 @@ public class TibetanDictionaryController {
      */
     @PostMapping("/batch")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> batchAdd(@RequestBody Map<String, Object> request) {
-        @SuppressWarnings("unchecked")
-        Map<String, String> translations = (Map<String, String>) request.get("translations");
-        String typeStr = (String) request.get("type");
-
-        if (translations == null || translations.isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "翻译数据不能为空"));
-        }
-
+    public ResponseEntity<?> batchAdd(@Valid @RequestBody DictionaryBatchAddRequest dto) {
         TibetanDictionary.Type type = TibetanDictionary.Type.WORD;
-        if (typeStr != null) {
+        if (dto.getType() != null) {
             try {
-                type = TibetanDictionary.Type.valueOf(typeStr.toUpperCase());
+                type = TibetanDictionary.Type.valueOf(dto.getType().toUpperCase());
             } catch (IllegalArgumentException e) {
                 // 使用默认值
             }
         }
 
-        List<TibetanDictionary> saved = translationService.batchAddEntries(translations, type);
+        List<TibetanDictionary> saved = translationService.batchAddEntries(dto.getTranslations(), type);
         return ResponseEntity.ok(Map.of(
                 "message", "批量添加成功",
                 "count", saved.size(),

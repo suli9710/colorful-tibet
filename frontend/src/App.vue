@@ -8,7 +8,7 @@ import ToastHost from './components/ToastHost.vue'
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { AnimatePresence, MotionConfig, motion } from 'motion-v'
-import { installAlertToastBridge, showToast } from './composables/useToast'
+import { showToast } from './composables/useToast'
 import {
   motionEase,
   pageAnimate,
@@ -38,8 +38,6 @@ const finishNavigation = () => {
     isNavigating.value = false
   }, 160)
 }
-
-installAlertToastBridge()
 
 onMounted(() => {
   removeBeforeEach = router.beforeEach(() => {

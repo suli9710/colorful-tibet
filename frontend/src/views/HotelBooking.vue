@@ -203,7 +203,7 @@
     :amount="totalPrice"
     recaptcha-action="hotel_booking"
     @close="showPaymentModal = false"
-    @paid="handlePaymentConfirmed"
+    @status-check="handlePaymentStatusCheck"
   />
 
   <MobileStickyActionBar
@@ -368,7 +368,7 @@ const submitBooking = () => {
   showPaymentModal.value = true
 }
 
-const handlePaymentConfirmed = async (recaptchaToken = '') => {
+const handlePaymentStatusCheck = async (recaptchaToken = '') => {
   showPaymentModal.value = false
   submitting.value = true
   submitError.value = ''

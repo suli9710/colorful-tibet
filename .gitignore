@@ -12,7 +12,6 @@ backend/compile*.log
 frontend/node_modules/
 frontend/dist/
 frontend/.vite/
-frontend/package-lock.json
 
 # Python
 scrapler/.venv/
@@ -46,10 +45,14 @@ frontend/.env.local
 logs/
 backend/logs/
 
+# Deployment-generated certificate snapshots
+certs/
+
 # Build outputs
 build/
 dist/
 out/
+output/
 
 # Temporary files
 .startup/

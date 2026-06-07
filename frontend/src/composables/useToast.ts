@@ -25,18 +25,6 @@ export const showToast = (message: string, type: ToastType = 'info', duration = 
   window.setTimeout(() => dismissToast(id), duration)
 }
 
-export const installAlertToastBridge = () => {
-  if (typeof window === 'undefined') return
-
-  const bridgeKey = '__colorfulTibetToastAlertBridgeInstalled'
-  if ((window as any)[bridgeKey]) return
-
-  ;(window as any)[bridgeKey] = true
-  window.alert = (message?: any) => {
-    showToast(String(message ?? ''), 'info')
-  }
-}
-
 export const useToast = () => ({
   toasts: readonly(toasts),
   showToast,

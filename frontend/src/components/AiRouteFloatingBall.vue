@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { AnimatePresence, motion } from 'motion-v'
 import { useRouteGenerationStore } from '../stores/routeGeneration'
@@ -49,19 +49,26 @@ const currentMotion = computed(() => {
 })
 
 // When jumping finishes (non-loop), switch to waving for completed state
+let jumpCheckTimer: ReturnType<typeof setInterval> | null = null
+
 watch(currentMotion, (motion) => {
   if (motion === 'jumping') {
-    // After jump plays once, the widget auto-returns to idle.
-    // We override this by watching and re-triggering.
-    const timer = setInterval(() => {
+    if (jumpCheckTimer) clearInterval(jumpCheckTimer)
+    jumpCheckTimer = setInterval(() => {
       if (isCompleted.value && live2dRef.value) {
         live2dRef.value.setMotion('waving')
       }
-    }, 1200) // jump duration ~625ms, check after
-    watch(isCompleted, (val) => {
-      if (!val) clearInterval(timer)
-    })
+    }, 1200)
+  } else {
+    if (jumpCheckTimer) {
+      clearInterval(jumpCheckTimer)
+      jumpCheckTimer = null
+    }
   }
+})
+
+onBeforeUnmount(() => {
+  if (jumpCheckTimer) clearInterval(jumpCheckTimer)
 })
 
 function handleClick() {

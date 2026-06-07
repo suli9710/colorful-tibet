@@ -24,7 +24,7 @@ services:
       - DOUBAO_STREAM_API_URL=${DOUBAO_STREAM_API_URL:-}
       - DOUBAO_MODEL=${DOUBAO_MODEL}
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required in production}
-      - ADMIN_ENCRYPTION_KEY=${ADMIN_ENCRYPTION_KEY}
+      - ADMIN_ENCRYPTION_KEY=${ADMIN_ENCRYPTION_KEY:?ADMIN_ENCRYPTION_KEY is required in production}
       - CSRF_SIGNING_SECRET=${CSRF_SIGNING_SECRET:?CSRF_SIGNING_SECRET is required in production}
       - PII_KEYS=${PII_KEYS:?PII_KEYS is required in production}
       - PII_ACTIVE_KID=${PII_ACTIVE_KID:?PII_ACTIVE_KID is required in production}
@@ -48,12 +48,15 @@ services:
       - DB_HOST=${DB_HOST:-mysql}
       - DB_PORT=${DB_PORT:-3306}
       - DB_NAME=${DB_NAME:-tibet_tourism}
-      - DB_SSL_MODE=${DB_SSL_MODE:-VERIFY_IDENTITY}
+      # The bundled mysql service has no TLS certs; external DBs should use VERIFY_IDENTITY plus DB_JDBC_EXTRA_PARAMS truststore settings.
+      - DB_SSL_MODE=${DB_SSL_MODE:-DISABLED}
       - DB_ALLOW_PUBLIC_KEY_RETRIEVAL=${DB_ALLOW_PUBLIC_KEY_RETRIEVAL:-false}
+      - DB_JDBC_EXTRA_PARAMS=${DB_JDBC_EXTRA_PARAMS:-}
       - REDIS_HOST=${REDIS_HOST:-redis}
       - REDIS_PORT=${REDIS_PORT:-6379}
       - REDIS_PASSWORD=${REDIS_PASSWORD:?REDIS_PASSWORD is required in production}
       - REDIS_DATABASE=${REDIS_DATABASE:-0}
+      - FILE_UPLOAD_DIR=${FILE_UPLOAD_DIR:-/app/data/uploads}
       - RECOMMENDATION_ITEM_SIMILARITY_PRELOAD_ON_STARTUP=${RECOMMENDATION_ITEM_SIMILARITY_PRELOAD_ON_STARTUP:-false}
       - ZIPKIN_ENDPOINT=${ZIPKIN_ENDPOINT:-http://zipkin:9411/api/v2/spans}
       - TRACING_SAMPLING_PROBABILITY=${TRACING_SAMPLING_PROBABILITY:-0.1}
@@ -197,17 +200,17 @@ services:
       - NGINX_CERT_DOMAIN=${NGINX_CERT_DOMAIN:?NGINX_CERT_DOMAIN is required in production}
     container_name: colorful-tibet-frontend
     ports:
-      - "80:80"
-      - "443:443"
+      - "80:8080"
+      - "443:8443"
     volumes:
-      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - ./certs:/etc/nginx/certs:ro
       - /var/www/certbot:/var/www/certbot:ro
     depends_on:
       backend:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/health >/dev/null || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/health >/dev/null || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3

@@ -2,14 +2,12 @@ package com.tibet.tourism.modules.spot.application;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.tibet.tourism.common.security.OutboundUrlValidator;
 import com.tibet.tourism.modules.spot.domain.ScenicSpot;
 import com.tibet.tourism.modules.spot.web.dto.PriceInfo;
 import com.tibet.tourism.modules.user.domain.User;
 import jakarta.annotation.PostConstruct;
 import java.math.BigDecimal;
-import java.net.IDN;
-import java.net.InetAddress;
-import java.net.URI;
 import java.time.Duration;
 import java.util.*;
 import java.util.regex.Matcher;
@@ -33,6 +31,9 @@ public class PriceFetchService {
 
     @Autowired
     private WebClient.Builder webClientBuilder;
+
+    @Autowired
+    private OutboundUrlValidator outboundUrlValidator;
 
     @Value("${doubao.api.url:}")
     private String aiApiUrl;
@@ -62,95 +63,11 @@ public class PriceFetchService {
     @PostConstruct
     void initScraplingTimeout() {
         scraplingTimeout = Duration.ofSeconds(scraplingTimeoutSeconds);
-        validateExternalUrl("ark.api.url", aiApiUrl);
-        validateExternalUrl("doubao.api.url", aiApiUrl);
-        validateServiceUrl(scraplingServiceUrl);
-    }
-
-    private void validateExternalUrl(String name, String url) {
-        if (url != null && !url.isEmpty()) {
-            URI uri = parseConfiguredUri(name, url);
-            if (!"https".equalsIgnoreCase(uri.getScheme())) {
-                throw new IllegalStateException(name + " must use HTTPS");
-            }
-            String host = requireAsciiHost(name, uri);
-            rejectUnsafeResolvedAddresses(name, host);
-        }
-    }
-
-    private void validateServiceUrl(String url) {
-        if (url != null && !url.isEmpty()) {
-            URI uri = parseConfiguredUri("scrapling.service.url", url);
-            if (!"http".equalsIgnoreCase(uri.getScheme()) && !"https".equalsIgnoreCase(uri.getScheme())) {
-                throw new IllegalStateException("scrapling.service.url must use HTTP or HTTPS");
-            }
-            String host = requireAsciiHost("scrapling.service.url", uri);
-            if (!ALLOWED_LOCAL_SERVICE_HOSTS.contains(host.toLowerCase(Locale.ROOT))) {
-                rejectUnsafeResolvedAddresses("scrapling.service.url", host);
-            }
-        }
-    }
-
-    private URI parseConfiguredUri(String name, String url) {
-        try {
-            URI uri = URI.create(url.trim());
-            if (uri.getRawUserInfo() != null || uri.getHost() == null || uri.getScheme() == null) {
-                throw new IllegalStateException(name + " is not a valid service URL");
-            }
-            return uri;
-        } catch (IllegalArgumentException e) {
-            throw new IllegalStateException(name + " is not a valid service URL", e);
-        }
-    }
-
-    private String requireAsciiHost(String name, URI uri) {
-        String host = uri.getHost();
-        if (host == null || host.isBlank()) {
-            throw new IllegalStateException(name + " must include a host");
-        }
-        String asciiHost = IDN.toASCII(host, IDN.USE_STD3_ASCII_RULES);
-        boolean asciiOnly = host.chars().allMatch(ch -> ch < 128);
-        if (!asciiOnly || !asciiHost.equals(host)) {
-            throw new IllegalStateException(name + " host must be ASCII");
-        }
-        return host;
-    }
-
-    private void rejectUnsafeResolvedAddresses(String name, String host) {
-        try {
-            for (InetAddress address : InetAddress.getAllByName(host)) {
-                if (isBlockedAddress(address)) {
-                    throw new IllegalStateException(name + " resolves to a blocked network address");
-                }
-            }
-        } catch (IllegalStateException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new IllegalStateException(name + " host could not be resolved safely", e);
-        }
-    }
-
-    private boolean isBlockedAddress(InetAddress address) {
-        if (address.isAnyLocalAddress()
-                || address.isLoopbackAddress()
-                || address.isLinkLocalAddress()
-                || address.isSiteLocalAddress()
-                || address.isMulticastAddress()) {
-            return true;
-        }
-        byte[] bytes = address.getAddress();
-        if (bytes.length == 4) {
-            int first = bytes[0] & 0xff;
-            int second = bytes[1] & 0xff;
-            return first == 0
-                    || first == 10
-                    || first == 127
-                    || (first == 100 && second >= 64 && second <= 127)
-                    || (first == 169 && second == 254)
-                    || (first == 172 && second >= 16 && second <= 31)
-                    || (first == 192 && second == 168);
-        }
-        return bytes.length == 16 && (bytes[0] & 0xfe) == 0xfc;
+        outboundUrlValidator.validateHttpsUrl("doubao.api.url", aiApiUrl);
+        outboundUrlValidator.validateHttpOrHttpsServiceUrl(
+                "scrapling.service.url",
+                scraplingServiceUrl,
+                ALLOWED_LOCAL_SERVICE_HOSTS);
     }
 
     /**

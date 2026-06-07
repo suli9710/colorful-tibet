@@ -56,6 +56,8 @@ public interface HotelBookingRepository extends JpaRepository<HotelBooking, Long
 
     List<HotelBooking> findByStatusAndDeletedAtIsNullAndCreatedAtAfterOrderByCreatedAtAsc(HotelBooking.Status status, LocalDateTime createdAt);
 
+    List<HotelBooking> findByStatusAndDeletedAtIsNullAndCreatedAtBeforeOrderByCreatedAtAsc(HotelBooking.Status status, LocalDateTime createdAt);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             SELECT hb FROM HotelBooking hb

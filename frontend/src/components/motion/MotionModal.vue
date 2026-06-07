@@ -28,6 +28,9 @@
           :transition="modalPanelTransition"
           role="dialog"
           aria-modal="true"
+          :aria-labelledby="props.labelledBy || undefined"
+          tabindex="-1"
+          ref="panelRef"
         >
           <slot />
         </motion.div>
@@ -37,7 +40,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { AnimatePresence, motion } from 'motion-v'
 import {
   modalBackdropTransition,
@@ -57,6 +60,7 @@ const props = withDefaults(defineProps<{
   backdropClass?: string
   panelClass?: string
   closeOnBackdrop?: boolean
+  labelledBy?: string
 }>(), {
   modalKey: 'motion-modal',
   rootClass: '',
@@ -68,6 +72,26 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{
   close: []
 }>()
+
+type PanelRef = HTMLElement | { $el?: HTMLElement }
+
+const panelRef = ref<PanelRef | null>(null)
+let previouslyFocusedElement: HTMLElement | null = null
+
+const focusableSelector = [
+  'a[href]',
+  'button:not([disabled])',
+  'textarea:not([disabled])',
+  'input:not([disabled])',
+  'select:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])'
+].join(',')
+
+const getPanelElement = () => {
+  const panel = panelRef.value
+  if (panel instanceof HTMLElement) return panel
+  return panel?.$el instanceof HTMLElement ? panel.$el : null
+}
 
 const rootClasses = computed(() => [
   'fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto',
@@ -84,4 +108,88 @@ const handleBackdropClick = () => {
     emit('close')
   }
 }
+
+const getFocusableElements = () => {
+  const panel = getPanelElement()
+  if (!panel) return []
+  return Array.from(panel.querySelectorAll<HTMLElement>(focusableSelector))
+    .filter(element => !element.hasAttribute('disabled') && element.tabIndex !== -1)
+}
+
+const focusInitialElement = async () => {
+  await nextTick()
+  const panel = getPanelElement()
+  if (!panel) return
+  const [firstFocusable] = getFocusableElements()
+  ;(firstFocusable || panel).focus({ preventScroll: true })
+}
+
+const restoreFocus = () => {
+  const element = previouslyFocusedElement
+  previouslyFocusedElement = null
+  if (element && typeof element.focus === 'function' && document.contains(element)) {
+    element.focus({ preventScroll: true })
+  }
+}
+
+const handleKeydown = (event: KeyboardEvent) => {
+  if (!props.show) return
+
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    emit('close')
+    return
+  }
+
+  if (event.key !== 'Tab') return
+
+  const focusable = getFocusableElements()
+  if (!focusable.length) {
+    event.preventDefault()
+    getPanelElement()?.focus({ preventScroll: true })
+    return
+  }
+
+  const first = focusable[0]
+  const last = focusable[focusable.length - 1]
+  const activeElement = document.activeElement
+  const panel = getPanelElement()
+
+  if (panel && activeElement instanceof Node && !panel.contains(activeElement)) {
+    event.preventDefault()
+    first.focus({ preventScroll: true })
+    return
+  }
+
+  if (event.shiftKey && activeElement === first) {
+    event.preventDefault()
+    last.focus({ preventScroll: true })
+  } else if (!event.shiftKey && activeElement === last) {
+    event.preventDefault()
+    first.focus({ preventScroll: true })
+  }
+}
+
+watch(
+  () => props.show,
+  show => {
+    if (show) {
+      previouslyFocusedElement = document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null
+      document.addEventListener('keydown', handleKeydown)
+      void focusInitialElement()
+      return
+    }
+
+    document.removeEventListener('keydown', handleKeydown)
+    restoreFocus()
+  },
+  { flush: 'post' }
+)
+
+onBeforeUnmount(() => {
+  document.removeEventListener('keydown', handleKeydown)
+  restoreFocus()
+})
 </script>

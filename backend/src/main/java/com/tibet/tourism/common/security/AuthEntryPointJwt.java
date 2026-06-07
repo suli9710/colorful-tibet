@@ -17,9 +17,7 @@ public class AuthEntryPointJwt implements AuthenticationEntryPoint {
         response.setContentType("application/json;charset=UTF-8");
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         PrintWriter writer = response.getWriter();
-        String message = authException != null && authException.getMessage() != null
-                ? authException.getMessage()
-                : "Authentication required";
+        String message = "Authentication required";
         writer.write("{\"error\":\"Unauthorized\",\"message\":\"" + escapeJson(message) + "\"}");
         writer.flush();
     }

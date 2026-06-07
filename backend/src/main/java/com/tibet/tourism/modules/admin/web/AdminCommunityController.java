@@ -1,7 +1,10 @@
 package com.tibet.tourism.modules.admin.web;
 import com.tibet.tourism.common.validation.InputSanitizer;
-import com.tibet.tourism.common.validation.RequestParseUtils;
-import com.tibet.tourism.modules.admin.web.mapper.AdminDtoMapper;
+import com.tibet.tourism.modules.admin.web.dto.CommunityAnswerUpdateRequest;
+import com.tibet.tourism.modules.admin.web.dto.CommunityContentUpdateRequest;
+import com.tibet.tourism.modules.admin.web.dto.CommunityQuestionUpdateRequest;
+import com.tibet.tourism.modules.admin.web.dto.CommunityRouteUpdateRequest;
+import com.tibet.tourism.modules.admin.web.dto.CommunitySpotCommentUpdateRequest;
 import com.tibet.tourism.modules.community.domain.Comment;
 import com.tibet.tourism.modules.community.domain.RouteComment;
 import com.tibet.tourism.modules.community.domain.SharedRoute;
@@ -15,6 +18,7 @@ import com.tibet.tourism.modules.community.infra.RouteLikeRepository;
 import com.tibet.tourism.modules.community.infra.SharedRouteRepository;
 import com.tibet.tourism.modules.community.infra.TravelAnswerRepository;
 import com.tibet.tourism.modules.community.infra.TravelQuestionRepository;
+import jakarta.validation.Valid;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -25,7 +29,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
-import static com.tibet.tourism.common.validation.RequestParseUtils.*;
+import static com.tibet.tourism.common.validation.RequestParseUtils.isBlank;
 import static com.tibet.tourism.modules.admin.web.mapper.AdminDtoMapper.*;
 
 @RestController
@@ -72,41 +76,39 @@ public class AdminCommunityController {
 
     @PutMapping("/community/routes/{id}")
     @Transactional
-    public ResponseEntity<?> updateCommunityRoute(@PathVariable Long id, @RequestBody Map<String, Object> request) {
+    public ResponseEntity<?> updateCommunityRoute(@PathVariable Long id, @Valid @RequestBody CommunityRouteUpdateRequest request) {
         Optional<SharedRoute> routeOpt = sharedRouteRepository.findById(id);
         if (routeOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
 
         SharedRoute route = routeOpt.get();
-        if (request.containsKey("title")) {
-            String title = stringValue(request.get("title"));
-            if (isBlank(title)) {
+        if (request.getTitle() != null) {
+            if (isBlank(request.getTitle())) {
                 return ResponseEntity.badRequest().body(Map.of("error", "标题不能为空"));
             }
-            route.setTitle(InputSanitizer.requiredPlainText(title, 200, "标题"));
+            route.setTitle(InputSanitizer.requiredPlainText(request.getTitle(), 200, "标题"));
         }
-        if (request.containsKey("content")) {
-            String content = stringValue(request.get("content"));
-            if (isBlank(content)) {
+        if (request.getContent() != null) {
+            if (isBlank(request.getContent())) {
                 return ResponseEntity.badRequest().body(Map.of("error", "内容不能为空"));
             }
-            route.setContent(InputSanitizer.requiredTextBlock(content, 12000, "内容"));
+            route.setContent(InputSanitizer.requiredTextBlock(request.getContent(), 12000, "内容"));
         }
-        if (request.containsKey("days")) {
-            Integer days = integerValue(request.get("days"));
-            if (days == null || days < 1 || days > 15) {
+        if (request.getDays() != null) {
+            Integer days = request.getDays();
+            if (days < 1 || days > 15) {
                 return ResponseEntity.badRequest().body(Map.of("error", "天数必须在1到15之间"));
             }
             route.setDays(days);
         }
-        if (request.containsKey("budget")) {
+        if (request.getBudget() != null) {
             route.setBudget(InputSanitizer.optionalAllowedValue(
-                    stringValue(request.get("budget")), ALLOWED_ROUTE_BUDGETS, "预算"));
+                    request.getBudget(), ALLOWED_ROUTE_BUDGETS, "预算"));
         }
-        if (request.containsKey("preference")) {
+        if (request.getPreference() != null) {
             route.setPreference(InputSanitizer.optionalAllowedValue(
-                    stringValue(request.get("preference")), ALLOWED_ROUTE_PREFERENCES, "旅行偏好"));
+                    request.getPreference(), ALLOWED_ROUTE_PREFERENCES, "旅行偏好"));
         }
 
         return ResponseEntity.ok(toAdminSharedRoute(sharedRouteRepository.save(route)));
@@ -132,19 +134,18 @@ public class AdminCommunityController {
 
     @PutMapping("/community/comments/{id}")
     @Transactional
-    public ResponseEntity<?> updateCommunityComment(@PathVariable Long id, @RequestBody Map<String, Object> request) {
+    public ResponseEntity<?> updateCommunityComment(@PathVariable Long id, @Valid @RequestBody CommunityContentUpdateRequest request) {
         Optional<RouteComment> commentOpt = routeCommentRepository.findById(id);
         if (commentOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
 
         RouteComment comment = commentOpt.get();
-        if (request.containsKey("content")) {
-            String content = stringValue(request.get("content"));
-            if (isBlank(content)) {
+        if (request.getContent() != null) {
+            if (isBlank(request.getContent())) {
                 return ResponseEntity.badRequest().body(Map.of("error", "内容不能为空"));
             }
-            comment.setContent(InputSanitizer.requiredTextBlock(content, 1000, "内容"));
+            comment.setContent(InputSanitizer.requiredTextBlock(request.getContent(), 1000, "内容"));
         }
 
         return ResponseEntity.ok(toAdminRouteComment(routeCommentRepository.save(comment)));
@@ -177,22 +178,21 @@ public class AdminCommunityController {
 
     @PutMapping("/community/spot-comments/{id}")
     @Transactional
-    public ResponseEntity<?> updateCommunitySpotComment(@PathVariable Long id, @RequestBody Map<String, Object> request) {
+    public ResponseEntity<?> updateCommunitySpotComment(@PathVariable Long id, @Valid @RequestBody CommunitySpotCommentUpdateRequest request) {
         Optional<Comment> commentOpt = commentRepository.findById(id);
         if (commentOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
 
         Comment comment = commentOpt.get();
-        if (request.containsKey("content")) {
-            String content = stringValue(request.get("content"));
-            if (isBlank(content)) {
+        if (request.getContent() != null) {
+            if (isBlank(request.getContent())) {
                 return ResponseEntity.badRequest().body(Map.of("error", "内容不能为空"));
             }
-            comment.setContent(InputSanitizer.requiredTextBlock(content, 1000, "内容"));
+            comment.setContent(InputSanitizer.requiredTextBlock(request.getContent(), 1000, "内容"));
         }
-        if (request.containsKey("rating") && request.get("rating") != null) {
-            int rating = Integer.parseInt(String.valueOf(request.get("rating")));
+        if (request.getRating() != null) {
+            int rating = request.getRating();
             if (rating < 1 || rating > 5) {
                 return ResponseEntity.badRequest().body(Map.of("error", "评分必须在1到5之间"));
             }
@@ -224,32 +224,30 @@ public class AdminCommunityController {
 
     @PutMapping("/community/questions/{id}")
     @Transactional
-    public ResponseEntity<?> updateCommunityQuestion(@PathVariable Long id, @RequestBody Map<String, Object> request) {
+    public ResponseEntity<?> updateCommunityQuestion(@PathVariable Long id, @Valid @RequestBody CommunityQuestionUpdateRequest request) {
         Optional<TravelQuestion> questionOpt = travelQuestionRepository.findById(id);
         if (questionOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
 
         TravelQuestion question = questionOpt.get();
-        if (request.containsKey("title")) {
-            String title = stringValue(request.get("title"));
-            if (isBlank(title)) {
+        if (request.getTitle() != null) {
+            if (isBlank(request.getTitle())) {
                 return ResponseEntity.badRequest().body(Map.of("error", "标题不能为空"));
             }
-            question.setTitle(InputSanitizer.requiredPlainText(title, 200, "标题"));
+            question.setTitle(InputSanitizer.requiredPlainText(request.getTitle(), 200, "标题"));
         }
-        if (request.containsKey("content")) {
-            String content = stringValue(request.get("content"));
-            if (isBlank(content)) {
+        if (request.getContent() != null) {
+            if (isBlank(request.getContent())) {
                 return ResponseEntity.badRequest().body(Map.of("error", "内容不能为空"));
             }
-            question.setContent(InputSanitizer.requiredTextBlock(content, 4000, "内容"));
+            question.setContent(InputSanitizer.requiredTextBlock(request.getContent(), 4000, "内容"));
         }
-        if (request.containsKey("tags")) {
-            question.setTags(InputSanitizer.optionalTags(stringValue(request.get("tags")), 500));
+        if (request.getTags() != null) {
+            question.setTags(InputSanitizer.optionalTags(request.getTags(), 500));
         }
-        if (request.containsKey("isResolved")) {
-            question.setIsResolved(booleanValue(request.get("isResolved")));
+        if (request.getIsResolved() != null) {
+            question.setIsResolved(request.getIsResolved());
         }
 
         return ResponseEntity.ok(toAdminQuestion(travelQuestionRepository.save(question)));
@@ -279,22 +277,21 @@ public class AdminCommunityController {
 
     @PutMapping("/community/answers/{id}")
     @Transactional
-    public ResponseEntity<?> updateCommunityAnswer(@PathVariable Long id, @RequestBody Map<String, Object> request) {
+    public ResponseEntity<?> updateCommunityAnswer(@PathVariable Long id, @Valid @RequestBody CommunityAnswerUpdateRequest request) {
         Optional<TravelAnswer> answerOpt = travelAnswerRepository.findById(id);
         if (answerOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
 
         TravelAnswer answer = answerOpt.get();
-        if (request.containsKey("content")) {
-            String content = stringValue(request.get("content"));
-            if (isBlank(content)) {
+        if (request.getContent() != null) {
+            if (isBlank(request.getContent())) {
                 return ResponseEntity.badRequest().body(Map.of("error", "内容不能为空"));
             }
-            answer.setContent(InputSanitizer.requiredTextBlock(content, 4000, "内容"));
+            answer.setContent(InputSanitizer.requiredTextBlock(request.getContent(), 4000, "内容"));
         }
-        if (request.containsKey("isAccepted")) {
-            Boolean accepted = booleanValue(request.get("isAccepted"));
+        if (request.getIsAccepted() != null) {
+            Boolean accepted = request.getIsAccepted();
             answer.setIsAccepted(accepted);
 
             TravelQuestion question = answer.getQuestion();

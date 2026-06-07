@@ -7,7 +7,22 @@ on:
       - master
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
+  secret-scan:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+
   backend:
     name: Backend tests
     runs-on: ubuntu-latest
@@ -25,8 +40,34 @@ jobs:
           java-version: '17'
           cache: maven
 
+      - name: Validate Flyway migration files
+        run: |
+          set -euo pipefail
+          files="$(find src/main/resources/db/migration -maxdepth 1 -type f -name '*.sql' -printf '%f\n' | sort -V)"
+          invalid="$(printf '%s\n' "$files" | grep -Ev '^V[0-9]+__[A-Za-z0-9_]+\.sql$' || true)"
+          if [ -n "$invalid" ]; then
+            echo "Invalid Flyway migration names:"
+            printf '%s\n' "$invalid"
+            exit 1
+          fi
+          duplicates="$(printf '%s\n' "$files" | sed -E 's/^V([0-9]+)__.*/\1/' | sort -n | uniq -d)"
+          if [ -n "$duplicates" ]; then
+            echo "Duplicate Flyway migration versions:"
+            printf 'V%s\n' $duplicates
+            exit 1
+          fi
+
       - name: Test backend
         run: mvn -q test
+
+      - name: Trivy filesystem scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
 
   frontend:
     name: Frontend typecheck and build
@@ -41,7 +82,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
@@ -56,5 +97,17 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Audit production dependencies
+        run: npm audit --omit=dev
+
       - name: Build
         run: npm run build
+
+      - name: Trivy frontend image scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: frontend
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'

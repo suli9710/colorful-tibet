@@ -1,10 +1,11 @@
 package com.tibet.tourism.modules.admin.web;
 import com.tibet.tourism.common.validation.InputSanitizer;
-import com.tibet.tourism.common.validation.RequestParseUtils;
+import com.tibet.tourism.modules.admin.web.dto.NewsRequest;
 import com.tibet.tourism.modules.content.application.TibetanTranslationService;
 import com.tibet.tourism.modules.content.domain.News;
 import com.tibet.tourism.modules.content.domain.TibetanDictionary;
 import com.tibet.tourism.modules.content.infra.NewsRepository;
+import jakarta.validation.Valid;
 import java.util.Map;
 import java.util.Optional;
 import org.springframework.cache.annotation.CacheEvict;
@@ -39,49 +40,46 @@ public class AdminNewsController {
 
     @PostMapping("/news")
     @CacheEvict(value = "newsCache", allEntries = true)
-    public ResponseEntity<?> createNews(@RequestBody Map<String, Object> request) {
+    public ResponseEntity<?> createNews(@Valid @RequestBody NewsRequest request) {
         News news = new News();
-        boolean autoTranslate = request.getOrDefault("autoTranslate", true).equals(true);
+        boolean autoTranslate = request.getAutoTranslate() == null || request.getAutoTranslate();
 
-        String title = InputSanitizer.requiredPlainText((String) request.get("title"), 200, "标题");
+        String title = InputSanitizer.requiredPlainText(request.getTitle(), 200, "标题");
 
         if (autoTranslate) {
             String tibetanTitle = translationService.translateOrCreate(title, null, com.tibet.tourism.modules.content.domain.TibetanDictionary.Type.SENTENCE);
             if (tibetanTitle != null) {
                 news.setTitleTibetan(tibetanTitle);
             }
-        } else if (request.containsKey("titleTibetan")) {
-            news.setTitleTibetan(InputSanitizer.optionalPlainText((String) request.get("titleTibetan"), 200, "藏语标题"));
+        } else if (request.getTitleTibetan() != null) {
+            news.setTitleTibetan(InputSanitizer.optionalPlainText(request.getTitleTibetan(), 200, "藏语标题"));
         }
         news.setTitle(title);
 
-        String content = InputSanitizer.requiredTextBlock((String) request.get("content"), 20000, "内容");
+        String content = InputSanitizer.requiredTextBlock(request.getContent(), 20000, "内容");
 
         if (autoTranslate) {
             String tibetanContent = translationService.translateDescription(content);
             if (tibetanContent != null) {
                 news.setContentTibetan(tibetanContent);
             }
-        } else if (request.containsKey("contentTibetan")) {
-            news.setContentTibetan(InputSanitizer.optionalTextBlock((String) request.get("contentTibetan"), 20000, "藏语内容"));
+        } else if (request.getContentTibetan() != null) {
+            news.setContentTibetan(InputSanitizer.optionalTextBlock(request.getContentTibetan(), 20000, "藏语内容"));
         }
         news.setContent(content);
 
-        if (request.containsKey("category")) {
+        if (request.getCategory() != null) {
             try {
-                news.setCategory(News.Category.valueOf(((String) request.get("category")).toUpperCase()));
+                news.setCategory(News.Category.valueOf(request.getCategory().toUpperCase()));
             } catch (IllegalArgumentException e) {
                 return ResponseEntity.badRequest().body(Map.of("error", "无效的类别"));
             }
         }
-        if (request.containsKey("imageUrl")) {
-            news.setImageUrl(safeImageUrl(request.get("imageUrl"), "资讯图片"));
+        if (request.getImageUrl() != null) {
+            news.setImageUrl(safeImageUrl(request.getImageUrl(), "资讯图片"));
         }
-        if (request.containsKey("viewCount")) {
-            Object viewCountObj = request.get("viewCount");
-            if (viewCountObj instanceof Number) {
-                news.setViewCount(((Number) viewCountObj).intValue());
-            }
+        if (request.getViewCount() != null) {
+            news.setViewCount(request.getViewCount());
         }
 
         newsRepository.save(news);
@@ -90,17 +88,17 @@ public class AdminNewsController {
 
     @PutMapping("/news/{id}")
     @CacheEvict(value = "newsCache", allEntries = true)
-    public ResponseEntity<?> updateNews(@PathVariable Long id, @RequestBody Map<String, Object> request) {
+    public ResponseEntity<?> updateNews(@PathVariable Long id, @Valid @RequestBody NewsRequest request) {
         Optional<News> newsOpt = newsRepository.findById(id);
         if (newsOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
 
         News news = newsOpt.get();
-        boolean autoTranslate = request.getOrDefault("autoTranslate", true).equals(true);
+        boolean autoTranslate = request.getAutoTranslate() == null || request.getAutoTranslate();
 
-        if (request.containsKey("title")) {
-            String title = InputSanitizer.requiredPlainText((String) request.get("title"), 200, "标题");
+        if (request.getTitle() != null) {
+            String title = InputSanitizer.requiredPlainText(request.getTitle(), 200, "标题");
             news.setTitle(title);
             if (autoTranslate && (news.getTitleTibetan() == null || news.getTitleTibetan().isEmpty())) {
                 String tibetanTitle = translationService.translateOrCreate(title, null, com.tibet.tourism.modules.content.domain.TibetanDictionary.Type.SENTENCE);
@@ -110,8 +108,8 @@ public class AdminNewsController {
             }
         }
 
-        if (request.containsKey("content")) {
-            String content = InputSanitizer.requiredTextBlock((String) request.get("content"), 20000, "内容");
+        if (request.getContent() != null) {
+            String content = InputSanitizer.requiredTextBlock(request.getContent(), 20000, "内容");
             news.setContent(content);
             if (autoTranslate && (news.getContentTibetan() == null || news.getContentTibetan().isEmpty())) {
                 String tibetanContent = translationService.translateDescription(content);
@@ -121,27 +119,24 @@ public class AdminNewsController {
             }
         }
 
-        if (request.containsKey("titleTibetan")) {
-            news.setTitleTibetan(InputSanitizer.optionalPlainText((String) request.get("titleTibetan"), 200, "藏语标题"));
+        if (request.getTitleTibetan() != null) {
+            news.setTitleTibetan(InputSanitizer.optionalPlainText(request.getTitleTibetan(), 200, "藏语标题"));
         }
-        if (request.containsKey("contentTibetan")) {
-            news.setContentTibetan(InputSanitizer.optionalTextBlock((String) request.get("contentTibetan"), 20000, "藏语内容"));
+        if (request.getContentTibetan() != null) {
+            news.setContentTibetan(InputSanitizer.optionalTextBlock(request.getContentTibetan(), 20000, "藏语内容"));
         }
-        if (request.containsKey("category")) {
+        if (request.getCategory() != null) {
             try {
-                news.setCategory(News.Category.valueOf(((String) request.get("category")).toUpperCase()));
+                news.setCategory(News.Category.valueOf(request.getCategory().toUpperCase()));
             } catch (IllegalArgumentException e) {
                 return ResponseEntity.badRequest().body(Map.of("error", "无效的类别"));
             }
         }
-        if (request.containsKey("imageUrl")) {
-            news.setImageUrl(safeImageUrl(request.get("imageUrl"), "资讯图片"));
+        if (request.getImageUrl() != null) {
+            news.setImageUrl(safeImageUrl(request.getImageUrl(), "资讯图片"));
         }
-        if (request.containsKey("viewCount")) {
-            Object viewCountObj = request.get("viewCount");
-            if (viewCountObj instanceof Number) {
-                news.setViewCount(((Number) viewCountObj).intValue());
-            }
+        if (request.getViewCount() != null) {
+            news.setViewCount(request.getViewCount());
         }
 
         newsRepository.save(news);

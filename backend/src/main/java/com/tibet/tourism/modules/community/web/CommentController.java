@@ -6,12 +6,14 @@ import com.tibet.tourism.modules.community.domain.Comment;
 import com.tibet.tourism.modules.community.domain.CommentLike;
 import com.tibet.tourism.modules.community.infra.CommentLikeRepository;
 import com.tibet.tourism.modules.community.infra.CommentRepository;
+import com.tibet.tourism.modules.community.web.dto.AddCommentRequest;
 import com.tibet.tourism.modules.community.web.dto.CommentDTO;
 import com.tibet.tourism.modules.spot.domain.ScenicSpot;
 import com.tibet.tourism.modules.spot.infra.ScenicSpotRepository;
 import com.tibet.tourism.modules.upload.application.FileStorageService;
 import com.tibet.tourism.modules.user.domain.User;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -55,32 +57,24 @@ public class CommentController {
 
     @PostMapping
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<?> addComment(@RequestBody Map<String, Object> payload, HttpServletRequest request) {
+    public ResponseEntity<?> addComment(@Valid @RequestBody AddCommentRequest dto, HttpServletRequest request) {
         User user = jwtAuthSupport.resolveCurrentUser(request);
-        long spotId = Long.parseLong(payload.get("spotId").toString());
-        String content = InputSanitizer.requiredTextBlock(
-                payload.get("content") == null ? null : payload.get("content").toString(), 1000, "评论内容");
-        Integer rating = Integer.valueOf(payload.get("rating").toString());
-        String imageUrl = InputSanitizer.optionalLocalAssetPath(
-                payload.get("imageUrl") == null ? null : payload.get("imageUrl").toString(), "评论图片");
+        String content = InputSanitizer.requiredTextBlock(dto.getContent(), 1000, "评论内容");
+        String imageUrl = InputSanitizer.optionalLocalAssetPath(dto.getImageUrl(), "评论图片");
 
-        if (rating < 1 || rating > 5) {
-            return ResponseEntity.badRequest().body(Map.of("error", "评分必须在1到5之间"));
-        }
-
-        ScenicSpot spot = spotRepository.findById(spotId)
+        ScenicSpot spot = spotRepository.findById(dto.getSpotId())
                 .orElseThrow(() -> new ResourceNotFoundException("Spot not found"));
 
         Comment comment = new Comment();
         comment.setUser(user);
         comment.setSpot(spot);
         comment.setContent(content);
-        comment.setRating(rating);
+        comment.setRating(dto.getRating());
         comment.setImageUrl(imageUrl);
 
-        commentRepository.save(comment);
+        Comment saved = commentRepository.save(comment);
 
-        return ResponseEntity.ok(comment);
+        return ResponseEntity.ok(CommentDTO.fromEntity(saved));
     }
     
     @PostMapping("/{commentId}/like")

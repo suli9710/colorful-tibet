@@ -1,5 +1,8 @@
 package com.tibet.tourism.modules.admin.web;
 import com.tibet.tourism.common.validation.InputSanitizer;
+import com.tibet.tourism.modules.admin.web.dto.HeritageEventRequest;
+import com.tibet.tourism.modules.admin.web.dto.HeritageInheritorRequest;
+import com.tibet.tourism.modules.admin.web.dto.HeritageItemRequest;
 import com.tibet.tourism.modules.content.domain.HeritageEvent;
 import com.tibet.tourism.modules.content.domain.HeritageInheritor;
 import com.tibet.tourism.modules.content.domain.HeritageItem;
@@ -8,7 +11,7 @@ import com.tibet.tourism.modules.content.infra.HeritageEventRepository;
 import com.tibet.tourism.modules.content.infra.HeritageInheritorRepository;
 import com.tibet.tourism.modules.content.infra.HeritageItemRepository;
 import com.tibet.tourism.modules.content.infra.HeritageLikeRepository;
-import java.time.LocalDate;
+import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Map;
 import org.springframework.data.domain.Page;
@@ -19,7 +22,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
-import static com.tibet.tourism.common.validation.RequestParseUtils.safeImageUrl;
 
 @RestController
 @RequestMapping("/api/admin/heritage")
@@ -52,7 +54,7 @@ public class AdminHeritageController {
     }
 
     @PostMapping
-    public ResponseEntity<?> createItem(@RequestBody Map<String, Object> request) {
+    public ResponseEntity<?> createItem(@RequestBody @Valid HeritageItemRequest request) {
         HeritageItem item = new HeritageItem();
         applyItemFields(item, request);
         itemRepository.save(item);
@@ -60,7 +62,7 @@ public class AdminHeritageController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<?> updateItem(@PathVariable Long id, @RequestBody Map<String, Object> request) {
+    public ResponseEntity<?> updateItem(@PathVariable Long id, @RequestBody @Valid HeritageItemRequest request) {
         HeritageItem item = itemRepository.findById(id).orElse(null);
         if (item == null) return ResponseEntity.notFound().build();
         applyItemFields(item, request);
@@ -87,7 +89,7 @@ public class AdminHeritageController {
     }
 
     @PostMapping("/{itemId}/inheritors")
-    public ResponseEntity<?> createInheritor(@PathVariable Long itemId, @RequestBody Map<String, Object> request) {
+    public ResponseEntity<?> createInheritor(@PathVariable Long itemId, @RequestBody @Valid HeritageInheritorRequest request) {
         HeritageItem item = itemRepository.findById(itemId).orElse(null);
         if (item == null) return ResponseEntity.notFound().build();
 
@@ -99,7 +101,7 @@ public class AdminHeritageController {
     }
 
     @PutMapping("/inheritors/{id}")
-    public ResponseEntity<?> updateInheritor(@PathVariable Long id, @RequestBody Map<String, Object> request) {
+    public ResponseEntity<?> updateInheritor(@PathVariable Long id, @RequestBody @Valid HeritageInheritorRequest request) {
         HeritageInheritor inheritor = inheritorRepository.findById(id).orElse(null);
         if (inheritor == null) return ResponseEntity.notFound().build();
         applyInheritorFields(inheritor, request);
@@ -121,7 +123,7 @@ public class AdminHeritageController {
     }
 
     @PostMapping("/{itemId}/events")
-    public ResponseEntity<?> createEvent(@PathVariable Long itemId, @RequestBody Map<String, Object> request) {
+    public ResponseEntity<?> createEvent(@PathVariable Long itemId, @RequestBody @Valid HeritageEventRequest request) {
         HeritageItem item = itemRepository.findById(itemId).orElse(null);
         if (item == null) return ResponseEntity.notFound().build();
 
@@ -133,7 +135,7 @@ public class AdminHeritageController {
     }
 
     @PutMapping("/events/{id}")
-    public ResponseEntity<?> updateEvent(@PathVariable Long id, @RequestBody Map<String, Object> request) {
+    public ResponseEntity<?> updateEvent(@PathVariable Long id, @RequestBody @Valid HeritageEventRequest request) {
         HeritageEvent event = eventRepository.findById(id).orElse(null);
         if (event == null) return ResponseEntity.notFound().build();
         applyEventFields(event, request);
@@ -149,41 +151,41 @@ public class AdminHeritageController {
     }
 
     // ---- Private helpers ----
-    private void applyItemFields(HeritageItem item, Map<String, Object> req) {
-        if (req.containsKey("name")) item.setName(InputSanitizer.requiredPlainText((String) req.get("name"), 200, "名称"));
-        if (req.containsKey("nameTibetan")) item.setNameTibetan(InputSanitizer.optionalPlainText((String) req.get("nameTibetan"), 200, "藏语名称"));
-        if (req.containsKey("description")) item.setDescription(InputSanitizer.optionalTextBlock((String) req.get("description"), 10000, "描述"));
-        if (req.containsKey("descriptionTibetan")) item.setDescriptionTibetan(InputSanitizer.optionalTextBlock((String) req.get("descriptionTibetan"), 10000, "藏语描述"));
-        if (req.containsKey("category")) item.setCategory(InputSanitizer.optionalPlainText((String) req.get("category"), 100, "类别"));
-        if (req.containsKey("imageUrl")) item.setImageUrl(safeImageUrl(req.get("imageUrl"), "图片"));
-        if (req.containsKey("videoUrl")) item.setVideoUrl(InputSanitizer.optionalPlainText((String) req.get("videoUrl"), 512, "视频链接"));
-        if (req.containsKey("originStory")) item.setOriginStory(InputSanitizer.optionalTextBlock((String) req.get("originStory"), 10000, "起源故事"));
-        if (req.containsKey("significance")) item.setSignificance(InputSanitizer.optionalTextBlock((String) req.get("significance"), 10000, "文化价值"));
-        if (req.containsKey("baikeUrl")) item.setBaikeUrl(InputSanitizer.optionalPlainText((String) req.get("baikeUrl"), 512, "百科链接"));
-        if (req.containsKey("region")) item.setRegion(InputSanitizer.optionalPlainText((String) req.get("region"), 100, "地区"));
-        if (req.containsKey("protectionLevel")) item.setProtectionLevel(InputSanitizer.optionalPlainText((String) req.get("protectionLevel"), 50, "保护级别"));
+    private void applyItemFields(HeritageItem item, HeritageItemRequest req) {
+        if (req.getName() != null) item.setName(InputSanitizer.requiredPlainText(req.getName(), 200, "名称"));
+        if (req.getNameTibetan() != null) item.setNameTibetan(InputSanitizer.optionalPlainText(req.getNameTibetan(), 200, "藏语名称"));
+        if (req.getDescription() != null) item.setDescription(InputSanitizer.optionalTextBlock(req.getDescription(), 10000, "描述"));
+        if (req.getDescriptionTibetan() != null) item.setDescriptionTibetan(InputSanitizer.optionalTextBlock(req.getDescriptionTibetan(), 10000, "藏语描述"));
+        if (req.getCategory() != null) item.setCategory(InputSanitizer.optionalPlainText(req.getCategory(), 100, "类别"));
+        if (req.getImageUrl() != null) item.setImageUrl(InputSanitizer.optionalPublicImageUrl(req.getImageUrl(), "图片"));
+        if (req.getVideoUrl() != null) item.setVideoUrl(InputSanitizer.optionalSafeLinkUrl(req.getVideoUrl(), "视频链接"));
+        if (req.getOriginStory() != null) item.setOriginStory(InputSanitizer.optionalTextBlock(req.getOriginStory(), 10000, "起源故事"));
+        if (req.getSignificance() != null) item.setSignificance(InputSanitizer.optionalTextBlock(req.getSignificance(), 10000, "文化价值"));
+        if (req.getBaikeUrl() != null) item.setBaikeUrl(InputSanitizer.optionalSafeLinkUrl(req.getBaikeUrl(), "百科链接"));
+        if (req.getRegion() != null) item.setRegion(InputSanitizer.optionalPlainText(req.getRegion(), 100, "地区"));
+        if (req.getProtectionLevel() != null) item.setProtectionLevel(InputSanitizer.optionalPlainText(req.getProtectionLevel(), 50, "保护级别"));
     }
 
-    private void applyInheritorFields(HeritageInheritor inheritor, Map<String, Object> req) {
-        if (req.containsKey("name")) inheritor.setName(InputSanitizer.requiredPlainText((String) req.get("name"), 100, "姓名"));
-        if (req.containsKey("nameTibetan")) inheritor.setNameTibetan(InputSanitizer.optionalPlainText((String) req.get("nameTibetan"), 100, "藏语姓名"));
-        if (req.containsKey("avatarUrl")) inheritor.setAvatarUrl(safeImageUrl(req.get("avatarUrl"), "头像"));
-        if (req.containsKey("level")) inheritor.setLevel(InputSanitizer.optionalPlainText((String) req.get("level"), 50, "级别"));
-        if (req.containsKey("bio")) inheritor.setBio(InputSanitizer.optionalTextBlock((String) req.get("bio"), 5000, "简介"));
-        if (req.containsKey("bioTibetan")) inheritor.setBioTibetan(InputSanitizer.optionalTextBlock((String) req.get("bioTibetan"), 5000, "藏语简介"));
-        if (req.containsKey("story")) inheritor.setStory(InputSanitizer.optionalTextBlock((String) req.get("story"), 10000, "传承故事"));
-        if (req.containsKey("region")) inheritor.setRegion(InputSanitizer.optionalPlainText((String) req.get("region"), 100, "所在地区"));
+    private void applyInheritorFields(HeritageInheritor inheritor, HeritageInheritorRequest req) {
+        if (req.getName() != null) inheritor.setName(InputSanitizer.requiredPlainText(req.getName(), 100, "姓名"));
+        if (req.getNameTibetan() != null) inheritor.setNameTibetan(InputSanitizer.optionalPlainText(req.getNameTibetan(), 100, "藏语姓名"));
+        if (req.getAvatarUrl() != null) inheritor.setAvatarUrl(InputSanitizer.optionalPublicImageUrl(req.getAvatarUrl(), "头像"));
+        if (req.getLevel() != null) inheritor.setLevel(InputSanitizer.optionalPlainText(req.getLevel(), 50, "级别"));
+        if (req.getBio() != null) inheritor.setBio(InputSanitizer.optionalTextBlock(req.getBio(), 5000, "简介"));
+        if (req.getBioTibetan() != null) inheritor.setBioTibetan(InputSanitizer.optionalTextBlock(req.getBioTibetan(), 5000, "藏语简介"));
+        if (req.getStory() != null) inheritor.setStory(InputSanitizer.optionalTextBlock(req.getStory(), 10000, "传承故事"));
+        if (req.getRegion() != null) inheritor.setRegion(InputSanitizer.optionalPlainText(req.getRegion(), 100, "所在地区"));
     }
 
-    private void applyEventFields(HeritageEvent event, Map<String, Object> req) {
-        if (req.containsKey("title")) event.setTitle(InputSanitizer.requiredPlainText((String) req.get("title"), 200, "标题"));
-        if (req.containsKey("titleTibetan")) event.setTitleTibetan(InputSanitizer.optionalPlainText((String) req.get("titleTibetan"), 200, "藏语标题"));
-        if (req.containsKey("description")) event.setDescription(InputSanitizer.optionalTextBlock((String) req.get("description"), 5000, "描述"));
-        if (req.containsKey("descriptionTibetan")) event.setDescriptionTibetan(InputSanitizer.optionalTextBlock((String) req.get("descriptionTibetan"), 5000, "藏语描述"));
-        if (req.containsKey("eventDate")) event.setEventDate(LocalDate.parse((String) req.get("eventDate")));
-        if (req.containsKey("endDate")) event.setEndDate(LocalDate.parse((String) req.get("endDate")));
-        if (req.containsKey("location")) event.setLocation(InputSanitizer.optionalPlainText((String) req.get("location"), 200, "地点"));
-        if (req.containsKey("imageUrl")) event.setImageUrl(safeImageUrl(req.get("imageUrl"), "活动图片"));
-        if (req.containsKey("contactInfo")) event.setContactInfo(InputSanitizer.optionalPlainText((String) req.get("contactInfo"), 200, "联系方式"));
+    private void applyEventFields(HeritageEvent event, HeritageEventRequest req) {
+        if (req.getTitle() != null) event.setTitle(InputSanitizer.requiredPlainText(req.getTitle(), 200, "标题"));
+        if (req.getTitleTibetan() != null) event.setTitleTibetan(InputSanitizer.optionalPlainText(req.getTitleTibetan(), 200, "藏语标题"));
+        if (req.getDescription() != null) event.setDescription(InputSanitizer.optionalTextBlock(req.getDescription(), 5000, "描述"));
+        if (req.getDescriptionTibetan() != null) event.setDescriptionTibetan(InputSanitizer.optionalTextBlock(req.getDescriptionTibetan(), 5000, "藏语描述"));
+        if (req.getEventDate() != null) event.setEventDate(req.getEventDate());
+        if (req.getEndDate() != null) event.setEndDate(req.getEndDate());
+        if (req.getLocation() != null) event.setLocation(InputSanitizer.optionalPlainText(req.getLocation(), 200, "地点"));
+        if (req.getImageUrl() != null) event.setImageUrl(InputSanitizer.optionalPublicImageUrl(req.getImageUrl(), "活动图片"));
+        if (req.getContactInfo() != null) event.setContactInfo(InputSanitizer.optionalPlainText(req.getContactInfo(), 200, "联系方式"));
     }
 }

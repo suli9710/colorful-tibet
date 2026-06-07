@@ -1,5 +1,6 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
+import { clearAllRoutePlannerDrafts } from '../composables/useRoutePlannerDraft'
 
 export interface AuthUser {
   id?: number
@@ -17,13 +18,32 @@ export interface AuthUser {
 }
 
 const USER_STORAGE_KEY = 'user'
+const AUTH_SESSION_VERSION_KEY = 'auth-session-version'
+const AUTH_SESSION_EVENT = 'auth-session-changed'
 const apiBaseURL = import.meta.env.VITE_API_BASE_URL || '/api'
 
 const hasStorage = () => typeof window !== 'undefined' && typeof window.localStorage !== 'undefined'
 
 const normalizedApiBaseURL = () => String(apiBaseURL).replace(/\/+$/, '')
 
-const SAFE_USER_FIELDS = new Set(['id', 'username', 'nickname', 'avatar', 'role', 'createdAt', 'mustChangePassword'])
+const notifySessionChanged = () => {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new CustomEvent(AUTH_SESSION_EVENT))
+}
+
+const bumpSessionVersion = () => {
+  if (!hasStorage()) {
+    notifySessionChanged()
+    return
+  }
+
+  const currentVersion = Number.parseInt(localStorage.getItem(AUTH_SESSION_VERSION_KEY) || '0', 10)
+  const nextVersion = Number.isFinite(currentVersion) ? currentVersion + 1 : 1
+  localStorage.setItem(AUTH_SESSION_VERSION_KEY, String(nextVersion))
+  notifySessionChanged()
+}
+
+const SAFE_USER_FIELDS = new Set(['id', 'username', 'nickname', 'avatar', 'createdAt'])
 
 const stripAuthTokens = (userData: AuthUser): AuthUser => {
   const { token: _token, accessToken: _accessToken, jwt: _jwt, data: _data, ...userWithoutToken } = userData
@@ -55,13 +75,20 @@ const readStoredUser = (): AuthUser | null => {
 
 const persistUser = (userData: AuthUser) => {
   if (!hasStorage()) return
-  localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(sanitizeForStorage(userData)))
+  const nextUser = JSON.stringify(sanitizeForStorage(userData))
+  if (localStorage.getItem(USER_STORAGE_KEY) === nextUser) return
+  localStorage.setItem(USER_STORAGE_KEY, nextUser)
+  bumpSessionVersion()
 }
 
 export const clearStoredAuth = () => {
-  if (!hasStorage()) return
-  localStorage.removeItem(USER_STORAGE_KEY)
-  localStorage.removeItem('token')
+  if (hasStorage()) {
+    const hadStoredAuth = Boolean(localStorage.getItem(USER_STORAGE_KEY) || localStorage.getItem('token'))
+    localStorage.removeItem(USER_STORAGE_KEY)
+    localStorage.removeItem('token')
+    if (!hadStoredAuth) return
+  }
+  bumpSessionVersion()
 }
 
 const fetchCurrentUser = async (): Promise<AuthUser> => {
@@ -106,6 +133,7 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = null
     sessionChecked.value = true
     clearStoredAuth()
+    clearAllRoutePlannerDrafts()
   }
 
   async function refreshSession() {
@@ -132,7 +160,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function ensureSession() {
-    if (isLoggedIn.value) {
+    if (isLoggedIn.value && user.value?.role) {
       return true
     }
     return refreshSession()

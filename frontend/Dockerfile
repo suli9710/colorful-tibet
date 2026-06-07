@@ -1,5 +1,5 @@
 # 多阶段构建：先构建前端，再使用nginx服务
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 WORKDIR /app
 COPY package*.json ./
 RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
@@ -22,7 +22,9 @@ ENV VITE_AMAP_SECURITY_CODE=$VITE_AMAP_SECURITY_CODE
 RUN npm run build
 
 FROM nginx:alpine
-RUN apk add --no-cache gettext openssl
+RUN apk add --no-cache gettext openssl \
+    && mkdir -p /etc/nginx/certs /var/cache/nginx /var/run /run \
+    && chown -R 101:101 /etc/nginx/conf.d /etc/nginx/certs /var/cache/nginx /var/run /run
 
 # 复制构建好的文件
 COPY --from=builder /app/dist /usr/share/nginx/html
@@ -35,10 +37,12 @@ ENV NGINX_SERVER_NAME=localhost
 ENV NGINX_CERT_DOMAIN=localhost
 ENV NGINX_HTTP_ONLY=false
 
-# 暴露端口
-EXPOSE 80 443
+# Expose unprivileged ports; compose maps public 80/443 to these.
+EXPOSE 8080 8443
+
+USER 101:101
 
 # Render only our deployment variables and keep nginx runtime variables intact.
 # A short-lived self-signed cert keeps local Docker Compose usable when real
 # Let's Encrypt files are not mounted.
-CMD ["sh", "-c", "set -e; if [ \"$NGINX_HTTP_ONLY\" = \"true\" ]; then envsubst '$NGINX_SERVER_NAME $NGINX_CERT_DOMAIN' < /etc/nginx/http.conf.template > /etc/nginx/conf.d/default.conf; else cert_dir=\"/etc/letsencrypt/live/$NGINX_CERT_DOMAIN\"; if [ ! -f \"$cert_dir/fullchain.pem\" ] || [ ! -f \"$cert_dir/privkey.pem\" ]; then mkdir -p \"$cert_dir\"; openssl req -x509 -nodes -newkey rsa:2048 -days 1 -subj \"/CN=$NGINX_CERT_DOMAIN\" -keyout \"$cert_dir/privkey.pem\" -out \"$cert_dir/fullchain.pem\" >/dev/null 2>&1; cp \"$cert_dir/fullchain.pem\" \"$cert_dir/chain.pem\"; fi; envsubst '$NGINX_SERVER_NAME $NGINX_CERT_DOMAIN' < /etc/nginx/default.conf.template > /etc/nginx/conf.d/default.conf; fi; nginx -g 'daemon off;'"]
+CMD ["sh", "-c", "set -e; if [ \"$NGINX_HTTP_ONLY\" = \"true\" ]; then envsubst '$NGINX_SERVER_NAME $NGINX_CERT_DOMAIN' < /etc/nginx/http.conf.template > /etc/nginx/conf.d/default.conf; else cert_dir=\"/etc/nginx/certs/$NGINX_CERT_DOMAIN\"; if [ ! -f \"$cert_dir/fullchain.pem\" ] || [ ! -f \"$cert_dir/privkey.pem\" ]; then mkdir -p \"$cert_dir\"; openssl req -x509 -nodes -newkey rsa:2048 -days 1 -subj \"/CN=$NGINX_CERT_DOMAIN\" -keyout \"$cert_dir/privkey.pem\" -out \"$cert_dir/fullchain.pem\" >/dev/null 2>&1; cp \"$cert_dir/fullchain.pem\" \"$cert_dir/chain.pem\"; fi; envsubst '$NGINX_SERVER_NAME $NGINX_CERT_DOMAIN' < /etc/nginx/default.conf.template > /etc/nginx/conf.d/default.conf; fi; nginx -g 'daemon off;'"]

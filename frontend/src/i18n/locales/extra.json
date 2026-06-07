@@ -1,0 +1,1324 @@
+{
+  "zh": {
+    "home": {
+      "carouselDot": "切换到第 {index} 张轮播图",
+      "highRatingSpot": "高评分景点",
+      "popularSpot": "热门景点",
+      "selectedForYou": "为您精选"
+    },
+    "common": {
+      "refresh": "刷新",
+      "retry": "重试",
+      "create": "创建",
+      "add": "添加",
+      "update": "更新",
+      "enabled": "启用",
+      "disabled": "禁用",
+      "unknown": "未知",
+      "unknownLocation": "未知位置",
+      "consult": "咨询",
+      "items": "条",
+      "countUnit": "个",
+      "peopleUnit": "人",
+      "hotelsUnit": "家",
+      "imagesUnit": "张",
+      "nightsUnit": "晚",
+      "timesUnit": "次",
+      "expandAll": "查看全部",
+      "collapse": "收起",
+      "upload": "上传",
+      "back": "返回"
+    },
+    "favorites": {
+      "title": "我的收藏",
+      "subtitle": "已收藏的旅游线路",
+      "empty": "还没有收藏任何线路",
+      "goExplore": "去探索线路",
+      "unknownRoute": "未知线路",
+      "remove": "取消收藏",
+      "operationFailed": "操作失败"
+    },
+    "upload": {
+      "pasteUrl": "或粘贴图片URL",
+      "selectImageFile": "请选择图片文件",
+      "imageTooLarge": "图片大小不能超过5MB",
+      "missingUploadUrl": "上传接口未返回图片地址",
+      "uploadFailed": "上传失败，请重试",
+      "previewAlt": "图片预览",
+      "imageLoadFailed": "图片加载失败",
+      "changeImage": "更换图片",
+      "removeImage": "移除图片",
+      "uploading": "上传中...",
+      "chooseOrDrag": "选择图片或拖拽上传",
+      "formatHint": "JPG、PNG、WebP，5MB 内"
+    },
+    "privacy": {
+      "title": "隐私政策",
+      "lastUpdated": "最后更新日期：2025年11月",
+      "sections": [
+        {
+          "title": "引言",
+          "paragraphs": [
+            "七彩西藏旅游网（以下简称\"我们\"）非常重视您的隐私保护。本隐私政策说明了我们如何收集、使用、存储和保护您的个人信息。在使用我们的服务前，请仔细阅读本政策。"
+          ]
+        },
+        {
+          "title": "一、我们收集的信息",
+          "blocks": [
+            {
+              "title": "1.1 账户信息",
+              "text": "当您注册账户时，我们可能收集您的用户名、电子邮箱地址、手机号码等基本信息，用于账户管理和身份验证。"
+            },
+            {
+              "title": "1.2 使用数据",
+              "text": "我们自动收集您使用我们服务时的相关信息，包括访问时间、浏览页面、点击记录、设备信息、IP地址等。"
+            },
+            {
+              "title": "1.3 内容信息",
+              "text": "当您使用发布评论、分享行程、上传照片等功能时，我们可能收集您主动提供的内容信息。"
+            },
+            {
+              "title": "1.4 位置信息",
+              "text": "在您同意的情况下，我们可能收集您的位置信息，用于为您提供附近景点推荐等基于位置的个性化服务。"
+            }
+          ]
+        },
+        {
+          "title": "二、信息的使用目的",
+          "list": [
+            "提供、维护和改进我们的服务",
+            "处理您的注册、登录和账户管理请求",
+            "向您发送服务通知、更新和安全提醒",
+            "提供个性化内容推荐和用户体验",
+            "进行数据分析并优化服务质量",
+            "检测、预防和解决技术问题、欺诈行为或安全威胁",
+            "遵守法律法规要求，配合司法或行政机关调查"
+          ]
+        },
+        {
+          "title": "三、信息的共享与披露",
+          "paragraphs": [
+            "我们承诺不会向第三方出售、交易或出租您的个人信息。我们仅在以下情况下共享必要信息："
+          ],
+          "blocks": [
+            {
+              "title": "3.1 获得您的明确同意",
+              "text": "在获得您明确同意的情况下，我们可能会与第三方共享您的信息。"
+            },
+            {
+              "title": "3.2 服务提供商",
+              "text": "我们可能与为我们提供云存储、数据分析、支付处理等服务的第三方共享必要信息，但服务商必须遵守保密义务。"
+            },
+            {
+              "title": "3.3 法律要求",
+              "text": "在法律、法规、司法程序或政府机关要求的情况下，我们可能需要披露您的信息。"
+            },
+            {
+              "title": "3.4 业务转让",
+              "text": "如果发生合并、收购或资产转让，您的信息可能会被转移给新的所有者。"
+            }
+          ]
+        },
+        {
+          "title": "四、信息安全",
+          "paragraphs": [
+            "我们采用行业标准的安全技术和措施来保护您的个人信息，包括数据加密、访问控制、安全审计等。但任何互联网传输或电子存储方式都无法保证绝对安全。"
+          ]
+        },
+        {
+          "title": "五、您的权利",
+          "paragraphs": [
+            "根据适用法律法规，您对自己的个人信息享有以下权利："
+          ],
+          "list": [
+            "访问权：您可以访问和查看我们持有的您的个人信息",
+            "更正权：您可以要求更正不准确或不完整的个人信息",
+            "删除权：在符合法律要求的情况下，您可以要求删除您的个人信息",
+            "撤回同意：您可以随时撤回之前给予的同意",
+            "数据可携权：您可以要求以结构化、常用和机器可读的格式获取您的个人信息",
+            "投诉权：如果您认为我们处理个人信息的方式违反法律法规，您有权向相关监管机构投诉"
+          ]
+        },
+        {
+          "title": "六、Cookie和追踪技术",
+          "paragraphs": [
+            "我们使用 Cookie 和类似技术改善浏览体验、分析网站流量、个性化内容。您可以通过浏览器设置管理 Cookie，但禁用 Cookie 可能影响部分功能。"
+          ]
+        },
+        {
+          "title": "七、未成年人保护",
+          "paragraphs": [
+            "我们的服务主要面向成年人。如果您是未成年人，请在父母或监护人的陪同下使用服务。如果发现未经同意收集了未成年人的个人信息，我们将尽快删除相关数据。"
+          ]
+        },
+        {
+          "title": "八、隐私政策的更新",
+          "paragraphs": [
+            "我们可能不时更新本隐私政策。发生重大变更时，我们会在网站上发布通知。继续使用服务即表示您接受更新后的政策。"
+          ]
+        },
+        {
+          "title": "九、联系我们",
+          "paragraphs": [
+            "如果您对本隐私政策有任何疑问、意见或建议，或希望行使您的权利，请通过以下方式联系我们："
+          ],
+          "contact": true
+        }
+      ]
+    },
+    "terms": {
+      "sections": [
+        {
+          "title": "引言",
+          "paragraphs": [
+            "欢迎使用七彩西藏旅游网（以下简称\"本网站\"或\"我们\"）。在使用我们的服务前，请仔细阅读本服务条款（以下简称\"条款\"）。通过访问或使用本网站，您表示同意遵守并受本条款的约束。如果您不同意本条款的任何内容，请勿使用我们的服务。"
+          ]
+        },
+        {
+          "title": "一、服务描述",
+          "paragraphs": [
+            "七彩西藏旅游网是一个提供西藏旅游信息、景点导览、行程规划、社区交流等服务的在线平台。我们致力于为用户提供："
+          ],
+          "list": [
+            "详细的景点信息和导览服务",
+            "AI智能行程规划工具",
+            "用户社区和内容分享平台",
+            "西藏非遗文化展示和教育",
+            "旅游资讯和新闻更新"
+          ]
+        },
+        {
+          "title": "二、用户账户",
+          "blocks": [
+            {
+              "title": "2.1 账户注册",
+              "text": "使用某些功能需要注册账户。您同意提供真实、准确、完整和最新的注册信息，并负责维护和更新这些信息。"
+            },
+            {
+              "title": "2.2 账户安全",
+              "text": "您有责任维护账户信息的安全性和保密性，包括但不限于密码。您应对账户下的所有活动负责。如发现任何未经授权的使用，请立即通知我们。"
+            },
+            {
+              "title": "2.3 账户终止",
+              "text": "我们保留在任何时候因违反本条款或其他合理原因而暂停或终止您账户的权利，恕不另行通知。"
+            }
+          ]
+        },
+        {
+          "title": "三、用户行为规范",
+          "paragraphs": [
+            "在使用我们的服务时，您同意："
+          ],
+          "list": [
+            "遵守所有适用的法律法规",
+            "尊重其他用户的权利和尊严",
+            "不发布、传播或分享任何违法、有害、威胁、辱骂、骚扰、诽谤、粗俗、淫秽或其他令人反感的内容",
+            "不侵犯他人的知识产权、隐私权或其他合法权益",
+            "不进行任何可能损害网站功能或安全的行为",
+            "不利用服务进行任何商业活动，除非获得我们的明确授权",
+            "不冒充他人或实体，或虚假陈述与任何个人或实体的关联"
+          ],
+          "footer": "违反上述规定的，我们有权删除相关内容、暂停或终止您的账户，并可能追究法律责任。"
+        },
+        {
+          "title": "四、知识产权",
+          "blocks": [
+            {
+              "title": "4.1 网站内容",
+              "text": "本网站的所有内容，包括文字、图片、音频、视频、软件、代码、设计、商标等，均受知识产权法保护，归我们或相关权利人所有。未经授权，不得复制、传播、修改或使用。"
+            },
+            {
+              "title": "4.2 用户内容",
+              "text": "您保留对您在本网站发布、上传或分享内容的所有权。提交用户内容即表示您授予我们必要许可，用于提供和改进服务。"
+            },
+            {
+              "title": "4.3 侵权举报",
+              "text": "如果您认为本网站上的任何内容侵犯了您的知识产权，请及时联系我们，我们将根据相关法律法规处理。"
+            }
+          ]
+        },
+        {
+          "title": "五、服务变更和中断",
+          "paragraphs": [
+            "我们保留随时修改、暂停或终止任何服务或功能的权利，恕不另行通知。我们不对因服务中断、变更或终止而造成的任何损失承担责任。"
+          ]
+        },
+        {
+          "title": "六、免责声明",
+          "paragraphs": [
+            "本网站提供的信息和服务仅供参考，不构成任何形式的建议或保证。您理解并同意："
+          ],
+          "list": [
+            "我们不对信息的准确性、完整性或及时性作任何保证",
+            "我们不对因使用或无法使用本服务而造成的任何损害承担责任",
+            "我们不对第三方网站、服务或内容的质量、准确性或可用性负责",
+            "我们不对用户之间的互动或交易承担责任",
+            "实际旅游活动可能存在风险，请根据自身情况谨慎决策"
+          ]
+        },
+        {
+          "title": "七、第三方链接和服务",
+          "paragraphs": [
+            "本网站可能包含指向第三方网站或服务的链接。这些链接仅为方便您而提供，我们不对第三方网站或服务的内容、隐私政策或做法负责。"
+          ]
+        },
+        {
+          "title": "八、赔偿",
+          "paragraphs": [
+            "您同意赔偿并使我们免受因您违反本条款、使用服务、用户内容或侵犯任何第三方权利而产生的任何索赔、损失、责任、损害、成本和费用。"
+          ]
+        },
+        {
+          "title": "九、适用法律和争议解决",
+          "paragraphs": [
+            "本条款的订立、生效、解释、履行和争议解决均适用中华人民共和国法律。如因本条款产生任何争议，双方应首先通过友好协商解决；协商不成的，可向我们所在地有管辖权的人民法院提起诉讼。"
+          ]
+        },
+        {
+          "title": "十、条款的修改",
+          "paragraphs": [
+            "我们保留随时修改本条款的权利。修改后的条款将在网站上公布，并在公布后立即生效。您继续使用服务即表示接受修改后的条款。"
+          ]
+        },
+        {
+          "title": "十一、联系我们",
+          "paragraphs": [
+            "如果您对本服务条款有任何疑问、意见或建议，请通过以下方式联系我们："
+          ],
+          "contact": true
+        }
+      ]
+    },
+    "questionDetail": {
+      "backToCommunity": "返回社区",
+      "anonymousUser": "匿名用户",
+      "viewCount": "{count} 次浏览",
+      "deleteQuestion": "删除问题",
+      "questionNotFound": "问题不存在",
+      "answerFailed": "回答失败，请稍后重试",
+      "acceptFailed": "采纳失败",
+      "confirmDelete": "确定要删除这个问题吗？",
+      "deleteFailed": "删除失败"
+    },
+    "routePlanner": {
+      "daysUnit": "天",
+      "emptyTitle": "定制您的西藏之旅",
+      "emptyDescription": "在左侧选择天数、预算和偏好，然后点击生成按钮，AI 将为您规划专属行程。",
+      "budgetDesc": {
+        "economy": "经济实惠的住宿与交通",
+        "comfort": "性价比高的舒适体验",
+        "luxury": "高端酒店与专车服务"
+      },
+      "preferenceDesc": {
+        "natural": "雪山圣湖 · 自然奇观",
+        "cultural": "寺庙古迹 · 文化深度",
+        "photography": "日照金山 · 光影秘境",
+        "relaxation": "林芝氧吧 · 身心放松"
+      },
+      "budgetShort": {
+        "economy": "经济型",
+        "comfort": "舒适型",
+        "luxury": "豪华型"
+      },
+      "finalFailure": "路线生成失败，请检查后重试。"
+    },
+    "community": {
+      "publishFailedRetry": "发布失败，请稍后重试",
+      "officialRoute": "官方推荐",
+      "userSharedRoute": "用户分享"
+    },
+    "payment": {
+      "title": "扫码支付",
+      "qrAlt": "支付二维码",
+      "scanHint": "请使用微信或支付宝扫描二维码完成支付",
+      "payAmount": "支付金额：",
+      "confirmPaid": "我已支付完成",
+      "cancel": "取消"
+    },
+    "hotel": {
+      "bookable": "可预订",
+      "apiHotelDescription": "{name}位于{location}，电话：{phone}",
+      "noPhone": "暂无",
+      "roomType": "房型",
+      "nights": "晚数",
+      "total": "合计",
+      "checkInRequired": "请选择入住和离店日期",
+      "guestNameRequired": "请填写预订人姓名",
+      "phoneRequired": "请填写联系电话",
+      "securityVerificationFailed": "安全验证加载失败，请刷新页面后重试",
+      "noRoomTypes": "暂无房型信息"
+    },
+    "admin": {
+      "title": "后台管理看板",
+      "subtitle": "数据概览与运营统计",
+      "totalUsers": "总用户数",
+      "totalOrders": "总订单数",
+      "totalRevenue": "总营收",
+      "hotelOrders": "酒店订单",
+      "loadingHotelOrders": "正在加载酒店订单...",
+      "orderId": "订单ID",
+      "user": "用户",
+      "hotelAndRoom": "酒店 / 房型",
+      "checkInOut": "入住 - 离店",
+      "booker": "预订人",
+      "amount": "金额",
+      "status": "状态",
+      "orderedAt": "下单时间",
+      "action": "操作",
+      "unknownHotel": "未知酒店",
+      "toDate": "至 {date}",
+      "noHotelOrders": "暂无酒店订单",
+      "expandHotelOrders": "点击上方标题栏展开查看全部订单（共{count}条）",
+      "latestOrders": "最新订单",
+      "hotel": "酒店",
+      "spot": "景点",
+      "noOrders": "暂无订单",
+      "popularSpots": "热门景点",
+      "visits": "{count}次",
+      "spotManagement": "景点管理",
+      "loadingSpots": "正在加载景点数据...",
+      "loadFailed": "加载失败",
+      "noSpotData": "暂无景点数据",
+      "clickEdit": "点击编辑",
+      "editArrow": "编辑 →",
+      "expandSpots": "点击上方标题栏展开管理景点（共{count}个）",
+      "userManagement": "用户管理",
+      "username": "用户名",
+      "password": "密码",
+      "nickname": "昵称",
+      "city": "城市",
+      "ipAddress": "IP地址",
+      "lastLogin": "最后登录",
+      "registeredAt": "注册时间",
+      "bcryptHash": "BCrypt 哈希",
+      "passwordHashTitle": "密码仅保存 BCrypt 哈希，无法查看明文",
+      "neverLoggedIn": "从未登录",
+      "role": "角色",
+      "adminRole": "管理员",
+      "userRole": "普通用户",
+      "setAdmin": "设为管理员",
+      "unsetAdmin": "取消管理员",
+      "notOperable": "不可操作",
+      "locked": "封禁中",
+      "unlock": "解封",
+      "confirmUnlock": "确定要解除 {name} 的登录锁定吗？",
+      "unlockSuccess": "已解除 {name} 的登录锁定",
+      "newsManagement": "旅游资讯管理",
+      "createNews": "+ 创建",
+      "loadingNews": "正在加载资讯数据...",
+      "viewCount": "浏览量: {count}",
+      "views": "浏览量",
+      "noNews": "暂无资讯数据",
+      "expandNews": "点击上方标题栏展开查看全部资讯（共{count}条）",
+      "carouselManagement": "轮播图管理",
+      "addCarousel": "+ 添加",
+      "routeManagement": "线路管理",
+      "routeSource": "来源",
+      "officialRoute": "官方推荐",
+      "userSharedRoute": "用户分享",
+      "officialAuthor": "七彩西藏官方",
+      "routeStats": "互动",
+      "communityManagement": "社区内容管理",
+      "communityRoutes": "分享路线",
+      "communityQuestions": "问答问题",
+      "communityComments": "路线评论",
+      "communitySpotComments": "景点评论",
+      "communityAnswers": "问答回答",
+      "loadingCommunity": "正在加载社区内容...",
+      "loadCommunityFailed": "社区内容加载失败",
+      "loadCommunityPartialFailed": "部分社区内容加载失败，请刷新重试",
+      "expandCommunity": "点击上方标题栏展开管理社区内容（共{count}条）",
+      "communityAuthor": "发布者",
+      "communitySource": "所属内容",
+      "communityMeta": "信息",
+      "communityCounts": "浏览 {views} · 点赞 {likes} · 评论 {comments}",
+      "communityQuestionCounts": "回答 {answers} · 点赞 {likes}",
+      "communityEditTitle": "编辑社区内容",
+      "communityTypeRoute": "分享路线",
+      "communityTypeQuestion": "问题",
+      "communityTypeComment": "评论",
+      "communityTypeSpotComment": "景点评论",
+      "communityTypeAnswer": "回答",
+      "communityTitlePlaceholder": "输入标题",
+      "communityContentPlaceholder": "输入社区内容...",
+      "noCommunityRoutes": "暂无分享路线",
+      "noCommunityQuestions": "暂无社区问题",
+      "noCommunityComments": "暂无路线评论",
+      "noCommunitySpotComments": "暂无景点评论",
+      "noCommunityAnswers": "暂无问答回答",
+      "confirmDeleteCommunityItem": "确定要删除这条{type}吗？此操作不可恢复。",
+      "createdAt": "创建时间",
+      "budget": "预算",
+      "preference": "偏好",
+      "tags": "标签",
+      "tagsPlaceholder": "多个标签用英文逗号分隔",
+      "resolved": "已解决",
+      "unresolved": "未解决",
+      "accepted": "已采纳",
+      "notAccepted": "未采纳",
+      "markResolved": "标记为已解决",
+      "markAccepted": "标记为已采纳",
+      "addNew": "+ 新增",
+      "name": "名称",
+      "days": "天数",
+      "price": "价格",
+      "difficulty": "难度",
+      "temperature": "温度",
+      "geography": "地理",
+      "daysValue": "{count}天",
+      "hotelManagement": "酒店管理",
+      "addHotel": "+ 新增酒店",
+      "roomManagement": "房型管理",
+      "roomTypesCount": "{count}个房型",
+      "loading": "加载中...",
+      "noRoomTypes": "暂无房型，请在下方添加",
+      "pricePerNightWithCapacity": "¥{price} / 晚 · {capacity}人",
+      "roomNamePlaceholder": "名称",
+      "capacityPlaceholder": "人",
+      "roomTypes": "房型",
+      "noHotels": "暂无酒店数据",
+      "addFirstHotel": "+ 添加第一家酒店",
+      "expandHotels": "点击上方标题栏展开管理酒店（共{count}家）",
+      "editOrCreateCarousel": "{mode}轮播图",
+      "editOrCreateRoute": "{mode}线路",
+      "editOrCreateHotel": "{mode}酒店",
+      "titleLabel": "标题",
+      "subtitleLabel": "副标题",
+      "tagLabel": "标签",
+      "image": "图片",
+      "linkUrl": "链接URL",
+      "sortOrder": "排序",
+      "routeName": "名称",
+      "easy": "简单",
+      "medium": "中等",
+      "hard": "困难",
+      "geographyPlaceholder": "如: 高原河谷地带",
+      "temperaturePlaceholder": "如: 15°C - 25°C",
+      "description": "描述",
+      "location": "位置",
+      "phone": "电话",
+      "priceRange": "价格区间",
+      "rating": "评分",
+      "likesCount": "{count} 个赞",
+      "facilities": "设施",
+      "facilitiesPlaceholder": "WiFi, 停车场, 餐厅...",
+      "editNewsTitle": "编辑资讯",
+      "createNewsTitle": "创建资讯",
+      "content": "内容",
+      "titlePlaceholder": "输入资讯标题",
+      "contentPlaceholder": "输入资讯内容...",
+      "currentWordCount": "当前字数：{count}",
+      "category": "分类",
+      "selectCategory": "请选择分类",
+      "categoryPolicy": "政策",
+      "categoryEvent": "活动",
+      "categoryNotice": "通知",
+      "saveEditing": "保存修改",
+      "saving": "保存中...",
+      "editSpotInfo": "编辑景点信息",
+      "spotName": "景点名称",
+      "currentCover": "当前封面",
+      "newImage": "新图片",
+      "ticketPriceYuan": "门票价格（元）",
+      "current": "当前：",
+      "ticketPlaceholder": "不修改则留空，例：199.00",
+      "ticketHint": "提示：输入新的门票价格（保留两位小数），不修改价格时可留空。",
+      "fetchPrice": "获取价格",
+      "fetchingPrices": "获取中...",
+      "batchFetchPrices": "批量获取价格",
+      "priceFetched": "{name} 价格获取成功: ¥{price}",
+      "priceFetchFailed": "{name} 价格获取失败",
+      "confirmBatchFetch": "确认批量获取所有景点价格？这将调用爬虫逐个查询，可能需要一些时间。",
+      "batchFetchDone": "批量获取完成：成功 {updated} 个，失败 {failed} 个",
+      "batchFetchFailed": "批量获取失败，请稍后重试",
+      "spotIntro": "景点介绍",
+      "spotIntroPlaceholder": "输入景点介绍...",
+      "analyticsLoadFailed": "统计面板加载失败，请稍后重试",
+      "malformedResponse": "响应数据格式错误：期望数组，但收到 {type}",
+      "serverError": "服务器错误 ({status})",
+      "unknownError": "未知错误",
+      "fillOneField": "请至少修改一项内容",
+      "spotUpdateSuccess": "景点信息更新成功！",
+      "updateFailed": "更新失败，请重试",
+      "confirmRoleChange": "确定要将该用户设置为 {role} 吗？",
+      "operationSuccess": "操作成功",
+      "operationFailed": "操作失败",
+      "confirmDeleteUser": "确定要删除用户 \"{name}\" 吗？此操作不可恢复。",
+      "userDeleted": "用户 \"{name}\" 已删除",
+      "deleteFailed": "删除失败",
+      "statusUpdateFailed": "更新状态失败",
+      "confirmDeleteOrder": "确定要删除此订单吗？",
+      "deleteSuccess": "删除成功",
+      "notLoggedIn": "未登录，请先登录",
+      "loginExpired": "登录已过期，请重新登录",
+      "noAdminPermission": "您没有管理员权限",
+      "unauthorizedAdmin": "未授权：请先登录管理员账户",
+      "forbiddenAdmin": "禁止访问：您没有管理员权限",
+      "fetchNewsFailed": "获取资讯列表失败: {message}",
+      "connectionFailed": "无法连接到后端服务，请检查：1) 后端是否运行在 http://localhost:8080 2) 网络连接是否正常",
+      "fillNewsFields": "请填写标题、内容和分类",
+      "newsUpdateSuccess": "资讯更新成功！",
+      "newsCreateSuccess": "资讯创建成功！",
+      "confirmDeleteNews": "确定要删除这条资讯吗？此操作不可恢复。",
+      "saveSuccess": "保存成功",
+      "saveFailed": "保存失败",
+      "confirmDelete": "确定删除？",
+      "addFailed": "添加失败",
+      "confirmDeleteRoomType": "确定删除该房型？",
+      "statusLabel": {
+        "PENDING": "待确认",
+        "CONFIRMED": "已确认",
+        "CANCELLED": "已取消"
+      },
+      "securityPosture": {
+        "title": "安全态势中心",
+        "subtitle": "生产就绪、安全控制与关键依赖的集中巡检",
+        "loading": "正在加载安全态势...",
+        "loadFailed": "安全态势加载失败，请稍后重试",
+        "score": "就绪评分",
+        "updatedAt": "巡检时间：{time}",
+        "configured": "已配置",
+        "missing": "缺失",
+        "findings": "安全发现",
+        "dependencies": "关键依赖",
+        "status": {
+          "READY": "生产就绪",
+          "DEGRADED": "需要加固",
+          "BLOCKED": "阻断上线"
+        },
+        "groups": {
+          "environment": "运行环境",
+          "exposure": "公开暴露面",
+          "auth": "身份与会话",
+          "protection": "主动防护"
+        },
+        "items": {
+          "activeProfiles": "激活配置",
+          "strictSecrets": "强密钥模式",
+          "publicDocs": "公开文档",
+          "publicMetrics": "公开指标",
+          "cors": "CORS 白名单",
+          "jwt": "JWT 签名",
+          "csrf": "CSRF 签名",
+          "totp": "超管二次验证",
+          "cookie": "Cookie SameSite",
+          "rateLimit": "接口限流",
+          "bruteForce": "登录防爆破",
+          "antibot": "反机器人",
+          "pii": "PII 加密"
+        },
+        "dependency": {
+          "database": "数据库",
+          "redis": "Redis",
+          "scrapling": "票价爬虫",
+          "ai": "AI 服务",
+          "payment": "支付回调"
+        },
+        "dependencyStatus": {
+          "UP": "正常",
+          "DOWN": "异常",
+          "OUT_OF_SERVICE": "停用",
+          "UNKNOWN": "未知",
+          "DISABLED": "未启用"
+        },
+        "findingStatus": {
+          "PASS": "通过",
+          "WARN": "关注",
+          "FAIL": "失败",
+          "INFO": "信息"
+        },
+        "finding": {
+          "PUBLIC_DOCS_ENABLED": "OpenAPI 文档访问策略",
+          "PUBLIC_METRICS_ENABLED": "Prometheus 指标访问策略",
+          "JWT_CONFIGURED": "JWT 签名密钥配置",
+          "CSRF_CONFIGURED": "CSRF 签名密钥配置",
+          "RATE_LIMITING": "API 限流保护",
+          "PII_KEYS": "敏感信息加密密钥",
+          "PAYMENT_CALLBACK": "支付回调签名密钥",
+          "SCRAPLING_HEALTH": "票价爬虫服务配置"
+        }
+      },
+      "analytics": {
+        "title": "运营分析面板",
+        "subtitle": "景点、订单、用户与资讯的关键运营指标",
+        "updatedAt": "数据更新时间：{time}",
+        "realtime": "实时统计",
+        "loading": "正在加载运营分析数据...",
+        "spotCategories": {
+          "NATURAL": "自然景观",
+          "HISTORICAL": "历史人文",
+          "CULTURAL": "文化体验",
+          "UNCLASSIFIED": "未分类"
+        },
+        "summary": {
+          "userCount": "总用户数",
+          "userHint": "平台注册用户规模",
+          "orderCount": "总订单数",
+          "orderHint": "景点 + 酒店已确认订单",
+          "revenue": "总营收",
+          "revenueHint": "已确认订单营收",
+          "spotCount": "景点总数",
+          "spotHint": "当前景点资源数量"
+        },
+        "charts": {
+          "orderRevenueTrend": "订单与营收趋势",
+          "lastSixMonths": "近六个月",
+          "categoryShare": "景点分类占比",
+          "currentSpotData": "按当前景点数据统计",
+          "touristCityDistribution": "游客来源分布",
+          "registeredCityDistribution": "按注册城市分布",
+          "popularSpotVisits": "热门景点访问量",
+          "topEight": "前八名",
+          "newsAndUserGrowth": "资讯与用户增长",
+          "userGrowthTrend": "用户增长曲线",
+          "newsPublishTrend": "资讯发布趋势",
+          "orders": "订单数",
+          "revenue": "营收",
+          "month": "月份",
+          "visits": "访问量",
+          "spot": "景点",
+          "userGrowth": "用户增长",
+          "newsPublished": "资讯发布",
+          "quantity": "数量",
+          "tourists": "游客",
+          "unknownCity": "未知城市"
+        }
+      }
+    },
+    "footer": {
+      "phone": "19532458802",
+      "email": "lengzhehao{'@'}gmail.com"
+    }
+  },
+  "bo": {
+    "home": {
+      "carouselDot": "འཁོར་སྟོན་པར་ཨང {index} ལ་བསྒྱུར།",
+      "highRatingSpot": "སྐར་མ་མཐོ་བའི་ས་གནས།",
+      "popularSpot": "ཁྱབ་ཆེན་ས་གནས།",
+      "selectedForYou": "ཁྱེད་ལ་བདམས་པ།"
+    },
+    "common": {
+      "refresh": "བསྐྱར་གསོ།",
+      "retry": "བསྐྱར་ཚོད།",
+      "create": "གསར་བཟོ།",
+      "add": "སྣོན་པ།",
+      "update": "གསར་སྒྱུར།",
+      "enabled": "སྤྱོད་བཞིན།",
+      "disabled": "སྤྱོད་མེད།",
+      "unknown": "མ་ཤེས།",
+      "unknownLocation": "གནས་ཡུལ་མ་ཤེས།",
+      "consult": "འདྲི་རྩད།",
+      "items": "ཚན།",
+      "countUnit": "ཚན།",
+      "peopleUnit": "མི།",
+      "hotelsUnit": "ཁང་།",
+      "imagesUnit": "པར།",
+      "nightsUnit": "མཚན།",
+      "timesUnit": "ཐེངས།",
+      "expandAll": "ཚང་མར་ལྟ།",
+      "collapse": "བསྡུ།",
+      "upload": "ཡར་སྤྲོད།",
+      "back": "ཕྱིར་ལོག"
+    },
+    "favorites": {
+      "title": "ངའི་ཉར་ཚགས།",
+      "subtitle": "ཉར་ཚགས་བྱས་པའི་འགྲུལ་ལམ།",
+      "empty": "ད་དུང་འགྲུལ་ལམ་ཉར་ཚགས་མེད།",
+      "goExplore": "འགྲུལ་ལམ་འཚོལ།",
+      "unknownRoute": "མ་ཤེས་པའི་འགྲུལ་ལམ།",
+      "remove": "ཉར་ཚགས་ཆ་མེད།",
+      "operationFailed": "བྱ་སྒོ་མ་ཐུབ།"
+    },
+    "upload": {
+      "pasteUrl": "ཡང་ན་པར་གྱི URL སྦྱར།",
+      "selectImageFile": "པར་གྱི་ཡིག་ཆ་འདེམས་རོགས།",
+      "imageTooLarge": "པར་ཆེ་ཚད 5MB ལས་མི་བརྒལ་དགོས།",
+      "missingUploadUrl": "ཡར་སྤྲོད་མཐུད་ཁ་ནས་པར་གནས་མ་ཕྱིར་སྤྲད།",
+      "uploadFailed": "ཡར་སྤྲོད་མ་ཐུབ། བསྐྱར་ཚོད་གནང་།",
+      "previewAlt": "པར་སྔོན་ལྟ།",
+      "imageLoadFailed": "པར་འཇུག་མ་ཐུབ།",
+      "changeImage": "པར་བརྗེ།",
+      "removeImage": "པར་སུབ།",
+      "uploading": "ཡར་སྤྲོད་བཞིན་པ་...",
+      "chooseOrDrag": "པར་འདེམས་པའམ་འདྲུད་ནས་ཡར་སྤྲོད།",
+      "formatHint": "JPG, PNG, WebP། 5MB ནང་།"
+    },
+    "privacy": {
+      "title": "གསང་བའི་སྲིད་ཇུས།",
+      "lastUpdated": "མཐའ་མཇུག་གསར་སྒྱུར། 2025 ལོའི་ཟླ 11 པ།",
+      "sections": [
+        {
+          "title": "གླེང་སློང་།",
+          "paragraphs": [
+            "བོད་ཀྱི་ཚོན་མདངས་ཡུལ་སྐོར་དྲ་ཚིགས་ཀྱིས་ཁྱེད་ཀྱི་གསང་བའི་སྲུང་སྐྱོབ་ལ་ཧ་ཅང་གལ་ཆེན་དུ་བརྩི། སྲིད་ཇུས་འདིས་ང་ཚོས་ཇི་ལྟར་མི་སྒེར་གྱི་ཆ་འཕྲིན་བསྡུ། སྤྱོད། ཉར། སྲུང་བྱེད་པ་གསལ་བཤད་བྱེད།"
+          ]
+        },
+        {
+          "title": "དང་པོ། ང་ཚོས་བསྡུ་བའི་ཆ་འཕྲིན།",
+          "blocks": [
+            {
+              "title": "1.1 ཐོ་འགོད་ཆ་འཕྲིན།",
+              "text": "ཁྱེད་ཀྱིས་ཐོ་འགོད་སྐབས་སྤྱོད་མིང་། གློག་འཕྲིན། ཁ་པར་ཨང་སོགས་བསྡུ་སྲིད།"
+            },
+            {
+              "title": "1.2 སྤྱོད་སྟངས་ཆ་འཕྲིན།",
+              "text": "དྲ་ངོས་ལྟ་སྐོར། མནན་ཐེངས། སྒྲིག་ཆས་དང IP གནས་སོགས་བསྡུ་སྲིད།"
+            },
+            {
+              "title": "1.3 ནང་དོན་ཆ་འཕྲིན།",
+              "text": "དཔྱད་གཏམ་སྤེལ་བ། འགྲུལ་ལམ་བཤེར་བ། པར་ཡར་སྤྲོད་སོགས་སྐབས་ཁྱེད་ཀྱིས་སྤྲད་པའི་ནང་དོན་བསྡུ་སྲིད།"
+            },
+            {
+              "title": "1.4 གནས་ཡུལ་ཆ་འཕྲིན།",
+              "text": "ཁྱེད་ཀྱི་མོས་མཐུན་ཡོད་ན། ཉེ་འཁོར་གྱི་གཟིགས་སྐོར་ས་གནས་འོས་སྦྱོར་སོགས་ལ་གནས་ཡུལ་ཆ་འཕྲིན་སྤྱོད་སྲིད།"
+            }
+          ]
+        },
+        {
+          "title": "གཉིས་པ། ཆ་འཕྲིན་སྤྱོད་དོན།",
+          "list": [
+            "ཞབས་ཞུ་སྤྲོད། ཉམས་གསོ། ལེགས་སྒྱུར།",
+            "ཐོ་འགོད་དང་ནང་འཛུལ་སྒྲིག་སྐྱོང་།",
+            "ཞབས་ཞུའི་བརྡ་ཐོ་དང་བདེ་འཇགས་དྲན་སྐུལ།",
+            "མི་སྒེར་ཅན་གྱི་ནང་དོན་འོས་སྦྱོར།",
+            "གྲངས་ཐོ་དཔྱད་ཞིབ་དང་སྤུས་ཚད་ལེགས་སྒྱུར།"
+          ]
+        },
+        {
+          "title": "གསུམ་པ། ཆ་འཕྲིན་བཤེར་བ་དང་ཕྱིར་སྟོན།",
+          "paragraphs": [
+            "ང་ཚོས་ཁྱེད་ཀྱི་མི་སྒེར་ཆ་འཕྲིན་ཕྱི་ཕྱོགས་ལ་ཚོང་བའམ་གླ་གཏོང་མི་བྱེད། དགོས་ངེས་དང་ཁྲིམས་མཐུན་སྐབས་ཁོ་ནར་བཤེར་སྲིད།"
+          ]
+        },
+        {
+          "title": "བཞི་པ། ཆ་འཕྲིན་བདེ་འཇགས།",
+          "paragraphs": [
+            "ང་ཚོས་གསང་སྡོམ། འཛུལ་སྤྱོད་ཚོད་འཛིན། བདེ་འཇགས་ཞིབ་བཤེར་སོགས་སྤྱད་ནས་ཆ་འཕྲིན་སྲུང་བྱེད། འོན་ཀྱང་དྲ་རྒྱའི་སྐྱེལ་འདྲེན་ལ་བརྒྱ་ཆ་བརྒྱའི་བདེ་འཇགས་འགན་ལེན་མེད།"
+          ]
+        },
+        {
+          "title": "ལྔ་པ། ཁྱེད་ཀྱི་ཐོབ་ཐང་།",
+          "paragraphs": [
+            "ཁྱེད་ལ་མི་སྒེར་ཆ་འཕྲིན་ལ་ལྟ་བ། བཅོས་པ། སུབ་པ། མོས་མཐུན་ཕྱིར་འཐེན་པ་སོགས་ཀྱི་ཐོབ་ཐང་ཡོད།"
+          ]
+        },
+        {
+          "title": "དྲུག་པ། Cookie དང་རྗེས་འདེད་ལག་རྩལ།",
+          "paragraphs": [
+            "ང་ཚོས Cookie དང་འདྲ་བའི་ལག་རྩལ་སྤྱད་ནས་ལྟ་སྐོར་ཉམས་མྱོང་ལེགས་སུ་གཏོང་།"
+          ]
+        },
+        {
+          "title": "བདུན་པ། ན་གཞོན་སྲུང་སྐྱོབ།",
+          "paragraphs": [
+            "ཞབས་ཞུ་འདི་གཙོ་བོ་མི་རྒན་པར་ཁ་ཕྱོགས། ན་གཞོན་ཡིན་ན་ཕ་མའམ་སྐྱོང་མཁན་དང་མཉམ་དུ་སྤྱོད་རོགས།"
+          ]
+        },
+        {
+          "title": "བརྒྱད་པ། སྲིད་ཇུས་གསར་སྒྱུར།",
+          "paragraphs": [
+            "ང་ཚོས་དུས་དང་བསྟུན་ནས་སྲིད་ཇུས་འདི་གསར་སྒྱུར་བྱ་སྲིད།"
+          ]
+        },
+        {
+          "title": "དགུ་པ། ང་ཚོར་འབྲེལ་བ།",
+          "paragraphs": [
+            "གསང་བའི་སྲིད་ཇུས་འདིར་དྲི་བ་ཡོད་ན་གཤམ་གྱི་ཐབས་ལམ་བརྒྱུད་འབྲེལ་བ་གནང་རོགས།"
+          ],
+          "contact": true
+        }
+      ]
+    },
+    "terms": {
+      "sections": [
+        {
+          "title": "གླེང་སློང་།",
+          "paragraphs": [
+            "བོད་ཀྱི་ཚོན་མདངས་ཡུལ་སྐོར་དྲ་ཚིགས་སྤྱོད་པར་དགའ་བསུ་ཞུ། ཞབས་ཞུ་སྤྱོད་སྔོན་གཤམ་གྱི་ཞབས་ཞུའི་ཁྱད་ཆོད་ཞིབ་ཀློག་གནང་རོགས།"
+          ]
+        },
+        {
+          "title": "དང་པོ། ཞབས་ཞུའི་གསལ་བཤད།",
+          "paragraphs": [
+            "དྲ་ཚིགས་འདིས་བོད་ཡུལ་སྐོར་ཆ་འཕྲིན། གཟིགས་སྐོར་ས་གནས་ལམ་སྟོན། འགྲུལ་ལམ་འཆར་འགོད། སྤྱི་ཚོགས་བརྗེ་རེས་སོགས་སྤྲོད།"
+          ],
+          "list": [
+            "གཟིགས་སྐོར་ས་གནས་ཆ་འཕྲིན།",
+            "AI འགྲུལ་ལམ་འཆར་འགོད།",
+            "སྤྱི་ཚོགས་ནང་དོན་བཤེར་བ།",
+            "རིག་གནས་ཤུལ་བཞག་འགྲེམས་སྟོན།",
+            "ཡུལ་སྐོར་གསར་འགྱུར།"
+          ]
+        },
+        {
+          "title": "གཉིས་པ། སྤྱོད་མཁན་ཐོ་ཁོངས།",
+          "blocks": [
+            {
+              "title": "2.1 ཐོ་འགོད།",
+              "text": "ཁྱད་ལས་ཁ་ཤས་སྤྱོད་པར་ཐོ་འགོད་དགོས།"
+            },
+            {
+              "title": "2.2 ཐོ་ཁོངས་བདེ་འཇགས།",
+              "text": "ཁྱེད་རང་གི་གསང་ཚིག་དང་ཐོ་ཁོངས་བདེ་འཇགས་སྲུང་འགན་ཁྱེད་ལ་ཡོད།"
+            }
+          ]
+        },
+        {
+          "title": "གསུམ་པ། སྤྱོད་སྤྱོད་ཚད་གཞི།",
+          "paragraphs": [
+            "ཞབས་ཞུ་སྤྱོད་སྐབས་ཁྲིམས་སྲོལ་སྲུང་དགོས། གཞན་གྱི་ཐོབ་ཐང་ལ་བརྩི་དགོས། ཁྲིམས་འགལ་དང་གནོད་འཚེའི་ནང་དོན་སྤེལ་མི་ཆོག"
+          ]
+        },
+        {
+          "title": "བཞི་པ། ཤེས་བྱའི་ཐོབ་ཐང་།",
+          "paragraphs": [
+            "དྲ་ཚིགས་ཀྱི་ནང་དོན་དང་ཇུས་འགོད་སོགས་ཤེས་བྱའི་ཐོབ་ཐང་གིས་སྲུང་བྱེད།"
+          ]
+        },
+        {
+          "title": "ལྔ་པ། ཞབས་ཞུ་བསྒྱུར་བ་དང་མཚམས་འཇོག",
+          "paragraphs": [
+            "ང་ཚོས་དུས་གང་ཡང་ཞབས་ཞུ་བསྒྱུར་བའམ་མཚམས་འཇོག་བྱ་ཐུབ།"
+          ]
+        },
+        {
+          "title": "དྲུག་པ། འགན་མི་འཁུར་བའི་གསལ་བསྒྲགས།",
+          "paragraphs": [
+            "དྲ་ཚིགས་ཀྱི་ཆ་འཕྲིན་ནི་ལྟ་སྤྱོད་ཁོ་ན་ཡིན། ཡུལ་སྐོར་བྱ་སྒོར་ཉེན་ཁ་ཡོད་སྲིད་པས་རང་གི་གནས་ཚུལ་ལ་བསྟུན་ནས་ཐག་གཅོད་གནང་རོགས།"
+          ]
+        },
+        {
+          "title": "བདུན་པ། ཕྱི་ཕྱོགས་འབྲེལ་ཐག",
+          "paragraphs": [
+            "དྲ་ཚིགས་འདིར་ཕྱི་ཕྱོགས་དྲ་ཚིགས་ཀྱི་འབྲེལ་ཐག་ཡོད་སྲིད། དེ་ཚོའི་ནང་དོན་ལ་ང་ཚོས་འགན་མི་འཁུར།"
+          ]
+        },
+        {
+          "title": "བརྒྱད་པ། གུན་གསབ།",
+          "paragraphs": [
+            "ཁྱེད་ཀྱིས་ཁྱད་ཆོད་འགལ་བའམ་ཞབས་ཞུ་སྤྱོད་པའི་རྐྱེན་གྱི་གྱོང་གུན་ལ་འགན་ཁུར་དགོས།"
+          ]
+        },
+        {
+          "title": "དགུ་པ། ཁྲིམས་སྤྱོད་དང་རྩོད་གཞི།",
+          "paragraphs": [
+            "ཁྱད་ཆོད་འདི་ཀྲུང་ཧྭ་མི་དམངས་སྤྱི་མཐུན་རྒྱལ་ཁབ་ཀྱི་ཁྲིམས་ལུགས་ལ་བསྟུན།"
+          ]
+        },
+        {
+          "title": "བཅུ་པ། ཁྱད་ཆོད་བཟོ་བཅོས།",
+          "paragraphs": [
+            "ང་ཚོས་ཁྱད་ཆོད་འདི་དུས་དང་བསྟུན་ནས་བཟོ་བཅོས་བྱ་སྲིད།"
+          ]
+        },
+        {
+          "title": "བཅུ་གཅིག ང་ཚོར་འབྲེལ་བ།",
+          "paragraphs": [
+            "ཞབས་ཞུའི་ཁྱད་ཆོད་ལ་དྲི་བ་ཡོད་ན་གཤམ་གྱི་ཐབས་ལམ་བརྒྱུད་འབྲེལ་བ་གནང་རོགས།"
+          ],
+          "contact": true
+        }
+      ]
+    },
+    "questionDetail": {
+      "backToCommunity": "སྤྱི་ཚོགས་ལ་ཕྱིར་ལོག",
+      "anonymousUser": "མིང་མེད་སྤྱོད་མཁན།",
+      "viewCount": "{count} ཐེངས་བལྟས།",
+      "deleteQuestion": "དྲི་བ་སུབ།",
+      "questionNotFound": "དྲི་བ་མ་རྙེད།",
+      "answerFailed": "ལན་སྤྲོད་མ་ཐུབ། ཏོག་ཙམ་རྗེས་སུ་བསྐྱར་ཚོད།",
+      "acceptFailed": "ལན་ལེན་མ་ཐུབ།",
+      "confirmDelete": "དྲི་བ་འདི་སུབ་ངེས་ཡིན་ནམ།",
+      "deleteFailed": "སུབ་མ་ཐུབ།"
+    },
+    "routePlanner": {
+      "daysUnit": "ཉིན།",
+      "emptyTitle": "ཁྱེད་ཀྱི་བོད་འགྲུལ་རང་སྒྲིག",
+      "emptyDescription": "གཡོན་ཕྱོགས་ནས་ཉིན་གྲངས། འགྲོ་སོང་། དགའ་ཞེན་འདེམས་རྗེས AI ཡིས་ཁྱེད་ལ་འགྲུལ་ལམ་བཟོ།",
+      "budgetDesc": {
+        "economy": "འགྲོ་སོང་ཉུང་བའི་སྡོད་ཁང་དང་འགྲིམ་འགྲུལ།",
+        "comfort": "སྤུས་ཚད་དང་རིན་ཐང་མཐུན་པའི་ཉམས་མྱོང་།",
+        "luxury": "མཐོ་རིམ་མགྲོན་ཁང་དང་ཆེད་སྤྱོད་འཁོར་ལོ།"
+      },
+      "preferenceDesc": {
+        "natural": "གངས་རི་དང་མཚོ་གཙོ།",
+        "cultural": "དགོན་པ་དང་རིག་གནས་གཏིང་ཟབ།",
+        "photography": "ཉི་འོད་གསེར་མདོག་དང་པར་ལེན།",
+        "relaxation": "ཉིང་ཁྲིའི་ངལ་གསོ་ཉམས་མྱོང་།"
+      },
+      "budgetShort": {
+        "economy": "དཔལ་འབྱོར།",
+        "comfort": "བདེ་སྡོད།",
+        "luxury": "རྒྱས་སྤྲོས།"
+      },
+      "finalFailure": "འགྲུལ་ལམ་བཟོ་མ་ཐུབ། ཞིབ་བཤེར་བྱས་ནས་བསྐྱར་ཚོད།"
+    },
+    "community": {
+      "publishFailedRetry": "སྤེལ་མ་ཐུབ། ཏོག་ཙམ་རྗེས་སུ་བསྐྱར་ཚོད།",
+      "officialRoute": "གཞུང་ཕྱོགས་འོས་སྦྱོར།",
+      "userSharedRoute": "སྤྱོད་མཁན་མཉམ་སྤྱོད།"
+    },
+    "payment": {
+      "title": "ཡིག་ཚགས་ཇུས་ནས་སྤྲོད།",
+      "qrAlt": "སྤྲོད་པའི་ཡིག་ཚགས།",
+      "scanHint": "དངུལ་སྤྲོད་བྱེད་པར་微信 དང་ Alipay ཡིག་ཚགས་ཇུས་སྤྱོད་རོགས།",
+      "payAmount": "དངུལ་སྤྲོད་ཚད།",
+      "confirmPaid": "དངུལ་སྤྲོད་ཚར།",
+      "cancel": "ཆ་མེད།"
+    },
+    "hotel": {
+      "bookable": "ཐོ་འགོད་ཆོག",
+      "apiHotelDescription": "{name} གནས་ཡུལ། {location}། ཁ་པར། {phone}",
+      "noPhone": "ད་སྔ་མེད།",
+      "roomType": "ཁང་རིགས།",
+      "nights": "མཚན་གྲངས།",
+      "total": "ཁྱོན་བསྡོམས།",
+      "checkInRequired": "ནང་སྡོད་དང་ཕྱིར་ཐོན་ཚེས་གྲངས་འདེམས་རོགས།",
+      "guestNameRequired": "ཐོ་འགོད་མཁན་གྱི་མིང་འབྲི་རོགས།",
+      "phoneRequired": "འབྲེལ་བའི་ཁ་པར་འབྲི་རོགས།",
+      "securityVerificationFailed": "བདེ་འཇགས་ར་སྤྲོད་འཇུག་མ་ཐུབ། ཤོག་ངོས་བསྐྱར་སྒྲིག་བྱས་ནས་བསྐྱར་ཚོད་ལྟ་གནང་རོགས།",
+      "noRoomTypes": "ཁང་རིགས་ཆ་འཕྲིན་མེད།"
+    },
+    "admin": {
+      "title": "རྒྱབ་སྐྱོར་དོ་དམ་པང་།",
+      "subtitle": "གྲངས་ཐོ་སྤྱི་ལྟ་དང་ལས་སྐྱོང་རྩིས་ཐོ།",
+      "totalUsers": "སྤྱོད་མཁན་ཁྱོན།",
+      "totalOrders": "མངགས་ཐོ་ཁྱོན།",
+      "totalRevenue": "ཡོང་འབབ་ཁྱོན།",
+      "hotelOrders": "མགྲོན་ཁང་མངགས་ཐོ།",
+      "loadingHotelOrders": "མགྲོན་ཁང་མངགས་ཐོ་འཇུག་བཞིན་པ་...",
+      "orderId": "མངགས་ཐོ ID",
+      "user": "སྤྱོད་མཁན།",
+      "hotelAndRoom": "མགྲོན་ཁང / ཁང་རིགས།",
+      "checkInOut": "ནང་སྡོད - ཕྱིར་ཐོན།",
+      "booker": "ཐོ་འགོད་མཁན།",
+      "amount": "དངུལ་འབོར།",
+      "status": "གནས་ཚུལ།",
+      "orderedAt": "མངགས་དུས།",
+      "action": "བྱ་སྒོ།",
+      "unknownHotel": "མ་ཤེས་པའི་མགྲོན་ཁང་།",
+      "toDate": "{date} བར།",
+      "noHotelOrders": "མགྲོན་ཁང་མངགས་ཐོ་མེད།",
+      "expandHotelOrders": "གོང་གི་མཚན་བྱང་ལ་མནན་ནས་མངགས་ཐོ་ཚང་མར་ལྟ། ཁྱོན {count} ཚན།",
+      "latestOrders": "ཉེ་ཆར་མངགས་ཐོ།",
+      "hotel": "མགྲོན་ཁང་།",
+      "spot": "གཟིགས་སྐོར་ས་གནས།",
+      "noOrders": "མངགས་ཐོ་མེད།",
+      "popularSpots": "ཁྱབ་ཆེན་གཟིགས་སྐོར་ས་གནས།",
+      "visits": "{count} ཐེངས།",
+      "spotManagement": "གཟིགས་སྐོར་ས་གནས་དོ་དམ།",
+      "loadingSpots": "ས་གནས་གྲངས་ཐོ་འཇུག་བཞིན་པ་...",
+      "loadFailed": "འཇུག་མ་ཐུབ།",
+      "noSpotData": "ས་གནས་གྲངས་ཐོ་མེད།",
+      "clickEdit": "མནན་ནས་བཟོ་བཅོས།",
+      "editArrow": "བཟོ་བཅོས →",
+      "expandSpots": "གོང་གི་མཚན་བྱང་ལ་མནན་ནས་ས་གནས་དོ་དམ། ཁྱོན {count} ཚན།",
+      "userManagement": "སྤྱོད་མཁན་དོ་དམ།",
+      "username": "སྤྱོད་མིང་།",
+      "password": "གསང་ཚིག",
+      "nickname": "མིང་འདོགས།",
+      "city": "གྲོང་ཁྱེར།",
+      "ipAddress": "IP གནས།",
+      "lastLogin": "མཐའ་མཇུག་ནང་འཛུལ།",
+      "registeredAt": "ཐོ་འགོད་དུས།",
+      "bcryptHash": "BCrypt ཧ་ཤི།",
+      "passwordHashTitle": "གསང་ཚིག BCrypt ཧ་ཤི་ཁོ་ན་ཉར། ཡི་གེ་གསལ་བཤད་ལྟ་མི་ཐུབ།",
+      "neverLoggedIn": "ད་སྔ་ནང་འཛུལ་མེད།",
+      "role": "འགན་ཁུར།",
+      "adminRole": "དོ་དམ་པ།",
+      "userRole": "སྤྱོད་མཁན་དཀྱུས་མ།",
+      "setAdmin": "དོ་དམ་པར་བསྒྲིག",
+      "unsetAdmin": "དོ་དམ་པ་ཕྱིར་འཐེན།",
+      "notOperable": "བྱ་སྒོ་མི་ཆོག",
+      "locked": "བཀག་སྡོམ།",
+      "unlock": "བཀག་སྡོམ་གཏོང་།",
+      "confirmUnlock": "{name} ཡི་ནང་འཛུལ་བཀག་སྡོམ་གཏོང་རྒྱུར་གཏན་ཁེལ་རེད་པས།",
+      "unlockSuccess": "{name} ཡི་ནང་འཛུལ་བཀག་སྡོམ་བཏང་ཟིན།",
+      "newsManagement": "ཡུལ་སྐོར་གསར་འགྱུར་དོ་དམ།",
+      "createNews": "+ གསར་བཟོ།",
+      "loadingNews": "གསར་འགྱུར་གྲངས་ཐོ་འཇུག་བཞིན་པ་...",
+      "viewCount": "ལྟ་ཐེངས། {count}",
+      "views": "ལྟ་ཐེངས།",
+      "noNews": "གསར་འགྱུར་མེད།",
+      "expandNews": "གོང་གི་མཚན་བྱང་ལ་མནན་ནས་གསར་འགྱུར་ཚང་མར་ལྟ། ཁྱོན {count} ཚན།",
+      "carouselManagement": "འཁོར་སྟོན་པར་དོ་དམ།",
+      "addCarousel": "+ སྣོན།",
+      "routeManagement": "འགྲུལ་ལམ་དོ་དམ།",
+      "routeSource": "འབྱུང་ཁུངས།",
+      "officialRoute": "གཞུང་ཕྱོགས་འོས་སྦྱོར།",
+      "userSharedRoute": "སྤྱོད་མཁན་མཉམ་སྤྱོད།",
+      "officialAuthor": "བོད་ཀྱི་ཚོན་མདངས་གཞུང་ཕྱོགས།",
+      "routeStats": "མཉམ་འབྲེལ།",
+      "communityManagement": "སྤྱི་ཚོགས་ནང་དོན་དོ་དམ།",
+      "communityRoutes": "མཉམ་སྤྱོད་འགྲུལ་ལམ།",
+      "communityQuestions": "དྲི་བ།",
+      "communityComments": "མཆན།",
+      "communitySpotComments": "ས་གནས་མཆན།",
+      "communityAnswers": "ལན།",
+      "loadingCommunity": "སྤྱི་ཚོགས་ནང་དོན་འཇུག་བཞིན་པ་...",
+      "loadCommunityFailed": "སྤྱི་ཚོགས་ནང་དོན་འཇུག་མ་ཐུབ།",
+      "loadCommunityPartialFailed": "སྤྱི་ཚོགས་ནང་དོན་ཁ་ཤས་འཇུག་མ་ཐུབ། ཡང་བསྐྱར་གསར་སྒྱུར་གནང་།",
+      "expandCommunity": "གོང་གི་མཚན་བྱང་ལ་མནན་ནས་སྤྱི་ཚོགས་ནང་དོན་དོ་དམ། ཁྱོན {count} ཚན།",
+      "communityAuthor": "སྤེལ་མཁན།",
+      "communitySource": "ཁོངས་གཏོགས་ནང་དོན།",
+      "communityMeta": "ཆ་འཕྲིན།",
+      "communityCounts": "ལྟ {views} · དགའ {likes} · མཆན {comments}",
+      "communityQuestionCounts": "ལན {answers} · དགའ {likes}",
+      "communityEditTitle": "སྤྱི་ཚོགས་ནང་དོན་བཟོ་བཅོས།",
+      "communityTypeRoute": "འགྲུལ་ལམ།",
+      "communityTypeQuestion": "དྲི་བ།",
+      "communityTypeComment": "མཆན།",
+      "communityTypeSpotComment": "ས་གནས་མཆན།",
+      "communityTypeAnswer": "ལན།",
+      "communityTitlePlaceholder": "མཚན་བྱང་འཇུག",
+      "communityContentPlaceholder": "སྤྱི་ཚོགས་ནང་དོན་འཇུག...",
+      "noCommunityRoutes": "མཉམ་སྤྱོད་འགྲུལ་ལམ་མེད།",
+      "noCommunityQuestions": "སྤྱི་ཚོགས་དྲི་བ་མེད།",
+      "noCommunityComments": "མཆན་མེད།",
+      "noCommunitySpotComments": "ས་གནས་མཆན་མེད།",
+      "noCommunityAnswers": "ལན་མེད།",
+      "confirmDeleteCommunityItem": "{type} འདི་སུབ་ངེས་ཡིན་ནམ། བསྐྱར་གསོ་མི་ཐུབ།",
+      "createdAt": "གསར་བཟོ་དུས།",
+      "budget": "འགྲོ་སོང་།",
+      "preference": "དགའ་ཕྱོགས།",
+      "tags": "མཚོན་རྟགས།",
+      "tagsPlaceholder": "མཚོན་རྟགས་མང་པོ་ན་དབྱིན་ཡིག་གི་ཚེག་བར་སྤྱོད།",
+      "resolved": "ཐག་བཅད་ཟིན།",
+      "unresolved": "ཐག་མ་བཅད།",
+      "accepted": "ངོས་ལེན་ཟིན།",
+      "notAccepted": "ངོས་མ་ལེན།",
+      "markResolved": "ཐག་བཅད་ཟིན་པར་རྟགས་རྒྱག",
+      "markAccepted": "ངོས་ལེན་ཟིན་པར་རྟགས་རྒྱག",
+      "addNew": "+ གསར་སྣོན།",
+      "name": "མིང་།",
+      "days": "ཉིན་གྲངས།",
+      "price": "རིན་གོང་།",
+      "difficulty": "དཀའ་ཚད།",
+      "temperature": "དྲོད་ཚད།",
+      "geography": "ས་ཁམས།",
+      "daysValue": "{count} ཉིན།",
+      "hotelManagement": "མགྲོན་ཁང་དོ་དམ།",
+      "addHotel": "+ མགྲོན་ཁང་གསར་སྣོན།",
+      "roomManagement": "ཁང་རིགས་དོ་དམ།",
+      "roomTypesCount": "{count} ཁང་རིགས།",
+      "loading": "འཇུག་བཞིན་པ་...",
+      "noRoomTypes": "ཁང་རིགས་མེད། གཤམ་ནས་སྣོན་རོགས།",
+      "pricePerNightWithCapacity": "¥{price} / མཚན · {capacity} མི།",
+      "roomNamePlaceholder": "མིང་།",
+      "capacityPlaceholder": "མི།",
+      "roomTypes": "ཁང་རིགས།",
+      "noHotels": "མགྲོན་ཁང་གྲངས་ཐོ་མེད།",
+      "addFirstHotel": "+ མགྲོན་ཁང་དང་པོ་སྣོན།",
+      "expandHotels": "གོང་གི་མཚན་བྱང་ལ་མནན་ནས་མགྲོན་ཁང་དོ་དམ། ཁྱོན {count} ཁང་།",
+      "editOrCreateCarousel": "{mode} འཁོར་སྟོན་པར།",
+      "editOrCreateRoute": "{mode} འགྲུལ་ལམ།",
+      "editOrCreateHotel": "{mode} མགྲོན་ཁང་།",
+      "titleLabel": "མཚན་བྱང་།",
+      "subtitleLabel": "མཚན་བྱང་ཕལ་པ།",
+      "tagLabel": "མཚོན་རྟགས།",
+      "image": "པར།",
+      "linkUrl": "འབྲེལ་ཐག URL",
+      "sortOrder": "གོ་རིམ།",
+      "routeName": "མིང་།",
+      "easy": "སླ་པོ།",
+      "medium": "འབྲིང་།",
+      "hard": "དཀའ་པོ།",
+      "geographyPlaceholder": "དཔེར་ན། ས་མཐོའི་གཙང་རོང་།",
+      "temperaturePlaceholder": "དཔེར་ན། 15°C - 25°C",
+      "description": "གསལ་བཤད།",
+      "location": "གནས་ཡུལ།",
+      "phone": "ཁ་པར།",
+      "priceRange": "རིན་གོང་ཁྱབ་ཁོངས།",
+      "rating": "སྐར་གྲངས།",
+      "likesCount": "དགའ {count}",
+      "facilities": "སྒྲིག་ཆས།",
+      "facilitiesPlaceholder": "WiFi, འཁོར་འཇོག་ས། ཟ་ཁང་...",
+      "editNewsTitle": "གསར་འགྱུར་བཟོ་བཅོས།",
+      "createNewsTitle": "གསར་འགྱུར་གསར་བཟོ།",
+      "content": "ནང་དོན།",
+      "titlePlaceholder": "གསར་འགྱུར་མཚན་བྱང་འཇུག",
+      "contentPlaceholder": "གསར་འགྱུར་ནང་དོན་འཇུག...",
+      "currentWordCount": "མིག་སྔའི་ཡིག་གྲངས། {count}",
+      "category": "རིགས།",
+      "selectCategory": "རིགས་འདེམས།",
+      "categoryPolicy": "སྲིད་ཇུས།",
+      "categoryEvent": "བྱ་འགུལ།",
+      "categoryNotice": "བརྡ་ཐོ།",
+      "saveEditing": "བཟོ་བཅོས་ཉར།",
+      "saving": "ཉར་བཞིན་པ་...",
+      "editSpotInfo": "ས་གནས་ཆ་འཕྲིན་བཟོ་བཅོས།",
+      "spotName": "ས་གནས་མིང་།",
+      "currentCover": "མིག་སྔའི་ཁ་བྱང་པར།",
+      "newImage": "པར་གསར་པ།",
+      "ticketPriceYuan": "འཛིན་ཤོག་རིན་གོང་།",
+      "current": "མིག་སྔ།",
+      "ticketPlaceholder": "བཟོ་བཅོས་མེད་ན་སྟོང་པར་བཞག",
+      "ticketHint": "དྲན་སྐུལ། འཛིན་ཤོག་རིན་གོང་གསར་པ་འཇུག མི་བཟོ་ན་སྟོང་པར་བཞག",
+      "fetchPrice": "རིན་གོང་ལེན་པ།",
+      "fetchingPrices": "ལེན་བཞིན་པ་...",
+      "batchFetchPrices": "མང་པོའི་རིན་གོང་ལེན་པ།",
+      "priceFetched": "{name} རིན་གོང་ལེན་ཐུབ། ¥{price}",
+      "priceFetchFailed": "{name} རིན་གོང་ལེན་མ་ཐུབ།",
+      "confirmBatchFetch": "ས་གནས་ཚང་མའི་རིན་གོང་མང་པོར་ལེན་རྒྱུར་ངོས་འཛིན་བྱེད་དམ།",
+      "batchFetchDone": "མང་པོ་ལེན་ཚར། ལེགས་གྲུབ་ {updated} མ་ཐུབ་ {failed}",
+      "batchFetchFailed": "མང་པོ་ལེན་མ་ཐུབ། ཏོག་ཙམ་རྗེས་སུ་བསྐྱར་ཚོད།",
+      "spotIntro": "ས་གནས་ངོ་སྤྲོད།",
+      "spotIntroPlaceholder": "ས་གནས་ངོ་སྤྲོད་འཇུག...",
+      "analyticsLoadFailed": "རྩིས་ཐོ་པང་འཇུག་མ་ཐུབ། ཏོག་ཙམ་རྗེས་སུ་བསྐྱར་ཚོད།",
+      "malformedResponse": "ལན་གྱི་གྲངས་ཐོ་རྣམ་པ་ནོར། འབྱོར་བ། {type}",
+      "serverError": "ཞབས་ཞུའི་ནོར་འཁྲུལ། ({status})",
+      "unknownError": "མ་ཤེས་པའི་ནོར་འཁྲུལ།",
+      "fillOneField": "ཉུང་མཐར་ནང་དོན་གཅིག་བཟོ་བཅོས་གནང་།",
+      "spotUpdateSuccess": "ས་གནས་ཆ་འཕྲིན་གསར་སྒྱུར་ལེགས་གྲུབ།",
+      "updateFailed": "གསར་སྒྱུར་མ་ཐུབ།",
+      "confirmRoleChange": "སྤྱོད་མཁན་འདི {role} ལ་བསྒྲིག་ངེས་ཡིན་ནམ།",
+      "operationSuccess": "བྱ་སྒོ་ལེགས་གྲུབ།",
+      "operationFailed": "བྱ་སྒོ་མ་ཐུབ།",
+      "confirmDeleteUser": "སྤྱོད་མཁན \"{name}\" སུབ་ངེས་ཡིན་ནམ། བསྐྱར་གསོ་མི་ཐུབ།",
+      "userDeleted": "སྤྱོད་མཁན \"{name}\" སུབ་ཟིན།",
+      "deleteFailed": "སུབ་མ་ཐུབ།",
+      "statusUpdateFailed": "གནས་ཚུལ་གསར་སྒྱུར་མ་ཐུབ།",
+      "confirmDeleteOrder": "མངགས་ཐོ་འདི་སུབ་ངེས་ཡིན་ནམ།",
+      "deleteSuccess": "སུབ་ལེགས་གྲུབ།",
+      "notLoggedIn": "ནང་འཛུལ་མེད། སྔོན་ལ་ནང་འཛུལ་གནང་།",
+      "loginExpired": "ནང་འཛུལ་དུས་ཡོལ། བསྐྱར་ནང་འཛུལ་གནང་།",
+      "noAdminPermission": "ཁྱེད་ལ་དོ་དམ་པའི་དབང་ཆ་མེད།",
+      "unauthorizedAdmin": "དབང་མ་སྤྲད། དོ་དམ་པའི་ཐོ་ཁོངས་ནས་ནང་འཛུལ་གནང་།",
+      "forbiddenAdmin": "འཛུལ་མི་ཆོག ཁྱེད་ལ་དོ་དམ་དབང་ཆ་མེད།",
+      "fetchNewsFailed": "གསར་འགྱུར་ཐོ་འཇུག་མ་ཐུབ། {message}",
+      "connectionFailed": "རྒྱབ་ཞབས་ལ་འབྲེལ་མ་ཐུབ། ཞབས་ཞུ་འགོ་འཛུགས་ཡོད་མེད་ཞིབ་བཤེར་གནང་།",
+      "fillNewsFields": "མཚན་བྱང་། ནང་དོན། རིགས་བཅས་འབྲི་རོགས།",
+      "newsUpdateSuccess": "གསར་འགྱུར་གསར་སྒྱུར་ལེགས་གྲུབ།",
+      "newsCreateSuccess": "གསར་འགྱུར་གསར་བཟོ་ལེགས་གྲུབ།",
+      "confirmDeleteNews": "གསར་འགྱུར་འདི་སུབ་ངེས་ཡིན་ནམ། བསྐྱར་གསོ་མི་ཐུབ།",
+      "saveSuccess": "ཉར་ལེགས་གྲུབ།",
+      "saveFailed": "ཉར་མ་ཐུབ།",
+      "confirmDelete": "སུབ་ངེས་ཡིན་ནམ།",
+      "addFailed": "སྣོན་མ་ཐུབ།",
+      "confirmDeleteRoomType": "ཁང་རིགས་འདི་སུབ་ངེས་ཡིན་ནམ།",
+      "statusLabel": {
+        "PENDING": "ངེས་སྒུག",
+        "CONFIRMED": "ངེས་ཟིན།",
+        "CANCELLED": "ཆ་མེད།"
+      },
+      "securityPosture": {
+        "title": "བདེ་འཇགས་གནས་ཚུལ།",
+        "subtitle": "ཐོན་སྤྱོད་གྲ་སྒྲིག བདེ་འཇགས་སྲུང་སྐྱོབ། གཙོ་བོའི་ཞབས་ཞུ་ཞིབ་བཤེར།",
+        "loading": "བདེ་འཇགས་གནས་ཚུལ་འཇུག་བཞིན་པ་...",
+        "loadFailed": "བདེ་འཇགས་གནས་ཚུལ་འཇུག་མ་ཐུབ།",
+        "score": "གྲ་སྒྲིག་སྐར་གྲངས།",
+        "updatedAt": "ཞིབ་བཤེར་དུས། {time}",
+        "configured": "སྒྲིག་ཟིན།",
+        "missing": "མ་ཚང་།",
+        "findings": "བདེ་འཇགས་རྙེད་དོན།",
+        "dependencies": "གཙོ་བོའི་ཞབས་ཞུ།",
+        "status": {
+          "READY": "ཐོན་སྤྱོད་གྲ་སྒྲིག",
+          "DEGRADED": "བཙན་སྲུང་དགོས།",
+          "BLOCKED": "འགོག་དགོས།"
+        },
+        "groups": {
+          "environment": "འཁོར་ཡུག",
+          "exposure": "ཕྱིར་མངོན།",
+          "auth": "ཐོབ་ཐང་དང་མཚམས།",
+          "protection": "སྔོན་སྲུང་།"
+        },
+        "items": {
+          "activeProfiles": "འགུལ་སྒྲིག",
+          "strictSecrets": "གསང་ཚིག་བཙན་པོ།",
+          "publicDocs": "སྤྱི་བསྒྲགས་ཡིག་ཆ།",
+          "publicMetrics": "སྤྱི་བསྒྲགས་རྩིས་ཐོ།",
+          "cors": "CORS དཀར་ཐོ།",
+          "jwt": "JWT མཚན་རྟགས།",
+          "csrf": "CSRF མཚན་རྟགས།",
+          "totp": "དོ་དམ་གཉིས་པ།",
+          "cookie": "Cookie SameSite",
+          "rateLimit": "API ཚད་བཀག",
+          "bruteForce": "ནང་འཛུལ་སྲུང་བ།",
+          "antibot": "འཕྲུལ་མི་སྲུང་བ།",
+          "pii": "PII གསང་སྡོམ།"
+        },
+        "dependency": {
+          "database": "གྲངས་མཛོད།",
+          "redis": "Redis",
+          "scrapling": "རིན་གོང་འཚོལ་བ།",
+          "ai": "AI ཞབས་ཞུ།",
+          "payment": "དངུལ་སྤྲོད་ལན།"
+        },
+        "dependencyStatus": {
+          "UP": "རྒྱུན་ལྡན།",
+          "DOWN": "ནོར་འཁྲུལ།",
+          "OUT_OF_SERVICE": "མཚམས་བཞག",
+          "UNKNOWN": "མ་ཤེས།",
+          "DISABLED": "སྤྱོད་མེད།"
+        },
+        "findingStatus": {
+          "PASS": "བརྒྱུད།",
+          "WARN": "དོ་སྣང་།",
+          "FAIL": "མ་ཐུབ།",
+          "INFO": "གནས་ཚུལ།"
+        },
+        "finding": {
+          "PUBLIC_DOCS_ENABLED": "OpenAPI ཡིག་ཆའི་ཐོབ་ཐང་།",
+          "PUBLIC_METRICS_ENABLED": "Prometheus རྩིས་ཐོའི་ཐོབ་ཐང་།",
+          "JWT_CONFIGURED": "JWT གསང་ཚིག་སྒྲིག་སྟངས།",
+          "CSRF_CONFIGURED": "CSRF གསང་ཚིག་སྒྲིག་སྟངས།",
+          "RATE_LIMITING": "API ཚད་བཀག་སྲུང་སྐྱོབ།",
+          "PII_KEYS": "མི་སྒེར་ཆ་འཕྲིན་གསང་སྡོམ།",
+          "PAYMENT_CALLBACK": "དངུལ་སྤྲོད་ལན་མཚན་རྟགས།",
+          "SCRAPLING_HEALTH": "རིན་གོང་ཞབས་ཞུ་སྒྲིག་སྟངས།"
+        }
+      },
+      "analytics": {
+        "title": "ལས་སྐྱོང་དཔྱད་ཞིབ་པང་།",
+        "subtitle": "ས་གནས། མངགས་ཐོ། སྤྱོད་མཁན། གསར་འགྱུར་གྱི་རྩ་བའི་དཔྱད་གྲངས།",
+        "updatedAt": "གྲངས་ཐོ་གསར་སྒྱུར་དུས། {time}",
+        "realtime": "དུས་ཐོག་རྩིས་ཐོ།",
+        "loading": "ལས་སྐྱོང་དཔྱད་ཞིབ་གྲངས་ཐོ་འཇུག་བཞིན་པ་...",
+        "spotCategories": {
+          "NATURAL": "རང་བྱུང་ཡུལ་ལྗོངས།",
+          "HISTORICAL": "ལོ་རྒྱུས་རིག་གནས།",
+          "CULTURAL": "རིག་གནས་ཉམས་མྱོང་།",
+          "UNCLASSIFIED": "རིགས་མ་དབྱེ།"
+        },
+        "summary": {
+          "userCount": "སྤྱོད་མཁན་ཁྱོན།",
+          "userHint": "ལས་སྟེགས་ཐོ་འགོད་སྤྱོད་མཁན།",
+          "orderCount": "མངགས་ཐོ་ཁྱོན།",
+          "orderHint": "ངེས་ཟིན་པའི་ས་གནས + མགྲོན་ཁང་མངགས་ཐོ།",
+          "revenue": "ཡོང་འབབ་ཁྱོན།",
+          "revenueHint": "ངེས་ཟིན་པའི་མངགས་ཐོའི་ཡོང་འབབ།",
+          "spotCount": "ས་གནས་ཁྱོན།",
+          "spotHint": "མིག་སྔའི་ས་གནས་ཐོན་ཁུངས།"
+        },
+        "charts": {
+          "orderRevenueTrend": "མངགས་ཐོ་དང་ཡོང་འབབ་འཕེལ་རིམ།",
+          "lastSixMonths": "ཟླ་དྲུག་ཉེ་ཆར།",
+          "categoryShare": "ས་གནས་རིགས་བགོས།",
+          "currentSpotData": "མིག་སྔའི་ས་གནས་གྲངས་ཐོ་ལྟར།",
+          "touristCityDistribution": "ཡུལ་སྐོར་བའི་ཡོང་ཁུངས་ཁྱབ་ཚུལ།",
+          "registeredCityDistribution": "ཐོ་འགོད་གྲོང་ཁྱེར་ལྟར།",
+          "popularSpotVisits": "ཁྱབ་ཆེན་ས་གནས་ལྟ་ཐེངས།",
+          "topEight": "མདུན་གྲལ་བརྒྱད།",
+          "newsAndUserGrowth": "གསར་འགྱུར་དང་སྤྱོད་མཁན་འཕེལ་ཚད།",
+          "userGrowthTrend": "སྤྱོད་མཁན་འཕེལ་ཚད་ཀྱི་འཁྱོག་ཐིག",
+          "newsPublishTrend": "གསར་འགྱུར་སྤེལ་ཚུལ་འཕེལ་རིམ།",
+          "orders": "མངགས་ཐོ་གྲངས།",
+          "revenue": "ཡོང་འབབ།",
+          "month": "ཟླ་བ།",
+          "visits": "ལྟ་ཐེངས།",
+          "spot": "ས་གནས།",
+          "userGrowth": "སྤྱོད་མཁན་འཕེལ་ཚད།",
+          "newsPublished": "གསར་འགྱུར་སྤེལ་གྲངས།",
+          "quantity": "གྲངས་ཚད།",
+          "tourists": "ཡུལ་སྐོར་བ།",
+          "unknownCity": "མ་ཤེས་པའི་གྲོང་ཁྱེར།"
+        }
+      }
+    },
+    "footer": {
+      "phone": "19532458802",
+      "email": "lengzhehao{'@'}gmail.com"
+    }
+  }
+}

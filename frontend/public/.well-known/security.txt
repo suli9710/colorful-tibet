@@ -1,0 +1,4 @@
+Contact: mailto:security@lengzhehao.xin
+Preferred-Languages: zh, en
+Canonical: https://lengzhehao.xin/.well-known/security.txt
+Policy: https://lengzhehao.xin/privacy

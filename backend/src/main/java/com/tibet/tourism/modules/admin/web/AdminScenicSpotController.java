@@ -1,6 +1,6 @@
 package com.tibet.tourism.modules.admin.web;
 import com.tibet.tourism.common.validation.InputSanitizer;
-import com.tibet.tourism.common.validation.RequestParseUtils;
+import com.tibet.tourism.modules.admin.web.dto.ScenicSpotRequest;
 import com.tibet.tourism.modules.community.domain.Comment;
 import com.tibet.tourism.modules.community.infra.CommentLikeRepository;
 import com.tibet.tourism.modules.community.infra.CommentRepository;
@@ -12,7 +12,7 @@ import com.tibet.tourism.modules.spot.infra.ScenicSpotRepository;
 import com.tibet.tourism.modules.spot.infra.SpotTagRepository;
 import com.tibet.tourism.modules.user.domain.User;
 import com.tibet.tourism.modules.user.infra.UserVisitHistoryRepository;
-import java.math.BigDecimal;
+import jakarta.validation.Valid;
 import java.util.Map;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
@@ -61,17 +61,17 @@ public class AdminScenicSpotController {
     }
 
     @PutMapping("/spots/{id}")
-    public ResponseEntity<?> updateSpot(@PathVariable Long id, @RequestBody Map<String, Object> request) {
+    public ResponseEntity<?> updateSpot(@PathVariable Long id, @Valid @RequestBody ScenicSpotRequest request) {
         Optional<ScenicSpot> spotOpt = scenicSpotRepository.findById(id);
         if (spotOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
 
         ScenicSpot spot = spotOpt.get();
-        boolean autoTranslate = request.getOrDefault("autoTranslate", true).equals(true);
+        boolean autoTranslate = request.getAutoTranslate() == null || request.getAutoTranslate();
 
-        if (request.containsKey("name")) {
-            String name = InputSanitizer.requiredPlainText((String) request.get("name"), 200, "景点名称");
+        if (request.getName() != null) {
+            String name = InputSanitizer.requiredPlainText(request.getName(), 200, "景点名称");
             spot.setName(name);
             if (autoTranslate && (spot.getNameTibetan() == null || spot.getNameTibetan().isEmpty())) {
                 String tibetanName = translationService.translateOrCreate(name, null, com.tibet.tourism.modules.content.domain.TibetanDictionary.Type.WORD);
@@ -81,8 +81,8 @@ public class AdminScenicSpotController {
             }
         }
 
-        if (request.containsKey("description")) {
-            String description = InputSanitizer.optionalTextBlock((String) request.get("description"), 5000, "景点描述");
+        if (request.getDescription() != null) {
+            String description = InputSanitizer.optionalTextBlock(request.getDescription(), 5000, "景点描述");
             spot.setDescription(description);
             if (autoTranslate && description != null && (spot.getDescriptionTibetan() == null || spot.getDescriptionTibetan().isEmpty())) {
                 String tibetanDesc = translationService.translateDescription(description);
@@ -92,102 +92,90 @@ public class AdminScenicSpotController {
             }
         }
 
-        if (request.containsKey("nameTibetan")) {
-            spot.setNameTibetan(InputSanitizer.optionalPlainText((String) request.get("nameTibetan"), 200, "藏语名称"));
+        if (request.getNameTibetan() != null) {
+            spot.setNameTibetan(InputSanitizer.optionalPlainText(request.getNameTibetan(), 200, "藏语名称"));
         }
-        if (request.containsKey("descriptionTibetan")) {
-            spot.setDescriptionTibetan(InputSanitizer.optionalTextBlock((String) request.get("descriptionTibetan"), 5000, "藏语描述"));
+        if (request.getDescriptionTibetan() != null) {
+            spot.setDescriptionTibetan(InputSanitizer.optionalTextBlock(request.getDescriptionTibetan(), 5000, "藏语描述"));
         }
-        if (request.containsKey("imageUrl")) {
-            spot.setImageUrl(safeImageUrl(request.get("imageUrl"), "景点图片"));
+        if (request.getImageUrl() != null) {
+            spot.setImageUrl(safeImageUrl(request.getImageUrl(), "景点图片"));
         }
-        if (request.containsKey("ticketPrice")) {
-            Object priceObj = request.get("ticketPrice");
-            if (priceObj instanceof Number) {
-                spot.setTicketPrice(BigDecimal.valueOf(((Number) priceObj).doubleValue()));
-            } else if (priceObj instanceof String) {
-                try {
-                    spot.setTicketPrice(new BigDecimal((String) priceObj));
-                } catch (NumberFormatException e) {
-                    return ResponseEntity.badRequest().body(Map.of("error", "无效的价格格式"));
-                }
-            }
+        if (request.getTicketPrice() != null) {
+            spot.setTicketPrice(request.getTicketPrice());
         }
-        if (request.containsKey("altitude")) {
-            spot.setAltitude(InputSanitizer.optionalPlainText((String) request.get("altitude"), 100, "海拔"));
+        if (request.getAltitude() != null) {
+            spot.setAltitude(InputSanitizer.optionalPlainText(request.getAltitude(), 100, "海拔"));
         }
-        if (request.containsKey("location")) {
-            spot.setLocation(InputSanitizer.optionalPlainText((String) request.get("location"), 200, "位置"));
+        if (request.getLocation() != null) {
+            spot.setLocation(InputSanitizer.optionalPlainText(request.getLocation(), 200, "位置"));
         }
-        if (request.containsKey("category")) {
+        if (request.getCategory() != null) {
             try {
-                spot.setCategory(ScenicSpot.Category.valueOf(((String) request.get("category")).toUpperCase()));
+                spot.setCategory(ScenicSpot.Category.valueOf(request.getCategory().toUpperCase()));
             } catch (IllegalArgumentException e) {
                 return ResponseEntity.badRequest().body(Map.of("error", "无效的类别"));
             }
         }
-        if (request.containsKey("num")) spot.setNum(((Number) request.get("num")).intValue());
-        if (request.containsKey("openInfo")) spot.setOpenInfo(InputSanitizer.optionalPlainText((String) request.get("openInfo"), 500, "开放信息"));
-        if (request.containsKey("entryTime")) spot.setEntryTime(InputSanitizer.optionalPlainText((String) request.get("entryTime"), 200, "入园时间"));
-        if (request.containsKey("latitude")) spot.setLatitude(new BigDecimal(request.get("latitude").toString()));
-        if (request.containsKey("longitude")) spot.setLongitude(new BigDecimal(request.get("longitude").toString()));
+        if (request.getNum() != null) spot.setNum(request.getNum());
+        if (request.getOpenInfo() != null) spot.setOpenInfo(InputSanitizer.optionalPlainText(request.getOpenInfo(), 500, "开放信息"));
+        if (request.getEntryTime() != null) spot.setEntryTime(InputSanitizer.optionalPlainText(request.getEntryTime(), 200, "入园时间"));
+        if (request.getLatitude() != null) spot.setLatitude(request.getLatitude());
+        if (request.getLongitude() != null) spot.setLongitude(request.getLongitude());
 
         scenicSpotRepository.save(spot);
         return ResponseEntity.ok(spot);
     }
 
     @PostMapping("/spots")
-    public ResponseEntity<?> createSpot(@RequestBody Map<String, Object> request) {
+    public ResponseEntity<?> createSpot(@Valid @RequestBody ScenicSpotRequest request) {
         ScenicSpot spot = new ScenicSpot();
-        boolean autoTranslate = request.getOrDefault("autoTranslate", true).equals(true);
+        boolean autoTranslate = request.getAutoTranslate() == null || request.getAutoTranslate();
 
-        String name = InputSanitizer.requiredPlainText((String) request.get("name"), 200, "景点名称");
+        String name = InputSanitizer.requiredPlainText(request.getName(), 200, "景点名称");
 
         if (autoTranslate) {
             String tibetanName = translationService.translateOrCreate(name, null, com.tibet.tourism.modules.content.domain.TibetanDictionary.Type.WORD);
             if (tibetanName != null) {
                 spot.setNameTibetan(tibetanName);
             }
-        } else if (request.containsKey("nameTibetan")) {
-            spot.setNameTibetan(InputSanitizer.optionalPlainText((String) request.get("nameTibetan"), 200, "藏语名称"));
+        } else if (request.getNameTibetan() != null) {
+            spot.setNameTibetan(InputSanitizer.optionalPlainText(request.getNameTibetan(), 200, "藏语名称"));
         }
         spot.setName(name);
 
-        if (request.containsKey("description")) {
-            String description = InputSanitizer.optionalTextBlock((String) request.get("description"), 5000, "景点描述");
+        if (request.getDescription() != null) {
+            String description = InputSanitizer.optionalTextBlock(request.getDescription(), 5000, "景点描述");
             spot.setDescription(description);
             if (autoTranslate && description != null) {
                 String tibetanDesc = translationService.translateDescription(description);
                 if (tibetanDesc != null) {
                     spot.setDescriptionTibetan(tibetanDesc);
                 }
-            } else if (request.containsKey("descriptionTibetan")) {
-                spot.setDescriptionTibetan(InputSanitizer.optionalTextBlock((String) request.get("descriptionTibetan"), 5000, "藏语描述"));
+            } else if (request.getDescriptionTibetan() != null) {
+                spot.setDescriptionTibetan(InputSanitizer.optionalTextBlock(request.getDescriptionTibetan(), 5000, "藏语描述"));
             }
         }
-        if (request.containsKey("imageUrl")) {
-            spot.setImageUrl(safeImageUrl(request.get("imageUrl"), "景点图片"));
+        if (request.getImageUrl() != null) {
+            spot.setImageUrl(safeImageUrl(request.getImageUrl(), "景点图片"));
         }
-        if (request.containsKey("ticketPrice")) {
-            Object priceObj = request.get("ticketPrice");
-            if (priceObj instanceof Number) {
-                spot.setTicketPrice(BigDecimal.valueOf(((Number) priceObj).doubleValue()));
-            }
+        if (request.getTicketPrice() != null) {
+            spot.setTicketPrice(request.getTicketPrice());
         }
-        if (request.containsKey("category")) {
+        if (request.getCategory() != null) {
             try {
-                spot.setCategory(ScenicSpot.Category.valueOf(((String) request.get("category")).toUpperCase()));
+                spot.setCategory(ScenicSpot.Category.valueOf(request.getCategory().toUpperCase()));
             } catch (IllegalArgumentException e) {
                 return ResponseEntity.badRequest().body(Map.of("error", "无效的类别"));
             }
         }
-        if (request.containsKey("num")) spot.setNum(((Number) request.get("num")).intValue());
-        if (request.containsKey("openInfo")) spot.setOpenInfo(InputSanitizer.optionalPlainText((String) request.get("openInfo"), 500, "开放信息"));
-        if (request.containsKey("entryTime")) spot.setEntryTime(InputSanitizer.optionalPlainText((String) request.get("entryTime"), 200, "入园时间"));
-        if (request.containsKey("latitude")) spot.setLatitude(new BigDecimal(request.get("latitude").toString()));
-        if (request.containsKey("longitude")) spot.setLongitude(new BigDecimal(request.get("longitude").toString()));
-        if (request.containsKey("altitude")) spot.setAltitude(InputSanitizer.optionalPlainText((String) request.get("altitude"), 100, "海拔"));
-        if (request.containsKey("location")) spot.setLocation(InputSanitizer.optionalPlainText((String) request.get("location"), 200, "位置"));
+        if (request.getNum() != null) spot.setNum(request.getNum());
+        if (request.getOpenInfo() != null) spot.setOpenInfo(InputSanitizer.optionalPlainText(request.getOpenInfo(), 500, "开放信息"));
+        if (request.getEntryTime() != null) spot.setEntryTime(InputSanitizer.optionalPlainText(request.getEntryTime(), 200, "入园时间"));
+        if (request.getLatitude() != null) spot.setLatitude(request.getLatitude());
+        if (request.getLongitude() != null) spot.setLongitude(request.getLongitude());
+        if (request.getAltitude() != null) spot.setAltitude(InputSanitizer.optionalPlainText(request.getAltitude(), 100, "海拔"));
+        if (request.getLocation() != null) spot.setLocation(InputSanitizer.optionalPlainText(request.getLocation(), 200, "位置"));
 
         scenicSpotRepository.save(spot);
         return ResponseEntity.ok(spot);

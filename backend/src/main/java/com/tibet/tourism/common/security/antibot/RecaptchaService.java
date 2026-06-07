@@ -1,5 +1,6 @@
 package com.tibet.tourism.common.security.antibot;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.tibet.tourism.common.security.PiiMasker;
 import java.time.Duration;
 import java.util.OptionalDouble;
 import org.slf4j.Logger;
@@ -28,7 +29,7 @@ public class RecaptchaService {
             return OptionalDouble.empty();
         }
         if (!StringUtils.hasText(token)) {
-            log.warn("reCAPTCHA token is missing for ip={}", remoteIp);
+            log.warn("reCAPTCHA token is missing for ip={}", PiiMasker.maskIp(remoteIp));
             return OptionalDouble.empty();
         }
         if (!StringUtils.hasText(cfg.getSecretKey())) {
@@ -51,7 +52,7 @@ public class RecaptchaService {
                 double score = scoreNode != null && scoreNode.isNumber()
                         ? scoreNode.asDouble()
                         : RECAPTCHA_V2_SUCCESS_SCORE;
-                log.debug("reCAPTCHA verification succeeded score={} for ip={}", score, remoteIp);
+                log.debug("reCAPTCHA verification succeeded score={} for ip={}", score, PiiMasker.maskIp(remoteIp));
                 return OptionalDouble.of(score);
             }
             log.warn("reCAPTCHA verification failed: {}", response);

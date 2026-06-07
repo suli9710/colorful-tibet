@@ -1,6 +1,13 @@
-import axios, { type AxiosResponse } from 'axios'
+﻿import axios, { type AxiosResponse } from 'axios'
 import { clearStoredAuth } from '../stores/auth'
 import { getDeviceFingerprint } from '../utils/deviceFingerprint'
+
+declare module 'axios' {
+  export interface AxiosRequestConfig {
+    skipAuthRedirect?: boolean
+    skipGetCache?: boolean
+  }
+}
 
 const apiBaseURL = import.meta.env.VITE_API_BASE_URL || '/api'
 const DEFAULT_TIMEOUT_MS = 15000
@@ -9,6 +16,20 @@ const GUIDE_CHAT_TIMEOUT_MS = 60000
 const UPLOAD_TIMEOUT_MS = 60000
 const PRICE_TIMEOUT_MS = 300000
 const GET_CACHE_TTL_MS = 15000
+const USER_STORAGE_KEY = 'user'
+const AUTH_SESSION_VERSION_KEY = 'auth-session-version'
+const AUTH_SESSION_EVENT = 'auth-session-changed'
+const PRIVATE_GET_PATH_MARKERS = [
+  '/admin',
+  '/auth/me',
+  '/bookings/my',
+  '/favorites',
+  '/hotel-bookings/my',
+  '/itineraries/my',
+  '/orders/my',
+  '/routes/ai',
+  '/routes/my-routes'
+]
 
 const api = axios.create({
   baseURL: apiBaseURL,
@@ -39,6 +60,47 @@ function clearGetCache() {
   getResponseCache.clear()
 }
 
+const canUseLocalStorage = () =>
+  typeof window !== 'undefined' && typeof window.localStorage !== 'undefined'
+
+function readLocalStorage(key: string): string {
+  if (!canUseLocalStorage()) return ''
+  try {
+    return window.localStorage.getItem(key) || ''
+  } catch {
+    return ''
+  }
+}
+
+function getStoredSessionUserId(): string {
+  const storedUser = readLocalStorage(USER_STORAGE_KEY)
+  if (!storedUser) return ''
+
+  try {
+    const user = JSON.parse(storedUser) as { id?: unknown; username?: unknown }
+    return String(user.id ?? user.username ?? 'authenticated')
+  } catch {
+    return 'authenticated'
+  }
+}
+
+function getSessionCacheScope(): string {
+  const version = readLocalStorage(AUTH_SESSION_VERSION_KEY) || '0'
+  const userId = getStoredSessionUserId()
+  return userId ? `user:${userId}:v${version}` : `anon:v${version}`
+}
+
+function isPrivateGetUrl(url: string): boolean {
+  const requestUrl = String(url || '')
+  return PRIVATE_GET_PATH_MARKERS.some(marker => requestUrl.includes(marker))
+}
+
+function shouldUseGetCache(url: string, config: any = {}) {
+  if (config.skipGetCache) return false
+  if (getStoredSessionUserId()) return false
+  return !isPrivateGetUrl(url)
+}
+
 function stableStringify(value: unknown): string {
   if (value === null || typeof value !== 'object') return JSON.stringify(value)
   if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`
@@ -53,7 +115,8 @@ function getRequestKey(url: string, config: any = {}) {
     baseURL: config.baseURL || apiBaseURL,
     url,
     params: config.params || {},
-    locale: memoizedLocale
+    locale: memoizedLocale,
+    session: getSessionCacheScope()
   })
 }
 
@@ -83,6 +146,10 @@ function withSpecialTimeout(url: string, config: any = {}) {
 const rawGet = api.get.bind(api)
 api.get = ((url: string, config?: any) => {
   const nextConfig = withSpecialTimeout(url, config)
+  if (!shouldUseGetCache(url, nextConfig)) {
+    return rawGet(url, nextConfig)
+  }
+
   const key = getRequestKey(url, nextConfig)
   const cached = getResponseCache.get(key)
 
@@ -107,6 +174,48 @@ api.get = ((url: string, config?: any) => {
   pendingGets.set(key, request)
   return request
 }) as typeof api.get
+
+export const expireAuthSession = (redirectTo = '/login') => {
+  clearStoredAuth()
+  clearTokenCache()
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('auth-expired', { detail: { redirectTo } }))
+  }
+}
+
+export function handleUnauthorizedResponse(error: any) {
+  const method = String(error.config?.method || '').toLowerCase()
+  const requestUrl = String(error.config?.url || '')
+
+  if (import.meta.env.DEV) {
+    console.error(`[401] ${method.toUpperCase()} ${requestUrl}`, error.response?.data)
+  }
+
+  if (requestUrl.includes('/admin')) {
+    return
+  }
+
+  const isBookingCreate = method === 'post' && requestUrl.includes('/bookings')
+  const isAiRouteGenerate = method === 'post' && requestUrl.includes('/routes/generate')
+  const isRouteShare = method === 'post' && requestUrl.includes('/routes/share')
+  const skipAuthRedirect = Boolean(error.config?.skipAuthRedirect)
+
+  if (!skipAuthRedirect && !isBookingCreate && !isAiRouteGenerate && !isRouteShare) {
+    const currentPath = window.location.pathname
+    if (currentPath !== '/login') {
+      expireAuthSession('/login')
+    }
+  }
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener(AUTH_SESSION_EVENT, clearGetCache)
+  window.addEventListener('storage', event => {
+    if (event.key === USER_STORAGE_KEY || event.key === AUTH_SESSION_VERSION_KEY) {
+      clearGetCache()
+    }
+  })
+}
 
 api.interceptors.request.use(async config => {
   config.timeout = withSpecialTimeout(String(config.url || ''), config).timeout
@@ -137,28 +246,8 @@ api.interceptors.response.use(
   },
   error => {
     if (error.response && error.response.status === 401) {
-      const method = String(error.config?.method || '').toLowerCase()
-      const requestUrl = String(error.config?.url || '')
-      console.error(`[401] ${method.toUpperCase()} ${requestUrl}`, error.response.data)
-
-      // 对于 /admin 路径的请求，不自动跳转，由各页面自己处理
-      const isAdminRequest = requestUrl.includes('/admin')
-      if (isAdminRequest) {
-        return Promise.reject(error)
-      }
-
-      const isBookingCreate = method === 'post' && requestUrl.includes('/bookings')
-      const isAiRouteGenerate = method === 'post' && requestUrl.includes('/routes/generate')
-      const isRouteShare = method === 'post' && requestUrl.includes('/routes/share')
-
-      if (!isBookingCreate && !isAiRouteGenerate && !isRouteShare) {
-        const currentPath = window.location.pathname
-        if (currentPath !== '/login') {
-          clearStoredAuth()
-          clearTokenCache()
-          window.dispatchEvent(new CustomEvent('auth-expired', { detail: { redirectTo: '/login' } }))
-        }
-      }
+      handleUnauthorizedResponse(error)
+      return Promise.reject(error)
     }
     return Promise.reject(error)
   }
@@ -257,6 +346,66 @@ export interface HeritageEventItem {
   createdAt?: string
 }
 
+export type SecurityPostureStatus = 'READY' | 'DEGRADED' | 'BLOCKED'
+export type SecurityFindingStatus = 'PASS' | 'WARN' | 'FAIL' | 'INFO'
+export type DependencyHealthStatus = 'UP' | 'DOWN' | 'OUT_OF_SERVICE' | 'UNKNOWN' | 'DISABLED'
+
+export interface SecurityPostureResponse {
+  status: SecurityPostureStatus
+  score: number
+  generatedAt: string
+  environment: {
+    activeProfiles: string[]
+    strictSecretsRequired: boolean
+  }
+  exposure: {
+    publicDocsEnabled: boolean
+    publicMetricsEnabled: boolean
+    actuatorHealthPublic: boolean
+    actuatorInfoAdminOnly: boolean
+    corsConfigured: boolean
+    trustedProxyHeadersEnabled: boolean
+  }
+  authentication: {
+    jwtConfigured: boolean
+    jwtIssuerConfigured: boolean
+    jwtAudienceConfigured: boolean
+    jwtExpirationMs: number
+    cookieSecure: boolean
+    cookieSameSite: string
+    csrfConfigured: boolean
+    superAdminTotpConfigured: boolean
+    tokenRevocationRedisEnabled: boolean
+  }
+  protections: {
+    rateLimitEnabled: boolean
+    rateLimitRedisEnabled: boolean
+    bruteForceEnabled: boolean
+    bruteForceRedisEnabled: boolean
+    antibotEnabled: boolean
+    recaptchaConfigured: boolean
+  }
+  dataProtection: {
+    piiKeysConfigured: boolean
+    piiActiveKeyConfigured: boolean
+    legacyPiiKeyConfigured: boolean
+    piiMigrationEnabled: boolean
+  }
+  dependencies: {
+    database: DependencyHealthStatus
+    redis: DependencyHealthStatus
+    scrapling: DependencyHealthStatus
+    aiProviderConfigured: boolean
+    paymentCallbackSecretConfigured: boolean
+  }
+  findings: Array<{
+    id: string
+    severity: 'HIGH' | 'MEDIUM' | 'LOW'
+    status: SecurityFindingStatus
+    message: string
+  }>
+}
+
 export const endpoints = {
   auth: {
     login: '/auth/login',
@@ -344,6 +493,7 @@ export const endpoints = {
   },
   admin: {
     stats: '/admin/stats',
+    securityPosture: '/admin/security-posture',
     users: '/admin/users',
     updateRole: (id: number) => `/admin/users/${id}/role`,
     deleteUser: (id: number) => `/admin/users/${id}`,

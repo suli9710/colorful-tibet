@@ -16,7 +16,7 @@ spring:
     async:
       request-timeout: 120000
   datasource:
-    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:tibet_tourism}?useUnicode=true&characterEncoding=utf8&sslMode=${DB_SSL_MODE:VERIFY_IDENTITY}&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=${DB_ALLOW_PUBLIC_KEY_RETRIEVAL:false}
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:tibet_tourism}?useUnicode=true&characterEncoding=utf8&sslMode=${DB_SSL_MODE:VERIFY_IDENTITY}&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=${DB_ALLOW_PUBLIC_KEY_RETRIEVAL:false}${DB_JDBC_EXTRA_PARAMS:}
     username: ${DB_USERNAME:tibet_user}
     password: ${DB_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -140,6 +140,8 @@ recommendation:
 jwt:
   secret: ${JWT_SECRET}
   expiration: ${JWT_EXPIRATION_MS:1800000}  # 30 minutes by default in production
+  issuer: ${JWT_ISSUER:colorful-tibet-prod}
+  audience: ${JWT_AUDIENCE:colorful-tibet-web}
 
 app:
   cors:

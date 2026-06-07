@@ -1,0 +1,42 @@
+{
+  "zh": {
+    "security": {
+      "recaptchaFailed": "安全验证未完成，请刷新页面后重试。",
+      "invalidExternalLink": "链接地址不安全，已阻止打开。"
+    },
+    "payment": {
+      "operationTitle": "支付与订单状态",
+      "scanHint": "请完成支付操作后点击下方按钮刷新订单状态，系统会以订单最新状态为准。",
+      "confirmOperationComplete": "我已完成操作，刷新订单状态",
+      "mockCallbackSubmitted": "已提交模拟支付回调并刷新订单状态，请以订单最新状态为准。",
+      "statusRefreshFailed": "刷新订单状态失败，请稍后重试。"
+    },
+    "orderCenter": {
+      "cancelSubmitted": "订单取消请求已提交。",
+      "refundSubmitted": "退款申请已提交。",
+      "invoiceSubmitted": "发票申请已提交。",
+      "invoiceTitleRequired": "请填写发票抬头。",
+      "operationFailed": "操作失败，请稍后重试。"
+    }
+  },
+  "bo": {
+    "security": {
+      "recaptchaFailed": "安全验证未完成，请刷新页面后重试。",
+      "invalidExternalLink": "链接地址不安全，已阻止打开。"
+    },
+    "payment": {
+      "operationTitle": "支付与订单状态",
+      "scanHint": "请完成支付操作后点击下方按钮刷新订单状态，系统会以订单最新状态为准。",
+      "confirmOperationComplete": "我已完成操作，刷新订单状态",
+      "mockCallbackSubmitted": "已提交模拟支付回调并刷新订单状态，请以订单最新状态为准。",
+      "statusRefreshFailed": "刷新订单状态失败，请稍后重试。"
+    },
+    "orderCenter": {
+      "cancelSubmitted": "订单取消请求已提交。",
+      "refundSubmitted": "退款申请已提交。",
+      "invoiceSubmitted": "发票申请已提交。",
+      "invoiceTitleRequired": "请填写发票抬头。",
+      "operationFailed": "操作失败，请稍后重试。"
+    }
+  }
+}

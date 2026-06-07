@@ -46,6 +46,21 @@ class InputSanitizerTest {
     }
 
     @Test
+    void safeLinkUrlRejectsDangerousSchemes() {
+        assertThat(InputSanitizer.optionalSafeLinkUrl("https://baike.example.com/item/1", "link"))
+                .isEqualTo("https://baike.example.com/item/1");
+        assertThat(InputSanitizer.optionalSafeLinkUrl("/heritage/items/1", "link"))
+                .isEqualTo("/heritage/items/1");
+
+        assertThatThrownBy(() -> InputSanitizer.optionalSafeLinkUrl("javascript:alert(1)", "link"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> InputSanitizer.optionalSafeLinkUrl("data:text/html,<script>alert(1)</script>", "link"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> InputSanitizer.optionalSafeLinkUrl("https://token@example.com/item/1", "link"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void tagFilterRejectsLikeWildcards() {
         assertThat(InputSanitizer.optionalTags("林芝，#摄影;高原-徒步", 500))
                 .isEqualTo("林芝,#摄影,高原-徒步");

@@ -93,7 +93,6 @@ logging:
     org.hibernate.SQL_SLOW: WARN
 
 springdoc:
-  packages-to-scan: com.tibet.tourism.controller
   paths-to-match: /api/**
   api-docs:
     path: /v3/api-docs
@@ -107,6 +106,8 @@ springdoc:
 jwt:
   secret: ${JWT_SECRET:}
   expiration: 86400000  # 24小时
+  issuer: ${JWT_ISSUER:colorful-tibet}
+  audience: ${JWT_AUDIENCE:colorful-tibet-web}
 
 ark:
   api:
@@ -155,7 +156,7 @@ recommendation:
 
 app:
   cors:
-    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000}
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:}
   security:
     public-docs-enabled: ${PUBLIC_DOCS_ENABLED:false}
     public-metrics-enabled: ${PUBLIC_METRICS_ENABLED:false}

@@ -36,7 +36,25 @@ export function useBehaviorTracker() {
     }
   }
 
-  function onKeyDown() {
+  function shouldSkipKeyTarget(target: EventTarget | null) {
+    if (!(target instanceof HTMLElement)) return false
+    if (target.isContentEditable) return true
+    if (target instanceof HTMLTextAreaElement) return true
+    if (target instanceof HTMLInputElement) {
+      const type = target.type.toLowerCase()
+      const autocomplete = (target.autocomplete || '').toLowerCase()
+      return type === 'password'
+        || autocomplete === 'current-password'
+        || autocomplete === 'new-password'
+    }
+    return false
+  }
+
+  function onKeyDown(event: KeyboardEvent) {
+    if (shouldSkipKeyTarget(event.target)) {
+      lastKeyTime = 0
+      return
+    }
     const now = performance.now()
     if (lastKeyTime > 0) {
       keyIntervals.value.push(Math.round(now - lastKeyTime))

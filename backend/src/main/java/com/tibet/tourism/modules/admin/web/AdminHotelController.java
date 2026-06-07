@@ -1,6 +1,6 @@
 package com.tibet.tourism.modules.admin.web;
 import com.tibet.tourism.common.validation.InputSanitizer;
-import com.tibet.tourism.common.validation.RequestParseUtils;
+import com.tibet.tourism.modules.admin.web.dto.HotelRequest;
 import com.tibet.tourism.modules.hotel.domain.Hotel;
 import com.tibet.tourism.modules.hotel.domain.RoomType;
 import com.tibet.tourism.modules.hotel.infra.HotelRepository;
@@ -51,36 +51,36 @@ public class AdminHotelController {
     }
 
     @PostMapping("/hotels")
-    public ResponseEntity<?> createHotel(@RequestBody Map<String, Object> request) {
+    public ResponseEntity<?> createHotel(@Valid @RequestBody HotelRequest request) {
         Hotel hotel = new Hotel();
-        String name = InputSanitizer.requiredPlainText((String) request.get("name"), 200, "酒店名称");
+        String name = InputSanitizer.requiredPlainText(request.getName(), 200, "酒店名称");
         hotel.setName(name);
-        if (request.containsKey("location")) hotel.setLocation(InputSanitizer.optionalPlainText((String) request.get("location"), 200, "位置"));
-        if (request.containsKey("phone")) hotel.setPhone(InputSanitizer.optionalPlainText((String) request.get("phone"), 32, "电话"));
-        if (request.containsKey("priceRange")) hotel.setPriceRange(InputSanitizer.optionalPlainText((String) request.get("priceRange"), 100, "价格区间"));
-        if (request.containsKey("imageUrl")) hotel.setImageUrl(safeImageUrl(request.get("imageUrl"), "酒店图片"));
-        if (request.containsKey("facilities")) hotel.setFacilities(InputSanitizer.optionalPlainText((String) request.get("facilities"), 500, "设施"));
-        if (request.containsKey("rating")) {
-            hotel.setRating(new BigDecimal(request.get("rating").toString()));
+        if (request.getLocation() != null) hotel.setLocation(InputSanitizer.optionalPlainText(request.getLocation(), 200, "位置"));
+        if (request.getPhone() != null) hotel.setPhone(InputSanitizer.optionalPlainText(request.getPhone(), 32, "电话"));
+        if (request.getPriceRange() != null) hotel.setPriceRange(InputSanitizer.optionalPlainText(request.getPriceRange(), 100, "价格区间"));
+        if (request.getImageUrl() != null) hotel.setImageUrl(safeImageUrl(request.getImageUrl(), "酒店图片"));
+        if (request.getFacilities() != null) hotel.setFacilities(InputSanitizer.optionalPlainText(request.getFacilities(), 500, "设施"));
+        if (request.getRating() != null) {
+            hotel.setRating(request.getRating());
         }
         hotelRepository.save(hotel);
         return ResponseEntity.ok(hotel);
     }
 
     @PutMapping("/hotels/{id}")
-    public ResponseEntity<?> updateHotel(@PathVariable Long id, @RequestBody Map<String, Object> request) {
+    public ResponseEntity<?> updateHotel(@PathVariable Long id, @Valid @RequestBody HotelRequest request) {
         Hotel hotel = hotelRepository.findById(id).orElse(null);
         if (hotel == null) {
             return ResponseEntity.notFound().build();
         }
-        if (request.containsKey("name")) hotel.setName(InputSanitizer.requiredPlainText((String) request.get("name"), 200, "酒店名称"));
-        if (request.containsKey("location")) hotel.setLocation(InputSanitizer.optionalPlainText((String) request.get("location"), 200, "位置"));
-        if (request.containsKey("phone")) hotel.setPhone(InputSanitizer.optionalPlainText((String) request.get("phone"), 32, "电话"));
-        if (request.containsKey("priceRange")) hotel.setPriceRange(InputSanitizer.optionalPlainText((String) request.get("priceRange"), 100, "价格区间"));
-        if (request.containsKey("imageUrl")) hotel.setImageUrl(safeImageUrl(request.get("imageUrl"), "酒店图片"));
-        if (request.containsKey("facilities")) hotel.setFacilities(InputSanitizer.optionalPlainText((String) request.get("facilities"), 500, "设施"));
-        if (request.containsKey("rating")) {
-            hotel.setRating(new BigDecimal(request.get("rating").toString()));
+        if (request.getName() != null) hotel.setName(InputSanitizer.requiredPlainText(request.getName(), 200, "酒店名称"));
+        if (request.getLocation() != null) hotel.setLocation(InputSanitizer.optionalPlainText(request.getLocation(), 200, "位置"));
+        if (request.getPhone() != null) hotel.setPhone(InputSanitizer.optionalPlainText(request.getPhone(), 32, "电话"));
+        if (request.getPriceRange() != null) hotel.setPriceRange(InputSanitizer.optionalPlainText(request.getPriceRange(), 100, "价格区间"));
+        if (request.getImageUrl() != null) hotel.setImageUrl(safeImageUrl(request.getImageUrl(), "酒店图片"));
+        if (request.getFacilities() != null) hotel.setFacilities(InputSanitizer.optionalPlainText(request.getFacilities(), 500, "设施"));
+        if (request.getRating() != null) {
+            hotel.setRating(request.getRating());
         }
         hotelRepository.save(hotel);
         return ResponseEntity.ok(hotel);
@@ -125,11 +125,6 @@ public class AdminHotelController {
         if (!roomTypeRepository.existsById(id)) return ResponseEntity.notFound().build();
         roomTypeRepository.deleteById(id);
         return ResponseEntity.ok(Map.of("message", "删除成功"));
-    }
-
-    @GetMapping("/public/room-types/{hotelId}")
-    public ResponseEntity<?> getPublicRoomTypes(@PathVariable Long hotelId) {
-        return ResponseEntity.ok(roomTypeRepository.findByHotelIdOrderBySortOrderAsc(hotelId));
     }
 
     private void applyRoomTypeRequest(RoomType roomType, RoomTypeRequest request) {

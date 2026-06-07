@@ -130,6 +130,23 @@ public class HotelBookingController {
         }
     }
 
+    @GetMapping("/{id}/pii")
+    @PreAuthorize("hasRole('ADMIN') and hasAuthority('HOTEL_BOOKING_PII_READ')")
+    public ResponseEntity<?> revealBookingPii(@PathVariable Long id) {
+        User user = getCurrentUser();
+        if (user == null) {
+            return ResponseEntity.status(401).body(Map.of("error", "User not authenticated"));
+        }
+
+        try {
+            return ResponseEntity.ok(hotelBookingService.revealBookingPii(user, id));
+        } catch (SecurityException e) {
+            return ResponseEntity.status(403).body(Map.of("error", "Unauthorized"));
+        } catch (NoSuchElementException e) {
+            return ResponseEntity.status(404).body(Map.of("error", "Hotel booking not found"));
+        }
+    }
+
     @PutMapping("/{id}/status")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<?> updateStatus(@PathVariable Long id, @RequestBody Map<String, String> payload) {

@@ -3,6 +3,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.mock.env.MockEnvironment;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.util.ReflectionTestUtils;
+import java.security.SecureRandom;
+import java.util.Base64;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -75,9 +77,18 @@ class JwtUtilsSecurityTest {
 
     @Test
     void acceptsStrongProductionSecret() {
-        JwtUtils jwtUtils = jwtUtils("a".repeat(64), 86_400_000, true);
+        JwtUtils jwtUtils = jwtUtils(strongBase64Secret(), 86_400_000, true);
 
         assertThatCode(jwtUtils::validateJwtConfiguration).doesNotThrowAnyException();
+    }
+
+    @Test
+    void rejectsLowEntropyProductionSecret() {
+        JwtUtils jwtUtils = jwtUtils("a".repeat(64), 86_400_000, true);
+
+        assertThatThrownBy(jwtUtils::validateJwtConfiguration)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("high-entropy random material");
     }
 
     @Test
@@ -97,6 +108,26 @@ class JwtUtilsSecurityTest {
         assertThat(jwtUtils.getSessionVersionFromJwtToken(token)).isEqualTo(7L);
     }
 
+    @Test
+    void generatedTokenRequiresConfiguredIssuerAndAudience() {
+        JwtUtils jwtUtils = jwtUtils("c".repeat(64), 86_400_000, false);
+        jwtUtils.validateJwtConfiguration();
+        var principal = org.springframework.security.core.userdetails.User
+                .withUsername("traveler")
+                .password("encoded")
+                .roles("USER")
+                .build();
+        var authentication = new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());
+
+        String token = jwtUtils.generateJwtToken(authentication, 1L);
+        JwtUtils differentAudience = jwtUtils("c".repeat(64), 86_400_000, false);
+        ReflectionTestUtils.setField(differentAudience, "jwtAudience", "other-audience");
+        differentAudience.validateJwtConfiguration();
+
+        assertThat(jwtUtils.validateJwtToken(token)).isTrue();
+        assertThat(differentAudience.validateJwtToken(token)).isFalse();
+    }
+
     private JwtUtils jwtUtils(String secret, int expirationMs, boolean requireStrongSecrets, String... activeProfiles) {
         JwtUtils jwtUtils = new JwtUtils();
         MockEnvironment environment = new MockEnvironment();
@@ -104,8 +135,16 @@ class JwtUtilsSecurityTest {
 
         ReflectionTestUtils.setField(jwtUtils, "jwtSecret", secret);
         ReflectionTestUtils.setField(jwtUtils, "jwtExpirationMs", expirationMs);
+        ReflectionTestUtils.setField(jwtUtils, "jwtIssuer", "colorful-tibet-test");
+        ReflectionTestUtils.setField(jwtUtils, "jwtAudience", "colorful-tibet-web");
         ReflectionTestUtils.setField(jwtUtils, "requireStrongSecrets", requireStrongSecrets);
         ReflectionTestUtils.setField(jwtUtils, "environment", environment);
         return jwtUtils;
+    }
+
+    private String strongBase64Secret() {
+        byte[] bytes = new byte[64];
+        new SecureRandom(new byte[]{1, 2, 3, 4}).nextBytes(bytes);
+        return Base64.getEncoder().encodeToString(bytes);
     }
 }

@@ -424,7 +424,7 @@
                       <a
                         :href="buildBaikeUrl(item.name)"
                         target="_blank"
-                        rel="noopener"
+                        rel="noopener noreferrer"
                         class="flex-shrink-0 inline-flex items-center gap-0.5 text-[10px] text-tibet-red hover:text-tibet-brown hover:underline transition"
                         :title="t('heritage.openBaike') + ': ' + item.name"
                         @click.stop
@@ -518,7 +518,7 @@
                   </svg>
                 </span>
                 <span
-                  v-if="item.baikeUrl"
+                  v-if="safeExternalUrl(item.baikeUrl)"
                   class="inline-flex items-center gap-0.5 text-xs text-stone-400 hover:text-red-500 transition cursor-pointer"
                   :title="t('heritage.openBaike')"
                   @click.stop="openBaikeUrl(item.baikeUrl)"
@@ -538,6 +538,7 @@
       <MotionModal
         :show="Boolean(selectedItem)"
         modal-key="heritage-detail-modal"
+        labelled-by="heritage-detail-title"
         root-class="z-[120] px-3 sm:px-4"
         backdrop-class="bg-black/45 backdrop-blur-sm"
         panel-class="max-w-3xl rounded-2xl bg-white overflow-hidden p-0 max-h-[92dvh]"
@@ -584,10 +585,25 @@
               <p class="text-xs text-red-100 font-medium mb-1">
                 {{ selectedItem.category || t('heritage.representativeTitle') }}
               </p>
-              <h3 class="text-lg md:text-2xl font-bold text-white line-clamp-2">
+              <h3 id="heritage-detail-title" class="text-lg md:text-2xl font-bold text-white line-clamp-2">
                 {{ selectedItem.name }}
               </h3>
             </motion.div>
+          </div>
+
+          <div
+            v-if="detailAuthRequired"
+            class="mx-4 mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 sm:mx-6"
+          >
+            <p class="font-medium">
+              {{ t('heritage.loginToViewDetail', '登录后可查看完整非遗故事、传承人、活动与评论') }}
+            </p>
+            <router-link
+              to="/login"
+              class="mt-2 inline-flex rounded-lg bg-tibet-red px-3 py-1.5 text-xs font-medium text-white hover:bg-tibet-red/90"
+            >
+              {{ t('common.login', '登录') }}
+            </router-link>
           </div>
 
           <!-- 互动状态栏：浏览数 / 点赞 / 评论 -->
@@ -635,10 +651,10 @@
             >
               <!-- 百度百科跳转按钮 -->
               <a
-                v-if="selectedItem.baikeUrl"
-                :href="selectedItem.baikeUrl"
+                v-if="safeExternalUrl(selectedItem.baikeUrl)"
+                :href="safeExternalUrl(selectedItem.baikeUrl)"
                 target="_blank"
-                rel="noopener"
+                rel="noopener noreferrer"
                 class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-600 hover:text-white hover:border-blue-600 transition font-medium text-sm shadow-sm"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -719,6 +735,7 @@
 
             <!-- 线下体验模块：地图示意 + 门店列表 + 导航 -->
             <motion.div
+              v-if="!detailAuthRequired"
               class="border-t border-dashed border-stone-200 pt-4"
               :initial="{ opacity: 0, y: 12 }"
               :animate="{ opacity: 1, y: 0 }"
@@ -835,7 +852,7 @@
                         class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-medium bg-red-50 text-red-700 border border-red-100 hover:bg-red-600 hover:text-white hover:border-red-600 transition"
                         :href="buildNavUrl(spot)"
                         target="_blank"
-                        rel="noopener"
+                        rel="noopener noreferrer"
                       >
                         {{ t('heritage.navigate') }}
                         <svg
@@ -859,7 +876,7 @@
             </motion.div>
 
             <!-- 传承人 -->
-            <div v-if="itemInheritors.length" class="border-t border-dashed border-stone-200 pt-4">
+            <div v-if="!detailAuthRequired && itemInheritors.length" class="border-t border-dashed border-stone-200 pt-4">
               <h4 class="text-sm font-semibold text-stone-900 mb-3">
                 {{ t('heritage.inheritors', '代表性传承人') }}
               </h4>
@@ -888,7 +905,7 @@
             </div>
 
             <!-- 相关活动 -->
-            <div v-if="itemEvents.length" class="border-t border-dashed border-stone-200 pt-4">
+            <div v-if="!detailAuthRequired && itemEvents.length" class="border-t border-dashed border-stone-200 pt-4">
               <h4 class="text-sm font-semibold text-stone-900 mb-3">
                 {{ t('heritage.relatedEvents', '相关活动') }}
               </h4>
@@ -910,7 +927,7 @@
             </div>
 
             <!-- 评论区 -->
-            <div v-if="selectedItem.id < 10000" class="border-t border-dashed border-stone-200 pt-4">
+            <div v-if="selectedItem.id < 10000 && !detailAuthRequired" class="border-t border-dashed border-stone-200 pt-4">
               <h4 class="text-sm font-semibold text-stone-900 mb-3">
                 {{ t('heritage.commentsTitle', '用户评论') }} ({{ selectedItem.commentCount || 0 }})
               </h4>
@@ -1118,6 +1135,16 @@ const buildBaikeUrl = (name: string): string => {
   return 'https://baike.baidu.com/search?word=' + encodeURIComponent(name)
 }
 
+const safeExternalUrl = (value?: string | null): string => {
+  if (!value) return ''
+  try {
+    const url = new URL(value)
+    return ['https:', 'http:'].includes(url.protocol) ? url.href : ''
+  } catch {
+    return ''
+  }
+}
+
 const heritageItems = ref<HeritageItem[]>([])
 const loading = ref(true)
 const selectedItem = ref<HeritageItem | null>(null)
@@ -1129,6 +1156,7 @@ const itemComments = ref<HeritageCommentItem[]>([])
 const commentsLoading = ref(false)
 const itemInheritors = ref<HeritageInheritorItem[]>([])
 const itemEvents = ref<HeritageEventItem[]>([])
+const detailAuthRequired = ref(false)
 const liked = ref(false)
 const newCommentContent = ref('')
 const newCommentRating = ref(5)
@@ -1829,6 +1857,19 @@ const mergeFeaturedInheritors = (inheritors: HeritageInheritorItem[]) => {
   featuredInheritors.value = Array.from(merged.values()).slice(0, 6)
 }
 
+const isUnauthorizedError = (error: unknown): boolean => {
+  return Boolean(
+    error &&
+    typeof error === 'object' &&
+    'response' in error &&
+    (error as { response?: { status?: number } }).response?.status === 401
+  )
+}
+
+const detailRequestConfig = {
+  skipAuthRedirect: true
+}
+
 const fetchFeaturedInheritors = async (items: HeritageItem[]) => {
   const candidates = items.filter(item => item.id && item.id < 10000).slice(0, 8)
   if (!candidates.length) {
@@ -1885,7 +1926,11 @@ const fetchHeritageItems = async (keyword?: string) => {
     const response = await api.get(endpoints.heritage.list, { params })
     const items = response.data?.content || response.data || []
     heritageItems.value = items
-    void fetchFeaturedInheritors(items)
+    if (authStore.isLoggedIn) {
+      void fetchFeaturedInheritors(items)
+    } else {
+      featuredInheritors.value = []
+    }
   } catch (error) {
     console.error('Failed to fetch heritage items:', error)
   } finally {
@@ -1917,12 +1962,37 @@ const loadDetailData = async (item: HeritageItem) => {
   if (!item.id || item.id >= 10000) return
 
   commentsLoading.value = true
+  detailAuthRequired.value = false
   try {
-    const [detailRes, commentsRes, inheritorsRes, eventsRes] = await Promise.all([
-      api.get(endpoints.heritage.detail(item.id)).catch(() => null),
-      api.get(endpoints.heritage.comments(item.id)).catch(() => null),
-      api.get(endpoints.heritage.inheritors(item.id)).catch(() => null),
-      api.get(endpoints.heritage.events(item.id)).catch(() => null)
+    const detailRes = await api.get(endpoints.heritage.detail(item.id), detailRequestConfig)
+      .catch(error => {
+        if (isUnauthorizedError(error)) {
+          detailAuthRequired.value = true
+          return null
+        }
+        throw error
+      })
+
+    if (detailAuthRequired.value) {
+      itemComments.value = []
+      itemInheritors.value = []
+      itemEvents.value = []
+      return
+    }
+
+    const [commentsRes, inheritorsRes, eventsRes] = await Promise.all([
+      api.get(endpoints.heritage.comments(item.id), detailRequestConfig).catch(error => {
+        if (isUnauthorizedError(error)) return null
+        throw error
+      }),
+      api.get(endpoints.heritage.inheritors(item.id), detailRequestConfig).catch(error => {
+        if (isUnauthorizedError(error)) return null
+        throw error
+      }),
+      api.get(endpoints.heritage.events(item.id), detailRequestConfig).catch(error => {
+        if (isUnauthorizedError(error)) return null
+        throw error
+      })
     ])
     const detailItem = detailRes?.data as HeritageItem | undefined
     if (detailItem?.id) {
@@ -1939,9 +2009,9 @@ const loadDetailData = async (item: HeritageItem) => {
     commentsLoading.value = false
   }
 
-  if (authStore.isLoggedIn) {
+  if (authStore.isLoggedIn && !detailAuthRequired.value) {
     try {
-      const res = await api.get(endpoints.heritage.likeStatus(item.id))
+      const res = await api.get(endpoints.heritage.likeStatus(item.id), detailRequestConfig)
       liked.value = res.data?.liked || false
     } catch { liked.value = false }
   }
@@ -2015,6 +2085,23 @@ watch(locale, () => {
   void fetchUpcomingEvents()
 })
 
+watch(() => authStore.isLoggedIn, (isLoggedIn) => {
+  if (isLoggedIn) {
+    void fetchFeaturedInheritors(heritageItems.value)
+    if (selectedItem.value && selectedItem.value.id < 10000 && detailAuthRequired.value) {
+      void loadDetailData(selectedItem.value)
+    }
+  } else {
+    featuredInheritors.value = []
+    itemComments.value = []
+    itemInheritors.value = []
+    itemEvents.value = []
+    if (selectedItem.value && selectedItem.value.id < 10000) {
+      detailAuthRequired.value = true
+    }
+  }
+})
+
 const toggleCategory = (categoryName: string) => {
   activeCategory.value = activeCategory.value === categoryName ? null : categoryName
 }
@@ -2024,13 +2111,19 @@ const openDetail = (item: HeritageItem) => {
   itemComments.value = []
   itemInheritors.value = []
   itemEvents.value = []
+  detailAuthRequired.value = false
   liked.value = false
   newCommentContent.value = ''
   loadDetailData(item)
 }
 
-const openBaikeUrl = (url: string) => {
-  window.open(url, '_blank', 'noopener')
+const openBaikeUrl = (url?: string | null) => {
+  const safeUrl = safeExternalUrl(url)
+  if (!safeUrl) {
+    window.alert(t('security.invalidExternalLink'))
+    return
+  }
+  window.open(safeUrl, '_blank', 'noopener,noreferrer')
 }
 
 // 构建地图导航链接（这里以高德地图 Web 导航链接为例，可根据实际需要切换为百度地图等）

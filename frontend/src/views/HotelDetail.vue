@@ -132,7 +132,7 @@
                 {{ t('hotel.bookNow') }}
               </router-link>
               <a :href="`https://uri.amap.com/navigation?to=${hotel.lng},${hotel.lat},${encodeURIComponent(hotel.name)}&mode=car&utm_source=colorful-tibet`"
-                 target="_blank" rel="noopener"
+                 target="_blank" rel="noopener noreferrer"
                  class="mt-3 w-full flex items-center justify-center gap-2 px-5 py-3 rounded-full bg-tibet-turquoise text-white font-semibold hover:bg-tibet-turquoise/90 transition-colors">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                 {{ t('hotel.navigate') }}

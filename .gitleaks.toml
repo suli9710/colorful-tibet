@@ -1,0 +1,6 @@
+[allowlist]
+description = "Project test vectors and deterministic fixture values"
+paths = [
+  '''backend/src/test/java/com/tibet/tourism/modules/auth/application/TotpServiceTest\.java''',
+  '''backend/src/test/java/com/tibet/tourism/modules/auth/application/AuthApplicationServiceTest\.java''',
+]
