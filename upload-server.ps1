@@ -14,6 +14,7 @@ $Remote = "${User}@${HostName}"
 $RemoteArchive = "/tmp/colorful-tibet-upload.tar.gz"
 $RemoteScript = "/tmp/colorful-tibet-upload.sh"
 $LocalRemoteScript = Join-Path $env:TEMP "colorful-tibet-upload.sh"
+$SshOptions = @("-o", "StrictHostKeyChecking=yes")
 
 function Invoke-Native {
     param(
@@ -162,6 +163,17 @@ if ! grep -Eq '^(DOUBAO_API_KEY|ARK_API_KEY)=[^[:space:]]+' "$PROJECT_DIR/.env";
   echo "WARNING: DOUBAO_API_KEY/ARK_API_KEY is empty; AI route generation will use local fallback routes." >&2
 fi
 
+SCRAPLING_API_KEY_VALUE=$(grep -E '^SCRAPLING_API_KEY=' "$PROJECT_DIR/.env" | tail -n 1 | cut -d= -f2- || true)
+if [ -z "$SCRAPLING_API_KEY_VALUE" ]; then
+  echo "Refusing deployment: SCRAPLING_API_KEY must be configured for production scrapler access." >&2
+  exit 1
+fi
+
+if printf '%s' "$SCRAPLING_API_KEY_VALUE" | grep -Eiq 'change-me|changeme|replace-with|placeholder'; then
+  echo "Refusing deployment: SCRAPLING_API_KEY must not contain placeholder values." >&2
+  exit 1
+fi
+
 if grep -qx 'SUPER_ADMIN_SECONDARY_PASSWORD=lzh031224' "$PROJECT_DIR/.env"; then
   echo "Refusing deployment: remove the legacy SUPER_ADMIN_SECONDARY_PASSWORD published default before uploading." >&2
   exit 1
@@ -301,10 +313,10 @@ $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 [System.IO.File]::WriteAllText($LocalRemoteScript, $remoteScriptContent, $utf8NoBom)
 
 Write-Host "Uploading archive and remote runner..." -ForegroundColor Cyan
-Invoke-Native "scp" @($ArchivePath, $LocalRemoteScript, "${Remote}:/tmp/") $RepoRoot
+Invoke-Native "scp" ($SshOptions + @($ArchivePath, $LocalRemoteScript, "${Remote}:/tmp/")) $RepoRoot
 
 Write-Host "Running server deployment..." -ForegroundColor Cyan
-Invoke-Native "ssh" @($Remote, "bash $RemoteScript") $RepoRoot
+Invoke-Native "ssh" ($SshOptions + @($Remote, "bash $RemoteScript")) $RepoRoot
 
 Write-Host "Checking public site..." -ForegroundColor Cyan
 if (Get-Command "curl.exe" -ErrorAction SilentlyContinue) {

@@ -33,6 +33,17 @@ interface HeatmapChartPoint {
   value: [number, number, number]
 }
 
+const HTML_ESCAPE_MAP: Record<string, string> = {
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '"': '&quot;',
+  "'": '&#39;'
+}
+
+const escapeTooltipHtml = (value: unknown): string =>
+  String(value ?? '').replace(/[&<>"']/g, char => HTML_ESCAPE_MAP[char] || char)
+
 const fallbackHeatmapData: HeatmapChartPoint[] = [
   { id: 1, name: '布达拉宫', value: [91.1167, 29.653, 19850] },
   { id: 2, name: '纳木错', value: [90.6, 30.75, 18780] },
@@ -141,10 +152,15 @@ const loadChartData = async () => {
       formatter: function (params: any) {
         const heat = params.value[2]
         const level = getHeatLevel(heat)
+        const spotName = escapeTooltipHtml(params.name || params.data?.name || '')
+        const heatText = escapeTooltipHtml(heat)
+        const levelText = escapeTooltipHtml(level)
+        const accessHeatLabel = escapeTooltipHtml(t('heatmap.accessHeat'))
+        const heatLevelLabel = escapeTooltipHtml(t('heatmap.heatLevelLabel'))
         const clickHint = params.data?.id
-          ? `<br/><span style="color: #fde68a">${t('heatmap.clickToView')}</span>`
+          ? `<br/><span style="color: #fde68a">${escapeTooltipHtml(t('heatmap.clickToView'))}</span>`
           : ''
-        return `<strong style="font-size: 14px">${params.name}</strong><br/>${t('heatmap.accessHeat')}: ${heat}<br/>${t('heatmap.heatLevelLabel')}: ${level}${clickHint}`
+        return `<strong style="font-size: 14px">${spotName}</strong><br/>${accessHeatLabel}: ${heatText}<br/>${heatLevelLabel}: ${levelText}${clickHint}`
       },
       backgroundColor: 'rgba(0, 0, 0, 0.85)',
       borderColor: '#fbbf24',

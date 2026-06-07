@@ -10,5 +10,5 @@ route:
 receivers:
   - name: webhook
     webhook_configs:
-      - url: http://127.0.0.1:9099/alerts
+      - url: https://example.com/alerts
         send_resolved: true

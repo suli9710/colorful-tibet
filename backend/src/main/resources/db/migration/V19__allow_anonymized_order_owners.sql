@@ -1,0 +1,1 @@
+ALTER TABLE orders MODIFY user_id BIGINT NULL;

@@ -110,6 +110,10 @@ def configured_api_key() -> str:
     return (os.getenv("SCRAPLING_API_KEY") or "").strip()
 
 
+def allow_unauthenticated_access() -> bool:
+    return _env_bool("SCRAPLING_ALLOW_UNAUTHENTICATED", False)
+
+
 def allow_request_mode_override() -> bool:
     return _env_bool("SCRAPLING_ALLOW_REQUEST_MODE_OVERRIDE", False)
 
@@ -117,7 +121,12 @@ def allow_request_mode_override() -> bool:
 def require_api_key(api_key: Optional[str] = Header(default=None, alias=API_KEY_HEADER)) -> None:
     expected = configured_api_key()
     if not expected:
-        return
+        if allow_unauthenticated_access():
+            return
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="SCRAPLING_API_KEY is required",
+        )
 
     provided = (api_key or "").strip()
     if not provided or not secrets.compare_digest(provided, expected):
@@ -179,6 +188,7 @@ async def capabilities():
         "proxyConfigured": bool(BASE_CONFIG.proxy_url),
         "solveCloudflare": BASE_CONFIG.solve_cloudflare,
         "maxConcurrency": MAX_CONCURRENCY,
+        "apiKeyRequired": bool(configured_api_key()) or not allow_unauthenticated_access(),
         "requestModeOverrideAllowed": allow_request_mode_override(),
     }
 

@@ -1176,7 +1176,10 @@ const defaultForm: RoutePlannerFormState = {
   preference: 'natural'
 }
 
+const routeDraftPersistenceSuspended = ref(false)
+
 const onAuthExpired = () => {
+  suspendRouteDraftPersistence()
   if (window.location.pathname !== '/login') alert(t('routePlanner.authFailed'))
 }
 
@@ -1583,7 +1586,11 @@ const routeDraftStorageKey = computed(() => {
   return userId ? `colorful-tibet:route-planner:draft:${userId}` : 'colorful-tibet:route-planner:draft:anonymous'
 })
 
-const { persistRouteDraft, restoreRouteDraft } = useRoutePlannerDraft(
+const {
+  persistRouteDraft: persistRoutePlannerDraft,
+  restoreRouteDraft,
+  clearRouteDraft
+} = useRoutePlannerDraft(
   {
     form,
     result,
@@ -1607,6 +1614,16 @@ const { persistRouteDraft, restoreRouteDraft } = useRoutePlannerDraft(
     onRestoreError: error => console.warn('Failed to restore route planner draft:', error)
   }
 )
+
+const persistRouteDraft = (overrides: Parameters<typeof persistRoutePlannerDraft>[0] = {}) => {
+  if (routeDraftPersistenceSuspended.value) return
+  persistRoutePlannerDraft(overrides)
+}
+
+function suspendRouteDraftPersistence() {
+  routeDraftPersistenceSuspended.value = true
+  clearRouteDraft()
+}
 
 const renderMarkdownSync = (markdown: string) => {
   renderedResult.value = sanitizeHtml(markdown ? String(marked.parse(markdown)) : '')
@@ -1733,7 +1750,7 @@ const generateBookableItinerary = async (versionType = 'default') => {
     errorMessage.value = ''
   } catch (error: any) {
     console.error('Failed to generate bookable itinerary:', error)
-    errorMessage.value = error.response?.data?.error || '可预订行程生成失败'
+    errorMessage.value = t('routePlanner.generateFailed')
   } finally {
     itineraryLoading.value = false
     itineraryVersionLoading.value = null
@@ -1789,14 +1806,14 @@ const applyAiRouteRecord = (record: AiRouteRecordResponse) => {
   stopFirstTokenProgress()
 
   if (record.content?.trim()) {
-    errorMessage.value = record.status === 'FAILED' ? record.errorMessage || t('routePlanner.generateFailed') : ''
+    errorMessage.value = record.status === 'FAILED' ? t('routePlanner.generateFailed') : ''
     statusMessage.value = t('routePlanner.routeGenComplete', { chars: record.content.trim().length })
     persistRouteDraft({ jobId: '', completed: record.status === 'COMPLETED' })
     return true
   }
 
   if (record.status === 'FAILED') {
-    errorMessage.value = record.errorMessage || t('routePlanner.generateFailed')
+    errorMessage.value = t('routePlanner.generateFailed')
     statusMessage.value = t('routePlanner.routeGenFailedStatus')
     persistRouteDraft({ jobId: '', completed: false })
     return true
@@ -1872,7 +1889,7 @@ const applyRouteJobSnapshot = (snapshot: RouteGenerationJobSnapshot) => {
     })
     persistRouteDraft({ jobId: snapshot.jobId, completed: false })
   } else if (snapshot.status === 'FAILED') {
-    failRouteJob(snapshot.errorMessage || t('routePlanner.generateFailed'))
+    failRouteJob(t('routePlanner.generateFailed'))
   } else if (snapshot.status === 'COMPLETED') {
     void finishRouteJob(snapshot.jobId, snapshot.content || result.value)
   }
@@ -1897,7 +1914,7 @@ const subscribeToRouteJob = async (jobId: string) => {
         updateGeneratedRouteContent(content, true)
       },
       onDone: content => void finishRouteJob(jobId, content),
-      onError: message => failRouteJob(message)
+      onError: () => failRouteJob(t('routePlanner.generateFailed'))
     },
     controller.signal
   )
@@ -1936,7 +1953,7 @@ const resumeRouteJobFromDraft = async () => {
       persistRouteDraft({ jobId: '', completed: true })
       return
     }
-    failRouteJob(error.message || t('routePlanner.generateFailed'))
+    failRouteJob(t('routePlanner.generateFailed'))
   }
 }
 
@@ -2042,7 +2059,7 @@ const saveRoute = async () => {
     persistRouteDraft()
   } catch (error: any) {
     console.error('Failed to save AI route record:', error)
-    errorMessage.value = error.response?.data?.error || t('routePlanner.saveFailed')
+    errorMessage.value = t('routePlanner.saveFailed')
     persistRouteDraft()
   } finally {
     saving.value = false
@@ -2150,6 +2167,18 @@ const downloadOfflinePackage = () => {
   document.body.removeChild(link)
   URL.revokeObjectURL(url)
 }
+
+watch(
+  () => auth.isLoggedIn,
+  (isLoggedIn, wasLoggedIn) => {
+    if (wasLoggedIn && !isLoggedIn) {
+      suspendRouteDraftPersistence()
+    } else if (isLoggedIn) {
+      routeDraftPersistenceSuspended.value = false
+    }
+  },
+  { flush: 'sync' }
+)
 
 watch(form, () => persistRouteDraft(), { deep: true })
 

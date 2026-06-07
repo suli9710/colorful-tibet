@@ -10,6 +10,8 @@ export interface ChatMessage {
   actionLabel?: string
   pending?: boolean
   fallback?: boolean
+  networkFallback?: boolean
+  retryText?: string
   limited?: boolean
   retryAfterSeconds?: number
   challengeRequired?: boolean

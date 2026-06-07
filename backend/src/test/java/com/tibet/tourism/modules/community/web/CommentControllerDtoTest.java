@@ -2,6 +2,7 @@ package com.tibet.tourism.modules.community.web;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -18,12 +19,15 @@ import com.tibet.tourism.modules.spot.infra.ScenicSpotRepository;
 import com.tibet.tourism.modules.upload.application.FileStorageService;
 import com.tibet.tourism.modules.user.domain.User;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -59,15 +63,31 @@ class CommentControllerDtoTest {
     private TrustedProxyIpResolver trustedProxyIpResolver;
 
     @Test
-    void addCommentReturnsDtoWithoutNestedUserEntity() throws Exception {
-        User user = new User();
-        user.setId(7L);
-        user.setUsername("login-name");
-        user.setPassword("hashed-password");
-        user.setNickname("Public Nickname");
-        user.setPhone("13800138000");
-        user.setIpAddress("203.0.113.99");
-        user.setAllowedLoginFingerprintHash("fingerprint-hash");
+    void spotCommentsReturnPublicUserWithoutLoginUsername() throws Exception {
+        Comment comment = comment(publicUser());
+
+        when(commentRepository.findBySpotIdOrderByCreatedAtDesc(any(Long.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(comment)));
+
+        mockMvc.perform(get("/api/comments/spot/5"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].id").value(10))
+                .andExpect(jsonPath("$.content[0].userId").value(7))
+                .andExpect(jsonPath("$.content[0].nickname").value("Public Nickname"))
+                .andExpect(jsonPath("$.content[0].avatar").value("/avatars/u7.png"))
+                .andExpect(jsonPath("$.content[0].user.id").value(7))
+                .andExpect(jsonPath("$.content[0].user.nickname").value("Public Nickname"))
+                .andExpect(jsonPath("$.content[0].user.avatar").value("/avatars/u7.png"))
+                .andExpect(jsonPath("$.content[0].username").doesNotExist())
+                .andExpect(jsonPath("$.content[0].user.username").doesNotExist())
+                .andExpect(jsonPath("$.content[0].user.phone").doesNotExist())
+                .andExpect(jsonPath("$.content[0].user.ipAddress").doesNotExist())
+                .andExpect(jsonPath("$.content[0].user.allowedLoginFingerprintHash").doesNotExist());
+    }
+
+    @Test
+    void addCommentReturnsDtoWithPublicUserOnly() throws Exception {
+        User user = publicUser();
 
         ScenicSpot spot = new ScenicSpot();
         spot.setId(5L);
@@ -95,10 +115,47 @@ class CommentControllerDtoTest {
                 .andExpect(jsonPath("$.id").value(10))
                 .andExpect(jsonPath("$.userId").value(7))
                 .andExpect(jsonPath("$.nickname").value("Public Nickname"))
-                .andExpect(jsonPath("$.user").doesNotExist())
+                .andExpect(jsonPath("$.avatar").value("/avatars/u7.png"))
+                .andExpect(jsonPath("$.user.id").value(7))
+                .andExpect(jsonPath("$.user.nickname").value("Public Nickname"))
+                .andExpect(jsonPath("$.user.avatar").value("/avatars/u7.png"))
+                .andExpect(jsonPath("$.username").doesNotExist())
+                .andExpect(jsonPath("$.user.username").doesNotExist())
+                .andExpect(jsonPath("$.user.phone").doesNotExist())
+                .andExpect(jsonPath("$.user.ipAddress").doesNotExist())
+                .andExpect(jsonPath("$.user.allowedLoginFingerprintHash").doesNotExist())
                 .andExpect(jsonPath("$.password").doesNotExist())
                 .andExpect(jsonPath("$.phone").doesNotExist())
                 .andExpect(jsonPath("$.ipAddress").doesNotExist())
                 .andExpect(jsonPath("$.allowedLoginFingerprintHash").doesNotExist());
+    }
+
+    private static User publicUser() {
+        User user = new User();
+        user.setId(7L);
+        user.setUsername("login-name");
+        user.setPassword("hashed-password");
+        user.setNickname("Public Nickname");
+        user.setAvatar("/avatars/u7.png");
+        user.setPhone("13800138000");
+        user.setIpAddress("203.0.113.99");
+        user.setAllowedLoginFingerprintHash("fingerprint-hash");
+        return user;
+    }
+
+    private static Comment comment(User user) {
+        ScenicSpot spot = new ScenicSpot();
+        spot.setId(5L);
+
+        Comment comment = new Comment();
+        comment.setId(10L);
+        comment.setUser(user);
+        comment.setSpot(spot);
+        comment.setContent("Nice view");
+        comment.setRating(5);
+        comment.setImageUrl("/uploads/comments/photo.jpg");
+        comment.setLikeCount(3);
+        comment.setCreatedAt(LocalDateTime.parse("2026-01-02T03:04:05"));
+        return comment;
     }
 }

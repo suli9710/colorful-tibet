@@ -46,9 +46,7 @@ public class PiiCryptoConverter implements AttributeConverter<String, String> {
 
     @Override
     public String convertToDatabaseColumn(String attribute) {
-        if (!StringUtils.hasText(attribute)
-                || attribute.startsWith(PREFIX_V2)
-                || attribute.startsWith(PREFIX_V1)) {
+        if (!StringUtils.hasText(attribute)) {
             return attribute;
         }
         String kid = requireActiveKid();
@@ -83,22 +81,33 @@ public class PiiCryptoConverter implements AttributeConverter<String, String> {
     }
 
     private String decryptV2(String dbData) {
-        int kidStart = PREFIX_V2.length();
-        int separator = dbData.indexOf(':', kidStart);
-        if (separator <= kidStart || separator == dbData.length() - 1) {
-            throw new IllegalStateException("Invalid encrypted PII v2 payload");
+        try {
+            int kidStart = PREFIX_V2.length();
+            int separator = dbData.indexOf(':', kidStart);
+            if (separator <= kidStart || separator == dbData.length() - 1) {
+                return dbData;
+            }
+            String kid = dbData.substring(kidStart, separator);
+            byte[] key = encryptionKeys.get(kid);
+            if (key == null) {
+                return dbData;
+            }
+            return decryptPayload(dbData.substring(separator + 1), key, "v2");
+        } catch (IllegalStateException e) {
+            return dbData;
         }
-        String kid = dbData.substring(kidStart, separator);
-        byte[] key = requireKey(kid);
-        return decryptPayload(dbData.substring(separator + 1), key, "v2");
     }
 
     private String decryptV1(String dbData) {
         byte[] key = legacyV1Key;
         if (key == null) {
-            throw new IllegalStateException("PII_ENCRYPTION_KEY must be configured to read legacy encrypted PII");
+            return dbData;
         }
-        return decryptPayload(dbData.substring(PREFIX_V1.length()), key, "v1");
+        try {
+            return decryptPayload(dbData.substring(PREFIX_V1.length()), key, "v1");
+        } catch (IllegalStateException e) {
+            return dbData;
+        }
     }
 
     private String decryptPayload(String encodedPayload, byte[] key, String version) {

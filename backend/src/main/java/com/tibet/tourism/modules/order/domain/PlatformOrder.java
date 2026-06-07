@@ -26,7 +26,7 @@ public class PlatformOrder {
     private String orderNo;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
+    @JoinColumn(name = "user_id")
     private User user;
 
     @Column(name = "idempotency_key", length = 96)

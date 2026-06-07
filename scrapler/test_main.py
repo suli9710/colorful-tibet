@@ -15,6 +15,7 @@ class ScraplingApiTest(unittest.TestCase):
             os.environ,
             {
                 "SCRAPLING_API_KEY": "",
+                "SCRAPLING_ALLOW_UNAUTHENTICATED": "true",
                 "SCRAPLING_ALLOW_REQUEST_MODE_OVERRIDE": "",
             },
         )
@@ -78,6 +79,21 @@ class ScraplingApiTest(unittest.TestCase):
             )
 
         self.assertEqual(401, response.status_code)
+
+    def test_scrape_price_rejects_unconfigured_token_by_default(self):
+        with patch.dict(
+            os.environ,
+            {
+                "SCRAPLING_API_KEY": "",
+                "SCRAPLING_ALLOW_UNAUTHENTICATED": "",
+            },
+        ):
+            response = self.client.post(
+                "/scrape/price",
+                json={"spotName": "Potala Palace"},
+            )
+
+        self.assertEqual(503, response.status_code)
 
     def test_scrape_price_accepts_configured_token(self):
         result = self.sample_result()
