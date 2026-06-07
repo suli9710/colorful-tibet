@@ -1,0 +1,5 @@
+ALTER TABLE orders MODIFY customer_name VARCHAR(512) NULL;
+ALTER TABLE hotel_bookings MODIFY guest_name VARCHAR(512) NULL;
+ALTER TABLE invoices MODIFY invoice_title VARCHAR(1024) NOT NULL;
+ALTER TABLE invoices MODIFY tax_no VARCHAR(512) NULL;
+ALTER TABLE itinerary_items ADD COLUMN version BIGINT NOT NULL DEFAULT 0;

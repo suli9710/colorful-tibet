@@ -676,7 +676,7 @@
                   class="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50/80 px-3 py-2 text-xs font-semibold text-emerald-700 transition-all hover:bg-emerald-100"
                 >
                   <ReceiptText class="h-3.5 w-3.5" />
-                  订单中心
+                  咨询记录
                 </router-link>
                 <motion.button
                   v-for="option in itineraryVersionOptions"
@@ -705,7 +705,7 @@
                   <p class="mt-1 text-xl font-bold text-tibet-dark">{{ formatCurrency(itineraryQuote?.totalEstimatedCost || bookableItinerary.totalEstimatedCost) }}</p>
                 </div>
                 <div class="rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3">
-                  <p class="text-xs text-emerald-700/70">可直接预订</p>
+                  <p class="text-xs text-emerald-700/70">第三方可订</p>
                   <p class="mt-1 text-xl font-bold text-emerald-700">{{ formatCurrency(itineraryQuote?.bookableTotal) }}</p>
                 </div>
                 <div class="rounded-2xl border border-sky-200 bg-sky-50/70 px-4 py-3">
@@ -744,7 +744,7 @@
                           <div class="flex flex-wrap items-center gap-2">
                             <p class="text-sm font-semibold text-tibet-dark">{{ item.startTime }} · {{ item.title }}</p>
                             <span class="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-600">{{ itemTypeLabel(item.itemType) }}</span>
-                            <span v-if="item.bookingStatus === 'BOOKED'" class="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">已预订</span>
+                            <span v-if="item.bookingStatus === 'BOOKED'" class="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">已提交</span>
                           </div>
                           <p class="mt-1 text-xs leading-relaxed text-tibet-brown/60 line-clamp-2">{{ item.description }}</p>
                           <p v-if="item.alternatives" class="mt-1 text-[11px] text-tibet-blue/70">可替换：{{ item.alternatives }}</p>
@@ -761,7 +761,7 @@
                           class="inline-flex items-center gap-1.5 rounded-xl bg-tibet-red px-3.5 py-2 text-xs font-semibold text-tibet-yellow shadow-md shadow-tibet-red/20 disabled:opacity-50"
                         >
                           <CalendarCheck class="h-3.5 w-3.5" />
-                          {{ itineraryBookingItemId === item.id ? '预订中' : '立即预订' }}
+                          {{ itineraryBookingItemId === item.id ? '打开中' : '去第三方' }}
                         </motion.button>
                       </div>
                     </div>
@@ -937,14 +937,6 @@
     </div>
   </div>
 
-  <PaymentModal
-    :show="showPaymentModal"
-    :amount="pendingPaymentItem?.estimatedCost"
-    recaptcha-action="itinerary_booking"
-    @close="resetPendingItineraryBooking"
-    @status-check="handleItineraryPaymentStatusCheck"
-  />
-
   <MobileStickyActionBar
     :show="Boolean(result)"
     :eyebrow="t('routePlanner.routeGenerated')"
@@ -993,13 +985,12 @@ import {
   type RouteGenerationJobSnapshot
 } from '../api/stream'
 import api, { endpoints, type AiRouteRecordResponse } from '../api'
-import PaymentModal from '../components/PaymentModal.vue'
 import MobileStickyActionBar from '../components/MobileStickyActionBar.vue'
 import { useRoutePlannerDraft, type RoutePlannerFormState } from '../composables/useRoutePlannerDraft'
-import { useBehaviorTracker } from '../composables/useBehaviorTracker'
 import { useAuthGuard } from '../composables/useAuthGuard'
 import { useAuthStore } from '../stores/auth'
 import { useRouteGenerationStore } from '../stores/routeGeneration'
+import { openExternalBooking } from '../utils/externalBooking'
 import {
   cardInitial,
   cardInView,
@@ -1015,7 +1006,6 @@ const { t } = useI18n()
 const router = useRouter()
 const auth = useAuthStore()
 const generationStore = useRouteGenerationStore()
-const { encodeBehaviorData, reset: resetBehavior } = useBehaviorTracker()
 const { requireAuth } = useAuthGuard()
 
 interface RouteSummarySection {
@@ -2126,74 +2116,25 @@ const shareRoute = async () => {
   }
 }
 
-const showPaymentModal = ref(false)
-const pendingPaymentItem = ref<ItineraryItem | null>(null)
-const pendingBookingPhone = ref('')
-
-const resetPendingItineraryBooking = () => {
-  showPaymentModal.value = false
-  pendingPaymentItem.value = null
-  pendingBookingPhone.value = ''
-}
-
-const bookItineraryItem = async (item: ItineraryItem) => {
+const bookItineraryItem = (item: ItineraryItem) => {
   if (!bookableItinerary.value || !isBookableItem(item)) return
 
-  if (!(await auth.ensureSession())) {
-    await requireAuth()
-    return
-  }
-
-  const phone = item.bookingAction === 'BOOK_HOTEL'
-    ? (window.prompt(t('hotel.phonePlaceholder')) || '').trim()
-    : ''
-
-  if (item.bookingAction === 'BOOK_HOTEL' && !phone) {
-    return
-  }
-
-  pendingBookingPhone.value = phone
-  pendingPaymentItem.value = item
-  showPaymentModal.value = true
-}
-
-const handleItineraryPaymentStatusCheck = async (recaptchaToken = '') => {
-  const item = pendingPaymentItem.value
-  if (!item || !bookableItinerary.value) return
-
-  showPaymentModal.value = false
-  const behaviorData = encodeBehaviorData()
-
-  const user = auth.user || {}
-  const guestName = String(user.nickname || user.username || '')
-  const phone = pendingBookingPhone.value
-
   itineraryBookingItemId.value = item.id
-  try {
-    const { data } = await api.post(endpoints.itineraries.bookItem(bookableItinerary.value.id, item.id), {
-      travelers: 2,
-      guestName,
-      phone
-    }, {
-      headers: {
-        ...(recaptchaToken ? { 'X-Recaptcha-Token': recaptchaToken } : {}),
-        ...(behaviorData ? { 'X-Behavior-Data': behaviorData } : {}),
-      }
-    })
-    statusMessage.value = `${data.message || '预订成功'}，可在订单中心查看。`
+  const opened = openExternalBooking({
+    kind: item.bookingAction === 'BOOK_HOTEL' ? 'hotel' : 'spot',
+    name: item.hotelName || item.scenicSpotName || item.title
+  })
+  if (opened) {
+    statusMessage.value = '已打开第三方平台，请在有资质的平台确认预订或继续咨询。'
     errorMessage.value = ''
-    await refreshBookableItinerary()
-    await fetchItineraryQuote(bookableItinerary.value.id)
-    await fetchTibetTravelKit(bookableItinerary.value.id)
-  } catch (error: any) {
-    console.error('Failed to book itinerary item:', error)
-    errorMessage.value = error.response?.data?.error || '预订失败'
-  } finally {
-    itineraryBookingItemId.value = null
-    pendingPaymentItem.value = null
-    pendingBookingPhone.value = ''
-    resetBehavior()
+  } else {
+    errorMessage.value = '浏览器拦截了第三方平台窗口，请允许弹窗后重试。'
   }
+  window.setTimeout(() => {
+    if (itineraryBookingItemId.value === item.id) {
+      itineraryBookingItemId.value = null
+    }
+  }, 600)
 }
 
 const downloadOfflinePackage = () => {

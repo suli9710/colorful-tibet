@@ -15,6 +15,9 @@ frontend/.vite/
 
 # Python
 scrapler/.venv/
+scrapler/__pycache__/
+scrapler/.pytest_cache/
+scrapler/**/*.py[cod]
 
 # IDE
 .idea/

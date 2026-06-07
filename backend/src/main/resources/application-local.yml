@@ -79,6 +79,7 @@ scrapling:
     max-sources: ${SCRAPLING_MAX_SOURCES:4}
     mode: ${SCRAPLING_MODE:basic}
     health-enabled: ${SCRAPLING_HEALTH_ENABLED:false}
+    api-key: ${SCRAPLING_API_KEY:}
 
 # 价格定时更新配置
 price:
@@ -106,6 +107,8 @@ app:
     public-docs-enabled: ${PUBLIC_DOCS_ENABLED:true}
     public-metrics-enabled: ${PUBLIC_METRICS_ENABLED:false}
     require-strong-secrets: ${REQUIRE_STRONG_SECRETS:false}
+    registration-recaptcha-required: ${REGISTRATION_RECAPTCHA_REQUIRED:false}
+    hotel-booking-pii-read-usernames: ${HOTEL_BOOKING_PII_READ_USERNAMES:${SUPER_ADMIN_USERNAME:}}
     csrf-signing-secret: ${CSRF_SIGNING_SECRET:}
     pii-keys: ${PII_KEYS:}
     pii-active-kid: ${PII_ACTIVE_KID:}
@@ -132,7 +135,7 @@ app:
   payments:
     mock-callback-enabled: ${PAYMENT_MOCK_CALLBACK_ENABLED:true}
     mock-callback-secret: ${PAYMENT_CALLBACK_SECRET:dev-payment-callback-secret}
-  super-admin-username: ${SUPER_ADMIN_USERNAME:lzh}
+  super-admin-username: ${SUPER_ADMIN_USERNAME:}
   seed:
     content:
       enabled: ${SEED_CONTENT_ENABLED:true}

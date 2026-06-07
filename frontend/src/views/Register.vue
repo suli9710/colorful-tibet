@@ -76,6 +76,16 @@
           </motion.div>
         </div>
 
+        <motion.div
+          v-if="isRecaptchaV2Enabled()"
+          :initial="authItemInitial"
+          :animate="authItemAnimate"
+          :transition="authItemTransition(0.5)"
+          class="min-h-[78px]"
+        >
+          <div ref="recaptchaContainer" class="flex justify-center"></div>
+        </motion.div>
+
         <motion.div :initial="authItemInitial" :animate="authItemAnimate" :transition="authItemTransition(0.54)">
           <motion.button type="submit" :disabled="loading"
                   :whileHover="loading ? {} : authSubmitHover"
@@ -110,11 +120,21 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { nextTick, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { motion, useReducedMotion } from 'motion-v'
 import api from '../api'
+import {
+  RecaptchaError,
+  getRecaptchaToken,
+  getRecaptchaWidgetResponse,
+  isRecaptchaError,
+  isRecaptchaV2Enabled,
+  isRecaptchaV3Enabled,
+  renderRecaptchaCheckbox,
+  resetRecaptchaWidget
+} from '../utils/recaptcha'
 import {
   authCardAnimate,
   authCardInitial,
@@ -136,6 +156,8 @@ const router = useRouter()
 const prefersReducedMotion = useReducedMotion()
 const loading = ref(false)
 const confirmPassword = ref('')
+const recaptchaContainer = ref<HTMLElement | null>(null)
+const recaptchaWidgetId = ref<number | null>(null)
 const form = ref({
   username: '',
   nickname: '',
@@ -150,10 +172,26 @@ const handleRegister = async () => {
 
   loading.value = true
   try {
-    await api.post('/auth/register', form.value)
+    let recaptchaToken = ''
+    if (isRecaptchaV3Enabled()) {
+      recaptchaToken = await getRecaptchaToken('register')
+    } else if (isRecaptchaV2Enabled()) {
+      recaptchaToken = getRecaptchaWidgetResponse(recaptchaWidgetId.value)
+      if (!recaptchaToken) {
+        throw new RecaptchaError()
+      }
+    }
+    await api.post('/auth/register', form.value, {
+      headers: recaptchaToken ? { 'X-Recaptcha-Token': recaptchaToken } : {}
+    })
     alert(t('register.registerSuccess'))
     router.push('/login')
   } catch (error: any) {
+    if (isRecaptchaError(error)) {
+      alert(t('security.recaptchaFailed'))
+      resetRecaptchaWidget(recaptchaWidgetId.value)
+      return
+    }
     console.error('Register failed:', error)
     const serverMessage = error?.response?.data?.message || error?.response?.data?.error
     alert(serverMessage || t('register.registerFailed'))
@@ -161,4 +199,14 @@ const handleRegister = async () => {
     loading.value = false
   }
 }
+
+onMounted(async () => {
+  if (!isRecaptchaV2Enabled()) return
+  await nextTick()
+  if (!recaptchaContainer.value) return
+  recaptchaWidgetId.value = await renderRecaptchaCheckbox(recaptchaContainer.value, {
+    onExpired: () => resetRecaptchaWidget(recaptchaWidgetId.value),
+    onError: () => resetRecaptchaWidget(recaptchaWidgetId.value)
+  })
+})
 </script>

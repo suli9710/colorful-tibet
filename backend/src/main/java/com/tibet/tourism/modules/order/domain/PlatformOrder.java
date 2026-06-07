@@ -55,16 +55,19 @@ public class PlatformOrder {
     @Column(name = "payable_amount")
     private BigDecimal payableAmount = BigDecimal.ZERO;
 
-    @Column(name = "customer_name", length = 64)
+    @Convert(converter = PiiCryptoConverter.class)
+    @Column(name = "customer_name", length = 512)
     private String customerName;
 
     @Convert(converter = PiiCryptoConverter.class)
     @Column(name = "customer_phone", length = 512)
     private String customerPhone;
 
+    @Convert(converter = PiiCryptoConverter.class)
     @Column(name = "customer_note", columnDefinition = "TEXT")
     private String customerNote;
 
+    @Convert(converter = PiiCryptoConverter.class)
     @Column(name = "support_note", columnDefinition = "TEXT")
     private String supportNote;
 

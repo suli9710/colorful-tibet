@@ -17,9 +17,12 @@ import jakarta.validation.Valid;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -31,6 +34,10 @@ import org.springframework.web.multipart.MultipartFile;
 @RestController
 @RequestMapping("/api/comments")
 public class CommentController {
+
+    private static final Set<String> ALLOWED_COMMENT_SORT_FIELDS = Set.of(
+            "id", "createdAt", "rating", "likeCount");
+    private static final Sort DEFAULT_COMMENT_SORT = Sort.by(Sort.Direction.DESC, "createdAt").and(Sort.by("id"));
 
     @Autowired
     private CommentRepository commentRepository;
@@ -51,7 +58,9 @@ public class CommentController {
     public Page<CommentDTO> getCommentsBySpot(
             @PathVariable long spotId,
             @PageableDefault(size = 20) Pageable pageable) {
-        return commentRepository.findBySpotIdOrderByCreatedAtDesc(spotId, pageable)
+        Pageable safePageable = InputSanitizer.sanitizePageable(
+                pageable, ALLOWED_COMMENT_SORT_FIELDS, DEFAULT_COMMENT_SORT, 20, 100);
+        return commentRepository.findBySpotIdOrderByCreatedAtDesc(spotId, safePageable)
                 .map(CommentDTO::fromEntity);
     }
 
@@ -88,25 +97,34 @@ public class CommentController {
                 .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
         
         boolean exists = commentLikeRepository.existsByUserIdAndCommentId(userId, commentId);
+        boolean liked;
         
         if (exists) {
             // 取消点赞
-            commentLikeRepository.deleteByUserIdAndCommentId(userId, commentId);
-            comment.setLikeCount(comment.getLikeCount() - 1);
+            long deleted = commentLikeRepository.deleteByUserIdAndCommentId(userId, commentId);
+            if (deleted > 0) {
+                commentRepository.decrementLikeCount(commentId);
+            }
+            liked = false;
         } else {
             // 添加点赞
             CommentLike like = new CommentLike();
             like.setUser(user);
             like.setComment(comment);
-            commentLikeRepository.save(like);
-            comment.setLikeCount(comment.getLikeCount() + 1);
+            try {
+                commentLikeRepository.saveAndFlush(like);
+                commentRepository.incrementLikeCount(commentId);
+            } catch (DataIntegrityViolationException duplicate) {
+                // Concurrent duplicate like; the unique row already represents the desired state.
+            }
+            liked = true;
         }
         
-        commentRepository.save(comment);
+        int likeCount = commentLikeRepository.countByCommentId(commentId);
         
         Map<String, Object> response = new HashMap<>();
-        response.put("liked", !exists);
-        response.put("likeCount", comment.getLikeCount());
+        response.put("liked", liked);
+        response.put("likeCount", likeCount);
         
         return ResponseEntity.ok(response);
     }

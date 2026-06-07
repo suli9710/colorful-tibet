@@ -1,4 +1,5 @@
 package com.tibet.tourism.modules.order.domain;
+import com.tibet.tourism.common.security.PiiCryptoConverter;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -21,10 +22,12 @@ public class Invoice {
     @Column(name = "invoice_no", nullable = false, length = 64, unique = true)
     private String invoiceNo;
 
-    @Column(name = "invoice_title", nullable = false, length = 160)
+    @Convert(converter = PiiCryptoConverter.class)
+    @Column(name = "invoice_title", nullable = false, length = 1024)
     private String invoiceTitle;
 
-    @Column(name = "tax_no", length = 64)
+    @Convert(converter = PiiCryptoConverter.class)
+    @Column(name = "tax_no", length = 512)
     private String taxNo;
 
     private BigDecimal amount = BigDecimal.ZERO;

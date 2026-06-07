@@ -319,10 +319,13 @@
                       <span class="text-tibet-brown/80 tibetan-font">{{ t('spotDetail.totalAmount') }}</span>
                       <span class="text-3xl font-bold text-tibet-gold">¥{{ totalPrice }}</span>
                     </div>
+                    <p class="mb-4 rounded-xl bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800">
+                      本平台不收款，实际交易、出票和售后确认由第三方平台负责。
+                    </p>
                     
                     <button type="submit" :disabled="submitting"
                             class="w-full bg-tibet-red text-tibet-yellow font-bold py-4 px-6 rounded-2xl transition-all duration-300 transform hover:scale-[1.02] hover:-translate-y-0.5 active:scale-[0.98] shadow-lg hover:shadow-tibet-red/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none tibetan-font">
-                      {{ submitting ? t('spotDetail.processing') : t('spotDetail.confirmPayment') }}
+                      {{ submitting ? t('spotDetail.processing') : t('spotDetail.externalBook') }}
                     </button>
                   </div>
                 </form>
@@ -334,20 +337,12 @@
     </div>
   </div>
 
-  <PaymentModal
-    :show="showPaymentModal"
-    :amount="totalPrice"
-    recaptcha-action="booking"
-    @close="showPaymentModal = false"
-    @status-check="handlePaymentStatusCheck"
-  />
-
   <MobileStickyActionBar
     :show="Boolean(spot)"
     :eyebrow="t('spotDetail.totalAmount')"
     :title="`¥${totalPrice}`"
     :meta="spot?.name"
-    :primary-label="submitting ? t('spotDetail.processing') : t('spotDetail.confirmPayment')"
+    :primary-label="submitting ? t('spotDetail.processing') : t('spotDetail.externalBook')"
     :primary-disabled="submitting"
     @primary="scrollToBooking"
   />
@@ -360,15 +355,12 @@ import { useI18n } from 'vue-i18n'
 import { motion } from 'motion-v'
 import { motionEase, revealInitial, revealInView, inViewOnce } from '../motion/presets'
 import api, { endpoints } from '../api'
-import PaymentModal from '../components/PaymentModal.vue'
 import MobileStickyActionBar from '../components/MobileStickyActionBar.vue'
-import { useBehaviorTracker } from '../composables/useBehaviorTracker'
 import { useAuthStore } from '../stores/auth'
+import { openExternalBooking } from '../utils/externalBooking'
 import type * as Leaflet from 'leaflet'
 
 const { t, locale } = useI18n()
-
-const { encodeBehaviorData, reset: resetBehavior } = useBehaviorTracker()
 
 const route = useRoute()
 const router = useRouter()
@@ -612,48 +604,23 @@ onBeforeUnmount(() => {
   clearCommentImagePreview()
 })
 
-const showPaymentModal = ref(false)
-
 const scrollToBooking = () => {
   document.getElementById('spot-booking-panel')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
 }
 
 const handleBooking = async () => {
-  if (!(await auth.ensureSession())) {
-    router.push('/login')
-    return
-  }
   if (!bookingForm.value.visitDate) {
     alert(t('spotDetail.pleaseSelectDate'))
     return
   }
-  showPaymentModal.value = true
-}
-
-const handlePaymentStatusCheck = async (recaptchaToken = '') => {
-  showPaymentModal.value = false
-  submitting.value = true
-  const behaviorData = encodeBehaviorData()
-
-  try {
-    await api.post('/bookings', {
-      spotId: spot.value.id,
-      visitDate: bookingForm.value.visitDate,
-      ticketCount: bookingForm.value.ticketCount
-    }, {
-      headers: {
-        ...(recaptchaToken ? { 'X-Recaptcha-Token': recaptchaToken } : {}),
-        ...(behaviorData ? { 'X-Behavior-Data': behaviorData } : {}),
-      }
-    })
-    alert(t('spotDetail.bookingSuccess'))
-    router.push('/profile')
-  } catch (error) {
-    console.error('Booking failed:', error)
-    alert(t('spotDetail.bookingFailed'))
-  } finally {
-    submitting.value = false
-    resetBehavior()
+  const opened = openExternalBooking({
+    kind: 'spot',
+    name: spot.value?.name,
+    location: spot.value?.location || t('spotDetail.tibetAutonomousRegion'),
+    date: bookingForm.value.visitDate
+  })
+  if (!opened) {
+    alert(t('spotDetail.externalBookBlocked'))
   }
 }
 

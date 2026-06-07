@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 import importlib.metadata
+import asyncio
 import logging
 import os
+import secrets
 from typing import Optional
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, status
 from pydantic import BaseModel, Field
+from starlette.concurrency import run_in_threadpool
 
 from scraper import (
     ScrapeResult,
@@ -25,6 +28,7 @@ logging.basicConfig(level=LOG_LEVEL, format="%(asctime)s %(levelname)s %(name)s:
 logger = logging.getLogger("scrapling-service")
 
 SERVICE_VERSION = "0.3.0"
+API_KEY_HEADER = "X-Scrapling-Api-Key"
 
 
 def _env_int(name: str, default: int) -> int:
@@ -71,6 +75,8 @@ def scrapling_version() -> Optional[str]:
 
 
 BASE_CONFIG = load_config()
+MAX_CONCURRENCY = max(1, _env_int("SCRAPLING_MAX_CONCURRENCY", 2))
+SCRAPE_SEMAPHORE = asyncio.Semaphore(MAX_CONCURRENCY)
 app = FastAPI(title="Scrapling Price Service", version=SERVICE_VERSION)
 
 
@@ -100,6 +106,27 @@ class PriceResponse(BaseModel):
     queriedUrls: list[str] = Field(default_factory=list)
 
 
+def configured_api_key() -> str:
+    return (os.getenv("SCRAPLING_API_KEY") or "").strip()
+
+
+def allow_request_mode_override() -> bool:
+    return _env_bool("SCRAPLING_ALLOW_REQUEST_MODE_OVERRIDE", False)
+
+
+def require_api_key(api_key: Optional[str] = Header(default=None, alias=API_KEY_HEADER)) -> None:
+    expected = configured_api_key()
+    if not expected:
+        return
+
+    provided = (api_key or "").strip()
+    if not provided or not secrets.compare_digest(provided, expected):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Unauthorized",
+        )
+
+
 def response_from_result(result: ScrapeResult) -> PriceResponse:
     return PriceResponse(
         basePrice=float(result.base_price) if result.base_price is not None else None,
@@ -113,13 +140,14 @@ def response_from_result(result: ScrapeResult) -> PriceResponse:
     )
 
 
-@app.post("/scrape/price", response_model=PriceResponse)
+@app.post("/scrape/price", response_model=PriceResponse, dependencies=[Depends(require_api_key)])
 async def scrape_price(request: ScrapeRequest) -> PriceResponse:
     spot_name = request.spotName.strip()
     if not spot_name:
         raise HTTPException(status_code=400, detail="spotName must not be blank")
 
-    active_config = normalize_config(BASE_CONFIG, mode=request.mode, max_sources=request.maxSources)
+    request_mode = request.mode if allow_request_mode_override() else None
+    active_config = normalize_config(BASE_CONFIG, mode=request_mode, max_sources=request.maxSources)
     logger.info(
         "Scraping price for spot=%s location=%s mode=%s max_sources=%s",
         spot_name,
@@ -128,15 +156,17 @@ async def scrape_price(request: ScrapeRequest) -> PriceResponse:
         active_config.max_sources,
     )
 
-    result = scrape_price_for_spot(
-        spot_name=spot_name,
-        location=request.location,
-        config=active_config,
-    )
+    async with SCRAPE_SEMAPHORE:
+        result = await run_in_threadpool(
+            scrape_price_for_spot,
+            spot_name=spot_name,
+            location=request.location,
+            config=active_config,
+        )
     return response_from_result(result)
 
 
-@app.get("/scrape/capabilities")
+@app.get("/scrape/capabilities", dependencies=[Depends(require_api_key)])
 async def capabilities():
     return {
         "serviceVersion": SERVICE_VERSION,
@@ -148,6 +178,8 @@ async def capabilities():
         "allowedDomains": BASE_CONFIG.allowed_domains,
         "proxyConfigured": bool(BASE_CONFIG.proxy_url),
         "solveCloudflare": BASE_CONFIG.solve_cloudflare,
+        "maxConcurrency": MAX_CONCURRENCY,
+        "requestModeOverrideAllowed": allow_request_mode_override(),
     }
 
 

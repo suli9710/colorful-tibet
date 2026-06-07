@@ -43,10 +43,7 @@ public class HeritageService {
     @Transactional
     public Optional<HeritageItem> getItemByIdAndIncrementView(Long id) {
         Optional<HeritageItem> opt = heritageItemRepository.findById(id);
-        opt.ifPresent(item -> {
-            item.setViewCount(item.getViewCount() == null ? 1 : item.getViewCount() + 1);
-            heritageItemRepository.save(item);
-        });
+        opt.ifPresent(item -> heritageItemRepository.incrementViewCount(item.getId()));
         return opt;
     }
 

@@ -129,15 +129,16 @@ class AuthApplicationServiceTest {
     }
 
     @Test
-    void verifiedSuperAdminLoginRepairsAdminRole() {
+    void verifiedSuperAdminLoginRejectsNonAdminRole() {
         User superAdmin = user("lzh", User.Role.USER);
         stubAuthenticatedUser("lzh", superAdmin);
         String currentCode = totpService.generateCodeForTime(TOTP_SECRET, Instant.now());
 
-        LoginResult result = service.login(loginRequest("lzh", "031224", currentCode), httpRequest);
+        assertThatThrownBy(() -> service.login(loginRequest("lzh", "031224", currentCode), httpRequest))
+                .isInstanceOf(AuthForbiddenException.class);
 
-        assertThat(superAdmin.getRole()).isEqualTo(User.Role.ADMIN);
-        assertThat(result.user()).containsEntry("role", User.Role.ADMIN);
+        assertThat(superAdmin.getRole()).isEqualTo(User.Role.USER);
+        verify(userRepository, never()).saveAndFlush(any(User.class));
     }
 
     @Test
@@ -240,7 +241,7 @@ class AuthApplicationServiceTest {
         request.setUsername("adm\u0456n");
         request.setPassword("Strong1!");
 
-        assertThatThrownBy(() -> service.register(request))
+        assertThatThrownBy(() -> service.register(request, httpRequest))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Registration failed");
     }
@@ -264,6 +265,7 @@ class AuthApplicationServiceTest {
                 "lzh",
                 totpSecret,
                 requireStrongSecrets,
+                false,
                 new MockEnvironment());
     }
 

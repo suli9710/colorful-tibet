@@ -63,6 +63,7 @@ class HeritageControllerCommentSecurityTest {
         assertThat(actualItem.getCommentCount()).isEqualTo(1);
         verify(heritageCommentRepository, never()).delete(any(HeritageComment.class));
         verify(heritageItemRepository, never()).save(any(HeritageItem.class));
+        verify(heritageItemRepository, never()).decrementCommentCount(anyLong());
         verify(heritageItemRepository, never()).findById(anyLong());
     }
 
@@ -77,9 +78,10 @@ class HeritageControllerCommentSecurityTest {
         ResponseEntity<?> response = controller.deleteComment(1L, 100L, request);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
-        assertThat(actualItem.getCommentCount()).isEqualTo(2);
+        assertThat(actualItem.getCommentCount()).isEqualTo(3);
         verify(heritageCommentRepository).delete(comment);
-        verify(heritageItemRepository).save(actualItem);
+        verify(heritageItemRepository).decrementCommentCount(1L);
+        verify(heritageItemRepository, never()).save(any(HeritageItem.class));
         verify(heritageItemRepository, never()).findById(anyLong());
     }
 
@@ -98,6 +100,7 @@ class HeritageControllerCommentSecurityTest {
         assertThat(actualItem.getCommentCount()).isEqualTo(1);
         verify(heritageCommentRepository, never()).delete(any(HeritageComment.class));
         verify(heritageItemRepository, never()).save(any(HeritageItem.class));
+        verify(heritageItemRepository, never()).decrementCommentCount(anyLong());
     }
 
     @Test
@@ -111,9 +114,10 @@ class HeritageControllerCommentSecurityTest {
         ResponseEntity<?> response = controller.deleteComment(1L, 100L, request);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
-        assertThat(actualItem.getCommentCount()).isZero();
+        assertThat(actualItem.getCommentCount()).isNull();
         verify(heritageCommentRepository).delete(comment);
-        verify(heritageItemRepository).save(actualItem);
+        verify(heritageItemRepository).decrementCommentCount(1L);
+        verify(heritageItemRepository, never()).save(any(HeritageItem.class));
     }
 
     @Test
@@ -129,7 +133,8 @@ class HeritageControllerCommentSecurityTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
         assertThat(actualItem.getCommentCount()).isZero();
         verify(heritageCommentRepository).delete(comment);
-        verify(heritageItemRepository).save(actualItem);
+        verify(heritageItemRepository).decrementCommentCount(1L);
+        verify(heritageItemRepository, never()).save(any(HeritageItem.class));
     }
 
     private static User user(Long id) {

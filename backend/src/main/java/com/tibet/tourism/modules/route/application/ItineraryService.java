@@ -135,7 +135,7 @@ public class ItineraryService {
 
     @Transactional
     public BookItineraryItemResponse bookItem(User user, Long itineraryId, Long itemId, BookItineraryItemRequest request) {
-        ItineraryItem item = itineraryItemRepository.findById(itemId)
+        ItineraryItem item = itineraryItemRepository.findByIdForUpdate(itemId)
                 .orElseThrow(() -> new NoSuchElementException("行程节点不存在"));
         Itinerary itinerary = item.getDay().getItinerary();
         if (!itinerary.getId().equals(itineraryId) || !itinerary.getUser().getId().equals(user.getId())) {
@@ -341,7 +341,7 @@ public class ItineraryService {
         item.setBookingReferenceType("SPOT_BOOKING");
         item.setBookingReferenceId(booking.getId());
         itineraryItemRepository.save(item);
-        return new BookItineraryItemResponse(item.getId(), "SPOT_BOOKING", booking.getId(), booking.getTotalPrice(), "景点门票预订已创建，等待支付确认");
+        return new BookItineraryItemResponse(item.getId(), "SPOT_BOOKING", booking.getId(), booking.getTotalPrice(), "景点门票咨询意向已提交，请到有资质的第三方平台完成支付和履约");
     }
 
     private BookItineraryItemResponse bookHotelItem(User user, ItineraryItem item, int travelers, BookItineraryItemRequest request) {
@@ -372,7 +372,7 @@ public class ItineraryService {
         item.setBookingReferenceType("HOTEL_BOOKING");
         item.setBookingReferenceId(saved.getId());
         itineraryItemRepository.save(item);
-        return new BookItineraryItemResponse(item.getId(), "HOTEL_BOOKING", saved.getId(), saved.getTotalPrice(), "酒店预订成功");
+        return new BookItineraryItemResponse(item.getId(), "HOTEL_BOOKING", saved.getId(), saved.getTotalPrice(), "酒店咨询意向已提交，请到有资质的第三方平台完成支付和履约");
     }
 
     private Itinerary loadItinerary(User user, Long itineraryId) {

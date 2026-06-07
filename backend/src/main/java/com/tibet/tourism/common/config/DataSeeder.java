@@ -40,6 +40,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 @Component
 public class DataSeeder implements CommandLineRunner {
@@ -108,7 +109,7 @@ public class DataSeeder implements CommandLineRunner {
     @Value("${app.seed.demo-users.user-password:}")
     private String demoUserPassword;
 
-    @Value("${app.super-admin-username:lzh}")
+    @Value("${app.super-admin-username:}")
     private String superAdminUsername;
 
     @Override
@@ -168,6 +169,9 @@ public class DataSeeder implements CommandLineRunner {
     }
 
     private void seedUsers() {
+        if (!StringUtils.hasText(superAdminUsername)) {
+            throw new IllegalStateException("Super-admin username must be configured when demo user seeding is enabled");
+        }
         String adminPassword = resolvePassword(demoAdminPassword, "admin");
         String superAdminPassword = resolvePassword(demoSuperAdminPassword, "super-admin");
         String user1Password = resolvePassword(demoUserPassword, "user1");

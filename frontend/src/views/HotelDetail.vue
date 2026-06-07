@@ -93,7 +93,7 @@
                     </div>
                     <span class="text-xs text-tibet-brown/40">{{ t('hotel.perNight') }}</span>
                   </div>
-                  <router-link :to="`/hotel-booking/${hotel.id}?roomId=${room.id}`" class="tibet-btn text-sm">{{ t('hotel.bookThisRoom') }}</router-link>
+                  <button type="button" class="tibet-btn text-sm" @click="openHotelBooking(room)">{{ t('hotel.externalBook') }}</button>
                 </div>
               </div>
             </div>
@@ -126,11 +126,12 @@
                   <span class="text-tibet-brown/50">{{ hotel.reviewCount }}{{ t('hotel.reviewCountUnit') }}</span>
                 </div>
               </div>
-              <router-link :to="`/hotel-booking/${hotel.id}?roomId=${roomTypes[0]?.id || 1}`"
-                           class="w-full flex items-center justify-center gap-2 px-5 py-3.5 rounded-full bg-tibet-red text-tibet-yellow font-semibold hover:bg-tibet-red/90 transition-colors shadow-lg shadow-tibet-red/20">
+              <button type="button"
+                      class="w-full flex items-center justify-center gap-2 px-5 py-3.5 rounded-full bg-tibet-red text-tibet-yellow font-semibold hover:bg-tibet-red/90 transition-colors shadow-lg shadow-tibet-red/20"
+                      @click="openHotelBooking()">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                {{ t('hotel.bookNow') }}
-              </router-link>
+                {{ t('hotel.externalBook') }}
+              </button>
               <a :href="`https://uri.amap.com/navigation?to=${hotel.lng},${hotel.lat},${encodeURIComponent(hotel.name)}&mode=car&utm_source=colorful-tibet`"
                  target="_blank" rel="noopener noreferrer"
                  class="mt-3 w-full flex items-center justify-center gap-2 px-5 py-3 rounded-full bg-tibet-turquoise text-white font-semibold hover:bg-tibet-turquoise/90 transition-colors">
@@ -164,15 +165,15 @@
     :title="`¥${displayPrice}`"
     :meta="hotel?.name"
     :secondary-label="t('hotel.navigate')"
-    :primary-label="t('hotel.bookNow')"
+    :primary-label="t('hotel.externalBook')"
     @secondary="openHotelNavigation"
-    @primary="goToHotelBooking"
+    @primary="openHotelBooking"
   />
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { motion } from 'motion-v'
 import { motionEase, revealInitial, revealInView, revealTransition, inViewOnce } from '../motion/presets'
@@ -181,10 +182,10 @@ import { applyHotelImageFallback, resolveHotelCoverImage } from '../data/hotelIm
 import { getCanonicalRegion, localizeApiRoom, localizeHotel } from '../data/hotelTranslations'
 import api, { endpoints } from '../api'
 import MobileStickyActionBar from '../components/MobileStickyActionBar.vue'
+import { openExternalBooking } from '../utils/externalBooking'
 
 const { t, locale } = useI18n()
 const route = useRoute()
-const router = useRouter()
 const hotelId = Number(route.params.id || 1)
 const rawHotel = ref<any>({})
 const rawRoomTypes = ref<any[]>([])
@@ -199,10 +200,15 @@ const displayPrice = computed(() => {
   return t('common.consult')
 })
 
-const firstRoomId = computed(() => roomTypes.value[0]?.id || 1)
-
-const goToHotelBooking = () => {
-  router.push(`/hotel-booking/${hotel.value.id}?roomId=${firstRoomId.value}`)
+const openHotelBooking = (room?: { name?: string }) => {
+  const opened = openExternalBooking({
+    kind: 'hotel',
+    name: [hotel.value.name, room?.name].filter(Boolean).join(' '),
+    location: hotel.value.city || hotel.value.address
+  })
+  if (!opened) {
+    alert(t('spotDetail.externalBookBlocked'))
+  }
 }
 
 const openHotelNavigation = () => {

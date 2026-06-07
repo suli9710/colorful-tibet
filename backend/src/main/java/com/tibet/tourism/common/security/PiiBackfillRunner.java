@@ -35,10 +35,20 @@ public class PiiBackfillRunner implements ApplicationRunner {
             return;
         }
         int users = migrateColumn("users", "phone");
-        int hotelBookings = migrateColumn("hotel_bookings", "phone");
-        int orders = migrateColumn("orders", "customer_phone");
-        logger.info("PII v2 backfill completed: users={}, hotelBookings={}, orders={}",
-                users, hotelBookings, orders);
+        int hotelBookingPhones = migrateColumn("hotel_bookings", "phone");
+        int hotelBookingGuests = migrateColumn("hotel_bookings", "guest_name");
+        int hotelBookingNotes = migrateColumn("hotel_bookings", "note");
+        int orderPhones = migrateColumn("orders", "customer_phone");
+        int orderNames = migrateColumn("orders", "customer_name");
+        int orderCustomerNotes = migrateColumn("orders", "customer_note");
+        int orderSupportNotes = migrateColumn("orders", "support_note");
+        int invoiceTitles = migrateColumn("invoices", "invoice_title");
+        int invoiceTaxNos = migrateColumn("invoices", "tax_no");
+        logger.info("PII v2 backfill completed: users={}, hotelBookingPhones={}, hotelBookingGuests={}, "
+                        + "hotelBookingNotes={}, orderPhones={}, orderNames={}, orderCustomerNotes={}, "
+                        + "orderSupportNotes={}, invoiceTitles={}, invoiceTaxNos={}",
+                users, hotelBookingPhones, hotelBookingGuests, hotelBookingNotes, orderPhones, orderNames,
+                orderCustomerNotes, orderSupportNotes, invoiceTitles, invoiceTaxNos);
     }
 
     private int migrateColumn(String table, String column) {

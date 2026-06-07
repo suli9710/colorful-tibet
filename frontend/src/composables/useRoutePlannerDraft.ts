@@ -2,6 +2,7 @@ import { unref, type Ref } from 'vue'
 
 const DEFAULT_STORAGE_KEY = 'colorful-tibet:route-planner:draft'
 const DEFAULT_DRAFT_VERSION = 1
+const DEFAULT_DRAFT_TTL_MS = 6 * 60 * 60 * 1000
 
 export interface RoutePlannerFormState {
   days: number
@@ -42,7 +43,14 @@ interface RoutePlannerDraftOptions {
   onRestoreError?: (error: unknown) => void
 }
 
-const hasBrowserStorage = () => typeof window !== 'undefined' && typeof window.localStorage !== 'undefined'
+const hasBrowserStorage = () => typeof window !== 'undefined' && typeof window.sessionStorage !== 'undefined'
+const clearLegacyLocalDraft = (key: string) => {
+  try {
+    window.localStorage?.removeItem(key)
+  } catch {
+    // Ignore legacy cleanup failures.
+  }
+}
 
 const normalizeDraftForm = (
   draftForm: Partial<RoutePlannerFormState> | undefined,
@@ -86,7 +94,8 @@ export function useRoutePlannerDraft(
     }
 
     try {
-      localStorage.setItem(storageKey, JSON.stringify(payload))
+      sessionStorage.setItem(storageKey, JSON.stringify(payload))
+      clearLegacyLocalDraft(storageKey)
     } catch (error) {
       options.onPersistError?.(error)
     }
@@ -96,12 +105,16 @@ export function useRoutePlannerDraft(
     if (!hasBrowserStorage()) return
 
     const storageKey = resolveStorageKey()
-    const rawDraft = localStorage.getItem(storageKey)
+    const rawDraft = sessionStorage.getItem(storageKey)
     if (!rawDraft) return
 
     try {
       const draft = JSON.parse(rawDraft) as Partial<RoutePlannerDraft>
       if (draft.version !== version) return
+      if (Number(draft.updatedAt) && Date.now() - Number(draft.updatedAt) > DEFAULT_DRAFT_TTL_MS) {
+        sessionStorage.removeItem(storageKey)
+        return
+      }
 
       const restoredDraft: RoutePlannerDraft = {
         version,
@@ -129,7 +142,7 @@ export function useRoutePlannerDraft(
       return restoredDraft
     } catch (error) {
       options.onRestoreError?.(error)
-      localStorage.removeItem(storageKey)
+      sessionStorage.removeItem(storageKey)
     }
   }
 
@@ -137,7 +150,8 @@ export function useRoutePlannerDraft(
     if (!hasBrowserStorage()) return
     const storageKey = resolveStorageKey()
     routeDraftKeys.delete(storageKey)
-    localStorage.removeItem(storageKey)
+    sessionStorage.removeItem(storageKey)
+    clearLegacyLocalDraft(storageKey)
   }
 
   return {
@@ -150,13 +164,24 @@ export function useRoutePlannerDraft(
 export function clearAllRoutePlannerDrafts() {
   if (!hasBrowserStorage()) return
   for (const key of routeDraftKeys) {
-    localStorage.removeItem(key)
+    sessionStorage.removeItem(key)
+    clearLegacyLocalDraft(key)
   }
   routeDraftKeys.clear()
-  for (let index = localStorage.length - 1; index >= 0; index -= 1) {
-    const key = localStorage.key(index)
+  for (let index = sessionStorage.length - 1; index >= 0; index -= 1) {
+    const key = sessionStorage.key(index)
     if (key?.startsWith('colorful-tibet:route-planner:draft:')) {
-      localStorage.removeItem(key)
+      sessionStorage.removeItem(key)
     }
+  }
+  try {
+    for (let index = localStorage.length - 1; index >= 0; index -= 1) {
+      const key = localStorage.key(index)
+      if (key?.startsWith('colorful-tibet:route-planner:draft:')) {
+        localStorage.removeItem(key)
+      }
+    }
+  } catch {
+    // Ignore legacy cleanup failures.
   }
 }

@@ -63,6 +63,7 @@ public class AuthApplicationService {
     private final String superAdminUsername;
     private final String superAdminTotpSecret;
     private final boolean requireStrongSecrets;
+    private final boolean registrationRecaptchaRequired;
     private final Environment environment;
 
     public AuthApplicationService(
@@ -76,9 +77,10 @@ public class AuthApplicationService {
             TotpService totpService,
             RecaptchaService recaptchaService,
             AntibotProperties antibotProperties,
-            @Value("${app.super-admin-username:lzh}") String superAdminUsername,
+            @Value("${app.super-admin-username:}") String superAdminUsername,
             @Value("${app.security.super-admin-totp-secret:}") String superAdminTotpSecret,
             @Value("${app.security.require-strong-secrets:false}") boolean requireStrongSecrets,
+            @Value("${app.security.registration-recaptcha-required:false}") boolean registrationRecaptchaRequired,
             Environment environment) {
         this.authenticationManager = authenticationManager;
         this.userRepository = userRepository;
@@ -93,6 +95,7 @@ public class AuthApplicationService {
         this.superAdminUsername = superAdminUsername;
         this.superAdminTotpSecret = superAdminTotpSecret;
         this.requireStrongSecrets = requireStrongSecrets;
+        this.registrationRecaptchaRequired = registrationRecaptchaRequired;
         this.environment = environment;
     }
 
@@ -116,6 +119,10 @@ public class AuthApplicationService {
         }
 
         totpService.validateSecret(superAdminTotpSecret);
+
+        if (strictMode && registrationRecaptchaRequired && !isRecaptchaConfigured()) {
+            throw new IllegalStateException("Registration reCAPTCHA is required but not configured");
+        }
     }
 
     public LoginResult login(LoginRequest loginRequest, HttpServletRequest request) {
@@ -166,7 +173,9 @@ public class AuthApplicationService {
     }
 
     @Transactional
-    public void register(RegisterRequest signUpRequest) {
+    public void register(RegisterRequest signUpRequest, HttpServletRequest request) {
+        enforceRegistrationRecaptcha(request);
+
         String username = signUpRequest.getUsername() == null ? "" : signUpRequest.getUsername().trim();
         String nickname = InputSanitizer.optionalPlainText(signUpRequest.getNickname(), 32, "nickname");
         String plainPassword = signUpRequest.getPassword();
@@ -254,15 +263,31 @@ public class AuthApplicationService {
                 && StringUtils.hasText(recaptcha.getSecretKey());
     }
 
+    private void enforceRegistrationRecaptcha(HttpServletRequest request) {
+        if (!registrationRecaptchaRequired) {
+            return;
+        }
+        if (!isRecaptchaConfigured()) {
+            logger.error("Registration reCAPTCHA is required but not configured");
+            throw new AuthForbiddenException(REGISTRATION_FAILED);
+        }
+        String clientIp = resolveClientIp(request);
+        OptionalDouble score = recaptchaService.verify(request.getHeader(RECAPTCHA_HEADER), clientIp);
+        double minScore = antibotProperties.getRecaptcha().getMinScore();
+        if (score.isEmpty() || score.getAsDouble() < minScore) {
+            logger.warn("Registration rejected by reCAPTCHA: ip={}, score={}, minScore={}",
+                    clientIp, score.isPresent() ? score.getAsDouble() : null, minScore);
+            throw new AuthForbiddenException(REGISTRATION_FAILED);
+        }
+    }
+
     private void enforceSuperAdminControls(User user, LoginRequest loginRequest, String clientIp) {
         if (!superAdminUsername.equalsIgnoreCase(user.getUsername())) {
             return;
         }
 
         enforceSuperAdminTotp(user, loginRequest, clientIp);
-        if (ensureSuperAdminRole(user)) {
-            userRepository.saveAndFlush(user);
-        }
+        enforceSuperAdminRolePresent(user);
     }
 
     private void enforceSuperAdminTotp(User user, LoginRequest loginRequest, String clientIp) {
@@ -285,15 +310,13 @@ public class AuthApplicationService {
         }
     }
 
-    private boolean ensureSuperAdminRole(User user) {
+    private void enforceSuperAdminRolePresent(User user) {
         if (user.getRole() == User.Role.ADMIN) {
-            return false;
+            return;
         }
-        logger.warn("Promoting configured super-admin account to ADMIN during verified login: username={}",
+        logger.error("Configured super-admin account is not ADMIN; refusing login until role is fixed out of band: username={}",
                 user.getUsername());
-        user.setRole(User.Role.ADMIN);
-        user.incrementSessionVersion();
-        return true;
+        throw new AuthForbiddenException(GENERIC_LOGIN_ERROR);
     }
 
     private boolean isProdProfileActive() {

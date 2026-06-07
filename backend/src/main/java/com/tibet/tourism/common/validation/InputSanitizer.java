@@ -5,14 +5,19 @@ import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.text.Normalizer;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HexFormat;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.regex.Pattern;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.util.StringUtils;
 import org.springframework.web.util.HtmlUtils;
 
@@ -231,6 +236,40 @@ public final class InputSanitizer {
             return defaultField;
         }
         return allowedFields.contains(normalized) ? normalized : defaultField;
+    }
+
+    public static Pageable sanitizePageable(
+            Pageable pageable,
+            Collection<String> allowedSortFields,
+            Sort defaultSort,
+            int defaultSize,
+            int maxSize) {
+        int page = pageable == null || pageable.isUnpaged() ? 0 : normalizePage(pageable.getPageNumber());
+        int size = pageable == null || pageable.isUnpaged()
+                ? normalizePageSize(defaultSize, defaultSize, maxSize)
+                : normalizePageSize(pageable.getPageSize(), defaultSize, maxSize);
+
+        List<Sort.Order> safeOrders = new ArrayList<>();
+        Sort requestedSort = pageable == null ? Sort.unsorted() : pageable.getSort();
+        for (Sort.Order order : requestedSort) {
+            String property = normalizeSingleLine(order.getProperty());
+            if (!allowedSortFields.contains(property)) {
+                continue;
+            }
+            Sort.Order safeOrder = new Sort.Order(order.getDirection(), property);
+            if (order.isIgnoreCase()) {
+                safeOrder = safeOrder.ignoreCase();
+            }
+            if (order.getNullHandling() != Sort.NullHandling.NATIVE) {
+                safeOrder = safeOrder.with(order.getNullHandling());
+            }
+            safeOrders.add(safeOrder);
+        }
+
+        Sort sort = safeOrders.isEmpty()
+                ? (defaultSort == null ? Sort.unsorted() : defaultSort)
+                : Sort.by(safeOrders);
+        return PageRequest.of(page, size, sort);
     }
 
     public static int normalizePage(int page) {

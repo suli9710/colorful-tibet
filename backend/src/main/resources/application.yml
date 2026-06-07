@@ -136,6 +136,7 @@ scrapling:
     max-sources: ${SCRAPLING_MAX_SOURCES:4}
     mode: ${SCRAPLING_MODE:}
     health-enabled: ${SCRAPLING_HEALTH_ENABLED:false}
+    api-key: ${SCRAPLING_API_KEY:}
 
 # 价格定时更新配置
 price:
@@ -147,6 +148,9 @@ price:
       cron: "0 0 3 ? * MON"  # 每周一凌晨3点强制更新
     hourly:
       cron: "0 0 * * * ?"  # 每小时执行一次（仅更新缺失价格的景点）
+    lock:
+      enabled: ${PRICE_UPDATE_LOCK_ENABLED:true}
+      ttl-seconds: ${PRICE_UPDATE_LOCK_TTL_SECONDS:1800}
 
 recommendation:
   item-similarity:
@@ -161,6 +165,8 @@ app:
     public-docs-enabled: ${PUBLIC_DOCS_ENABLED:false}
     public-metrics-enabled: ${PUBLIC_METRICS_ENABLED:false}
     require-strong-secrets: ${REQUIRE_STRONG_SECRETS:true}
+    registration-recaptcha-required: ${REGISTRATION_RECAPTCHA_REQUIRED:false}
+    hotel-booking-pii-read-usernames: ${HOTEL_BOOKING_PII_READ_USERNAMES:${SUPER_ADMIN_USERNAME:}}
     csrf-signing-secret: ${CSRF_SIGNING_SECRET:}
     pii-keys: ${PII_KEYS:}
     pii-active-kid: ${PII_ACTIVE_KID:}
@@ -240,7 +246,7 @@ app:
   payments:
     mock-callback-enabled: ${PAYMENT_MOCK_CALLBACK_ENABLED:false}
     mock-callback-secret: ${PAYMENT_CALLBACK_SECRET:}
-  super-admin-username: ${SUPER_ADMIN_USERNAME:lzh}
+  super-admin-username: ${SUPER_ADMIN_USERNAME:}
   seed:
     content:
       enabled: ${SEED_CONTENT_ENABLED:true}

@@ -34,10 +34,14 @@ public class HotelBooking {
     private LocalDate checkInDate;
     private LocalDate checkOutDate;
     private Integer guests;
+    @Convert(converter = PiiCryptoConverter.class)
+    @Column(length = 512)
     private String guestName;
     @Convert(converter = PiiCryptoConverter.class)
     @Column(length = 512)
     private String phone;
+    @Convert(converter = PiiCryptoConverter.class)
+    @Column(columnDefinition = "TEXT")
     private String note;
 
     private BigDecimal subtotal;

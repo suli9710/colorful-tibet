@@ -1,5 +1,6 @@
 package com.tibet.tourism.modules.spot.web;
 import com.tibet.tourism.common.util.LocaleHelper;
+import com.tibet.tourism.common.validation.InputSanitizer;
 import com.tibet.tourism.modules.recommendation.application.ColdStartOptimizationService;
 import com.tibet.tourism.modules.recommendation.application.ItemBasedRecommendationService;
 import com.tibet.tourism.modules.recommendation.application.RecommendationContextBuilder;
@@ -15,11 +16,13 @@ import com.tibet.tourism.modules.user.domain.User;
 import com.tibet.tourism.modules.user.infra.UserRepository;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -31,6 +34,9 @@ import org.springframework.web.bind.annotation.*;
 public class ScenicSpotController {
 
     private static final Logger logger = LoggerFactory.getLogger(ScenicSpotController.class);
+    private static final Set<String> ALLOWED_SPOT_SORT_FIELDS = Set.of(
+            "id", "name", "category", "ticketPrice", "rating", "visitCount", "createdAt");
+    private static final Sort DEFAULT_SPOT_SORT = Sort.by("id");
 
     @Autowired
     private ScenicSpotService scenicSpotService;
@@ -55,11 +61,13 @@ public class ScenicSpotController {
             @RequestParam(required = false) String category,
             @RequestParam(required = false, defaultValue = "zh") String locale,
             @PageableDefault(size = 20) Pageable pageable) {
+        Pageable safePageable = InputSanitizer.sanitizePageable(
+                pageable, ALLOWED_SPOT_SORT_FIELDS, DEFAULT_SPOT_SORT, 20, 100);
         Page<ScenicSpot> spots;
         if (category != null) {
-            spots = scenicSpotService.getSpotsByCategory(ScenicSpot.Category.valueOf(category.toUpperCase()), pageable);
+            spots = scenicSpotService.getSpotsByCategory(ScenicSpot.Category.valueOf(category.toUpperCase()), safePageable);
         } else {
-            spots = scenicSpotService.getAllSpots(pageable);
+            spots = scenicSpotService.getAllSpots(safePageable);
         }
 
         spots.forEach(spot -> LocaleHelper.resolveScenicSpotLocale(spot, locale));
@@ -85,7 +93,9 @@ public class ScenicSpotController {
             @RequestParam String keyword,
             @RequestParam(required = false, defaultValue = "zh") String locale,
             @PageableDefault(size = 20) Pageable pageable) {
-        Page<ScenicSpot> spots = scenicSpotService.searchSpots(keyword, pageable);
+        Pageable safePageable = InputSanitizer.sanitizePageable(
+                pageable, ALLOWED_SPOT_SORT_FIELDS, DEFAULT_SPOT_SORT, 20, 100);
+        Page<ScenicSpot> spots = scenicSpotService.searchSpots(keyword, safePageable);
         spots.forEach(spot -> LocaleHelper.resolveScenicSpotLocale(spot, locale));
         return spots;
     }

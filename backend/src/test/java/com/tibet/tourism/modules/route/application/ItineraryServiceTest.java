@@ -136,7 +136,7 @@ class ItineraryServiceTest {
         item.setBookingStatus(ItineraryItem.BookingStatus.BOOKABLE);
         item.setEstimatedCost(BigDecimal.valueOf(200));
 
-        when(itineraryItemRepository.findById(102L)).thenReturn(Optional.of(item));
+        when(itineraryItemRepository.findByIdForUpdate(102L)).thenReturn(Optional.of(item));
         when(bookingRepository.save(any(Booking.class))).thenAnswer(invocation -> {
             Booking booking = invocation.getArgument(0);
             booking.setId(900L);

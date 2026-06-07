@@ -72,6 +72,9 @@ public class AdminSecurityPostureService {
     @Value("${app.payments.mock-callback-secret:}")
     private String paymentCallbackSecret;
 
+    @Value("${app.payments.mock-callback-enabled:false}")
+    private boolean mockPaymentCallbackEnabled;
+
     @Value("${jwt.secret:}")
     private String jwtSecret;
 
@@ -166,7 +169,7 @@ public class AdminSecurityPostureService {
                 ? resolveHealthComponent("scrapling")
                 : "DISABLED");
         dependencySnapshot.setAiProviderConfigured(hasText(arkApiKey) || hasText(doubaoApiKey));
-        dependencySnapshot.setPaymentCallbackSecretConfigured(hasText(paymentCallbackSecret));
+        dependencySnapshot.setPaymentCallbackSecretConfigured(!mockPaymentCallbackEnabled || hasText(paymentCallbackSecret));
         response.setDependencies(dependencySnapshot);
 
         List<SecurityPostureResponse.Finding> findings = new ArrayList<>();
@@ -182,8 +185,13 @@ public class AdminSecurityPostureService {
                 rateLimitEnabled ? "Rate limiting enabled" : "Rate limiting disabled");
         addFinding(findings, "PII_KEYS", hasText(piiKeys) && hasText(piiActiveKid) ? "PASS" : "WARN",
                 hasText(piiKeys) && hasText(piiActiveKid) ? "PII encryption configured" : "PII encryption incomplete");
-        addFinding(findings, "PAYMENT_CALLBACK", hasText(paymentCallbackSecret) ? "PASS" : "WARN",
-                hasText(paymentCallbackSecret) ? "Payment callback secret configured" : "Payment callback secret missing");
+        addFinding(findings, "PAYMENT_CALLBACK",
+                mockPaymentCallbackEnabled ? (hasText(paymentCallbackSecret) ? "PASS" : "FAIL") : "INFO",
+                mockPaymentCallbackEnabled
+                        ? (hasText(paymentCallbackSecret)
+                                ? "Mock payment callback secret configured"
+                                : "Mock payment callback secret missing")
+                        : "Mock payment callbacks disabled; platform does not collect payment");
         addFinding(findings, "SCRAPLING_HEALTH", hasText(scraplingServiceUrl) ? "PASS" : "INFO",
                 hasText(scraplingServiceUrl) ? "Scrapling endpoint configured" : "Scrapling disabled");
         response.setFindings(findings);

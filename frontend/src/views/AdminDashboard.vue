@@ -1029,7 +1029,7 @@ const analyticsData = ref<Stats | null>(null)
 const securityPosture = ref<SecurityPostureResponse | null>(null)
 const loadingSecurityPosture = ref(false)
 const securityPostureError = ref('')
-let operationalRefreshTimer: ReturnType<typeof window.setInterval> | null = null
+let operationalRefreshTimer: number | null = null
 
 const fetchSecurityPosture = async () => {
   loadingSecurityPosture.value = true
