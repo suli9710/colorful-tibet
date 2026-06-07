@@ -22,7 +22,7 @@ ENV VITE_AMAP_SECURITY_CODE=$VITE_AMAP_SECURITY_CODE
 RUN npm run build
 
 FROM nginx:alpine
-RUN apk add --no-cache gettext openssl \
+RUN apk add --no-cache gettext \
     && mkdir -p /etc/nginx/certs /var/cache/nginx /var/run /run \
     && chown -R 101:101 /etc/nginx/conf.d /etc/nginx/certs /var/cache/nginx /var/run /run
 
@@ -43,6 +43,4 @@ EXPOSE 8080 8443
 USER 101:101
 
 # Render only our deployment variables and keep nginx runtime variables intact.
-# A short-lived self-signed cert keeps local Docker Compose usable when real
-# Let's Encrypt files are not mounted.
-CMD ["sh", "-c", "set -e; if [ \"$NGINX_HTTP_ONLY\" = \"true\" ]; then envsubst '$NGINX_SERVER_NAME $NGINX_CERT_DOMAIN' < /etc/nginx/http.conf.template > /etc/nginx/conf.d/default.conf; else cert_dir=\"/etc/nginx/certs/$NGINX_CERT_DOMAIN\"; if [ ! -f \"$cert_dir/fullchain.pem\" ] || [ ! -f \"$cert_dir/privkey.pem\" ]; then mkdir -p \"$cert_dir\"; openssl req -x509 -nodes -newkey rsa:2048 -days 1 -subj \"/CN=$NGINX_CERT_DOMAIN\" -keyout \"$cert_dir/privkey.pem\" -out \"$cert_dir/fullchain.pem\" >/dev/null 2>&1; cp \"$cert_dir/fullchain.pem\" \"$cert_dir/chain.pem\"; fi; envsubst '$NGINX_SERVER_NAME $NGINX_CERT_DOMAIN' < /etc/nginx/default.conf.template > /etc/nginx/conf.d/default.conf; fi; nginx -g 'daemon off;'"]
+CMD ["sh", "-c", "set -e; if [ \"$NGINX_HTTP_ONLY\" = \"true\" ]; then envsubst '$NGINX_SERVER_NAME $NGINX_CERT_DOMAIN' < /etc/nginx/http.conf.template > /etc/nginx/conf.d/default.conf; else cert_dir=\"/etc/nginx/certs/$NGINX_CERT_DOMAIN\"; for cert_file in fullchain.pem privkey.pem chain.pem; do if [ ! -f \"$cert_dir/$cert_file\" ]; then echo \"Missing TLS certificate file: $cert_dir/$cert_file\" >&2; exit 1; fi; done; envsubst '$NGINX_SERVER_NAME $NGINX_CERT_DOMAIN' < /etc/nginx/default.conf.template > /etc/nginx/conf.d/default.conf; fi; nginx -g 'daemon off;'"]

@@ -563,7 +563,6 @@ public class OrderCenterService {
         BigDecimal roomPrice = defaultMoney(roomType.getPrice());
         int quantity = defaultQuantity(request.getQuantity());
         BigDecimal subtotal = roomPrice.multiply(BigDecimal.valueOf(nights)).multiply(BigDecimal.valueOf(quantity));
-        BigDecimal serviceFee = subtotal.multiply(new BigDecimal("0.05")).setScale(0, RoundingMode.HALF_UP);
 
         OrderItem item = new OrderItem();
         item.setProductType(OrderItem.ProductType.HOTEL_ROOM);
@@ -575,7 +574,7 @@ public class OrderCenterService {
         item.setServiceEndDate(checkOut);
         item.setQuantity(quantity);
         item.setUnitPrice(roomPrice);
-        item.setSubtotal(subtotal.add(serviceFee));
+        item.setSubtotal(subtotal);
         item.setSortOrder(sortOrder);
         return item;
     }

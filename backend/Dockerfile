@@ -9,10 +9,13 @@ RUN mvn -B clean package -DskipTests
 FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
 
+ARG APP_UID=10001
+ARG APP_GID=10001
+
 # 创建必要的目录并安装运行期依赖
 RUN apk add --no-cache curl \
-    && addgroup -S app \
-    && adduser -S app -G app \
+    && addgroup -S -g "$APP_GID" app \
+    && adduser -S -D -H -u "$APP_UID" -G app app \
     && mkdir -p /app/data /app/logs \
     && chown -R app:app /app
 

@@ -1,5 +1,6 @@
 import unittest
 from decimal import Decimal
+from unittest.mock import patch
 
 from scraper import (
     ScraperConfig,
@@ -57,9 +58,23 @@ class ScraperUrlSafetyTest(unittest.TestCase):
             validate_target_url("http://127.0.0.1:8080/admin")
 
     def test_validate_target_url_applies_domain_allowlist(self):
-        validate_target_url("https://www.baidu.com/s?wd=test", allowed_domains=("baidu.com",))
+        with patch(
+            "scraper.socket.getaddrinfo",
+            return_value=[(None, None, None, None, ("8.8.8.8", 0))],
+        ) as getaddrinfo:
+            validate_target_url("https://www.baidu.com/s?wd=test", allowed_domains=("baidu.com",))
+
+        getaddrinfo.assert_called_once()
         with self.assertRaises(ValueError):
             validate_target_url("https://www.bing.com/search?q=test", allowed_domains=("baidu.com",))
+
+    def test_validate_target_url_blocks_private_dns_resolution(self):
+        with patch(
+            "scraper.socket.getaddrinfo",
+            return_value=[(None, None, None, None, ("10.0.0.5", 0))],
+        ):
+            with self.assertRaises(ValueError):
+                validate_target_url("https://example.com/spot")
 
     def test_config_defaults_are_bounded(self):
         config = ScraperConfig(max_sources=4, search_providers=("baidu", "bing"))

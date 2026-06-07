@@ -1,6 +1,7 @@
 ﻿import axios, { type AxiosResponse } from 'axios'
 import { clearStoredAuth } from '../stores/auth'
 import { getDeviceFingerprint } from '../utils/deviceFingerprint'
+import { apiBaseURL, isSameOriginApi } from '../utils/apiOrigin'
 
 declare module 'axios' {
   export interface AxiosRequestConfig {
@@ -9,7 +10,7 @@ declare module 'axios' {
   }
 }
 
-const apiBaseURL = import.meta.env.VITE_API_BASE_URL || '/api'
+const sameOriginApi = isSameOriginApi(apiBaseURL)
 const DEFAULT_TIMEOUT_MS = 15000
 const LONG_TIMEOUT_MS = 180000
 const GUIDE_CHAT_TIMEOUT_MS = 60000
@@ -34,9 +35,9 @@ const PRIVATE_GET_PATH_MARKERS = [
 const api = axios.create({
   baseURL: apiBaseURL,
   timeout: DEFAULT_TIMEOUT_MS,
-  withCredentials: true,
-  xsrfCookieName: 'XSRF-TOKEN',
-  xsrfHeaderName: 'X-XSRF-TOKEN',
+  withCredentials: sameOriginApi,
+  xsrfCookieName: sameOriginApi ? 'XSRF-TOKEN' : undefined,
+  xsrfHeaderName: sameOriginApi ? 'X-XSRF-TOKEN' : undefined,
   headers: { 'Content-Type': 'application/json' }
 })
 
@@ -435,20 +436,14 @@ export const endpoints = {
     my: '/itineraries/my',
     detail: (id: number) => `/itineraries/${id}`,
     quote: (id: number) => `/itineraries/${id}/quote`,
-    createVersion: (id: number) => `/itineraries/${id}/versions`,
-    bookItem: (id: number, itemId: number) => `/itineraries/${id}/items/${itemId}/bookings`
+    createVersion: (id: number) => `/itineraries/${id}/versions`
   },
   orders: {
     create: '/orders',
     my: '/orders/my',
     detail: (id: number) => `/orders/${id}`,
     cancel: (id: number) => `/orders/${id}/cancel`,
-    delete: (id: number) => `/orders/${id}`,
-    refunds: (id: number) => `/orders/${id}/refunds`,
-    invoice: (id: number) => `/orders/${id}/invoice`
-  },
-  payments: {
-    mockCallback: '/payments/callbacks/mock'
+    delete: (id: number) => `/orders/${id}`
   },
   tibetSpecialty: {
     travelKit: (itineraryId: number) => `/tibet-specialty/itineraries/${itineraryId}/travel-kit`,

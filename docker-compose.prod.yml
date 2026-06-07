@@ -6,6 +6,9 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      args:
+        - APP_UID=${BACKEND_APP_UID:-10001}
+        - APP_GID=${BACKEND_APP_GID:-10001}
     container_name: colorful-tibet-backend
     ports:
       - "127.0.0.1:8080:8080"
@@ -31,9 +34,10 @@ services:
       - PII_ENCRYPTION_KEY=${PII_ENCRYPTION_KEY:-}
       - PII_MIGRATION_ENABLED=${PII_MIGRATION_ENABLED:-false}
       - PAYMENT_MOCK_CALLBACK_ENABLED=${PAYMENT_MOCK_CALLBACK_ENABLED:-false}
-      - PAYMENT_CALLBACK_SECRET=${PAYMENT_CALLBACK_SECRET:?PAYMENT_CALLBACK_SECRET is required in production}
+      - PAYMENT_CALLBACK_SECRET=${PAYMENT_CALLBACK_SECRET:-}
       - REQUIRE_STRONG_SECRETS=${REQUIRE_STRONG_SECRETS:-true}
       - PUBLIC_DOCS_ENABLED=${PUBLIC_DOCS_ENABLED:-false}
+      - PUBLIC_METRICS_ENABLED=${PUBLIC_METRICS_ENABLED:-true}
       - SEED_CONTENT_ENABLED=${SEED_CONTENT_ENABLED:-false}
       - COOKIE_SECURE=${COOKIE_SECURE:-true}
       - SERVER_FORWARD_HEADERS_STRATEGY=${SERVER_FORWARD_HEADERS_STRATEGY:-none}
@@ -48,8 +52,8 @@ services:
       - DB_HOST=${DB_HOST:-mysql}
       - DB_PORT=${DB_PORT:-3306}
       - DB_NAME=${DB_NAME:-tibet_tourism}
-      # The bundled mysql service has no TLS certs; external DBs should use VERIFY_IDENTITY plus DB_JDBC_EXTRA_PARAMS truststore settings.
-      - DB_SSL_MODE=${DB_SSL_MODE:-DISABLED}
+      # Use REQUIRED for the bundled MySQL service; external DBs should set VERIFY_IDENTITY plus DB_JDBC_EXTRA_PARAMS truststore settings.
+      - DB_SSL_MODE=${DB_SSL_MODE:-REQUIRED}
       - DB_ALLOW_PUBLIC_KEY_RETRIEVAL=${DB_ALLOW_PUBLIC_KEY_RETRIEVAL:-false}
       - DB_JDBC_EXTRA_PARAMS=${DB_JDBC_EXTRA_PARAMS:-}
       - REDIS_HOST=${REDIS_HOST:-redis}
@@ -65,10 +69,13 @@ services:
       - SCRAPLING_MAX_SOURCES=${SCRAPLING_MAX_SOURCES:-4}
       - SCRAPLING_MODE=${SCRAPLING_MODE:-stealth}
       - SCRAPLING_HEALTH_ENABLED=${SCRAPLING_HEALTH_ENABLED:-true}
+      - SCRAPLING_API_KEY=${SCRAPLING_API_KEY:?SCRAPLING_API_KEY is required in production}
       - ANTIBOT_ENABLED=${ANTIBOT_ENABLED:-true}
-      - RECAPTCHA_ENABLED=${RECAPTCHA_ENABLED:-false}
-      - RECAPTCHA_SITE_KEY=${RECAPTCHA_SITE_KEY}
-      - RECAPTCHA_SECRET_KEY=${RECAPTCHA_SECRET_KEY}
+      - RECAPTCHA_ENABLED=${RECAPTCHA_ENABLED:-true}
+      - REGISTRATION_RECAPTCHA_REQUIRED=${REGISTRATION_RECAPTCHA_REQUIRED:-true}
+      - RECAPTCHA_SITE_KEY=${RECAPTCHA_SITE_KEY:?RECAPTCHA_SITE_KEY is required in production}
+      - RECAPTCHA_SECRET_KEY=${RECAPTCHA_SECRET_KEY:?RECAPTCHA_SECRET_KEY is required in production}
+      - HOTEL_BOOKING_PII_READ_USERNAMES=${HOTEL_BOOKING_PII_READ_USERNAMES:-${SUPER_ADMIN_USERNAME}}
       - FINGERPRINT_ENABLED=${FINGERPRINT_ENABLED:-true}
       - BEHAVIOR_ENABLED=${BEHAVIOR_ENABLED:-true}
       - RATE_LIMIT_AI_REQUESTS=${RATE_LIMIT_AI_REQUESTS:-6}
@@ -169,6 +176,9 @@ services:
       - SCRAPLING_ALLOWED_DOMAINS=${SCRAPLING_ALLOWED_DOMAINS:-}
       - SCRAPLING_PROXY_URL=${SCRAPLING_PROXY_URL:-}
       - SCRAPLING_SOLVE_CLOUDFLARE=${SCRAPLING_SOLVE_CLOUDFLARE:-false}
+      - SCRAPLING_API_KEY=${SCRAPLING_API_KEY:?SCRAPLING_API_KEY is required in production}
+      - SCRAPLING_MAX_CONCURRENCY=${SCRAPLING_MAX_CONCURRENCY:-2}
+      - SCRAPLING_ALLOW_REQUEST_MODE_OVERRIDE=${SCRAPLING_ALLOW_REQUEST_MODE_OVERRIDE:-false}
     restart: unless-stopped
     networks:
       - tibet-network
@@ -190,9 +200,9 @@ services:
       dockerfile: Dockerfile
       args:
         - VITE_API_BASE_URL=${VITE_API_BASE_URL:-/api}
-        - VITE_RECAPTCHA_ENABLED=${VITE_RECAPTCHA_ENABLED:-${RECAPTCHA_ENABLED:-false}}
-        - VITE_RECAPTCHA_MODE=${VITE_RECAPTCHA_MODE:-v2}
-        - VITE_RECAPTCHA_SITE_KEY=${VITE_RECAPTCHA_SITE_KEY:-${RECAPTCHA_SITE_KEY:-}}
+        - VITE_RECAPTCHA_ENABLED=${VITE_RECAPTCHA_ENABLED:-${RECAPTCHA_ENABLED:-true}}
+        - VITE_RECAPTCHA_MODE=${VITE_RECAPTCHA_MODE:-v3}
+        - VITE_RECAPTCHA_SITE_KEY=${VITE_RECAPTCHA_SITE_KEY:-${RECAPTCHA_SITE_KEY:?RECAPTCHA_SITE_KEY is required in production}}
         - VITE_AMAP_KEY=${VITE_AMAP_KEY:?VITE_AMAP_KEY is required for production map features}
         - VITE_AMAP_SECURITY_CODE=${VITE_AMAP_SECURITY_CODE:?VITE_AMAP_SECURITY_CODE is required for production map features}
     environment:
@@ -255,8 +265,7 @@ services:
       - -ec
     command:
       - |
-        if [ -n "$${ALERTMANAGER_WEBHOOK_URL:-}" ]; then
-          cat > /tmp/alertmanager.yml <<EOF
+        cat > /tmp/alertmanager.yml <<EOF
         route:
           receiver: webhook
           group_by:
@@ -272,18 +281,9 @@ services:
               - url: "$${ALERTMANAGER_WEBHOOK_URL}"
                 send_resolved: true
         EOF
-        else
-          cat > /tmp/alertmanager.yml <<EOF
-        route:
-          receiver: noop
-
-        receivers:
-          - name: noop
-        EOF
-        fi
         /bin/alertmanager --config.file=/tmp/alertmanager.yml
     environment:
-      - ALERTMANAGER_WEBHOOK_URL=${ALERTMANAGER_WEBHOOK_URL:-}
+      - ALERTMANAGER_WEBHOOK_URL=${ALERTMANAGER_WEBHOOK_URL:?ALERTMANAGER_WEBHOOK_URL is required in production}
     ports:
       - "127.0.0.1:9093:9093"
     restart: unless-stopped

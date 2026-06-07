@@ -56,6 +56,12 @@ public class PriceFetchService {
     @Value("${scrapling.service.mode:}")
     private String scraplingMode;
 
+    @Value("${scrapling.service.api-key:}")
+    private String scraplingApiKey;
+
+    @Value("${app.price-update.min-publish-confidence:0.9}")
+    private double minPublishConfidence;
+
     private static final Set<String> ALLOWED_LOCAL_SERVICE_HOSTS = Set.of("localhost", "127.0.0.1", "::1", "scrapling");
 
     private Duration scraplingTimeout;
@@ -75,7 +81,7 @@ public class PriceFetchService {
      */
     public PriceInfo fetchPrice(ScenicSpot spot) {
         List<PriceFetchStrategy> strategies = Arrays.asList(
-            new ScraplingServiceStrategy(webClientBuilder, scraplingServiceUrl, scraplingTimeout, scraplingMaxSources, scraplingMode),
+            new ScraplingServiceStrategy(webClientBuilder, scraplingServiceUrl, scraplingTimeout, scraplingMaxSources, scraplingMode, scraplingApiKey),
             new AiExtractStrategy(webClientBuilder, aiApiUrl, aiApiKey, aiModel),
             new WebScrapingStrategy(webClientBuilder),
             new ThirdPartyApiStrategy(webClientBuilder)
@@ -99,6 +105,17 @@ public class PriceFetchService {
         return null;
     }
 
+    public boolean isPublishablePrice(PriceInfo priceInfo) {
+        if (priceInfo == null || priceInfo.getBasePrice() == null) {
+            return false;
+        }
+        if (priceInfo.isReferenceOnly()) {
+            return false;
+        }
+        double confidence = priceInfo.getConfidence() == null ? 0.0 : priceInfo.getConfidence();
+        return confidence >= minPublishConfidence;
+    }
+
     /**
      * 价格获取策略接口
      */
@@ -115,13 +132,15 @@ public class PriceFetchService {
         private final Duration timeout;
         private final int maxSources;
         private final String mode;
+        private final String apiKey;
 
-        public ScraplingServiceStrategy(WebClient.Builder webClientBuilder, String serviceUrl, Duration timeout, int maxSources, String mode) {
+        public ScraplingServiceStrategy(WebClient.Builder webClientBuilder, String serviceUrl, Duration timeout, int maxSources, String mode, String apiKey) {
             this.webClientBuilder = webClientBuilder;
             this.serviceUrl = serviceUrl;
             this.timeout = timeout;
             this.maxSources = Math.max(1, Math.min(10, maxSources));
             this.mode = mode == null ? "" : mode.trim();
+            this.apiKey = apiKey == null ? "" : apiKey.trim();
         }
 
         @Override
@@ -141,11 +160,16 @@ public class PriceFetchService {
                     requestBody.put("mode", mode);
                 }
 
-                @SuppressWarnings("unchecked")
-                Map<String, Object> response = webClientBuilder.build()
+                WebClient.RequestBodySpec request = webClientBuilder.build()
                     .post()
                     .uri(endpoint("/scrape/price"))
-                    .header("Content-Type", "application/json")
+                    .header("Content-Type", "application/json");
+                if (!apiKey.isBlank()) {
+                    request.header("X-Scrapling-Api-Key", apiKey);
+                }
+
+                @SuppressWarnings("unchecked")
+                Map<String, Object> response = request
                     .bodyValue(requestBody)
                     .retrieve()
                     .bodyToMono(Map.class)
@@ -174,6 +198,7 @@ public class PriceFetchService {
 
                 String source = response.getOrDefault("source", "Scrapling").toString();
                 PriceInfo info = new PriceInfo(basePrice, source);
+                info.setReferenceOnly(true);
 
                 Object confidenceObj = response.get("confidence");
                 if (confidenceObj instanceof Number confNum) {
@@ -324,6 +349,7 @@ public class PriceFetchService {
 
                 PriceInfo info = new PriceInfo(basePrice, source);
                 info.setConfidence(0.85);
+                info.setReferenceOnly(true);
 
                 if (root.hasNonNull("peakSeasonPrice") && root.get("peakSeasonPrice").isNumber()) {
                     info.setPeakSeasonPrice(root.get("peakSeasonPrice").decimalValue());
@@ -393,6 +419,7 @@ public class PriceFetchService {
                     if (finalPrice != null) {
                         PriceInfo info = new PriceInfo(finalPrice, "网页爬虫");
                         info.setConfidence(calculateConfidence(allPrices, finalPrice));
+                        info.setReferenceOnly(true);
                         return info;
                     }
                 }

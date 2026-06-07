@@ -1,8 +1,10 @@
 import { expireAuthSession } from './index'
+import { apiBaseURL, isSameOriginApi } from '../utils/apiOrigin'
 
-const apiBaseURL = import.meta.env.VITE_API_BASE_URL || '/api'
+const sameOriginApi = isSameOriginApi(apiBaseURL)
 
 function readCookie(name: string): string {
+  if (!sameOriginApi) return ''
   const prefix = `${name}=`
   const cookie = document.cookie.split('; ').find(value => value.startsWith(prefix))
   return cookie ? decodeURIComponent(cookie.slice(prefix.length)) : ''
@@ -61,7 +63,7 @@ export async function startRouteGenerationJob(
 
   const response = await fetch(`${apiBaseURL}/routes/generate/jobs`, {
     method: 'POST',
-    credentials: 'include',
+    credentials: sameOriginApi ? 'include' : 'omit',
     headers,
     body: JSON.stringify({ ...requestBody, locale }),
   })
@@ -83,7 +85,7 @@ export async function startRouteGenerationJob(
 export async function getRouteGenerationJob(jobId: string): Promise<RouteGenerationJobSnapshot> {
   const response = await fetch(`${apiBaseURL}/routes/generate/jobs/${encodeURIComponent(jobId)}`, {
     method: 'GET',
-    credentials: 'include',
+    credentials: sameOriginApi ? 'include' : 'omit',
     headers: {
       'Accept': 'application/json',
       'Accept-Language': localStorage.getItem('locale') || 'zh',
@@ -111,7 +113,7 @@ export async function streamRouteGenerationJob(
 ): Promise<void> {
   const response = await fetch(`${apiBaseURL}/routes/generate/jobs/${encodeURIComponent(jobId)}/stream`, {
     method: 'GET',
-    credentials: 'include',
+    credentials: sameOriginApi ? 'include' : 'omit',
     headers: {
       'Accept': 'text/event-stream',
       'Accept-Language': localStorage.getItem('locale') || 'zh',
@@ -220,7 +222,7 @@ export async function generateRouteStream(
 
   const response = await fetch(`${apiBaseURL}/routes/generate/stream`, {
     method: 'POST',
-    credentials: 'include',
+    credentials: sameOriginApi ? 'include' : 'omit',
     headers,
     body: JSON.stringify({ ...requestBody, locale }),
     signal: abortSignal,

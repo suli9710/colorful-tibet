@@ -1,6 +1,7 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { clearAllRoutePlannerDrafts } from '../composables/useRoutePlannerDraft'
+import { apiBaseURL, isSameOriginApi, normalizedApiBaseURL } from '../utils/apiOrigin'
 
 export interface AuthUser {
   id?: number
@@ -20,11 +21,9 @@ export interface AuthUser {
 const USER_STORAGE_KEY = 'user'
 const AUTH_SESSION_VERSION_KEY = 'auth-session-version'
 const AUTH_SESSION_EVENT = 'auth-session-changed'
-const apiBaseURL = import.meta.env.VITE_API_BASE_URL || '/api'
+const sameOriginApi = isSameOriginApi(apiBaseURL)
 
 const hasStorage = () => typeof window !== 'undefined' && typeof window.localStorage !== 'undefined'
-
-const normalizedApiBaseURL = () => String(apiBaseURL).replace(/\/+$/, '')
 
 const notifySessionChanged = () => {
   if (typeof window === 'undefined') return
@@ -94,7 +93,7 @@ export const clearStoredAuth = () => {
 const fetchCurrentUser = async (): Promise<AuthUser> => {
   const locale = hasStorage() ? localStorage.getItem('locale') || 'zh' : 'zh'
   const response = await fetch(`${normalizedApiBaseURL()}/auth/me`, {
-    credentials: 'include',
+    credentials: sameOriginApi ? 'include' : 'omit',
     headers: {
       Accept: 'application/json',
       'Accept-Language': locale

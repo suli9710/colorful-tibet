@@ -41,9 +41,10 @@ public class PriceBatchUpdateJobService {
     @Value("${app.price-update.jobs.stale-running-minutes:1440}")
     private long staleRunningMinutes = 1440;
 
-    public PriceBatchUpdateJobService(ScenicSpotRepository scenicSpotRepository,
-                                      PriceUpdateService priceUpdateService,
-                                      @Qualifier("priceUpdateExecutor") Executor priceUpdateExecutor) {
+    public PriceBatchUpdateJobService(
+            ScenicSpotRepository scenicSpotRepository,
+            PriceUpdateService priceUpdateService,
+            @Qualifier("priceUpdateExecutor") Executor priceUpdateExecutor) {
         this.scenicSpotRepository = scenicSpotRepository;
         this.priceUpdateService = priceUpdateService;
         this.priceUpdateExecutor = priceUpdateExecutor;
@@ -138,7 +139,8 @@ public class PriceBatchUpdateJobService {
         if (message == null) {
             return false;
         }
-        return message.contains("跳过") || message.contains("skip") || message.contains("璺宠繃");
+        String normalized = message.toLowerCase();
+        return message.contains("SKIPPED_") || normalized.contains("skip");
     }
 
     public record PriceBatchUpdateJobSnapshot(

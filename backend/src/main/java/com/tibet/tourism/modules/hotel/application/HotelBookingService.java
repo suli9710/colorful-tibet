@@ -13,7 +13,6 @@ import com.tibet.tourism.modules.order.application.OrderCenterService;
 import com.tibet.tourism.modules.order.domain.Booking;
 import com.tibet.tourism.modules.user.domain.User;
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -86,9 +85,9 @@ public class HotelBookingService {
         long nights = ChronoUnit.DAYS.between(request.getCheckInDate(), request.getCheckOutDate());
         BigDecimal roomPrice = roomType.getPrice() == null ? BigDecimal.ZERO : roomType.getPrice();
         BigDecimal subtotal = roomPrice.multiply(BigDecimal.valueOf(nights));
-        BigDecimal serviceFee = subtotal.multiply(new BigDecimal("0.05")).setScale(0, RoundingMode.HALF_UP);
+        BigDecimal serviceFee = BigDecimal.ZERO;
         BigDecimal discount = BigDecimal.ZERO;
-        BigDecimal totalPrice = subtotal.add(serviceFee).subtract(discount);
+        BigDecimal totalPrice = subtotal.subtract(discount);
 
         HotelBooking booking = new HotelBooking();
         booking.setUser(user);
@@ -279,7 +278,7 @@ public class HotelBookingService {
                 booking.getGuests(),
                 fullPii || ownerView ? booking.getGuestName() : PiiMasker.maskName(booking.getGuestName()),
                 fullPii ? booking.getPhone() : PiiMasker.maskPhone(booking.getPhone()),
-                booking.getNote(),
+                noteFor(booking, piiView),
                 booking.getSubtotal(),
                 booking.getServiceFee(),
                 booking.getDiscount(),
@@ -287,5 +286,12 @@ public class HotelBookingService {
                 booking.getStatus() == null ? null : booking.getStatus().name(),
                 booking.getCreatedAt()
         );
+    }
+
+    private String noteFor(HotelBooking booking, PiiView piiView) {
+        if (piiView == PiiView.MASKED) {
+            return null;
+        }
+        return booking.getNote();
     }
 }

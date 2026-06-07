@@ -111,7 +111,7 @@ public class BookingController {
         orderCenterService.createFromLegacySpotBooking(booking);
 
         return ResponseEntity.ok(Map.of(
-                "message", "Booking created successfully and is pending payment.",
+                "message", "Ticket inquiry created. Complete payment and fulfillment on a qualified third-party platform.",
                 "bookingId", booking.getId(),
                 "status", booking.getStatus()));
     }

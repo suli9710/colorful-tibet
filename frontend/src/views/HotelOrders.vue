@@ -78,7 +78,6 @@ interface HotelOrder {
   note: string
   nights: number
   subtotal: number
-  serviceFee: number
   discount: number
   totalPrice: number
   status: 'PENDING' | 'CONFIRMED' | 'CANCELLED'

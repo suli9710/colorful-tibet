@@ -47,6 +47,10 @@ public class HeritageItem {
     @Column(name = "comment_count")
     private Integer commentCount = 0;
 
+    @Version
+    @Column(name = "version")
+    private Long version = 0L;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
@@ -182,6 +186,14 @@ public class HeritageItem {
 
     public void setCommentCount(Integer commentCount) {
         this.commentCount = commentCount;
+    }
+
+    public Long getVersion() {
+        return version;
+    }
+
+    public void setVersion(Long version) {
+        this.version = version;
     }
 
     public LocalDateTime getCreatedAt() {

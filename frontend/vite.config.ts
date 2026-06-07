@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vitest/config'
 import vue from '@vitejs/plugin-vue'
 import VueI18nPlugin from '@intlify/unplugin-vue-i18n/vite'
 import fs from 'fs'
@@ -86,5 +86,10 @@ export default defineConfig(({ command }) => ({
     : undefined,
   css: {
     postcss: './postcss.config.js',
+  },
+  test: {
+    environment: 'node',
+    globals: true,
+    include: ['src/**/*.test.ts']
   },
 }))

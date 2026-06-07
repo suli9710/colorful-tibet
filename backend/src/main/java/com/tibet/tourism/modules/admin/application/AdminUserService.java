@@ -46,7 +46,7 @@ public class AdminUserService {
     private final ItineraryRepository itineraryRepository;
     private final UserVisitHistoryRepository userVisitHistoryRepository;
 
-    @Value("${app.super-admin-username:lzh}")
+    @Value("${app.super-admin-username:}")
     private String superAdminUsername;
 
     public AdminUserService(UserRepository userRepository,

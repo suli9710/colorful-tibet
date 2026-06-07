@@ -18,7 +18,12 @@ interface ErrorPayload {
 const ERROR_REPORT_URL = import.meta.env.VITE_FRONTEND_ERROR_REPORT_URL as string | undefined
 const RELEASE = (import.meta.env.VITE_APP_VERSION as string | undefined) || 'development'
 const MAX_REPORTS_PER_MINUTE = 5
-const REDACTION_PATTERN = /((?:token|secret|password|authorization|code|key)=)[^&\s]+/gi
+const SENSITIVE_KEY_PATTERN = '(?:token|secret|password|authorization|code|key|api[_-]?key|access[_-]?token|refresh[_-]?token|xsrf[_-]?token|csrf[_-]?token|x-xsrf-token|session|cookie)'
+const QUERY_REDACTION_PATTERN = new RegExp(`\\b(${SENSITIVE_KEY_PATTERN}=)[^&\\s]+`, 'gi')
+const JSON_STRING_REDACTION_PATTERN = new RegExp(`(["'])(${SENSITIVE_KEY_PATTERN})\\1(\\s*:\\s*)(["'])[^"'\\r\\n]*\\4`, 'gi')
+const JSON_BARE_REDACTION_PATTERN = new RegExp(`(["'])(${SENSITIVE_KEY_PATTERN})\\1(\\s*:\\s*)([^"',}\\]\\s]+)`, 'gi')
+const HEADER_REDACTION_PATTERN = /\b((?:authorization|cookie|set-cookie|x-api-key|api-key|x-auth-token|x-xsrf-token|x-csrf-token)\s*:\s*)[^\r\n]+/gi
+const BEARER_REDACTION_PATTERN = /\b(Bearer\s+)[A-Za-z0-9._~+/-]+=*/gi
 let reportWindowStartedAt = 0
 let reportsInWindow = 0
 
@@ -30,8 +35,17 @@ function truncate(value: string | undefined, limit: number): string | undefined 
   return value.length > limit ? `${value.slice(0, limit)}...` : value
 }
 
-function redact(value: string | undefined): string | undefined {
-  return truncate(value?.replace(REDACTION_PATTERN, '$1<redacted>'), value === undefined ? 0 : value.length)
+export function redactForErrorReport(value: string | undefined): string | undefined {
+  if (!value) {
+    return undefined
+  }
+
+  return value
+    .replace(QUERY_REDACTION_PATTERN, '$1<redacted>')
+    .replace(JSON_STRING_REDACTION_PATTERN, '$1$2$1$3$4<redacted>$4')
+    .replace(JSON_BARE_REDACTION_PATTERN, '$1$2$1$3<redacted>')
+    .replace(HEADER_REDACTION_PATTERN, '$1<redacted>')
+    .replace(BEARER_REDACTION_PATTERN, '$1<redacted>')
 }
 
 function stringifyUnknown(value: unknown): string {
@@ -50,14 +64,14 @@ function normalizeError(error: unknown): Pick<ErrorPayload, 'name' | 'message' |
   if (error instanceof Error) {
     return {
       name: error.name || 'Error',
-      message: truncate(redact(error.message), 1000) || 'Unknown error',
-      stack: truncate(redact(error.stack), 4000),
+      message: truncate(redactForErrorReport(error.message), 1000) || 'Unknown error',
+      stack: truncate(redactForErrorReport(error.stack), 4000),
     }
   }
 
   return {
     name: 'NonErrorRejection',
-    message: truncate(redact(stringifyUnknown(error)), 1000) || 'Unknown error',
+    message: truncate(redactForErrorReport(stringifyUnknown(error)), 1000) || 'Unknown error',
   }
 }
 
@@ -112,7 +126,7 @@ function reportError(source: ErrorSource, error: unknown, router: Router, info?:
   const payload: ErrorPayload = {
     source,
     ...normalized,
-    info: truncate(redact(info), 500),
+    info: truncate(redactForErrorReport(info), 500),
     path: safeReportPath(router),
     release: RELEASE,
     userAgent: navigator.userAgent,

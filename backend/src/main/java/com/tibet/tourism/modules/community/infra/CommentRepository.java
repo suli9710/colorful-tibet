@@ -6,6 +6,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface CommentRepository extends JpaRepository<Comment, Long> {
     @EntityGraph(attributePaths = {"user", "spot"})
@@ -25,4 +28,12 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
     long countByUser(User user);
     void deleteByUser(User user);
     void deleteBySpotId(Long spotId);
+
+    @Modifying
+    @Query("UPDATE Comment c SET c.likeCount = COALESCE(c.likeCount, 0) + 1, c.version = COALESCE(c.version, 0) + 1 WHERE c.id = :id")
+    int incrementLikeCount(@Param("id") Long id);
+
+    @Modifying
+    @Query("UPDATE Comment c SET c.likeCount = CASE WHEN COALESCE(c.likeCount, 0) > 0 THEN c.likeCount - 1 ELSE 0 END, c.version = COALESCE(c.version, 0) + 1 WHERE c.id = :id")
+    int decrementLikeCount(@Param("id") Long id);
 }

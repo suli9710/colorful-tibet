@@ -20,9 +20,12 @@ import jakarta.validation.Valid;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -33,6 +36,16 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/heritage")
 public class HeritageController {
+
+    private static final Set<String> ALLOWED_HERITAGE_ITEM_SORT_FIELDS = Set.of(
+            "id", "name", "category", "region", "protectionLevel", "viewCount", "likeCount", "commentCount", "createdAt");
+    private static final Set<String> ALLOWED_HERITAGE_COMMENT_SORT_FIELDS = Set.of(
+            "id", "createdAt", "rating");
+    private static final Set<String> ALLOWED_HERITAGE_EVENT_SORT_FIELDS = Set.of(
+            "id", "eventDate", "createdAt");
+    private static final Sort DEFAULT_HERITAGE_ITEM_SORT = Sort.by("id");
+    private static final Sort DEFAULT_HERITAGE_COMMENT_SORT = Sort.by(Sort.Direction.DESC, "createdAt").and(Sort.by("id"));
+    private static final Sort DEFAULT_HERITAGE_EVENT_SORT = Sort.by(Sort.Direction.ASC, "eventDate").and(Sort.by("id"));
 
     @Autowired
     private HeritageService heritageService;
@@ -55,19 +68,21 @@ public class HeritageController {
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String keyword,
             @PageableDefault(size = 20) Pageable pageable) {
+        Pageable safePageable = InputSanitizer.sanitizePageable(
+                pageable, ALLOWED_HERITAGE_ITEM_SORT_FIELDS, DEFAULT_HERITAGE_ITEM_SORT, 20, 100);
         if (keyword != null && !keyword.isBlank()) {
             if (category != null && !category.isEmpty()) {
-                return heritageService.searchItemsByCategory(category, keyword, pageable)
+                return heritageService.searchItemsByCategory(category, keyword, safePageable)
                         .map(item -> HeritageItemDTO.fromEntity(item, locale));
             }
-            return heritageService.searchItems(keyword, pageable)
+            return heritageService.searchItems(keyword, safePageable)
                     .map(item -> HeritageItemDTO.fromEntity(item, locale));
         }
         if (category != null && !category.isEmpty()) {
-            return heritageService.getItemsByCategory(category, pageable)
+            return heritageService.getItemsByCategory(category, safePageable)
                     .map(item -> HeritageItemDTO.fromEntity(item, locale));
         }
-        return heritageService.getAllItems(pageable)
+        return heritageService.getAllItems(safePageable)
                 .map(item -> HeritageItemDTO.fromEntity(item, locale));
     }
 
@@ -91,21 +106,30 @@ public class HeritageController {
                 .orElseThrow(() -> new ResourceNotFoundException("Heritage item not found"));
 
         boolean exists = heritageLikeRepository.existsByUserIdAndHeritageItemId(user.getId(), id);
+        boolean liked;
         if (exists) {
-            heritageLikeRepository.deleteByUserIdAndHeritageItemId(user.getId(), id);
-            item.setLikeCount(Math.max(0, item.getLikeCount() - 1));
+            long deleted = heritageLikeRepository.deleteByUserIdAndHeritageItemId(user.getId(), id);
+            if (deleted > 0) {
+                heritageItemRepository.decrementLikeCount(id);
+            }
+            liked = false;
         } else {
             HeritageLike like = new HeritageLike();
             like.setUser(user);
             like.setHeritageItem(item);
-            heritageLikeRepository.save(like);
-            item.setLikeCount(item.getLikeCount() + 1);
+            try {
+                heritageLikeRepository.saveAndFlush(like);
+                heritageItemRepository.incrementLikeCount(id);
+            } catch (DataIntegrityViolationException duplicate) {
+                // Concurrent duplicate like; the unique row already represents the desired state.
+            }
+            liked = true;
         }
-        heritageItemRepository.save(item);
+        int likeCount = heritageLikeRepository.countByHeritageItemId(id);
 
         Map<String, Object> response = new HashMap<>();
-        response.put("liked", !exists);
-        response.put("likeCount", item.getLikeCount());
+        response.put("liked", liked);
+        response.put("likeCount", likeCount);
         return ResponseEntity.ok(response);
     }
 
@@ -123,7 +147,9 @@ public class HeritageController {
     public Page<HeritageCommentDTO> getComments(
             @PathVariable Long id,
             @PageableDefault(size = 20) Pageable pageable) {
-        return heritageCommentRepository.findByHeritageItemIdOrderByCreatedAtDesc(id, pageable)
+        Pageable safePageable = InputSanitizer.sanitizePageable(
+                pageable, ALLOWED_HERITAGE_COMMENT_SORT_FIELDS, DEFAULT_HERITAGE_COMMENT_SORT, 20, 100);
+        return heritageCommentRepository.findByHeritageItemIdOrderByCreatedAtDesc(id, safePageable)
                 .map(HeritageCommentDTO::fromEntity);
     }
 
@@ -145,11 +171,10 @@ public class HeritageController {
         comment.setHeritageItem(item);
         comment.setContent(content);
         comment.setRating(dto.getRating());
-        comment.setImageUrl(dto.getImageUrl());
+        comment.setImageUrl(InputSanitizer.optionalLocalAssetPath(dto.getImageUrl(), "heritage comment image"));
         heritageCommentRepository.save(comment);
 
-        item.setCommentCount(item.getCommentCount() == null ? 1 : item.getCommentCount() + 1);
-        heritageItemRepository.save(item);
+        heritageItemRepository.incrementCommentCount(id);
 
         return ResponseEntity.ok(HeritageCommentDTO.fromEntity(comment));
     }
@@ -176,9 +201,7 @@ public class HeritageController {
         }
 
         heritageCommentRepository.delete(comment);
-        int currentCount = item.getCommentCount() == null ? 0 : item.getCommentCount();
-        item.setCommentCount(Math.max(0, currentCount - 1));
-        heritageItemRepository.save(item);
+        heritageItemRepository.decrementCommentCount(heritageId);
 
         return ResponseEntity.noContent().build();
     }
@@ -213,7 +236,9 @@ public class HeritageController {
     public Page<HeritageEventDTO> getUpcomingEvents(
             @RequestParam(required = false, defaultValue = "zh") String locale,
             @PageableDefault(size = 10) Pageable pageable) {
-        return heritageService.getUpcomingEvents(pageable)
+        Pageable safePageable = InputSanitizer.sanitizePageable(
+                pageable, ALLOWED_HERITAGE_EVENT_SORT_FIELDS, DEFAULT_HERITAGE_EVENT_SORT, 10, 100);
+        return heritageService.getUpcomingEvents(safePageable)
                 .map(e -> HeritageEventDTO.fromEntity(e, locale));
     }
 }

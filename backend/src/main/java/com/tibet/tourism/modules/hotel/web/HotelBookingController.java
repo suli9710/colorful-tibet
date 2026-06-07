@@ -2,6 +2,7 @@ package com.tibet.tourism.modules.hotel.web;
 import com.tibet.tourism.common.security.antibot.BehaviorData;
 import com.tibet.tourism.common.security.antibot.RiskAssessmentService;
 import com.tibet.tourism.common.security.antibot.RiskResult;
+import com.tibet.tourism.common.validation.InputSanitizer;
 import com.tibet.tourism.modules.hotel.application.HotelBookingService;
 import com.tibet.tourism.modules.hotel.domain.Hotel;
 import com.tibet.tourism.modules.hotel.domain.HotelBooking;
@@ -14,8 +15,10 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Set;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -35,6 +38,10 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/hotel-bookings")
 public class HotelBookingController {
+
+    private static final Set<String> ALLOWED_BOOKING_SORT_FIELDS = Set.of(
+            "id", "status", "checkInDate", "checkOutDate", "totalPrice", "createdAt");
+    private static final Sort DEFAULT_BOOKING_SORT = Sort.by(Sort.Direction.DESC, "createdAt").and(Sort.by("id"));
 
     private final HotelBookingService hotelBookingService;
     private final UserRepository userRepository;
@@ -90,7 +97,7 @@ public class HotelBookingController {
         try {
             HotelBooking saved = hotelBookingService.createBooking(user, request);
             return ResponseEntity.ok(Map.of(
-                    "message", "Hotel booking created successfully and is pending payment.",
+                    "message", "Hotel inquiry created. Complete payment and fulfillment on a qualified third-party platform.",
                     "bookingId", saved.getId(),
                     "status", saved.getStatus(),
                     "totalPrice", saved.getTotalPrice()
@@ -111,7 +118,9 @@ public class HotelBookingController {
         if (user == null) {
             return ResponseEntity.status(401).body(Map.of("error", "User not authenticated"));
         }
-        Page<HotelBookingResponse> bookings = hotelBookingService.getUserBookings(user, pageable);
+        Pageable safePageable = InputSanitizer.sanitizePageable(
+                pageable, ALLOWED_BOOKING_SORT_FIELDS, DEFAULT_BOOKING_SORT, 20, 100);
+        Page<HotelBookingResponse> bookings = hotelBookingService.getUserBookings(user, safePageable);
         return ResponseEntity.ok(bookings);
     }
 
@@ -124,7 +133,9 @@ public class HotelBookingController {
         }
 
         try {
-            return ResponseEntity.ok(hotelBookingService.getAllBookings(user, pageable));
+            Pageable safePageable = InputSanitizer.sanitizePageable(
+                    pageable, ALLOWED_BOOKING_SORT_FIELDS, DEFAULT_BOOKING_SORT, 20, 100);
+            return ResponseEntity.ok(hotelBookingService.getAllBookings(user, safePageable));
         } catch (SecurityException e) {
             return ResponseEntity.status(403).body(Map.of("error", "无权操作该资源"));
         }

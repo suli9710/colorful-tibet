@@ -136,7 +136,7 @@
                 :exit="{ opacity: 0, y: -6 }"
                 :transition="{ duration: 0.18, ease: motionEase }"
               >
-                {{ t('common.confirmBook') }}
+                {{ t('hotel.submitInquiry') }}
               </motion.span>
             </AnimatePresence>
           </motion.button>
@@ -179,7 +179,7 @@
               <div class="flex justify-between"><span class="text-gray-500">{{ t('hotel.checkIn') }}</span><span class="font-medium">{{ form.checkInDate || '-' }}</span></div>
               <div class="flex justify-between"><span class="text-gray-500">{{ t('hotel.checkOut') }}</span><span class="font-medium">{{ form.checkOutDate || '-' }}</span></div>
               <div class="flex justify-between border-t border-tibet-gold/20 pt-2 mt-2">
-                <span class="font-semibold">{{ t('hotel.total') }}</span>
+                <span class="font-semibold">{{ t('hotel.referenceRoomFee') }}</span>
                 <motion.span
                   :key="totalPrice"
                   class="text-xl font-bold text-blue-600"
@@ -190,6 +190,9 @@
                   ¥{{ totalPrice }}
                 </motion.span>
               </div>
+              <p class="rounded-xl bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800">
+                {{ t('hotel.noPlatformPaymentHint') }}
+              </p>
               </motion.div>
             </AnimatePresence>
           </motion.div>
@@ -198,20 +201,12 @@
     </motion.section>
   </div>
 
-  <PaymentModal
-    :show="showPaymentModal"
-    :amount="totalPrice"
-    recaptcha-action="hotel_booking"
-    @close="showPaymentModal = false"
-    @status-check="handlePaymentStatusCheck"
-  />
-
   <MobileStickyActionBar
     :show="Boolean(hotel)"
-    :eyebrow="t('hotel.total')"
+    :eyebrow="t('hotel.referenceRoomFee')"
     :title="`¥${totalPrice}`"
     :meta="selectedRoom?.name || hotel?.name"
-    :primary-label="submitting ? t('common.submitting') : t('common.confirmBook')"
+    :primary-label="submitting ? t('common.submitting') : t('hotel.submitInquiry')"
     :primary-disabled="submitting"
     @primary="submitBooking"
   />
@@ -226,7 +221,6 @@ import { getHotelById, getRoomById, hotels } from '../data/hotels'
 import { applyHotelImageFallback, resolveHotelCoverImage } from '../data/hotelImages'
 import { getCanonicalRegion, localizeApiRoom, localizeHotel } from '../data/hotelTranslations'
 import api, { endpoints } from '../api'
-import PaymentModal from '../components/PaymentModal.vue'
 import MobileStickyActionBar from '../components/MobileStickyActionBar.vue'
 import { useBehaviorTracker } from '../composables/useBehaviorTracker'
 import {
@@ -339,19 +333,15 @@ const nights = computed(() => {
   return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)))
 })
 
-const serviceFee = computed(() => Math.round((selectedRoom.value?.price || 0) * nights.value * 0.05))
-
 const totalPrice = computed(() => {
   const roomTotal = (selectedRoom.value?.price || 0) * nights.value
-  return roomTotal + serviceFee.value
+  return roomTotal
 })
 
 const submitting = ref(false)
 const submitError = ref('')
 
-const showPaymentModal = ref(false)
-
-const submitBooking = () => {
+const submitBooking = async () => {
   submitError.value = ''
   if (!form.value.checkInDate || !form.value.checkOutDate) {
     submitError.value = t('hotel.checkInRequired')
@@ -365,11 +355,6 @@ const submitBooking = () => {
     submitError.value = t('hotel.phoneRequired')
     return
   }
-  showPaymentModal.value = true
-}
-
-const handlePaymentStatusCheck = async (recaptchaToken = '') => {
-  showPaymentModal.value = false
   submitting.value = true
   submitError.value = ''
   try {
@@ -388,7 +373,6 @@ const handlePaymentStatusCheck = async (recaptchaToken = '') => {
       note: form.value.note,
     }, {
       headers: {
-        ...(recaptchaToken ? { 'X-Recaptcha-Token': recaptchaToken } : {}),
         ...(behaviorData ? { 'X-Behavior-Data': behaviorData } : {}),
       }
     })
@@ -413,6 +397,6 @@ const handlePaymentStatusCheck = async (recaptchaToken = '') => {
   localStorage.removeItem('hotel-orders')
   window.dispatchEvent(new CustomEvent('hotel-orders-updated'))
   window.dispatchEvent(new CustomEvent('bookings-updated'))
-  router.push('/hotel-orders')
+  router.push('/orders')
 }
 </script>

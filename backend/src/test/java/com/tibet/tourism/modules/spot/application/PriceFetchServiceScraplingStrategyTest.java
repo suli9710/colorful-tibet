@@ -2,6 +2,7 @@ package com.tibet.tourism.modules.spot.application;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.tibet.tourism.modules.spot.domain.ScenicSpot;
 import com.tibet.tourism.modules.spot.web.dto.PriceInfo;
@@ -42,7 +43,8 @@ class PriceFetchServiceScraplingStrategyTest {
                 "http://scrapling:8000/",
                 Duration.ofSeconds(1),
                 4,
-                "basic");
+                "basic",
+                "test-token");
 
         PriceInfo info = strategy.fetch(spot);
 
@@ -52,6 +54,7 @@ class PriceFetchServiceScraplingStrategyTest {
         assertEquals("Scrapling (basic)", info.getSource());
         assertEquals(0.82, info.getConfidence());
         assertEquals("{\"evidence\":[{\"price\":200}]}", info.getRawData());
+        assertTrue(info.isReferenceOnly());
     }
 
     @Test
@@ -61,6 +64,7 @@ class PriceFetchServiceScraplingStrategyTest {
                 "",
                 Duration.ofSeconds(1),
                 4,
+                "",
                 "");
 
         assertNull(strategy.fetch(new ScenicSpot()));

@@ -90,10 +90,12 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public ResponseEntity<?> registerUser(@Valid @RequestBody RegisterRequest signUpRequest) {
+    public ResponseEntity<?> registerUser(@Valid @RequestBody RegisterRequest signUpRequest, HttpServletRequest request) {
         try {
-            authApplicationService.register(signUpRequest);
+            authApplicationService.register(signUpRequest, request);
             return ResponseEntity.ok(Map.of("message", "User registered successfully!"));
+        } catch (AuthForbiddenException exception) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", exception.getMessage()));
         } catch (DuplicateRegistrationException exception) {
             return ResponseEntity.badRequest().body(Map.of("message", exception.getMessage()));
         } catch (IllegalArgumentException exception) {
