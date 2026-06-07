@@ -4,6 +4,7 @@ import com.tibet.tourism.modules.hotel.domain.HotelBooking;
 import com.tibet.tourism.modules.hotel.infra.HotelBookingRepository;
 import com.tibet.tourism.modules.hotel.infra.HotelRepository;
 import com.tibet.tourism.modules.hotel.infra.RoomTypeRepository;
+import com.tibet.tourism.modules.order.domain.CancellationPolicy;
 import com.tibet.tourism.modules.order.domain.InventoryLock;
 import com.tibet.tourism.modules.order.domain.OrderItem;
 import com.tibet.tourism.modules.order.domain.PaymentTransaction;
@@ -13,6 +14,7 @@ import com.tibet.tourism.modules.order.infra.CancellationPolicyRepository;
 import com.tibet.tourism.modules.order.infra.InventoryLockRepository;
 import com.tibet.tourism.modules.order.infra.PaymentTransactionRepository;
 import com.tibet.tourism.modules.order.infra.PlatformOrderRepository;
+import com.tibet.tourism.modules.order.web.dto.CancelOrderRequest;
 import com.tibet.tourism.modules.order.web.dto.CreateOrderItemRequest;
 import com.tibet.tourism.modules.order.web.dto.CreateOrderRequest;
 import com.tibet.tourism.modules.order.web.dto.PaymentCallbackRequest;
@@ -367,6 +369,42 @@ class OrderCenterServiceTest {
     }
 
     @Test
+    void cancelConfirmedOrderUsesCancellationPolicyRefundRateAfterFreeWindow() {
+        PlatformOrder order = paidOrderWithItem();
+        OrderItem item = order.getItems().get(0);
+        item.setServiceStartDate(LocalDate.now().plusDays(1));
+        item.setCancellationPolicyId(5L);
+
+        when(orderRepository.findByIdAndUserIdForUpdate(99L, 1L)).thenReturn(Optional.of(order));
+        when(cancellationPolicyRepository.findById(5L))
+                .thenReturn(Optional.of(policy(72, new BigDecimal("0.50"))));
+
+        var response = orderCenterService.cancelOrder(user, 99L, new CancelOrderRequest());
+
+        assertEquals("REFUND_PENDING", response.status());
+        assertEquals(new BigDecimal("300.00"), response.refunds().get(0).amount());
+    }
+
+    @Test
+    void refundRequestUsesFullAmountInsideFreeCancellationWindow() {
+        PlatformOrder order = paidOrderWithItem();
+        OrderItem item = order.getItems().get(0);
+        item.setServiceStartDate(LocalDate.now().plusDays(10));
+        item.setCancellationPolicyId(5L);
+
+        when(orderRepository.findByIdAndUserIdForUpdate(99L, 1L)).thenReturn(Optional.of(order));
+        when(cancellationPolicyRepository.findById(5L))
+                .thenReturn(Optional.of(policy(72, new BigDecimal("0.50"))));
+
+        var response = orderCenterService.requestRefund(
+                user,
+                99L,
+                new com.tibet.tourism.modules.order.web.dto.RefundRequest());
+
+        assertEquals(new BigDecimal("600"), response.amount());
+    }
+
+    @Test
     void refundRequestRejectsDuplicatePendingRefund() {
         PlatformOrder order = paidOrderWithItem();
         RefundOrder pending = new RefundOrder();
@@ -443,6 +481,14 @@ class OrderCenterServiceTest {
         transaction.setPaidAt(java.time.LocalDateTime.now());
         order.addPaymentTransaction(transaction);
         return transaction;
+    }
+
+    private CancellationPolicy policy(int freeCancelBeforeHours, BigDecimal refundRate) {
+        CancellationPolicy policy = new CancellationPolicy();
+        policy.setProductType(OrderItem.ProductType.SCENIC_SPOT);
+        policy.setFreeCancelBeforeHours(freeCancelBeforeHours);
+        policy.setRefundRate(refundRate);
+        return policy;
     }
 
     private CreateOrderRequest scenicOrderRequest() {

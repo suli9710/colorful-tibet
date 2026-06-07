@@ -71,7 +71,8 @@ MYSQL_PASSWORD=local-db-password
 MYSQL_ROOT_PASSWORD=local-root-password
 MYSQL_SSL_MODE=DISABLED
 MYSQL_ALLOW_PUBLIC_KEY_RETRIEVAL=true
-DB_SSL_MODE=DISABLED
+DB_SSL_MODE=REQUIRED
+DB_ALLOW_PUBLIC_KEY_RETRIEVAL=false
 DB_JDBC_EXTRA_PARAMS=
 
 JWT_SECRET=replace-with-at-least-64-random-characters-for-local-dev
@@ -95,6 +96,8 @@ BACKEND_HOST_PORT=8080
 MYSQL_HOST_PORT=3307
 REDIS_HOST_PORT=6380
 SCRAPLING_HOST_PORT=8000
+SCRAPLING_API_KEY=local-scrapling-dev-secret
+SCRAPLING_ALLOW_UNAUTHENTICATED=false
 ```
 
 生成本地随机密钥的 PowerShell 示例：
@@ -119,13 +122,29 @@ $bytes = New-Object byte[] 32
 - `PII_KEYS` 格式必须是 `kid:base64-32-byte-key`，例如 `v1:xxxx`。
 - `SUPER_ADMIN_TOTP_SECRET` 本地可先使用示例 Base32 值，真实联调二次认证时再替换为认证器 App 中的密钥。
 - AI Key 可以留空；没有 `DOUBAO_API_KEY` 或 `ARK_API_KEY` 时，AI 路线相关功能应使用本地兜底逻辑或返回可理解的错误。
+- `SCRAPLING_API_KEY` 同时传给 backend 和 scrapling；只有 loopback-only 本地调试才可以临时设置 `SCRAPLING_ALLOW_UNAUTHENTICATED=true`。
 
-Production DB TLS note:
+生产数据库 TLS 说明：
 
-- `docker-compose.prod.yml` defaults `DB_SSL_MODE=DISABLED` because the bundled MySQL service does not provision TLS certificates.
-- For an external MySQL service, set `DB_SSL_MODE=VERIFY_IDENTITY` and provide explicit CA/truststore settings through `DB_JDBC_EXTRA_PARAMS`.
-- Example: `DB_JDBC_EXTRA_PARAMS=&trustCertificateKeyStoreUrl=file:/run/secrets/mysql-truststore.p12&trustCertificateKeyStorePassword=change-me&trustCertificateKeyStoreType=PKCS12`.
-- Keep `DB_ALLOW_PUBLIC_KEY_RETRIEVAL=false` in production unless you have a documented, temporary operational reason.
+`docker-compose.prod.yml`、`.env.example` 和 `application-prod.yml` 的生产默认值保持一致：
+
+```dotenv
+DB_SSL_MODE=REQUIRED
+DB_ALLOW_PUBLIC_KEY_RETRIEVAL=false
+DB_JDBC_EXTRA_PARAMS=
+```
+
+这些默认值适用于项目自带 MySQL 服务的直接部署路径：JDBC 会要求加密传输，但不要求为 Compose 管理的数据库额外配置 truststore。
+
+如果接入外部 MySQL，建议使用身份校验并继续禁用 public key retrieval：
+
+```dotenv
+DB_SSL_MODE=VERIFY_IDENTITY
+DB_ALLOW_PUBLIC_KEY_RETRIEVAL=false
+DB_JDBC_EXTRA_PARAMS=&trustCertificateKeyStoreUrl=file:/run/secrets/mysql-truststore.p12&trustCertificateKeyStorePassword=change-me&trustCertificateKeyStoreType=PKCS12
+```
+
+`DB_JDBC_EXTRA_PARAMS` 会追加到已有 JDBC 查询串后面，因此必须以 `&` 开头。生产环境不要使用 `DB_SSL_MODE=DISABLED`。只有在有明确记录的临时运维场景下，才可以设置 `DB_ALLOW_PUBLIC_KEY_RETRIEVAL=true`。
 
 ## 4. 推荐方式：一键启动
 
@@ -315,11 +334,13 @@ Vite 已在 `frontend/vite.config.ts` 中配置代理：
 
 | 用途 | 默认端口 | 修改变量 |
 | --- | --- | --- |
-| 前端 Nginx | `80` | `FRONTEND_HOST_PORT` |
+| 前端 Nginx | `127.0.0.1:80` | `FRONTEND_HOST_PORT` |
 | 后端 API | `8080` | `BACKEND_HOST_PORT` |
 | MySQL | `3307` | `MYSQL_HOST_PORT` |
 | Redis | `6380` | `REDIS_HOST_PORT` |
 | Scrapling | `8000` | `SCRAPLING_HOST_PORT` |
+
+`docker-compose.yml` 默认把前端绑定到 `127.0.0.1`，因此本地演示不会把 HTTP 前端暴露到所有网卡；只有主动修改 Compose 端口映射时才会对外监听。
 
 如果 `80` 端口被占用，可以在 `.env` 中改成：
 
@@ -545,7 +566,7 @@ docker compose logs -f backend
 - Redis 是否可连接。
 - `JWT_SECRET`、`PII_KEYS`、`PII_ACTIVE_KID`、`SUPER_ADMIN_TOTP_SECRET` 是否存在。
 - `SPRING_PROFILES_ACTIVE` 是否为 `local`。
-- `MYSQL_SSL_MODE` 是否为 `DISABLED`。
+- 本地 profile 可以使用 `MYSQL_SSL_MODE=DISABLED`；生产环境应使用 `DB_SSL_MODE=REQUIRED` 或 `VERIFY_IDENTITY`。
 
 ### 12.5 前端页面能打开但接口失败
 
@@ -617,6 +638,8 @@ SCRAPLING_RETRIES=2
 SCRAPLING_MAX_SOURCES=4
 SCRAPLING_SEARCH_PROVIDERS=baidu,bing
 SCRAPLING_HEALTH_ENABLED=true
+SCRAPLING_API_KEY=local-scrapling-dev-secret
+SCRAPLING_ALLOW_UNAUTHENTICATED=false
 ```
 
 本地网络不稳定时，可以先确认服务健康：
@@ -625,11 +648,13 @@ SCRAPLING_HEALTH_ENABLED=true
 curl.exe http://localhost:8000/health
 ```
 
-### 12.9 HTTP server deployment script
+### 12.9 HTTP 服务器部署脚本
 
-`deploy-new-server-http.ps1` is demo-only. It writes a local-profile HTTP environment with `REQUIRE_STRONG_SECRETS=false` and mock payment callbacks enabled, so it now refuses to run unless `-DemoOnly` is passed explicitly.
+`deploy-new-server-http.ps1` 只用于演示环境。它会写入 local profile 的 HTTP 配置，设置 `REQUIRE_STRONG_SECRETS=false` 并启用模拟支付回调；脚本现在要求显式传入 `-DemoOnly` 才会运行。
 
-Use `docker-compose.prod.yml` with real HTTPS certificates and production secrets for any public production deployment.
+脚本不再自动信任未知 SSH 主机密钥。请先通过其他可信渠道核对服务器密钥，再把它加入 `~/.ssh/known_hosts`；也可以传入 `-SshHostKeyFingerprint SHA256:<fingerprint>`，在首次连接时固定该指纹。
+
+任何公开生产部署都应使用 `docker-compose.prod.yml`，并配置真实 HTTPS 证书和生产密钥。
 
 ## 13. 本地开发建议
 

@@ -225,28 +225,18 @@ const fetchSpots = async () => {
     }
   } catch (error: any) {
     console.error('获取景点失败:', error)
-    const apiBaseURL = (api.defaults.baseURL || '/api')
-    
     let errorMessage = `${t('spots.errorTitle')}\n\n`
-    errorMessage += `${t('common.error')}: ${apiBaseURL}\n\n`
-    
+
     if (error.code === 'ECONNREFUSED' || error.message?.includes('Network Error')) {
-      if (apiBaseURL === '/api') {
-        errorMessage += `${t('spots.errorLocal')}\n\n`
-        errorMessage += `${t('spots.errorSolution')}\n`
-        errorMessage += `${t('spots.errorSolutionLocal')}`
-      } else {
-        errorMessage += `${t('spots.errorRemote')}: ${apiBaseURL}\n\n`
-        errorMessage += `${t('spots.errorSolution')}\n`
-        errorMessage += `${t('spots.errorSolutionRemote')}`
-      }
+      errorMessage += `${t('spots.errorRemote')}\n\n`
+      errorMessage += `${t('spots.errorSolution')}\n`
+      errorMessage += `${t('spots.reload')}`
     } else if (error.response) {
       errorMessage += `${t('common.error')}: ${error.response.status}\n`
-      errorMessage += `${error.response?.data?.message || error.response?.statusText || ''}`
     } else {
-      errorMessage += `${error.message || error}`
+      errorMessage += t('common.error')
     }
-    
+
     alert(errorMessage)
   } finally {
     loading.value = false

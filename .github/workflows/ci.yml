@@ -159,8 +159,8 @@ EOF
       - name: Test frontend
         run: npm run test -- --run
 
-      - name: Audit production dependencies
-        run: npm audit --omit=dev
+      - name: Audit dependencies
+        run: npm audit --audit-level=moderate
 
       - name: Build
         run: npm run build

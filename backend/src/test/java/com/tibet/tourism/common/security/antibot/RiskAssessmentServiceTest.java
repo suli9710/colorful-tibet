@@ -3,7 +3,6 @@ package com.tibet.tourism.common.security.antibot;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -126,7 +125,7 @@ class RiskAssessmentServiceTest {
     }
 
     @Test
-    void incompleteRecaptchaConfigurationDoesNotForceChallenge() {
+    void incompleteRecaptchaConfigurationChallengesInsteadOfAllowing() {
         properties.getRecaptcha().setSiteKey("");
         properties.getRecaptcha().setSecretKey("");
 
@@ -138,8 +137,9 @@ class RiskAssessmentServiceTest {
                 "203.0.113.10",
                 "/api/hotel-bookings");
 
-        assertThat(result.decision()).isEqualTo(RiskResult.Decision.ALLOW);
-        assertThat(result.finalScore()).isEqualTo(0.0);
-        verify(recaptchaService, never()).verify(any(), any());
+        assertThat(result.recaptchaRisk()).isEqualTo(100.0);
+        assertThat(result.finalScore()).isGreaterThanOrEqualTo(properties.getRisk().getChallengeThreshold());
+        assertThat(result.decision()).isEqualTo(RiskResult.Decision.CHALLENGE);
+        verify(recaptchaService).verify(eq(null), eq("203.0.113.10"));
     }
 }

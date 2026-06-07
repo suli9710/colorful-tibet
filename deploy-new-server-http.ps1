@@ -10,7 +10,8 @@ param(
     [switch]$DemoOnly,
     [string]$DoubaoApiKey = "",
     [string]$AmapKey = "",
-    [string]$AmapSecurityCode = ""
+    [string]$AmapSecurityCode = "",
+    [string]$SshHostKeyFingerprint = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -104,6 +105,7 @@ print(json.dumps({
     "piiEncryptionKey": b64(48),
     "piiKey": b64(32),
     "paymentCallbackSecret": b64(48),
+    "scraplingApiKey": token(32),
     "superAdminTotpSecret": b32(20),
     "seedAdminPassword": token(24),
     "seedSuperAdminPassword": token(24),
@@ -140,8 +142,8 @@ DB_USERNAME=tibet_user
 DB_PASSWORD=$($Secrets.mysqlPassword)
 DB_HOST=mysql
 DB_PORT=3306
-DB_SSL_MODE=DISABLED
-DB_ALLOW_PUBLIC_KEY_RETRIEVAL=true
+DB_SSL_MODE=REQUIRED
+DB_ALLOW_PUBLIC_KEY_RETRIEVAL=false
 
 REDIS_HOST=redis
 REDIS_PORT=6379
@@ -211,6 +213,8 @@ SCRAPLING_SEARCH_PROVIDERS=baidu,bing
 SCRAPLING_ALLOWED_DOMAINS=
 SCRAPLING_PROXY_URL=
 SCRAPLING_SOLVE_CLOUDFLARE=false
+SCRAPLING_API_KEY=$($Secrets.scraplingApiKey)
+SCRAPLING_ALLOW_UNAUTHENTICATED=false
 
 FILE_UPLOAD_DIR=/app/data/uploads
 NGINX_SERVER_NAME=$HostName
@@ -424,6 +428,9 @@ echo "HTTP demo deployment completed."
 function Write-Uploader {
     $uploader = @'
 import argparse
+import base64
+import hashlib
+import hmac
 import os
 import select
 import sys
@@ -447,6 +454,7 @@ parser.add_argument("--remote-archive", required=True)
 parser.add_argument("--remote-env", required=True)
 parser.add_argument("--remote-login", required=True)
 parser.add_argument("--remote-script", required=True)
+parser.add_argument("--host-key-fingerprint", default="")
 args = parser.parse_args()
 
 password = os.environ.get("COLORFUL_TIBET_DEPLOY_PASSWORD")
@@ -454,18 +462,61 @@ if not password:
     print("Missing COLORFUL_TIBET_DEPLOY_PASSWORD", file=sys.stderr)
     sys.exit(2)
 
+def normalize_sha256_fingerprint(value):
+    normalized = value.strip()
+    if normalized.startswith("SHA256:"):
+        normalized = normalized[len("SHA256:"):]
+    return normalized.rstrip("=")
+
+
+def key_sha256_fingerprint(key):
+    return base64.b64encode(hashlib.sha256(key.asbytes()).digest()).decode("ascii").rstrip("=")
+
+
+class PinnedHostKeyPolicy(paramiko.MissingHostKeyPolicy):
+    def __init__(self, expected_fingerprint):
+        self.expected_fingerprint = normalize_sha256_fingerprint(expected_fingerprint)
+
+    def missing_host_key(self, client, hostname, key):
+        actual_fingerprint = key_sha256_fingerprint(key)
+        if not hmac.compare_digest(actual_fingerprint, self.expected_fingerprint):
+            raise paramiko.SSHException(
+                f"SSH host key fingerprint mismatch for {hostname}: "
+                f"expected SHA256:{self.expected_fingerprint}, got SHA256:{actual_fingerprint}"
+            )
+        client._host_keys.add(hostname, key.get_name(), key)
+        print(f"Verified SSH host key for {hostname}: SHA256:{actual_fingerprint}", flush=True)
+
+
 client = paramiko.SSHClient()
-client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-client.connect(
-    hostname=args.host,
-    username=args.user,
-    password=password,
-    timeout=30,
-    banner_timeout=30,
-    auth_timeout=30,
-    look_for_keys=False,
-    allow_agent=False,
-)
+if args.host_key_fingerprint.strip():
+    client.set_missing_host_key_policy(PinnedHostKeyPolicy(args.host_key_fingerprint))
+else:
+    client.load_system_host_keys()
+    known_hosts = os.path.expanduser("~/.ssh/known_hosts")
+    if os.path.exists(known_hosts):
+        client.load_host_keys(known_hosts)
+    client.set_missing_host_key_policy(paramiko.RejectPolicy())
+
+try:
+    client.connect(
+        hostname=args.host,
+        username=args.user,
+        password=password,
+        timeout=30,
+        banner_timeout=30,
+        auth_timeout=30,
+        look_for_keys=False,
+        allow_agent=False,
+    )
+except (paramiko.BadHostKeyException, paramiko.SSHException) as exc:
+    print(f"SSH host key verification failed: {exc}", file=sys.stderr)
+    print(
+        "Verify the server host key out-of-band, then add it to ~/.ssh/known_hosts "
+        "or rerun with -SshHostKeyFingerprint SHA256:<fingerprint>.",
+        file=sys.stderr,
+    )
+    sys.exit(3)
 
 try:
     sftp = client.open_sftp()
@@ -599,7 +650,8 @@ try {
         "--remote-archive", $RemoteArchive,
         "--remote-env", $RemoteEnv,
         "--remote-login", $RemoteLogin,
-        "--remote-script", $RemoteScript
+        "--remote-script", $RemoteScript,
+        "--host-key-fingerprint", $SshHostKeyFingerprint
     ) $RepoRoot
 
     Write-Host "Done. Site: $SiteUrl" -ForegroundColor Green

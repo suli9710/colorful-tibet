@@ -28,7 +28,6 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
-import org.springframework.web.util.WebUtils;
 
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 20)
@@ -274,28 +273,7 @@ public class RequestRateLimitFilter extends OncePerRequestFilter {
     }
 
     private String clientIdentity(HttpServletRequest request) {
-        String authHash = authCookieHash(request);
-        String authPart = "anonymous".equals(authHash)
-                ? "anon:" + anonymousFingerprint(request)
-                : "auth:" + authHash;
-        return "ip:" + shortHash(clientIp(request))
-                + ":" + authPart;
-    }
-
-    private String authCookieHash(HttpServletRequest request) {
-        var authCookie = WebUtils.getCookie(request, CookieAuthConstants.AUTH_COOKIE_NAME);
-        if (authCookie == null || authCookie.getValue() == null || authCookie.getValue().isBlank()) {
-            return "anonymous";
-        }
-        return shortHash(authCookie.getValue());
-    }
-
-    private String anonymousFingerprint(HttpServletRequest request) {
-        String userAgent = request.getHeader("User-Agent");
-        String acceptLanguage = request.getHeader("Accept-Language");
-        return shortHash((userAgent == null ? "" : userAgent)
-                + "|"
-                + (acceptLanguage == null ? "" : acceptLanguage));
+        return "ip:" + shortHash(clientIp(request));
     }
 
     private String shortHash(String value) {

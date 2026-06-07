@@ -3,9 +3,13 @@ package com.tibet.tourism.modules.admin.application;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -28,6 +32,9 @@ import com.tibet.tourism.modules.route.infra.TibetTravelKitRepository;
 import com.tibet.tourism.modules.user.domain.User;
 import com.tibet.tourism.modules.user.infra.UserRepository;
 import com.tibet.tourism.modules.user.infra.UserVisitHistoryRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.Query;
+import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -76,6 +83,10 @@ class AdminUserServiceTest {
     private ItineraryRepository itineraryRepository;
     @Mock
     private UserVisitHistoryRepository userVisitHistoryRepository;
+    @Mock
+    private EntityManager entityManager;
+    @Mock
+    private Query nativeQuery;
 
     private AdminUserService service;
 
@@ -101,6 +112,9 @@ class AdminUserServiceTest {
                 itineraryRepository,
                 userVisitHistoryRepository);
         ReflectionTestUtils.setField(service, "superAdminUsername", "lzh");
+        ReflectionTestUtils.setField(service, "entityManager", entityManager);
+        lenient().when(entityManager.createNativeQuery(anyString())).thenReturn(nativeQuery);
+        lenient().when(nativeQuery.setParameter(anyString(), any())).thenReturn(nativeQuery);
     }
 
     @Test
@@ -134,9 +148,6 @@ class AdminUserServiceTest {
                 sharedRouteRepository,
                 aiRouteRecordRepository,
                 orderAuditLogRepository,
-                platformOrderRepository,
-                bookingRepository,
-                hotelBookingRepository,
                 tibetTravelKitRepository,
                 itineraryRepository,
                 userVisitHistoryRepository,
@@ -157,15 +168,25 @@ class AdminUserServiceTest {
         deletes.verify(sharedRouteRepository).deleteByAuthor(target);
         deletes.verify(aiRouteRecordRepository).deleteByUserId(10L);
         deletes.verify(orderAuditLogRepository).clearActorUserByUserId(10L);
-        deletes.verify(platformOrderRepository).deleteByUserId(10L);
-        deletes.verify(bookingRepository).deleteByUserId(10L);
-        deletes.verify(hotelBookingRepository).deleteByUserId(10L);
         deletes.verify(tibetTravelKitRepository).deleteByItineraryUserId(10L);
         deletes.verify(tibetTravelKitRepository).deleteByUserId(10L);
         deletes.verify(itineraryRepository).clearParentReferencesToUserItineraries(10L);
         deletes.verify(itineraryRepository).deleteByUserId(10L);
         deletes.verify(userVisitHistoryRepository).deleteByUserId(10L);
         deletes.verify(userRepository).delete(target);
+
+        ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+        verify(entityManager, times(4)).createNativeQuery(sqlCaptor.capture());
+        assertTrue(sqlCaptor.getAllValues().get(0).contains("UPDATE invoices"));
+        assertTrue(sqlCaptor.getAllValues().get(1).contains("UPDATE orders"));
+        assertTrue(sqlCaptor.getAllValues().get(2).contains("UPDATE bookings"));
+        assertTrue(sqlCaptor.getAllValues().get(3).contains("UPDATE hotel_bookings"));
+        verify(nativeQuery, times(4)).setParameter("userId", 10L);
+        verify(nativeQuery, times(3)).setParameter("anonymousLabel", "Deleted user");
+        verify(nativeQuery, times(4)).executeUpdate();
+        verify(platformOrderRepository, never()).deleteByUserId(10L);
+        verify(bookingRepository, never()).deleteByUserId(10L);
+        verify(hotelBookingRepository, never()).deleteByUserId(10L);
     }
 
     @Test

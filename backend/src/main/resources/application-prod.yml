@@ -16,7 +16,8 @@ spring:
     async:
       request-timeout: 120000
   datasource:
-    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:tibet_tourism}?useUnicode=true&characterEncoding=utf8&sslMode=${DB_SSL_MODE:VERIFY_IDENTITY}&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=${DB_ALLOW_PUBLIC_KEY_RETRIEVAL:false}${DB_JDBC_EXTRA_PARAMS:}
+    # DB_* 默认值需与 docker-compose.prod.yml 和 .env.example 保持一致。
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:tibet_tourism}?useUnicode=true&characterEncoding=utf8&sslMode=${DB_SSL_MODE:REQUIRED}&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=${DB_ALLOW_PUBLIC_KEY_RETRIEVAL:false}${DB_JDBC_EXTRA_PARAMS:}
     username: ${DB_USERNAME:tibet_user}
     password: ${DB_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -97,7 +98,7 @@ ark:
     url: ${ARK_API_URL:${DOUBAO_API_URL:https://ark.cn-beijing.volces.com/api/v3/responses}}
     key: ${ARK_API_KEY:${DOUBAO_API_KEY:}}
     model: ${AI_MODEL:${ARK_MODEL:${DOUBAO_MODEL:ep-20260516173036-4dpgm}}}
-    stream-url: ${ARK_STREAM_API_URL:${DOUBAO_STREAM_API_URL:}}  # 流式端点，为空时从url自动推导
+    stream-url: ${ARK_STREAM_API_URL:${DOUBAO_STREAM_API_URL:}}  # 流式端点，为空时从 url 自动推导
 
 doubao:
   api:
@@ -137,10 +138,10 @@ recommendation:
     preload-on-startup: ${RECOMMENDATION_ITEM_SIMILARITY_PRELOAD_ON_STARTUP:false}
     cron: "0 30 3 * * ?"
 
-# JWT配置（如果需要）
+# JWT 配置（如果需要）
 jwt:
   secret: ${JWT_SECRET}
-  expiration: ${JWT_EXPIRATION_MS:1800000}  # 30 minutes by default in production
+  expiration: ${JWT_EXPIRATION_MS:1800000}  # 生产默认 30 分钟
   issuer: ${JWT_ISSUER:colorful-tibet-prod}
   audience: ${JWT_AUDIENCE:colorful-tibet-web}
 

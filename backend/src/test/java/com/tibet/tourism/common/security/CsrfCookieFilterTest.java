@@ -98,6 +98,65 @@ class CsrfCookieFilterTest {
     }
 
     @Test
+    void stateChangingRequestRejectsCrossSiteOriginEvenWithValidCsrfToken() throws Exception {
+        String csrfToken = csrfTokenService.generateToken(SESSION_TOKEN);
+        MockHttpServletRequest request = apiRequest("POST", "/api/auth/me/change-password");
+        request.setCookies(
+                new Cookie(CookieAuthConstants.AUTH_COOKIE_NAME, SESSION_TOKEN),
+                new Cookie(CookieAuthConstants.CSRF_COOKIE_NAME, csrfToken));
+        request.addHeader(CookieAuthConstants.CSRF_HEADER_NAME, csrfToken);
+        request.addHeader("Origin", "https://evil.example");
+
+        MockHttpServletResponse response = doFilter(request);
+
+        assertEquals(403, response.getStatus());
+    }
+
+    @Test
+    void stateChangingRequestAcceptsOriginMatchingRequestOrigin() throws Exception {
+        String csrfToken = csrfTokenService.generateToken(SESSION_TOKEN);
+        MockHttpServletRequest request = apiRequest("POST", "/api/auth/me/change-password");
+        request.setCookies(
+                new Cookie(CookieAuthConstants.AUTH_COOKIE_NAME, SESSION_TOKEN),
+                new Cookie(CookieAuthConstants.CSRF_COOKIE_NAME, csrfToken));
+        request.addHeader(CookieAuthConstants.CSRF_HEADER_NAME, csrfToken);
+        request.addHeader("Origin", "http://localhost:8080");
+
+        MockHttpServletResponse response = doFilter(request);
+
+        assertEquals(200, response.getStatus());
+    }
+
+    @Test
+    void stateChangingRequestAcceptsSameOriginFetchMetadataWithoutOrigin() throws Exception {
+        String csrfToken = csrfTokenService.generateToken(SESSION_TOKEN);
+        MockHttpServletRequest request = apiRequest("POST", "/api/auth/me/change-password");
+        request.setCookies(
+                new Cookie(CookieAuthConstants.AUTH_COOKIE_NAME, SESSION_TOKEN),
+                new Cookie(CookieAuthConstants.CSRF_COOKIE_NAME, csrfToken));
+        request.addHeader(CookieAuthConstants.CSRF_HEADER_NAME, csrfToken);
+        request.addHeader("Sec-Fetch-Site", "same-origin");
+
+        MockHttpServletResponse response = doFilter(request);
+
+        assertEquals(200, response.getStatus());
+    }
+
+    @Test
+    void stateChangingRequestRejectsMissingOriginAndFetchMetadataEvenWithValidCsrfToken() throws Exception {
+        String csrfToken = csrfTokenService.generateToken(SESSION_TOKEN);
+        MockHttpServletRequest request = apiRequest("POST", "/api/auth/me/change-password");
+        request.setCookies(
+                new Cookie(CookieAuthConstants.AUTH_COOKIE_NAME, SESSION_TOKEN),
+                new Cookie(CookieAuthConstants.CSRF_COOKIE_NAME, csrfToken));
+        request.addHeader(CookieAuthConstants.CSRF_HEADER_NAME, csrfToken);
+
+        MockHttpServletResponse response = doFilter(request);
+
+        assertEquals(403, response.getStatus());
+    }
+
+    @Test
     void stateChangingRequestRejectsTamperedHeaderToken() throws Exception {
         String csrfToken = csrfTokenService.generateToken(SESSION_TOKEN);
         MockHttpServletRequest request = apiRequest("POST", "/api/auth/me/change-password");

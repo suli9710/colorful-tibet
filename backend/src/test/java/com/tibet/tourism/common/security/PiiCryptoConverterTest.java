@@ -35,6 +35,32 @@ class PiiCryptoConverterTest {
     }
 
     @Test
+    void encryptsPrefixLookingPlaintextInsteadOfTrustingIt() {
+        PiiCryptoConverter.configure("kid1:" + KEY_32_BYTES_BASE64, "kid1", "");
+        PiiCryptoConverter converter = new PiiCryptoConverter();
+        String forgedPrefixValue = "enc:v2:kid1:not-a-real-ciphertext";
+
+        String encrypted = converter.convertToDatabaseColumn(forgedPrefixValue);
+
+        assertThat(encrypted).startsWith("enc:v2:kid1:");
+        assertThat(encrypted).isNotEqualTo(forgedPrefixValue);
+        assertThat(converter.convertToEntityAttribute(encrypted)).isEqualTo(forgedPrefixValue);
+    }
+
+    @Test
+    void malformedEncryptedPrefixesReadAsPlaintextInsteadOfThrowing() {
+        PiiCryptoConverter.configure("kid1:" + KEY_32_BYTES_BASE64, "kid1", "");
+        PiiCryptoConverter converter = new PiiCryptoConverter();
+
+        assertThat(converter.convertToEntityAttribute("enc:v2:kid1:not-a-real-ciphertext"))
+                .isEqualTo("enc:v2:kid1:not-a-real-ciphertext");
+        assertThat(converter.convertToEntityAttribute("enc:v2:missing-kid:not-a-real-ciphertext"))
+                .isEqualTo("enc:v2:missing-kid:not-a-real-ciphertext");
+        assertThat(converter.convertToEntityAttribute("enc:v1:not-a-real-ciphertext"))
+                .isEqualTo("enc:v1:not-a-real-ciphertext");
+    }
+
+    @Test
     void rejectsNonBase64OrWrongLengthV2KeysAtStartupConfiguration() {
         String shortKey = Base64.getEncoder().encodeToString("too-short".getBytes(StandardCharsets.UTF_8));
 

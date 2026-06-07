@@ -39,7 +39,9 @@ desktop.ini
 # Environment variables
 .env
 .env.local
+.env.prod
 .env.production
+.env.staging
 backend/.env
 backend/.env.local
 frontend/.env

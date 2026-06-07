@@ -11,6 +11,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.RedisScript;
+import org.springframework.http.HttpHeaders;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -346,6 +347,28 @@ class RequestRateLimitFilterTest {
     }
 
     @Test
+    @DisplayName("unverified Bearer tokens do not bypass IP rate limits")
+    void unverifiedBearerTokensDoNotBypassIpLimit() throws Exception {
+        setField("defaultRequests", 1);
+
+        assertThat(doFilter(apiRequestWithBearer("GET", "/api/spots", "jwt-token-user-a")).getStatus())
+                .isEqualTo(200);
+        assertThat(doFilter(apiRequestWithBearer("GET", "/api/spots", "jwt-token-user-b")).getStatus())
+                .isEqualTo(429);
+    }
+
+    @Test
+    @DisplayName("client-controlled anonymous headers do not bypass IP rate limits")
+    void clientControlledAnonymousHeadersDoNotBypassIpLimit() throws Exception {
+        setField("defaultRequests", 1);
+
+        assertThat(doFilter(apiRequestWithFingerprint("GET", "/api/spots", "10.0.0.1", "ColorfulTest/1.0"))
+                .getStatus()).isEqualTo(200);
+        assertThat(doFilter(apiRequestWithFingerprint("GET", "/api/spots", "10.0.0.1", "ColorfulTest/2.0"))
+                .getStatus()).isEqualTo(429);
+    }
+
+    @Test
     @DisplayName("spoofed forwarded headers are ignored when remote address is not a trusted proxy")
     void spoofedForwardedHeadersDoNotBypassDirectBackendRateLimit() throws Exception {
         setField("trustProxyHeaders", true);
@@ -383,16 +406,14 @@ class RequestRateLimitFilterTest {
     }
 
     @Test
-    @DisplayName("clients with different auth cookies get independent rate limits")
-    void differentAuthCookiesIndependent() throws Exception {
-        // Exhaust user A's limit
-        for (int i = 0; i < 10; i++) {
-            doFilter(apiRequestWithCookie("GET", "/api/spots", "jwt-token-user-a"));
-        }
-        assertThat(doFilter(apiRequestWithCookie("GET", "/api/spots", "jwt-token-user-a")).getStatus()).isEqualTo(429);
+    @DisplayName("unverified auth cookies do not bypass IP rate limits")
+    void unverifiedAuthCookiesDoNotBypassIpLimit() throws Exception {
+        setField("defaultRequests", 1);
 
-        // User B should still be fine
-        assertThat(doFilter(apiRequestWithCookie("GET", "/api/spots", "jwt-token-user-b")).getStatus()).isEqualTo(200);
+        assertThat(doFilter(apiRequestWithCookieAndBearer(
+                "GET", "/api/spots", "jwt-token-user-a", "shared-bearer-token")).getStatus()).isEqualTo(200);
+        assertThat(doFilter(apiRequestWithCookieAndBearer(
+                "GET", "/api/spots", "jwt-token-user-b", "shared-bearer-token")).getStatus()).isEqualTo(429);
     }
 
     private MockHttpServletRequest apiRequest(String method, String path) {
@@ -406,9 +427,29 @@ class RequestRateLimitFilterTest {
         return request;
     }
 
+    private MockHttpServletRequest apiRequestWithFingerprint(String method, String path, String ip, String userAgent) {
+        MockHttpServletRequest request = apiRequestFromIp(method, path, ip);
+        request.addHeader("User-Agent", userAgent);
+        request.addHeader("Accept-Language", "zh-CN");
+        return request;
+    }
+
+    private MockHttpServletRequest apiRequestWithBearer(String method, String path, String token) {
+        MockHttpServletRequest request = apiRequestWithFingerprint(method, path, "10.0.0.1", "ColorfulTest/1.0");
+        request.addHeader(HttpHeaders.AUTHORIZATION, "Bearer " + token);
+        return request;
+    }
+
     private MockHttpServletRequest apiRequestWithCookie(String method, String path, String token) {
         MockHttpServletRequest request = apiRequestFromIp(method, path, "10.0.0.1");
         request.setCookies(new Cookie(CookieAuthConstants.AUTH_COOKIE_NAME, token));
+        return request;
+    }
+
+    private MockHttpServletRequest apiRequestWithCookieAndBearer(
+            String method, String path, String cookieToken, String bearerToken) {
+        MockHttpServletRequest request = apiRequestWithCookie(method, path, cookieToken);
+        request.addHeader(HttpHeaders.AUTHORIZATION, "Bearer " + bearerToken);
         return request;
     }
 

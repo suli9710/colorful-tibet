@@ -19,6 +19,9 @@ import com.tibet.tourism.modules.route.infra.TibetTravelKitRepository;
 import com.tibet.tourism.modules.user.domain.User;
 import com.tibet.tourism.modules.user.infra.UserRepository;
 import com.tibet.tourism.modules.user.infra.UserVisitHistoryRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+import jakarta.persistence.Query;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
@@ -26,6 +29,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AdminUserService {
+
+    private static final String ANONYMIZED_LABEL = "Deleted user";
 
     private final UserRepository userRepository;
     private final CommentLikeRepository commentLikeRepository;
@@ -45,6 +50,9 @@ public class AdminUserService {
     private final TibetTravelKitRepository tibetTravelKitRepository;
     private final ItineraryRepository itineraryRepository;
     private final UserVisitHistoryRepository userVisitHistoryRepository;
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     @Value("${app.super-admin-username:}")
     private String superAdminUsername;
@@ -157,9 +165,7 @@ public class AdminUserService {
         sharedRouteRepository.deleteByAuthor(targetUser);
         aiRouteRecordRepository.deleteByUserId(userId);
         orderAuditLogRepository.clearActorUserByUserId(userId);
-        platformOrderRepository.deleteByUserId(userId);
-        bookingRepository.deleteByUserId(userId);
-        hotelBookingRepository.deleteByUserId(userId);
+        anonymizeFinancialRecords(userId);
         tibetTravelKitRepository.deleteByItineraryUserId(userId);
         tibetTravelKitRepository.deleteByUserId(userId);
         itineraryRepository.clearParentReferencesToUserItineraries(userId);
@@ -167,5 +173,47 @@ public class AdminUserService {
         userVisitHistoryRepository.deleteByUserId(userId);
         userRepository.delete(targetUser);
         return new DeleteUserResult(true, 200, "用户删除成功");
+    }
+
+    private void anonymizeFinancialRecords(Long userId) {
+        executeNativeUpdate("""
+                UPDATE invoices i
+                JOIN orders o ON i.order_id = o.id
+                SET i.invoice_title = :anonymousLabel,
+                    i.tax_no = NULL
+                WHERE o.user_id = :userId
+                """, userId, true);
+        executeNativeUpdate("""
+                UPDATE orders
+                SET user_id = NULL,
+                    idempotency_key = NULL,
+                    customer_name = :anonymousLabel,
+                    customer_phone = NULL,
+                    customer_note = NULL,
+                    support_note = NULL
+                WHERE user_id = :userId
+                """, userId, true);
+        executeNativeUpdate("""
+                UPDATE bookings
+                SET user_id = NULL
+                WHERE user_id = :userId
+                """, userId, false);
+        executeNativeUpdate("""
+                UPDATE hotel_bookings
+                SET user_id = NULL,
+                    guest_name = :anonymousLabel,
+                    phone = NULL,
+                    note = NULL
+                WHERE user_id = :userId
+                """, userId, true);
+    }
+
+    private void executeNativeUpdate(String sql, Long userId, boolean usesAnonymousLabel) {
+        Query query = entityManager.createNativeQuery(sql);
+        query.setParameter("userId", userId);
+        if (usesAnonymousLabel) {
+            query.setParameter("anonymousLabel", ANONYMIZED_LABEL);
+        }
+        query.executeUpdate();
     }
 }

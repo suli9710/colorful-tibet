@@ -8,6 +8,11 @@ FastAPI microservice wrapping Scrapling for scenic spot ticket price discovery.
 - `GET /scrape/capabilities` returns enabled modes, search providers, and limits.
 - `POST /scrape/price` extracts ticket prices for a scenic spot.
 
+`/scrape/*` endpoints require `X-Scrapling-Api-Key` when `SCRAPLING_API_KEY`
+is configured. If no key is configured, the service rejects scrape requests by
+default; only set `SCRAPLING_ALLOW_UNAUTHENTICATED=true` for loopback-only local
+development.
+
 Example request:
 
 ```json
@@ -35,6 +40,8 @@ plus `queriedUrls` for diagnostics.
 | `SCRAPLING_PROXY_URL` | empty | Optional outbound proxy URL. |
 | `SCRAPLING_SOLVE_CLOUDFLARE` | `false` | Enables Scrapling stealth Cloudflare solving where supported. |
 | `SCRAPLING_ALLOWED_DOMAINS` | empty | Reserved allowlist for direct target scraping. |
+| `SCRAPLING_API_KEY` | empty | Shared secret required in public or shared deployments. |
+| `SCRAPLING_ALLOW_UNAUTHENTICATED` | `false` | Explicit local-only bypass when no API key is configured. |
 
 ## Local Checks
 

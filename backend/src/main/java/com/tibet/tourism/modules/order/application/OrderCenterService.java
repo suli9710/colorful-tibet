@@ -401,6 +401,7 @@ public class OrderCenterService {
         item.setStatus(confirmed ? OrderItem.Status.CONFIRMED : OrderItem.Status.LOCKED);
         item.setLegacyReferenceType("SPOT_BOOKING");
         item.setLegacyReferenceId(booking.getId());
+        attachCancellationPolicy(item);
         order.addItem(item);
         if (confirmed) {
             addLegacyPaymentAndVoucher(order, item);
@@ -452,6 +453,7 @@ public class OrderCenterService {
         item.setStatus(confirmed ? OrderItem.Status.CONFIRMED : OrderItem.Status.LOCKED);
         item.setLegacyReferenceType("HOTEL_BOOKING");
         item.setLegacyReferenceId(booking.getId());
+        attachCancellationPolicy(item);
         order.addItem(item);
         if (confirmed) {
             addLegacyPaymentAndVoucher(order, item);
@@ -521,7 +523,7 @@ public class OrderCenterService {
         return switch (productType) {
             case SCENIC_SPOT -> scenicSpotOrderItem(request, sortOrder);
             case HOTEL_ROOM -> hotelRoomOrderItem(request, sortOrder);
-            default -> throw new IllegalArgumentException("褰撳墠鍟嗗搧绫诲瀷鏆傛湭鎺ュ叆缁熶竴涓嬪崟");
+            default -> throw new IllegalArgumentException("当前商品类型暂未接入统一下单");
         };
     }
 
@@ -544,14 +546,14 @@ public class OrderCenterService {
 
     private OrderItem hotelRoomOrderItem(CreateOrderItemRequest request, int sortOrder) {
         if (request.getSkuId() == null) {
-            throw new IllegalArgumentException("閰掑簵鎴垮瀷涓嶈兘涓虹┖");
+            throw new IllegalArgumentException("酒店房型不能为空");
         }
         Hotel hotel = hotelRepository.findById(request.getProductId())
                 .orElseThrow(() -> new NoSuchElementException("Hotel not found"));
         RoomType roomType = roomTypeRepository.findByIdForUpdate(request.getSkuId())
                 .orElseThrow(() -> new NoSuchElementException("Room type not found"));
         if (roomType.getHotel() == null || !hotel.getId().equals(roomType.getHotel().getId())) {
-            throw new IllegalArgumentException("鎴垮瀷涓嶅睘浜庤閰掑簵");
+            throw new IllegalArgumentException("房型不属于该酒店");
         }
         LocalDate checkIn = request.getServiceStartDate();
         LocalDate checkOut = request.getServiceEndDate();
@@ -839,11 +841,84 @@ public class OrderCenterService {
     }
 
     private BigDecimal refundAmountForOrder(PlatformOrder order) {
-        return order.getPayableAmount();
+        BigDecimal amount = order.getItems().stream()
+                .map(this::refundAmountForItem)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal orderPayable = defaultMoney(order.getPayableAmount());
+        if (amount.compareTo(BigDecimal.ZERO) <= 0 && order.getItems().isEmpty()) {
+            return orderPayable;
+        }
+        if (orderPayable.compareTo(BigDecimal.ZERO) > 0 && amount.compareTo(orderPayable) > 0) {
+            return orderPayable;
+        }
+        return amount;
     }
 
     private BigDecimal refundAmountForItem(OrderItem item) {
-        return item.getSubtotal();
+        BigDecimal baseAmount = refundableBaseForItem(item);
+        Optional<CancellationPolicy> policy = cancellationPolicyFor(item);
+        if (policy.isEmpty()) {
+            return baseAmount;
+        }
+        if (withinFreeCancellationWindow(item, policy.get())) {
+            return baseAmount;
+        }
+        return baseAmount.multiply(normalizedRefundRate(policy.get())).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal refundableBaseForItem(OrderItem item) {
+        BigDecimal itemSubtotal = defaultMoney(item.getSubtotal());
+        PlatformOrder order = item.getOrder();
+        if (order == null || order.getItems().isEmpty()) {
+            return itemSubtotal;
+        }
+        BigDecimal orderSubtotal = order.getItems().stream()
+                .map(OrderItem::getSubtotal)
+                .map(this::defaultMoney)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal orderPayable = defaultMoney(order.getPayableAmount());
+        if (orderSubtotal.compareTo(BigDecimal.ZERO) <= 0
+                || orderPayable.compareTo(BigDecimal.ZERO) <= 0
+                || orderPayable.compareTo(orderSubtotal) >= 0) {
+            return itemSubtotal;
+        }
+        return itemSubtotal.multiply(orderPayable).divide(orderSubtotal, 2, RoundingMode.HALF_UP);
+    }
+
+    private Optional<CancellationPolicy> cancellationPolicyFor(OrderItem item) {
+        if (item == null || item.getProductType() == null) {
+            return Optional.empty();
+        }
+        if (item.getCancellationPolicyId() != null) {
+            Optional<CancellationPolicy> policy = cancellationPolicyRepository.findById(item.getCancellationPolicyId());
+            if (policy.isPresent()) {
+                return policy;
+            }
+        }
+        return cancellationPolicyRepository.findFirstByProductTypeAndActiveTrueOrderByPriorityDesc(item.getProductType());
+    }
+
+    private boolean withinFreeCancellationWindow(OrderItem item, CancellationPolicy policy) {
+        if (item.getServiceStartDate() == null) {
+            return false;
+        }
+        int freeCancelBeforeHours = Math.max(
+                policy.getFreeCancelBeforeHours() == null ? 0 : policy.getFreeCancelBeforeHours(),
+                0);
+        LocalDateTime freeCancelDeadline = item.getServiceStartDate().atStartOfDay().minusHours(freeCancelBeforeHours);
+        LocalDateTime now = LocalDateTime.now();
+        return !now.isAfter(freeCancelDeadline);
+    }
+
+    private BigDecimal normalizedRefundRate(CancellationPolicy policy) {
+        BigDecimal rate = policy.getRefundRate() == null ? BigDecimal.ONE : policy.getRefundRate();
+        if (rate.compareTo(BigDecimal.ZERO) < 0) {
+            return BigDecimal.ZERO;
+        }
+        if (rate.compareTo(BigDecimal.ONE) > 0) {
+            return BigDecimal.ONE;
+        }
+        return rate;
     }
 
     private OrderItem findOrderItem(PlatformOrder order, Long itemId) {
@@ -873,7 +948,7 @@ public class OrderCenterService {
         order.setConfirmedAt(LocalDateTime.now());
         order.setSourceType(sourceType);
         order.setSourceReferenceId(sourceReferenceId);
-        order.addAuditLog(audit(user, "LEGACY_MIRROR_CREATED", null, order.getStatus().name(), "鏃ч璁㈠啓鍏ョ粺涓€璁㈠崟涓績"));
+        order.addAuditLog(audit(user, "LEGACY_MIRROR_CREATED", null, order.getStatus().name(), "旧预订写入统一订单中心"));
         return order;
     }
 

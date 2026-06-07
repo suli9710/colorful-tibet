@@ -128,9 +128,7 @@ public class RiskAssessmentService {
     }
 
     private boolean isRecaptchaRequired(AntibotProperties.Recaptcha recaptchaCfg) {
-        return recaptchaCfg.isEnabled()
-                && StringUtils.hasText(recaptchaCfg.getSiteKey())
-                && StringUtils.hasText(recaptchaCfg.getSecretKey());
+        return recaptchaCfg.isEnabled();
     }
 
     private BehaviorData decodeBehaviorData(String header) {
