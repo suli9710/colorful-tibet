@@ -11,6 +11,24 @@ permissions:
   contents: read
 
 jobs:
+  repository-noise:
+    name: Repository noise guard
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Reject tracked generated files
+        run: |
+          set -euo pipefail
+          forbidden="$(git ls-files | grep -E '(^output/|^scrapler/\.venv/|(^|/)__pycache__/|\.pyc$|\.log$|(^|/)新建 文本文档\.txt$)' || true)"
+          if [ -n "$forbidden" ]; then
+            echo "Generated or local-only files are tracked:"
+            printf '%s\n' "$forbidden"
+            echo "Remove these paths from Git and keep them covered by .gitignore."
+            exit 1
+          fi
+
   secret-scan:
     name: Secret scan
     runs-on: ubuntu-latest

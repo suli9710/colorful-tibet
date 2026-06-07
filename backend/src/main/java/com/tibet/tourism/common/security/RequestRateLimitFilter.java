@@ -87,10 +87,10 @@ public class RequestRateLimitFilter extends OncePerRequestFilter {
     @Value("${app.security.rate-limit.ai.window-seconds:600}")
     private long aiWindowSeconds;
 
-    @Value("${app.security.rate-limit.guide-chat.requests:8}")
+    @Value("${app.security.rate-limit.guide-chat.requests:${app.security.guide-chat.window-limit:8}}")
     private int guideChatRequests;
 
-    @Value("${app.security.rate-limit.guide-chat.window-seconds:300}")
+    @Value("${app.security.rate-limit.guide-chat.window-seconds:${app.security.guide-chat.window-seconds:300}}")
     private long guideChatWindowSeconds;
 
     @Value("${app.security.rate-limit.upload.requests:30}")
