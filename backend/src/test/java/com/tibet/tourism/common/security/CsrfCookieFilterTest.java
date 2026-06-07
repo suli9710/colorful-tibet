@@ -71,6 +71,17 @@ class CsrfCookieFilterTest {
     }
 
     @Test
+    void stateChangingRequestWithAuthCookieAndBearerStillRequiresCsrfToken() throws Exception {
+        MockHttpServletRequest request = apiRequest("POST", "/api/orders");
+        request.addHeader("Authorization", "Bearer api-token");
+        request.setCookies(new Cookie(CookieAuthConstants.AUTH_COOKIE_NAME, SESSION_TOKEN));
+
+        MockHttpServletResponse response = doFilter(request);
+
+        assertEquals(403, response.getStatus());
+    }
+
+    @Test
     void stateChangingRequestAcceptsSignedDoubleSubmitToken() throws Exception {
         String csrfToken = csrfTokenService.generateToken(SESSION_TOKEN);
         MockHttpServletRequest request = apiRequest("POST", "/api/auth/me/change-password");

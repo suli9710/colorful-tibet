@@ -21,10 +21,24 @@ jobs:
       - name: Reject tracked generated files
         run: |
           set -euo pipefail
-          forbidden="$(git ls-files | grep -E '(^output/|^scrapler/\.venv/|(^|/)__pycache__/|\.pyc$|\.log$|(^|/)新建 文本文档\.txt$)' || true)"
-          if [ -n "$forbidden" ]; then
-            echo "Generated or local-only files are tracked:"
-            printf '%s\n' "$forbidden"
+          noise_pattern='(^output/|^scrapler/\.venv/|(^|/)__pycache__/|\.pyc$|\.log$|(^|/)新建 文本文档\.txt$)'
+          mapfile -t forbidden < <(git ls-files | grep -E "$noise_pattern" || true)
+          if [ "${#forbidden[@]}" -gt 0 ]; then
+            echo "::error title=Repository noise guard::Tracked generated/local-only files found"
+            cat <<'EOF'
+Repository noise guard failed.
+
+Tracked paths must not match generated or local-only patterns:
+  - output/
+  - scrapler/.venv/
+  - __pycache__/
+  - *.pyc
+  - *.log
+  - 新建 文本文档.txt
+
+Blocked tracked paths:
+EOF
+            printf '  - %s\n' "${forbidden[@]}"
             echo "Remove these paths from Git and keep them covered by .gitignore."
             exit 1
           fi
