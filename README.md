@@ -245,6 +245,7 @@ mvn -q test
 ## 文档
 
 - [部署文档](docs/DEPLOYMENT.md)
+- [部署配置治理说明](docs/deployment-configuration.md)
 - [Scrapling 票价服务说明](scrapler/README.md)
 - [后端价格抓取说明](backend/PRICE_FETCH_GUIDE.md)
 - [后端 Web 抓取说明](backend/WEB_SCRAPING_GUIDE.md)

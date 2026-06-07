@@ -13,6 +13,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -50,11 +53,26 @@ public class RequestRateLimitFilter extends OncePerRequestFilter {
     private final StringRedisTemplate redisTemplate;
     private final TrustedProxyIpResolver trustedProxyIpResolver;
     private final AtomicLong lastCleanupAt = new AtomicLong(0);
+    private final AtomicLong redisFallbackActive = new AtomicLong(0);
+    private final AtomicLong redisFallbackEvents = new AtomicLong(0);
+    private final Counter redisFallbackCounter;
 
     public RequestRateLimitFilter(ObjectProvider<StringRedisTemplate> redisTemplateProvider,
-                                  TrustedProxyIpResolver trustedProxyIpResolver) {
+                                  TrustedProxyIpResolver trustedProxyIpResolver,
+                                  ObjectProvider<MeterRegistry> meterRegistryProvider) {
         this.redisTemplate = redisTemplateProvider.getIfAvailable();
         this.trustedProxyIpResolver = trustedProxyIpResolver;
+        MeterRegistry meterRegistry = meterRegistryProvider.getIfAvailable();
+        if (meterRegistry == null) {
+            this.redisFallbackCounter = null;
+        } else {
+            this.redisFallbackCounter = Counter.builder("app.security.rate.limit.redis.fallback.events")
+                    .description("Number of rate limit requests served by in-memory fallback after Redis failure")
+                    .register(meterRegistry);
+            Gauge.builder("app.security.rate.limit.redis.fallback.active", redisFallbackActive, AtomicLong::get)
+                    .description("Whether rate limiting is currently using in-memory fallback because Redis failed")
+                    .register(meterRegistry);
+        }
     }
 
     @Value("${app.security.rate-limit.enabled:true}")
@@ -145,14 +163,47 @@ public class RequestRateLimitFilter extends OncePerRequestFilter {
             try {
                 RateDecision redisDecision = tryAcquireWithRedis(request, rule, now);
                 if (redisDecision != null) {
+                    clearRedisFallbackIfActive();
                     return redisDecision;
                 }
+                recordRedisFallback("empty-result", "Redis script returned no count");
             } catch (Exception e) {
-                logger.debug("Redis rate limiting unavailable; falling back to in-memory counters: {}", e.getMessage());
+                recordRedisFallback("exception", e.getMessage());
             }
         }
 
         return tryAcquireInMemory(request, rule, now);
+    }
+
+    private void recordRedisFallback(String reason, String detail) {
+        redisFallbackEvents.incrementAndGet();
+        if (redisFallbackCounter != null) {
+            redisFallbackCounter.increment();
+        }
+        String fallbackDetail = detail == null || detail.isBlank() ? "unavailable" : detail;
+        if (redisFallbackActive.compareAndSet(0, 1)) {
+            logger.warn("Redis rate limiting unavailable; using in-memory fallback counters. reason={}, detail={}",
+                    reason,
+                    fallbackDetail);
+            return;
+        }
+        logger.debug("Redis rate limiting still unavailable; continuing in-memory fallback. reason={}, detail={}",
+                reason,
+                fallbackDetail);
+    }
+
+    private void clearRedisFallbackIfActive() {
+        if (redisFallbackActive.compareAndSet(1, 0)) {
+            logger.info("Redis rate limiting recovered; using Redis counters again");
+        }
+    }
+
+    boolean isRedisFallbackActive() {
+        return redisFallbackActive.get() == 1;
+    }
+
+    long redisFallbackEvents() {
+        return redisFallbackEvents.get();
     }
 
     private RateDecision tryAcquireWithRedis(HttpServletRequest request, LimitRule rule, long now) {

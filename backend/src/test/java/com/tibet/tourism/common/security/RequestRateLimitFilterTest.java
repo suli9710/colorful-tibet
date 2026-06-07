@@ -1,12 +1,16 @@
 package com.tibet.tourism.common.security;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.servlet.http.Cookie;
 import java.lang.reflect.Field;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -18,50 +22,61 @@ class RequestRateLimitFilterTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        ObjectProvider<StringRedisTemplate> provider = new ObjectProvider<>() {
-            @Override
-            public StringRedisTemplate getObject() {
-                return null;
-            }
-
-            @Override
-            public StringRedisTemplate getObject(Object... args) {
-                return null;
-            }
-
-            @Override
-            public StringRedisTemplate getIfAvailable() {
-                return null;
-            }
-
-            @Override
-            public StringRedisTemplate getIfUnique() {
-                return null;
-            }
-        };
-        filter = new RequestRateLimitFilter(provider, new TrustedProxyIpResolver());
-        setField("enabled", true);
-        setField("redisEnabled", false);
-        setField("defaultRequests", 10);
-        setField("defaultWindowSeconds", 60L);
-        setField("authRequests", 3);
-        setField("authWindowSeconds", 60L);
-        setField("aiRequests", 2);
-        setField("aiWindowSeconds", 600L);
-        setField("guideChatRequests", 2);
-        setField("guideChatWindowSeconds", 300L);
-        setField("uploadRequests", 5);
-        setField("uploadWindowSeconds", 60L);
-        setField("adminRequests", 8);
-        setField("adminWindowSeconds", 60L);
-        setField("trustProxyHeaders", false);
-        setField("trustedProxyCidrs", "");
+        filter = new RequestRateLimitFilter(provider(null), new TrustedProxyIpResolver(), provider(null));
+        configureDefaults(filter);
     }
 
     private void setField(String name, Object value) throws Exception {
+        setField(filter, name, value);
+    }
+
+    private void setField(RequestRateLimitFilter targetFilter, String name, Object value) throws Exception {
         Field field = RequestRateLimitFilter.class.getDeclaredField(name);
         field.setAccessible(true);
-        field.set(filter, value);
+        field.set(targetFilter, value);
+    }
+
+    private void configureDefaults(RequestRateLimitFilter targetFilter) throws Exception {
+        setField(targetFilter, "enabled", true);
+        setField(targetFilter, "redisEnabled", false);
+        setField(targetFilter, "defaultRequests", 10);
+        setField(targetFilter, "defaultWindowSeconds", 60L);
+        setField(targetFilter, "authRequests", 3);
+        setField(targetFilter, "authWindowSeconds", 60L);
+        setField(targetFilter, "aiRequests", 2);
+        setField(targetFilter, "aiWindowSeconds", 600L);
+        setField(targetFilter, "guideChatRequests", 2);
+        setField(targetFilter, "guideChatWindowSeconds", 300L);
+        setField(targetFilter, "uploadRequests", 5);
+        setField(targetFilter, "uploadWindowSeconds", 60L);
+        setField(targetFilter, "adminRequests", 8);
+        setField(targetFilter, "adminWindowSeconds", 60L);
+        setField(targetFilter, "trustProxyHeaders", false);
+        setField(targetFilter, "trustedProxyCidrs", "");
+    }
+
+    private static <T> ObjectProvider<T> provider(T value) {
+        return new ObjectProvider<>() {
+            @Override
+            public T getObject() {
+                return value;
+            }
+
+            @Override
+            public T getObject(Object... args) {
+                return value;
+            }
+
+            @Override
+            public T getIfAvailable() {
+                return value;
+            }
+
+            @Override
+            public T getIfUnique() {
+                return value;
+            }
+        };
     }
 
     @Test
@@ -247,6 +262,44 @@ class RequestRateLimitFilterTest {
     }
 
     @Test
+    @DisplayName("Redis failures activate observable in-memory fallback")
+    void redisFailuresActivateObservableFallback() throws Exception {
+        SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+        RequestRateLimitFilter redisFilter = redisBackedFilter(new FailingRedisTemplate(), meterRegistry);
+
+        MockHttpServletResponse response = doFilter(redisFilter, apiRequest("GET", "/api/spots"));
+
+        assertThat(response.getStatus()).isEqualTo(200);
+        assertThat(redisFilter.isRedisFallbackActive()).isTrue();
+        assertThat(redisFilter.redisFallbackEvents()).isEqualTo(1);
+        assertThat(meterRegistry.find("app.security.rate.limit.redis.fallback.events").counter()).isNotNull();
+        assertThat(meterRegistry.find("app.security.rate.limit.redis.fallback.events").counter().count())
+                .isEqualTo(1.0);
+        assertThat(meterRegistry.find("app.security.rate.limit.redis.fallback.active").gauge()).isNotNull();
+        assertThat(meterRegistry.find("app.security.rate.limit.redis.fallback.active").gauge().value())
+                .isEqualTo(1.0);
+    }
+
+    @Test
+    @DisplayName("Redis success clears fallback status after recovery")
+    void redisSuccessClearsFallbackStatusAfterRecovery() throws Exception {
+        SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+        RequestRateLimitFilter redisFilter = redisBackedFilter(new RecoveringRedisTemplate(), meterRegistry);
+
+        assertThat(doFilter(redisFilter, apiRequest("GET", "/api/spots")).getStatus()).isEqualTo(200);
+        assertThat(redisFilter.isRedisFallbackActive()).isTrue();
+
+        assertThat(doFilter(redisFilter, apiRequest("GET", "/api/spots")).getStatus()).isEqualTo(200);
+
+        assertThat(redisFilter.isRedisFallbackActive()).isFalse();
+        assertThat(redisFilter.redisFallbackEvents()).isEqualTo(1);
+        assertThat(meterRegistry.find("app.security.rate.limit.redis.fallback.events").counter().count())
+                .isEqualTo(1.0);
+        assertThat(meterRegistry.find("app.security.rate.limit.redis.fallback.active").gauge().value())
+                .isEqualTo(0.0);
+    }
+
+    @Test
     @DisplayName("rate limit headers are set on every response")
     void rateLimitHeadersAreSet() throws Exception {
         MockHttpServletResponse response = doFilter(apiRequest("GET", "/api/spots"));
@@ -368,5 +421,42 @@ class RequestRateLimitFilterTest {
         MockHttpServletResponse response = new MockHttpServletResponse();
         targetFilter.doFilterInternal(request, response, new MockFilterChain());
         return response;
+    }
+
+    private RequestRateLimitFilter redisBackedFilter(StringRedisTemplate redisTemplate,
+                                                     SimpleMeterRegistry meterRegistry) throws Exception {
+        RequestRateLimitFilter targetFilter = new RequestRateLimitFilter(
+                provider(redisTemplate),
+                new TrustedProxyIpResolver(),
+                provider(meterRegistry));
+        configureDefaults(targetFilter);
+        setField(targetFilter, "redisEnabled", true);
+        return targetFilter;
+    }
+
+    private static final class FailingRedisTemplate extends StringRedisTemplate {
+        @Override
+        public <T> T execute(RedisScript<T> script, List<String> keys, Object... args) {
+            throw new IllegalStateException("redis unavailable");
+        }
+    }
+
+    private static final class RecoveringRedisTemplate extends StringRedisTemplate {
+        private int attempts;
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <T> T execute(RedisScript<T> script, List<String> keys, Object... args) {
+            attempts++;
+            if (attempts == 1) {
+                throw new IllegalStateException("redis unavailable");
+            }
+            return (T) Long.valueOf(1);
+        }
+
+        @Override
+        public Long getExpire(String key, TimeUnit timeUnit) {
+            return 60L;
+        }
     }
 }
