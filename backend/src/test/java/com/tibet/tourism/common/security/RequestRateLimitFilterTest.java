@@ -5,6 +5,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -144,6 +145,56 @@ class RequestRateLimitFilterTest {
         }
         MockHttpServletResponse blocked = doFilter(apiRequest("POST", "/api/guide/chat"));
         assertThat(blocked.getStatus()).isEqualTo(429);
+    }
+
+    @Test
+    @DisplayName("AI guide chat limit binds from rate-limit properties")
+    void aiGuideChatLimitBindsFromRateLimitProperties() {
+        new ApplicationContextRunner()
+                .withBean(TrustedProxyIpResolver.class)
+                .withBean(RequestRateLimitFilter.class)
+                .withPropertyValues(
+                        "app.security.rate-limit.redis-enabled=false",
+                        "app.security.rate-limit.guide-chat.requests=2",
+                        "app.security.rate-limit.guide-chat.window-seconds=60")
+                .run(context -> {
+                    RequestRateLimitFilter configuredFilter = context.getBean(RequestRateLimitFilter.class);
+
+                    assertThat(doFilter(configuredFilter, apiRequest("POST", "/api/guide/chat")).getStatus())
+                            .isEqualTo(200);
+                    assertThat(doFilter(configuredFilter, apiRequest("POST", "/api/guide/chat")).getStatus())
+                            .isEqualTo(200);
+
+                    MockHttpServletResponse blocked =
+                            doFilter(configuredFilter, apiRequest("POST", "/api/guide/chat"));
+                    assertThat(blocked.getStatus()).isEqualTo(429);
+                    assertThat(blocked.getHeader("X-RateLimit-Limit")).isEqualTo("2");
+                });
+    }
+
+    @Test
+    @DisplayName("AI guide chat limit remains compatible with legacy guide-chat properties")
+    void aiGuideChatLimitBindsFromLegacyGuideChatProperties() {
+        new ApplicationContextRunner()
+                .withBean(TrustedProxyIpResolver.class)
+                .withBean(RequestRateLimitFilter.class)
+                .withPropertyValues(
+                        "app.security.rate-limit.redis-enabled=false",
+                        "app.security.guide-chat.window-limit=2",
+                        "app.security.guide-chat.window-seconds=60")
+                .run(context -> {
+                    RequestRateLimitFilter configuredFilter = context.getBean(RequestRateLimitFilter.class);
+
+                    assertThat(doFilter(configuredFilter, apiRequest("POST", "/api/guide/chat")).getStatus())
+                            .isEqualTo(200);
+                    assertThat(doFilter(configuredFilter, apiRequest("POST", "/api/guide/chat")).getStatus())
+                            .isEqualTo(200);
+
+                    MockHttpServletResponse blocked =
+                            doFilter(configuredFilter, apiRequest("POST", "/api/guide/chat"));
+                    assertThat(blocked.getStatus()).isEqualTo(429);
+                    assertThat(blocked.getHeader("X-RateLimit-Limit")).isEqualTo("2");
+                });
     }
 
     @Test
@@ -309,8 +360,13 @@ class RequestRateLimitFilterTest {
     }
 
     private MockHttpServletResponse doFilter(MockHttpServletRequest request) throws Exception {
+        return doFilter(filter, request);
+    }
+
+    private MockHttpServletResponse doFilter(RequestRateLimitFilter targetFilter, MockHttpServletRequest request)
+            throws Exception {
         MockHttpServletResponse response = new MockHttpServletResponse();
-        filter.doFilterInternal(request, response, new MockFilterChain());
+        targetFilter.doFilterInternal(request, response, new MockFilterChain());
         return response;
     }
 }
