@@ -10,11 +10,13 @@ import com.tibet.tourism.modules.content.infra.HeritageCommentRepository;
 import com.tibet.tourism.modules.content.infra.HeritageItemRepository;
 import com.tibet.tourism.modules.content.infra.HeritageLikeRepository;
 import com.tibet.tourism.modules.content.web.dto.HeritageCommentDTO;
+import com.tibet.tourism.modules.content.web.dto.HeritageCommentRequest;
 import com.tibet.tourism.modules.content.web.dto.HeritageEventDTO;
 import com.tibet.tourism.modules.content.web.dto.HeritageInheritorDTO;
 import com.tibet.tourism.modules.content.web.dto.HeritageItemDTO;
 import com.tibet.tourism.modules.user.domain.User;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -70,6 +72,7 @@ public class HeritageController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<HeritageItemDTO> getItemById(
             @PathVariable Long id,
             @RequestParam(required = false, defaultValue = "zh") String locale) {
@@ -116,6 +119,7 @@ public class HeritageController {
 
     // ---- 评论 ----
     @GetMapping("/{id}/comments")
+    @PreAuthorize("isAuthenticated()")
     public Page<HeritageCommentDTO> getComments(
             @PathVariable Long id,
             @PageableDefault(size = 20) Pageable pageable) {
@@ -128,30 +132,20 @@ public class HeritageController {
     @Transactional
     public ResponseEntity<?> addComment(
             @PathVariable Long id,
-            @RequestBody Map<String, Object> payload,
+            @Valid @RequestBody HeritageCommentRequest dto,
             HttpServletRequest request) {
         User user = jwtAuthSupport.resolveCurrentUser(request);
         HeritageItem item = heritageItemRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Heritage item not found"));
 
-        String content = InputSanitizer.requiredTextBlock(
-                payload.get("content") == null ? null : payload.get("content").toString(), 1000, "评论内容");
-        Integer rating = null;
-        if (payload.containsKey("rating")) {
-            rating = Integer.valueOf(payload.get("rating").toString());
-            if (rating < 1 || rating > 5) {
-                return ResponseEntity.badRequest().body(Map.of("error", "评分必须在1到5之间"));
-            }
-        }
+        String content = InputSanitizer.requiredTextBlock(dto.getContent(), 1000, "评论内容");
 
         HeritageComment comment = new HeritageComment();
         comment.setUser(user);
         comment.setHeritageItem(item);
         comment.setContent(content);
-        comment.setRating(rating);
-        if (payload.containsKey("imageUrl")) {
-            comment.setImageUrl(payload.get("imageUrl") == null ? null : payload.get("imageUrl").toString());
-        }
+        comment.setRating(dto.getRating());
+        comment.setImageUrl(dto.getImageUrl());
         heritageCommentRepository.save(comment);
 
         item.setCommentCount(item.getCommentCount() == null ? 1 : item.getCommentCount() + 1);
@@ -191,6 +185,7 @@ public class HeritageController {
 
     // ---- 传承人 ----
     @GetMapping("/{id}/inheritors")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<HeritageInheritorDTO>> getInheritors(
             @PathVariable Long id,
             @RequestParam(required = false, defaultValue = "zh") String locale) {
@@ -203,6 +198,7 @@ public class HeritageController {
 
     // ---- 活动 ----
     @GetMapping("/{id}/events")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<HeritageEventDTO>> getEvents(
             @PathVariable Long id,
             @RequestParam(required = false, defaultValue = "zh") String locale) {

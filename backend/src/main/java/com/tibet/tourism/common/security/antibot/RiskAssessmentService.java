@@ -1,5 +1,6 @@
 package com.tibet.tourism.common.security.antibot;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.tibet.tourism.common.security.PiiMasker;
 import com.tibet.tourism.common.security.antibot.domain.BehaviorLog;
 import com.tibet.tourism.common.security.antibot.infra.BehaviorLogRepository;
 import com.tibet.tourism.modules.user.domain.User;
@@ -112,14 +113,16 @@ public class RiskAssessmentService {
         RiskResult result = new RiskResult(recaptchaRisk, metrics.risk(), fingerprintRisk,
                 finalScore, decision);
 
+        String userLabel = safeUserLabel(userId);
+        String fingerprintLabel = safeFingerprintLabel(fingerprint);
         log.info("Antibot assessment: endpoint={} user={} fp={} score={} decision={}",
-                endpoint, userId, fingerprint != null ? fingerprint.substring(0, Math.min(8, fingerprint.length())) : "null",
+                endpoint, userLabel, fingerprintLabel,
                 String.format("%.1f", finalScore), decision);
 
         final OptionalDouble captchaScore = recaptchaScore;
         final BehaviorAnalysisService.BehaviorMetrics m = metrics;
         CompletableFuture.runAsync(() -> persistLog(
-                userId, endpoint, fingerprint, m, captchaScore, finalScore, decision), executor);
+                userId, endpoint, fingerprintLabel, m, captchaScore, finalScore, decision), executor);
 
         return result;
     }
@@ -139,6 +142,22 @@ public class RiskAssessmentService {
             log.debug("Failed to decode behavior data: {}", e.getMessage());
             return null;
         }
+    }
+
+    private String safeFingerprintLabel(String fingerprint) {
+        String label = fingerprintService.fingerprintLabel(fingerprint);
+        if (StringUtils.hasText(label)) {
+            return label;
+        }
+        return "fp#" + PiiMasker.shortHash(fingerprint);
+    }
+
+    private String safeUserLabel(Long userId) {
+        String label = fingerprintService.userLabel(userId);
+        if (StringUtils.hasText(label)) {
+            return label;
+        }
+        return "user#" + PiiMasker.shortHash(userId == null ? null : userId.toString());
     }
 
     private void persistLog(Long userId, String endpoint, String fingerprint,

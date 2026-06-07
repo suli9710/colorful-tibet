@@ -9,6 +9,7 @@ import com.tibet.tourism.modules.admin.web.AdminHotelController;
 import com.tibet.tourism.modules.admin.web.AdminNewsController;
 import com.tibet.tourism.modules.admin.web.AdminRouteController;
 import com.tibet.tourism.modules.admin.web.AdminScenicSpotController;
+import com.tibet.tourism.modules.admin.web.AdminSecurityPostureController;
 import com.tibet.tourism.modules.admin.web.AdminStatsController;
 import com.tibet.tourism.modules.admin.web.AdminUserController;
 import com.tibet.tourism.modules.ai.web.AiRouteController;
@@ -58,6 +59,7 @@ class ControllerAuthorizationMatrixTest {
             AdminNewsController.class,
             AdminRouteController.class,
             AdminScenicSpotController.class,
+            AdminSecurityPostureController.class,
             AdminStatsController.class,
             AdminUserController.class,
             TibetSpecialtyController.class,

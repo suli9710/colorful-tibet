@@ -71,7 +71,7 @@
             :transition="authItemTransition(0.4)"
           >
             <label for="secondaryPassword" class="sr-only">{{ t('login.secondaryPassword') }}</label>
-            <input id="secondaryPassword" name="secondaryPassword" type="text" required v-model="form.secondaryPassword"
+            <input id="secondaryPassword" name="secondaryPassword" type="password" required v-model="form.secondaryPassword"
                    autocomplete="one-time-code"
                    inputmode="numeric"
                    maxlength="6"
@@ -120,13 +120,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { motion, useReducedMotion } from 'motion-v'
 import api, { clearTokenCache } from '../api'
 import { useAuthStore } from '../stores/auth'
-import { getRecaptchaToken, isRecaptchaV3Enabled } from '../utils/recaptcha'
+import { getRecaptchaToken, isRecaptchaError, isRecaptchaV3Enabled } from '../utils/recaptcha'
 import {
   authCardAnimate,
   authCardInitial,
@@ -156,8 +156,7 @@ const form = ref({
   password: '',
   secondaryPassword: ''
 })
-const superAdminUsername = 'lzh'
-const requiresSecondaryPassword = computed(() => form.value.username.trim().toLowerCase() === superAdminUsername)
+const requiresSecondaryPassword = ref(false)
 
 function clearError() {
   errorMessage.value = ''
@@ -221,6 +220,15 @@ const handleLogin = async () => {
 
     router.push(user.role === 'ADMIN' ? '/admin' : '/')
   } catch (error: any) {
+    if (isRecaptchaError(error)) {
+      errorMessage.value = t('security.recaptchaFailed')
+      return
+    }
+    if (error.response?.status === 449 && error.response?.data?.requiresSecondaryAuth) {
+      requiresSecondaryPassword.value = true
+      errorMessage.value = t('login.secondaryPasswordRequired')
+      return
+    }
     const msg = error.response?.data?.message || error.response?.data?.error || t('login.loginFailed')
     errorMessage.value = msg
 

@@ -1,3 +1,5 @@
+import { expireAuthSession } from './index'
+
 const apiBaseURL = import.meta.env.VITE_API_BASE_URL || '/api'
 
 function readCookie(name: string): string {
@@ -66,6 +68,9 @@ export async function startRouteGenerationJob(
 
   if (!response.ok) {
     const errorText = await response.text()
+    if (response.status === 401) {
+      expireAuthSession('/login')
+    }
     if (response.status === 429) {
       throw new Error(errorText || 'AI route generation is temporarily rate limited. Please wait a moment before starting a new route.')
     }
@@ -87,6 +92,9 @@ export async function getRouteGenerationJob(jobId: string): Promise<RouteGenerat
 
   if (!response.ok) {
     const errorText = await response.text()
+    if (response.status === 401) {
+      expireAuthSession('/login')
+    }
     if (response.status === 429) {
       throw new Error(errorText || 'AI route job status check is temporarily rate limited. Please wait a moment and retry.')
     }
@@ -113,6 +121,9 @@ export async function streamRouteGenerationJob(
 
   if (!response.ok) {
     const errorText = await response.text()
+    if (response.status === 401) {
+      expireAuthSession('/login')
+    }
     if (response.status === 429) {
       throw new Error(errorText || 'AI route stream recovery is temporarily rate limited. Please wait a moment and retry.')
     }
@@ -221,6 +232,9 @@ export async function generateRouteStream(
       errorText = await response.text()
     } catch {
       errorText = `HTTP ${response.status}`
+    }
+    if (response.status === 401) {
+      expireAuthSession('/login')
     }
     throw new Error(errorText || `HTTP ${response.status}`)
   }

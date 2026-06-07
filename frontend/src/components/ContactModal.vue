@@ -73,10 +73,10 @@
                   </div>
                   <div class="flex-1 min-w-0">
                     <h3 class="text-sm font-medium text-gray-500 mb-1">{{ t('contact.phoneConsult') }}</h3>
-                    <p class="text-lg font-semibold text-gray-900 mb-1">19532458802</p>
+                    <p class="text-lg font-semibold text-gray-900 mb-1">{{ t('footer.phone') }}</p>
                     <p class="text-xs text-gray-500">{{ t('contact.phoneHours') }}</p>
                   </div>
-                  <motion.button @click="copyToClipboard('19532458802')"
+                  <motion.button @click="copyToClipboard(t('footer.phone'))"
                           :whileHover="{ scale: 1.08 }"
                           :whileTap="{ scale: 0.9 }"
                           class="flex-shrink-0 w-8 h-8 rounded-lg bg-gray-100/50 hover:bg-gray-200/70 flex items-center justify-center transition-all duration-200 active:scale-90">
@@ -106,10 +106,10 @@
                   </div>
                   <div class="flex-1 min-w-0">
                     <h3 class="text-sm font-medium text-gray-500 mb-1">{{ t('contact.emailContact') }}</h3>
-                    <p class="text-lg font-semibold text-gray-900 mb-1 break-all">lengzhehao@gmail.com</p>
+                    <p class="text-lg font-semibold text-gray-900 mb-1 break-all">{{ t('footer.email') }}</p>
                     <p class="text-xs text-gray-500">{{ t('contact.emailResponse') }}</p>
                   </div>
-                  <motion.button @click="copyToClipboard('lengzhehao@gmail.com')"
+                  <motion.button @click="copyToClipboard(t('footer.email'))"
                           :whileHover="{ scale: 1.08 }"
                           :whileTap="{ scale: 0.9 }"
                           class="flex-shrink-0 w-8 h-8 rounded-lg bg-gray-100/50 hover:bg-gray-200/70 flex items-center justify-center transition-all duration-200 active:scale-90">

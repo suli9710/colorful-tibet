@@ -116,7 +116,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { marked } from 'marked'
-import DOMPurify from 'dompurify'
+import { sanitizeHtml } from '../utils/sanitize'
 import { motion } from 'motion-v'
 import { revealInitial, revealInView, revealTransition } from '../motion/presets'
 import api, { endpoints } from '../api'
@@ -138,7 +138,7 @@ const submitting = ref(false)
 const currentUser = computed(() => auth.user)
 
 const renderedContent = computed(() => {
-  return routeData.value ? DOMPurify.sanitize(marked(routeData.value.content) as string) : ''
+  return routeData.value ? sanitizeHtml(marked(routeData.value.content) as string) : ''
 })
 
 const loadRouteDetail = async () => {

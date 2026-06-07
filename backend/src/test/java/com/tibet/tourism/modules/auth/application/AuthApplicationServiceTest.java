@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -17,6 +18,7 @@ import com.tibet.tourism.common.security.LoginAttemptService;
 import com.tibet.tourism.common.security.antibot.AntibotProperties;
 import com.tibet.tourism.common.security.antibot.RecaptchaService;
 import com.tibet.tourism.modules.auth.domain.AuthForbiddenException;
+import com.tibet.tourism.modules.auth.domain.SecondaryAuthRequiredException;
 import com.tibet.tourism.modules.auth.domain.AuthRateLimitException;
 import com.tibet.tourism.modules.auth.web.dto.LoginRequest;
 import com.tibet.tourism.modules.auth.web.dto.RegisterRequest;
@@ -91,9 +93,9 @@ class AuthApplicationServiceTest {
         stubAuthenticatedUser("lzh", superAdmin);
 
         assertThatThrownBy(() -> service.login(loginRequest("lzh", "031224", ""), httpRequest))
-                .isInstanceOf(AuthForbiddenException.class);
+                .isInstanceOf(SecondaryAuthRequiredException.class);
 
-        verify(loginAttemptService).recordFailure("lzh", "127.0.0.1");
+        verify(loginAttemptService, never()).recordFailure(anyString(), anyString());
         assertThat(superAdmin.getAllowedLoginFingerprintHash()).isNull();
     }
 

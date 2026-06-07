@@ -2,6 +2,8 @@ package com.tibet.tourism.modules.user.application;
 import com.tibet.tourism.common.error.BusinessException;
 import com.tibet.tourism.common.error.ResourceNotFoundException;
 import com.tibet.tourism.common.validation.InputSanitizer;
+import com.tibet.tourism.modules.community.web.dto.CommentDTO;
+import com.tibet.tourism.modules.community.web.dto.RouteCommentResponse;
 import com.tibet.tourism.modules.community.infra.CommentRepository;
 import com.tibet.tourism.modules.community.infra.RouteCommentRepository;
 import com.tibet.tourism.modules.community.infra.SharedRouteRepository;
@@ -77,8 +79,12 @@ public class CurrentUserApplicationService {
         User user = getUser(userId);
 
         Map<String, Object> comments = new HashMap<>();
-        comments.put("spotComments", commentRepository.findByUserOrderByCreatedAtDesc(user));
-        comments.put("routeComments", routeCommentRepository.findByUserOrderByCreatedAtDesc(user));
+        comments.put("spotComments", commentRepository.findByUserOrderByCreatedAtDesc(user).stream()
+                .map(CommentDTO::fromEntity)
+                .toList());
+        comments.put("routeComments", routeCommentRepository.findByUserOrderByCreatedAtDesc(user).stream()
+                .map(RouteCommentResponse::fromEntity)
+                .toList());
         return comments;
     }
 

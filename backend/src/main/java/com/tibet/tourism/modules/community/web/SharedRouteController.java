@@ -9,10 +9,12 @@ import com.tibet.tourism.modules.community.application.SharedRouteService;
 import com.tibet.tourism.modules.community.domain.RouteComment;
 import com.tibet.tourism.modules.community.domain.SharedRoute;
 import com.tibet.tourism.modules.community.web.dto.RouteCommentResponse;
+import com.tibet.tourism.modules.community.web.dto.ShareRouteRequest;
 import com.tibet.tourism.modules.community.web.dto.SharedRouteResponse;
 import com.tibet.tourism.modules.user.domain.User;
 import com.tibet.tourism.modules.user.infra.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -79,15 +81,15 @@ public class SharedRouteController {
     // 分享路线
     @PostMapping("/share")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<?> shareRoute(@RequestBody Map<String, Object> payload, HttpServletRequest request) {
+    public ResponseEntity<?> shareRoute(@Valid @RequestBody ShareRouteRequest dto, HttpServletRequest request) {
         try {
             SharedRoute route = routeService.shareRoute(
                     getCurrentUserId(request),
-                    (String) payload.get("title"),
-                    (String) payload.get("content"),
-                    (Integer) payload.get("days"),
-                    (String) payload.get("budget"),
-                    (String) payload.get("preference")
+                    dto.getTitle(),
+                    dto.getContent(),
+                    dto.getDays(),
+                    dto.getBudget(),
+                    dto.getPreference()
             );
             return ResponseEntity.ok(SharedRouteResponse.fromEntity(route));
         } catch (Exception e) {

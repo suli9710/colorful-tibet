@@ -339,7 +339,7 @@
     :amount="totalPrice"
     recaptcha-action="booking"
     @close="showPaymentModal = false"
-    @paid="handlePaymentConfirmed"
+    @status-check="handlePaymentStatusCheck"
   />
 
   <MobileStickyActionBar
@@ -630,7 +630,7 @@ const handleBooking = async () => {
   showPaymentModal.value = true
 }
 
-const handlePaymentConfirmed = async (recaptchaToken = '') => {
+const handlePaymentStatusCheck = async (recaptchaToken = '') => {
   showPaymentModal.value = false
   submitting.value = true
   const behaviorData = encodeBehaviorData()
@@ -821,7 +821,15 @@ const toggleLike = async (comment: any) => {
 }
 
 const openImageModal = (imageUrl: string) => {
-  window.open(imageUrl, '_blank')
+  try {
+    const url = new URL(imageUrl, window.location.origin)
+    if (!['http:', 'https:', 'blob:'].includes(url.protocol)) {
+      return
+    }
+    window.open(url.href, '_blank', 'noopener,noreferrer')
+  } catch {
+    // Ignore malformed comment image URLs.
+  }
 }
 
 const handleCommentImageError = (event: Event) => {

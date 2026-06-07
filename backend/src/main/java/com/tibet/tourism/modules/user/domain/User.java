@@ -23,17 +23,21 @@ public class User {
     private String avatar;
     @Convert(converter = PiiCryptoConverter.class)
     @Column(length = 512)
+    @JsonIgnore
     private String phone;
     private String city; // 用户所在城市
     @Column(length = 64)
     private String ipAddress; // 最后登录IP地址哈希
     private LocalDateTime lastLoginAt; // 最后登录时间
+    @JsonIgnore
     private Boolean mustChangePassword = false;
 
     @Column(length = 64)
+    @JsonIgnore
     private String allowedLoginFingerprintHash;
 
     @Column(name = "session_version", nullable = false)
+    @JsonIgnore
     private Long sessionVersion = 0L;
 
     @Enumerated(EnumType.STRING)
@@ -120,6 +124,7 @@ public class User {
         this.city = city;
     }
 
+    @JsonIgnore
     public String getIpAddress() {
         return ipAddress;
     }
@@ -148,6 +153,7 @@ public class User {
         setSessionVersion(getSessionVersion() + 1);
     }
 
+    @JsonIgnore
     public LocalDateTime getLastLoginAt() {
         return lastLoginAt;
     }

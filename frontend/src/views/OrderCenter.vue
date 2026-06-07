@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="order-center-page tibet-page-shell min-h-screen relative overflow-hidden">
     <div class="absolute inset-0 pointer-events-none opacity-40 tibet-cloud-pattern"></div>
 
@@ -12,11 +12,11 @@
         <div>
           <div class="inline-flex items-center gap-2 rounded-full border border-tibet-gold/25 bg-white/75 px-3 py-1 text-xs font-semibold text-tibet-red">
             <ReceiptText class="h-3.5 w-3.5" />
-            统一旅行履约
+            缁熶竴鏃呰灞ョ害
           </div>
-          <h1 class="mt-4 text-2xl font-bold text-tibet-dark sm:text-3xl md:text-4xl">订单中心</h1>
+          <h1 class="mt-4 text-2xl font-bold text-tibet-dark sm:text-3xl md:text-4xl">璁㈠崟涓績</h1>
           <p class="mt-2 max-w-2xl text-sm leading-6 text-tibet-brown/65">
-            集中查看景点、酒店和行程节点预订，处理取消、退款、凭证和发票。
+            闆嗕腑鏌ョ湅鏅偣銆侀厭搴楀拰琛岀▼鑺傜偣棰勮锛屽鐞嗗彇娑堛€侀€€娆俱€佸嚟璇佸拰鍙戠エ銆?
           </p>
         </div>
 
@@ -26,7 +26,7 @@
             class="inline-flex items-center justify-center gap-2 rounded-xl border border-tibet-gold/25 bg-white/75 px-3 py-2.5 text-sm font-semibold text-tibet-brown transition hover:bg-amber-50 sm:px-4"
           >
             <Sparkles class="h-4 w-4" />
-            继续规划
+            缁х画瑙勫垝
           </router-link>
           <motion.button
             type="button"
@@ -37,7 +37,7 @@
             class="inline-flex items-center justify-center gap-2 rounded-xl bg-tibet-red px-3 py-2.5 text-sm font-semibold text-tibet-yellow shadow-md shadow-tibet-red/20 disabled:opacity-50 sm:px-4"
           >
             <RefreshCw class="h-4 w-4" :class="{ 'animate-spin': loading }" />
-            刷新订单
+            鍒锋柊璁㈠崟
           </motion.button>
         </div>
       </motion.header>
@@ -81,7 +81,7 @@
               v-model.trim="query"
               type="search"
               class="w-full rounded-xl border border-tibet-gold/20 bg-white/85 py-2.5 pl-9 pr-3 text-sm text-tibet-dark outline-none transition focus:border-tibet-gold/50 focus:ring-2 focus:ring-tibet-gold/10"
-              placeholder="搜索订单号、商品或凭证"
+              placeholder="鎼滅储璁㈠崟鍙枫€佸晢鍝佹垨鍑瘉"
             >
           </label>
         </div>
@@ -96,7 +96,7 @@
 
       <div v-if="loading && !orders.length" class="rounded-3xl border border-white/60 bg-white/70 p-12 text-center text-tibet-brown/60">
         <div class="mx-auto mb-4 h-11 w-11 animate-spin rounded-full border-2 border-tibet-gold/30 border-b-tibet-gold"></div>
-        <p class="text-sm font-semibold">正在加载订单</p>
+        <p class="text-sm font-semibold">姝ｅ湪鍔犺浇璁㈠崟</p>
       </div>
 
       <div v-else-if="!orders.length" class="rounded-3xl border border-white/60 bg-white/75 px-6 py-12 text-center shadow-sm shadow-slate-900/3">
@@ -135,7 +135,7 @@
                   </span>
                   <span class="text-xs text-tibet-brown/45">{{ order.orderNo }}</span>
                 </div>
-                <h2 class="mt-2 truncate text-base font-bold text-tibet-dark">{{ order.productSummary || '旅行订单' }}</h2>
+                <h2 class="mt-2 truncate text-base font-bold text-tibet-dark">{{ order.productSummary || '鏃呰璁㈠崟' }}</h2>
                 <p class="mt-1 line-clamp-2 text-sm text-tibet-brown/58">
                   {{ itemSummary(order) }}
                 </p>
@@ -152,7 +152,7 @@
                     class="inline-flex items-center gap-1.5 rounded-lg border border-tibet-gold/20 bg-white/80 px-2.5 py-1.5 text-xs font-semibold text-tibet-brown transition hover:bg-amber-50"
                     @click.stop="selectOrder(order.id)"
                   >
-                    查看详情
+                    鏌ョ湅璇︽儏
                   </button>
                   <button
                     v-if="canDelete(order)"
@@ -175,17 +175,17 @@
               </span>
               <span class="inline-flex items-center gap-1.5">
                 <TicketCheck class="h-3.5 w-3.5 text-tibet-gold" />
-                {{ order.vouchers?.length || 0 }} 张凭证
+                {{ order.vouchers?.length || 0 }} 寮犲嚟璇?
               </span>
               <span class="inline-flex items-center gap-1.5">
                 <FileText class="h-3.5 w-3.5 text-tibet-gold" />
-                {{ order.invoices?.length || 0 }} 张发票
+                {{ order.invoices?.length || 0 }} 寮犲彂绁?
               </span>
             </div>
           </motion.article>
 
           <div v-if="!filteredOrders.length" class="rounded-2xl border border-white/60 bg-white/70 p-8 text-center text-sm text-tibet-brown/60">
-            当前筛选下没有订单。
+            褰撳墠绛涢€変笅娌℃湁璁㈠崟銆?
           </div>
         </section>
 
@@ -195,7 +195,7 @@
               <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div class="min-w-0">
                   <p class="text-xs font-semibold text-tibet-brown/45">{{ selectedOrder.orderNo }}</p>
-                  <h2 class="mt-1 text-xl font-bold text-tibet-dark">{{ selectedOrder.productSummary || '旅行订单' }}</h2>
+                  <h2 class="mt-1 text-xl font-bold text-tibet-dark">{{ selectedOrder.productSummary || '鏃呰璁㈠崟' }}</h2>
                 </div>
                 <div class="flex shrink-0 flex-wrap items-center gap-2">
                   <span class="rounded-full border px-3 py-1 text-xs font-semibold" :class="statusMeta(selectedOrder.status).className">
@@ -204,7 +204,7 @@
                   <button
                     type="button"
                     class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-tibet-gold/20 bg-white/80 text-tibet-brown transition hover:bg-amber-50"
-                    aria-label="关闭订单详情"
+                    aria-label="鍏抽棴璁㈠崟璇︽儏"
                     @click="closeOrderDetail"
                   >
                     <X class="h-4 w-4" />
@@ -214,7 +214,7 @@
 
               <div class="mt-4 grid gap-3 sm:grid-cols-3">
                 <div>
-                  <p class="text-xs text-tibet-brown/45">应付金额</p>
+                  <p class="text-xs text-tibet-brown/45">搴斾粯閲戦</p>
                   <p class="mt-1 text-lg font-bold tabular-nums text-tibet-dark">{{ formatCurrency(selectedOrder.payableAmount, selectedOrder.currency) }}</p>
                 </div>
                 <div>
@@ -222,7 +222,7 @@
                   <p class="mt-1 text-sm font-semibold" :class="paymentMeta(selectedOrder.paymentStatus).textClass">{{ paymentMeta(selectedOrder.paymentStatus).label }}</p>
                 </div>
                 <div>
-                  <p class="text-xs text-tibet-brown/45">下单时间</p>
+                  <p class="text-xs text-tibet-brown/45">涓嬪崟鏃堕棿</p>
                   <p class="mt-1 text-sm font-semibold text-tibet-dark">{{ formatDate(selectedOrder.createdAt) }}</p>
                 </div>
               </div>
@@ -231,7 +231,7 @@
             <div class="divide-y divide-tibet-gold/10">
               <section class="px-5 py-4">
                 <div class="mb-3 flex items-center justify-between gap-3">
-                  <h3 class="text-sm font-bold text-tibet-dark">订单项目</h3>
+                  <h3 class="text-sm font-bold text-tibet-dark">璁㈠崟椤圭洰</h3>
                   <span class="text-xs text-tibet-brown/45">{{ selectedOrder.items?.length || 0 }} 项</span>
                 </div>
                 <div class="space-y-3">
@@ -245,7 +245,7 @@
                         <span class="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-600">{{ itemTypeLabel(item.productType) }}</span>
                       </div>
                       <p class="mt-1 text-xs text-tibet-brown/55">
-                        {{ item.skuName || '标准票/服务' }} · {{ formatServiceDate(item) }} · 数量 {{ item.quantity || 1 }}
+                        {{ item.skuName || '鏍囧噯绁?鏈嶅姟' }} 路 {{ formatServiceDate(item) }} 路 鏁伴噺 {{ item.quantity || 1 }}
                       </p>
                     </div>
                     <p class="shrink-0 text-sm font-bold tabular-nums text-tibet-dark sm:text-right">{{ formatCurrency(item.subtotal, selectedOrder.currency) }}</p>
@@ -259,23 +259,23 @@
                   <div v-for="voucher in selectedOrder.vouchers" :key="voucher.id" class="flex items-center justify-between gap-3 rounded-xl bg-emerald-50/75 px-3 py-2">
                     <div class="min-w-0">
                       <p class="truncate text-sm font-bold text-emerald-800">{{ voucher.voucherCode }}</p>
-                      <p class="text-xs text-emerald-700/65">{{ voucher.validFrom }} 至 {{ voucher.validUntil }}</p>
+                      <p class="text-xs text-emerald-700/65">{{ voucher.validFrom }} 鑷?{{ voucher.validUntil }}</p>
                     </div>
                     <span class="rounded-full bg-white/75 px-2 py-1 text-[11px] font-semibold text-emerald-700">{{ voucher.status }}</span>
                   </div>
                 </div>
-                <p v-else class="text-sm text-tibet-brown/55">暂无凭证，支付确认后会自动生成。</p>
+                <p v-else class="text-sm text-tibet-brown/55">暂无凭证，订单状态确认后会自动生成。</p>
               </section>
 
               <section class="px-5 py-4">
-                <h3 class="mb-3 text-sm font-bold text-tibet-dark">资金记录</h3>
+                <h3 class="mb-3 text-sm font-bold text-tibet-dark">璧勯噾璁板綍</h3>
                 <div class="space-y-2">
                   <div v-for="payment in selectedOrder.paymentTransactions" :key="payment.id" class="flex items-center justify-between gap-3 text-sm">
-                    <span class="text-tibet-brown/60">{{ payment.provider }} · {{ payment.status }}</span>
+                    <span class="text-tibet-brown/60">{{ payment.provider }} 路 {{ payment.status }}</span>
                     <span class="font-semibold text-tibet-dark">{{ formatCurrency(payment.amount, selectedOrder.currency) }}</span>
                   </div>
                   <div v-for="refund in selectedOrder.refunds" :key="refund.id" class="flex items-center justify-between gap-3 text-sm">
-                    <span class="text-tibet-brown/60">{{ refund.refundNo }} · {{ refund.status }}</span>
+                    <span class="text-tibet-brown/60">{{ refund.refundNo }} 路 {{ refund.status }}</span>
                     <span class="font-semibold text-rose-700">-{{ formatCurrency(refund.amount, selectedOrder.currency) }}</span>
                   </div>
                   <p v-if="!selectedOrder.paymentTransactions?.length && !selectedOrder.refunds?.length" class="text-sm text-tibet-brown/55">暂无支付或退款记录。</p>
@@ -284,7 +284,7 @@
 
               <section class="px-5 py-4">
                 <div class="mb-3 flex items-center justify-between gap-3">
-                  <h3 class="text-sm font-bold text-tibet-dark">发票</h3>
+                  <h3 class="text-sm font-bold text-tibet-dark">鍙戠エ</h3>
                   <span class="text-xs text-tibet-brown/45">{{ selectedOrder.invoices?.length || 0 }} 张</span>
                 </div>
                 <div v-if="selectedOrder.invoices?.length" class="space-y-2">
@@ -293,7 +293,7 @@
                       <p class="truncate text-sm font-bold text-sky-800">{{ invoice.invoiceTitle }}</p>
                       <span class="text-xs font-semibold text-sky-700">{{ invoice.status }}</span>
                     </div>
-                    <p class="mt-1 text-xs text-sky-700/65">{{ invoice.invoiceNo }} · {{ formatCurrency(invoice.amount, selectedOrder.currency) }}</p>
+                    <p class="mt-1 text-xs text-sky-700/65">{{ invoice.invoiceNo }} 路 {{ formatCurrency(invoice.amount, selectedOrder.currency) }}</p>
                   </div>
                 </div>
                 <p v-else class="text-sm text-tibet-brown/55">暂无发票申请。</p>
@@ -308,7 +308,7 @@
                     @click="showPaymentForOrder(selectedOrder)"
                   >
                     <WalletCards class="h-4 w-4" />
-                    去支付
+                    鍘绘敮浠?
                   </button>
                   <button
                     type="button"
@@ -318,7 +318,7 @@
                     @click="beginAction('cancel')"
                   >
                     <Ban class="h-4 w-4" />
-                    取消
+                    鍙栨秷
                   </button>
                   <button
                     type="button"
@@ -328,7 +328,7 @@
                     @click="beginAction('refund')"
                   >
                     <RotateCcw class="h-4 w-4" />
-                    退款
+                    閫€娆?
                   </button>
                   <button
                     type="button"
@@ -338,7 +338,7 @@
                     @click="beginAction('invoice')"
                   >
                     <FileText class="h-4 w-4" />
-                    开票
+                    寮€绁?
                   </button>
                   <button
                     v-if="canDelete(selectedOrder)"
@@ -393,7 +393,7 @@
                       v-model.trim="actionReason"
                       rows="3"
                       class="w-full resize-none rounded-xl border border-tibet-gold/20 bg-white px-3 py-2 text-sm outline-none focus:border-tibet-gold/50 focus:ring-2 focus:ring-tibet-gold/10"
-                      placeholder="可选，便于客服处理"
+                      placeholder="鍙€夛紝渚夸簬瀹㈡湇澶勭悊"
                     ></textarea>
                   </label>
 
@@ -419,12 +419,13 @@
     :amount="paymentOrder?.payableAmount ?? undefined"
     recaptcha-action="payment"
     @close="showPaymentModal = false; paymentOrder = null"
-    @paid="handlePaymentConfirmed"
+    @status-check="handlePaymentStatusCheck"
   />
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { motion } from 'motion-v'
 import {
@@ -541,6 +542,7 @@ type ActionType = 'cancel' | 'refund' | 'invoice'
 
 const router = useRouter()
 const auth = useAuthStore()
+const { t } = useI18n()
 
 const { encodeBehaviorData, reset: resetBehavior } = useBehaviorTracker()
 
@@ -563,7 +565,7 @@ const showPaymentForOrder = (order: Order) => {
   showPaymentModal.value = true
 }
 
-const handlePaymentConfirmed = async (recaptchaToken = '') => {
+const handlePaymentStatusCheck = async (recaptchaToken = '') => {
   const order = paymentOrder.value
   if (!order) return
   showPaymentModal.value = false
@@ -583,10 +585,10 @@ const handlePaymentConfirmed = async (recaptchaToken = '') => {
         ...(behaviorData ? { 'X-Behavior-Data': behaviorData } : {}),
       }
     })
-    statusMessage.value = '支付成功，订单已确认。'
+    statusMessage.value = t('payment.mockCallbackSubmitted')
     await loadOrders(selectedOrderId.value || undefined)
   } catch (error: any) {
-    actionError.value = error.response?.data?.error || '支付确认失败，请稍后重试'
+    actionError.value = error.response?.data?.error || t('payment.statusRefreshFailed')
   } finally {
     paymentOrder.value = null
     resetBehavior()
@@ -676,9 +678,8 @@ const stats = computed(() => {
 const actionSubmitLabel = computed(() => {
   if (activeAction.value === 'cancel') return '确认取消'
   if (activeAction.value === 'refund') return '提交退款'
-  return '申请开票'
+  return '申请发票'
 })
-
 const loadOrders = async (preferredId?: number | null) => {
   loading.value = true
   errorMessage.value = ''
@@ -694,7 +695,7 @@ const loadOrders = async (preferredId?: number | null) => {
     }
   } catch (error: any) {
     console.error('Failed to load orders:', error)
-    errorMessage.value = error.response?.data?.error || '订单加载失败'
+    errorMessage.value = error.response?.data?.error || '璁㈠崟鍔犺浇澶辫触'
   } finally {
     loading.value = false
   }
@@ -739,23 +740,23 @@ const submitAction = async () => {
     const order = selectedOrder.value
     if (activeAction.value === 'cancel') {
       await api.post(endpoints.orders.cancel(order.id), { reason: actionReason.value || undefined })
-      statusMessage.value = '订单已提交取消处理'
+      statusMessage.value = t('orderCenter.cancelSubmitted')
     } else if (activeAction.value === 'refund') {
       await api.post(endpoints.orders.refunds(order.id), {
         orderItemId: refundItemId.value ? Number(refundItemId.value) : undefined,
         reason: actionReason.value || undefined
       })
-      statusMessage.value = '退款申请已提交'
+      statusMessage.value = t('orderCenter.refundSubmitted')
     } else {
       if (!invoiceTitle.value.trim()) {
-        actionError.value = '请填写发票抬头'
+        actionError.value = t('orderCenter.invoiceTitleRequired')
         return
       }
       await api.post(endpoints.orders.invoice(order.id), {
         invoiceTitle: invoiceTitle.value,
         taxNo: invoiceTaxNo.value ? invoiceTaxNo.value.toUpperCase() : undefined
       })
-      statusMessage.value = '发票申请已提交'
+      statusMessage.value = t('orderCenter.invoiceSubmitted')
     }
 
     const currentId = order.id
@@ -763,7 +764,7 @@ const submitAction = async () => {
     await loadOrders(currentId)
   } catch (error: any) {
     console.error('Order action failed:', error)
-    actionError.value = error.response?.data?.error || '操作失败，请稍后重试'
+    actionError.value = error.response?.data?.error || t('orderCenter.operationFailed')
   } finally {
     actionLoading.value = false
   }
@@ -798,7 +799,7 @@ const deleteClosedOrder = async (order: Order) => {
     statusMessage.value = '已删除关闭订单。'
   } catch (error: any) {
     console.error('Failed to delete order:', error)
-    errorMessage.value = error.response?.data?.error || '订单删除失败，请稍后重试'
+    errorMessage.value = error.response?.data?.error || '璁㈠崟鍒犻櫎澶辫触锛岃绋嶅悗閲嶈瘯'
   } finally {
     deletingOrderId.value = null
   }
@@ -833,9 +834,9 @@ const formatServiceDate = (item: OrderItem) => {
 
 const itemTypeLabel = (type: string) => {
   const labels: Record<string, string> = {
-    SCENIC_SPOT: '景点门票',
-    HOTEL_ROOM: '酒店房型',
-    ROUTE_PACKAGE: '路线套餐'
+    SCENIC_SPOT: '鏅偣闂ㄧエ',
+    HOTEL_ROOM: '閰掑簵鎴垮瀷',
+    ROUTE_PACKAGE: '璺嚎濂楅'
   }
   return labels[type] || type
 }
@@ -847,10 +848,10 @@ const itemIcon = (type: string) => {
 }
 
 const itemSummary = (order: Order) => {
-  if (!order.items?.length) return '暂无商品明细'
+  if (!order.items?.length) return '鏆傛棤鍟嗗搧鏄庣粏'
   return order.items
     .slice(0, 3)
-    .map(item => `${item.productName}${item.skuName ? ` · ${item.skuName}` : ''}`)
+    .map(item => `${item.productName}${item.skuName ? ` - ${item.skuName}` : ''}`)
     .join(' / ')
 }
 

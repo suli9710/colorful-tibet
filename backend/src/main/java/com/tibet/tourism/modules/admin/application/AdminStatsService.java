@@ -1,4 +1,5 @@
 package com.tibet.tourism.modules.admin.application;
+import com.tibet.tourism.common.security.PiiMasker;
 import com.tibet.tourism.modules.community.infra.SharedRouteRepository;
 import com.tibet.tourism.modules.community.infra.TravelQuestionRepository;
 import com.tibet.tourism.modules.content.domain.News;
@@ -217,7 +218,7 @@ public class AdminStatsService {
         data.put("checkInDate", booking.getCheckInDate());
         data.put("checkOutDate", booking.getCheckOutDate());
         data.put("guests", booking.getGuests());
-        data.put("guestName", booking.getGuestName());
+        data.put("guestName", PiiMasker.maskName(booking.getGuestName()));
         data.put("totalPrice", booking.getTotalPrice());
         data.put("status", booking.getStatus() == null ? null : booking.getStatus().name());
         data.put("createdAt", booking.getCreatedAt());

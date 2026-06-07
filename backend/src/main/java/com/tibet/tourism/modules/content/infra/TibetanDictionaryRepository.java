@@ -50,7 +50,7 @@ public interface TibetanDictionaryRepository extends JpaRepository<TibetanDictio
      * 获取使用频率最高的词条
      */
     @Query("SELECT d FROM TibetanDictionary d ORDER BY d.usageCount DESC")
-    List<TibetanDictionary> findTopByUsageCount(int limit);
+    List<TibetanDictionary> findTopByUsageCount(Pageable pageable);
 }
 
 

@@ -3,9 +3,11 @@ import com.tibet.tourism.modules.spot.domain.ScenicSpot;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -43,6 +45,10 @@ public interface ScenicSpotRepository extends JpaRepository<ScenicSpot, Long> {
 
     @Query("SELECT DISTINCT s FROM ScenicSpot s LEFT JOIN FETCH s.tags WHERE s.id = :id")
     Optional<ScenicSpot> findByIdWithTags(@Param("id") Long id);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT s FROM ScenicSpot s WHERE s.id = :id")
+    Optional<ScenicSpot> findByIdForUpdate(@Param("id") Long id);
 
     @Query("SELECT DISTINCT s FROM ScenicSpot s LEFT JOIN FETCH s.tags st WHERE st.tag IN :tags AND s.id NOT IN :excludeIds")
     List<ScenicSpot> findByTagsInAndIdNotIn(@Param("tags") List<String> tags, @Param("excludeIds") Set<Long> excludeIds);

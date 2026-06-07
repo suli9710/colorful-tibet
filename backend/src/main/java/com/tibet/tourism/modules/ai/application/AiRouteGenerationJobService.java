@@ -248,7 +248,7 @@ public class AiRouteGenerationJobService {
 
     private RouteJob requireOwnedJob(String jobId, User currentUser) {
         RouteJob job = jobs.get(jobId);
-        if (job == null || currentUser == null || currentUser.getId() == null || job.userId != currentUser.getId()) {
+        if (job == null || currentUser == null || currentUser.getId() == null || job.userId != currentUser.getId().longValue()) {
             throw new IllegalArgumentException("AI route job not found");
         }
         return job;

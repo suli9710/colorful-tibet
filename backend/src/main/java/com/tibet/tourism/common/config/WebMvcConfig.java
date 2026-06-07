@@ -46,7 +46,6 @@ public class WebMvcConfig implements WebMvcConfigurer {
                 .allowedOriginPatterns(origins)
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH")
                 .allowedHeaders(
-                        "Authorization",
                         "Content-Type",
                         "Accept",
                         "X-XSRF-TOKEN",
@@ -125,9 +124,9 @@ public class WebMvcConfig implements WebMvcConfigurer {
                 .map(String::trim)
                 .filter(origin -> !origin.isEmpty())
                 .filter(origin -> {
-                    boolean unsafeWildcard = "*".equals(origin);
+                    boolean unsafeWildcard = origin.contains("*");
                     if (unsafeWildcard) {
-                        logger.warn("Ignoring wildcard CORS origin because credentials are enabled");
+                        logger.warn("Ignoring wildcard CORS origin because credentials are enabled: {}", origin);
                     }
                     return !unsafeWildcard;
                 })

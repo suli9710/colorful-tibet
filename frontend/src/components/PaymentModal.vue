@@ -2,6 +2,7 @@
   <MotionModal
     :show="show"
     modal-key="payment-modal"
+    labelled-by="payment-modal-title"
     :close-on-backdrop="true"
     panel-class="max-w-sm rounded-2xl bg-white p-0 overflow-hidden"
     @close="$emit('close')"
@@ -9,7 +10,7 @@
     <div class="relative">
       <!-- Header -->
       <div class="bg-gradient-to-r from-red-600 to-red-700 px-6 py-4">
-        <h3 class="text-white text-lg font-bold text-center">{{ $t('payment.title') }}</h3>
+        <h3 id="payment-modal-title" class="text-white text-lg font-bold text-center">{{ $t('payment.operationTitle') }}</h3>
       </div>
 
       <!-- QR Code -->
@@ -37,17 +38,17 @@
         </div>
 
         <p v-if="captchaError" class="mt-3 text-center text-sm text-red-600">
-          {{ $t('hotel.securityVerificationFailed') }}
+          {{ $t('security.recaptchaFailed') }}
         </p>
 
         <!-- Action buttons -->
         <div class="mt-6 w-full space-y-3">
           <button
-            @click="handlePaid"
+            @click="handleStatusCheck"
             :disabled="confirmDisabled"
             class="w-full py-3 rounded-xl bg-tibet-red text-white font-bold hover:bg-red-700 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {{ $t('payment.confirmPaid') }}
+            {{ $t('payment.confirmOperationComplete') }}
           </button>
           <button
             @click="$emit('close')"
@@ -81,7 +82,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   close: []
-  paid: [recaptchaToken?: string]
+  'status-check': [recaptchaToken?: string]
 }>()
 
 const paymentQrSrc = '/images/payment-qr.jpg'
@@ -143,7 +144,7 @@ watch(
   }
 )
 
-const handlePaid = async () => {
+const handleStatusCheck = async () => {
   captchaError.value = false
 
   if (requiresCaptcha.value) {
@@ -152,16 +153,23 @@ const handlePaid = async () => {
       captchaError.value = true
       return
     }
-    emit('paid', token)
+    emit('status-check', token)
     return
   }
 
   if (hasRecaptchaAction.value && isRecaptchaV3Enabled()) {
-    const token = await getRecaptchaToken(props.recaptchaAction || '')
-    emit('paid', token)
+    captchaLoading.value = true
+    try {
+      const token = await getRecaptchaToken(props.recaptchaAction || '')
+      emit('status-check', token)
+    } catch {
+      captchaError.value = true
+    } finally {
+      captchaLoading.value = false
+    }
     return
   }
 
-  emit('paid')
+  emit('status-check')
 }
 </script>

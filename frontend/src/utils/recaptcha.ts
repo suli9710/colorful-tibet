@@ -3,6 +3,18 @@ let loadedScriptKey = ''
 const ENABLED_VALUES = new Set(['1', 'true', 'yes', 'on'])
 type RecaptchaMode = 'v2' | 'v3'
 
+export class RecaptchaError extends Error {
+  constructor(message = 'reCAPTCHA verification failed') {
+    super(message)
+    this.name = 'RecaptchaError'
+  }
+}
+
+export function isRecaptchaError(error: unknown): error is RecaptchaError {
+  return error instanceof RecaptchaError
+    || Boolean(error && typeof error === 'object' && (error as { name?: string }).name === 'RecaptchaError')
+}
+
 function recaptchaSiteKey(): string {
   return String(import.meta.env.VITE_RECAPTCHA_SITE_KEY || '').trim()
 }
@@ -108,10 +120,17 @@ export async function getRecaptchaToken(action: string): Promise<string> {
   try {
     await loadRecaptcha(siteKey)
     const recaptcha = window.grecaptcha
-    if (!recaptcha?.execute) return ''
-    return await recaptcha.execute(siteKey, { action })
-  } catch {
-    return ''
+    if (!recaptcha?.execute) {
+      throw new RecaptchaError('reCAPTCHA execute API is not available')
+    }
+    const token = await recaptcha.execute(siteKey, { action })
+    if (!token) {
+      throw new RecaptchaError('reCAPTCHA returned an empty token')
+    }
+    return token
+  } catch (error) {
+    if (isRecaptchaError(error)) throw error
+    throw new RecaptchaError(error instanceof Error ? error.message : undefined)
   }
 }
 

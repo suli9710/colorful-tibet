@@ -4,7 +4,10 @@ import io.jsonwebtoken.security.Keys;
 import jakarta.annotation.PostConstruct;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.Date;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 import javax.crypto.SecretKey;
 import org.slf4j.Logger;
@@ -23,6 +26,8 @@ public class JwtUtils {
     private static final Logger logger = LoggerFactory.getLogger(JwtUtils.class);
     private static final int MIN_SECRET_LENGTH = 64;
     private static final int MIN_PROD_SECRET_LENGTH = 64;
+    private static final int MIN_RANDOM_SECRET_BYTES = 64;
+    private static final double MIN_PROD_SECRET_ENTROPY_BITS_PER_CHAR = 4.0;
     private static final int MIN_EXPIRATION_MS = 5 * 60 * 1000;
     private static final int MAX_EXPIRATION_MS = 7 * 24 * 60 * 60 * 1000;
     private static final String PUBLISHED_DEVELOPMENT_SECRET =
@@ -36,6 +41,12 @@ public class JwtUtils {
 
     @Value("${jwt.expiration:86400000}")
     private int jwtExpirationMs;
+
+    @Value("${jwt.issuer:colorful-tibet}")
+    private String jwtIssuer = "colorful-tibet";
+
+    @Value("${jwt.audience:colorful-tibet-web}")
+    private String jwtAudience = "colorful-tibet-web";
 
     @Value("${app.security.require-strong-secrets:false}")
     private boolean requireStrongSecrets;
@@ -54,6 +65,8 @@ public class JwtUtils {
             throw new IllegalStateException("JWT secret must be configured");
         }
         jwtSecret = secret;
+        jwtIssuer = requireText(jwtIssuer, "JWT issuer must be configured");
+        jwtAudience = requireText(jwtAudience, "JWT audience must be configured");
         if (jwtExpirationMs < MIN_EXPIRATION_MS || jwtExpirationMs > MAX_EXPIRATION_MS) {
             throw new IllegalStateException("JWT expiration must be between 5 minutes and 7 days");
         }
@@ -74,6 +87,9 @@ public class JwtUtils {
             if (looksLikeDevSecret) {
                 throw new IllegalStateException("Production JWT secret cannot use the development placeholder");
             }
+            if (!hasStrongRandomMaterial(secret)) {
+                throw new IllegalStateException("Production JWT secret must be high-entropy random material");
+            }
         } else if (looksLikeDevSecret) {
             logger.warn("Using development JWT secret placeholder; configure JWT_SECRET before shared deployment");
         }
@@ -87,6 +103,8 @@ public class JwtUtils {
         UserDetails userPrincipal = (UserDetails) authentication.getPrincipal();
 
         return Jwts.builder()
+                .issuer(jwtIssuer)
+                .audience().add(jwtAudience).and()
                 .subject(userPrincipal.getUsername())
                 .claim(SESSION_VERSION_CLAIM, Math.max(0L, sessionVersion))
                 .id(UUID.randomUUID().toString())
@@ -142,11 +160,74 @@ public class JwtUtils {
     private Jws<Claims> parseClaims(String token) {
         return Jwts.parser()
                 .verifyWith(getSigningKey())
+                .requireIssuer(jwtIssuer)
+                .requireAudience(jwtAudience)
                 .build()
                 .parseSignedClaims(token);
     }
 
     private SecretKey getSigningKey() {
         return Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private String requireText(String value, String message) {
+        String normalized = value == null ? "" : value.trim();
+        if (!StringUtils.hasText(normalized)) {
+            throw new IllegalStateException(message);
+        }
+        return normalized;
+    }
+
+    private boolean hasStrongRandomMaterial(String secret) {
+        byte[] decoded = decodeBase64Secret(secret);
+        if (decoded != null) {
+            return decoded.length >= MIN_RANDOM_SECRET_BYTES && hasByteVariety(decoded);
+        }
+        return shannonEntropy(secret) >= MIN_PROD_SECRET_ENTROPY_BITS_PER_CHAR && distinctCharacterCount(secret) >= 16;
+    }
+
+    private byte[] decodeBase64Secret(String secret) {
+        for (Base64.Decoder decoder : new Base64.Decoder[]{
+                Base64.getDecoder(),
+                Base64.getUrlDecoder()
+        }) {
+            try {
+                byte[] decoded = decoder.decode(secret);
+                if (decoded.length > 0) {
+                    return decoded;
+                }
+            } catch (IllegalArgumentException ignored) {
+                // Try the next supported Base64 alphabet, then entropy fallback.
+            }
+        }
+        return null;
+    }
+
+    private boolean hasByteVariety(byte[] bytes) {
+        Set<Byte> unique = new HashSet<>();
+        for (byte value : bytes) {
+            unique.add(value);
+        }
+        return unique.size() >= 16;
+    }
+
+    private int distinctCharacterCount(String value) {
+        return (int) value.chars().distinct().count();
+    }
+
+    private double shannonEntropy(String value) {
+        int[] counts = new int[Character.MAX_VALUE + 1];
+        for (int i = 0; i < value.length(); i++) {
+            counts[value.charAt(i)]++;
+        }
+        double entropy = 0.0;
+        for (int count : counts) {
+            if (count == 0) {
+                continue;
+            }
+            double probability = (double) count / value.length();
+            entropy -= probability * (Math.log(probability) / Math.log(2));
+        }
+        return entropy;
     }
 }

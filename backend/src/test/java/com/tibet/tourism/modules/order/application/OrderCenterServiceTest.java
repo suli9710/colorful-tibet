@@ -1,9 +1,14 @@
 package com.tibet.tourism.modules.order.application;
 import com.tibet.tourism.modules.hotel.domain.Hotel;
+import com.tibet.tourism.modules.hotel.domain.HotelBooking;
+import com.tibet.tourism.modules.hotel.infra.HotelBookingRepository;
 import com.tibet.tourism.modules.hotel.infra.HotelRepository;
 import com.tibet.tourism.modules.hotel.infra.RoomTypeRepository;
 import com.tibet.tourism.modules.order.domain.InventoryLock;
+import com.tibet.tourism.modules.order.domain.OrderItem;
+import com.tibet.tourism.modules.order.domain.PaymentTransaction;
 import com.tibet.tourism.modules.order.domain.PlatformOrder;
+import com.tibet.tourism.modules.order.domain.RefundOrder;
 import com.tibet.tourism.modules.order.infra.CancellationPolicyRepository;
 import com.tibet.tourism.modules.order.infra.InventoryLockRepository;
 import com.tibet.tourism.modules.order.infra.PaymentTransactionRepository;
@@ -44,6 +49,7 @@ class OrderCenterServiceTest {
     @Mock private ScenicSpotRepository scenicSpotRepository;
     @Mock private HotelRepository hotelRepository;
     @Mock private RoomTypeRepository roomTypeRepository;
+    @Mock private HotelBookingRepository hotelBookingRepository;
 
     private OrderCenterService orderCenterService;
     private User user;
@@ -58,7 +64,8 @@ class OrderCenterServiceTest {
                 inventoryLockRepository,
                 scenicSpotRepository,
                 hotelRepository,
-                roomTypeRepository
+                roomTypeRepository,
+                hotelBookingRepository
         );
         ReflectionTestUtils.setField(orderCenterService, "callbackSecret", "test-secret");
 
@@ -76,7 +83,7 @@ class OrderCenterServiceTest {
     @Test
     void createOrderBuildsUnifiedScenicOrderAndInventoryLock() {
         when(orderRepository.findByUserIdAndIdempotencyKey(1L, "idem-1")).thenReturn(Optional.empty());
-        when(scenicSpotRepository.findById(10L)).thenReturn(Optional.of(spot));
+        when(scenicSpotRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(spot));
         when(orderRepository.save(any(PlatformOrder.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(inventoryLockRepository.saveAndFlush(any(InventoryLock.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -109,7 +116,7 @@ class OrderCenterServiceTest {
     void validPaymentCallbackConfirmsOrderAndIssuesVoucher() {
         AtomicReference<PlatformOrder> savedOrder = new AtomicReference<>();
         when(orderRepository.findByUserIdAndIdempotencyKey(1L, "idem-1")).thenReturn(Optional.empty());
-        when(scenicSpotRepository.findById(10L)).thenReturn(Optional.of(spot));
+        when(scenicSpotRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(spot));
         when(orderRepository.save(any(PlatformOrder.class))).thenAnswer(invocation -> {
             PlatformOrder order = invocation.getArgument(0);
             savedOrder.set(order);
@@ -119,7 +126,7 @@ class OrderCenterServiceTest {
         when(inventoryLockRepository.findByOrder(any(PlatformOrder.class))).thenReturn(List.of());
 
         var created = orderCenterService.createOrder(user, scenicOrderRequest(), "idem-1");
-        when(orderRepository.findByOrderNo(created.orderNo())).thenReturn(Optional.of(savedOrder.get()));
+        when(orderRepository.findByOrderNoForUpdate(created.orderNo())).thenReturn(Optional.of(savedOrder.get()));
 
         String transactionNo = "PAY-1";
         BigDecimal amount = BigDecimal.valueOf(600).setScale(2);
@@ -131,6 +138,74 @@ class OrderCenterServiceTest {
         assertEquals("PAID", response.paymentStatus());
         assertEquals(1, response.vouchers().size());
         assertEquals("SUCCESS", response.paymentTransactions().get(0).status());
+    }
+
+    @Test
+    void latePaymentCallbackDoesNotReviveCancelledOrder() {
+        PlatformOrder order = payableOrder("ORD-CANCELLED", PlatformOrder.Status.CANCELLED);
+        when(orderRepository.findByOrderNoForUpdate("ORD-CANCELLED")).thenReturn(Optional.of(order));
+
+        BigDecimal amount = BigDecimal.valueOf(600).setScale(2);
+        var response = orderCenterService.handlePaymentCallback(new PaymentCallbackRequest(
+                "ORD-CANCELLED", "PAY-LATE", "MOCK", amount, "SUCCESS",
+                signature("ORD-CANCELLED", "PAY-LATE", amount, "SUCCESS")));
+
+        assertEquals("CANCELLED", response.status());
+        assertEquals("UNPAID", response.paymentStatus());
+        assertEquals(0, response.vouchers().size());
+        assertEquals(1, response.paymentTransactions().size());
+        assertEquals("SUCCESS", response.paymentTransactions().get(0).status());
+    }
+
+    @Test
+    void expiredOrderCannotBeConfirmedByLateCallbackAndReleasesLock() {
+        PlatformOrder order = payableOrder("ORD-EXPIRED", PlatformOrder.Status.PENDING_PAYMENT);
+        order.setExpiresAt(java.time.LocalDateTime.now().minusMinutes(1));
+        InventoryLock lock = new InventoryLock();
+        lock.setStatus(InventoryLock.Status.LOCKED);
+        lock.setActiveLockKey("HOTEL_ROOM:20:30:2026-06-01");
+
+        when(orderRepository.findByOrderNoForUpdate("ORD-EXPIRED")).thenReturn(Optional.of(order));
+        when(inventoryLockRepository.findByOrder(order)).thenReturn(List.of(lock));
+
+        BigDecimal amount = BigDecimal.valueOf(600).setScale(2);
+        var response = orderCenterService.handlePaymentCallback(new PaymentCallbackRequest(
+                "ORD-EXPIRED", "PAY-EXPIRED", "MOCK", amount, "SUCCESS",
+                signature("ORD-EXPIRED", "PAY-EXPIRED", amount, "SUCCESS")));
+
+        assertEquals("EXPIRED", response.status());
+        assertEquals("UNPAID", response.paymentStatus());
+        assertEquals(InventoryLock.Status.EXPIRED, lock.getStatus());
+        assertNull(lock.getActiveLockKey());
+        assertEquals(0, response.vouchers().size());
+    }
+
+    @Test
+    void duplicatePaymentTransactionReturnsExistingOrderWithoutReconfirming() {
+        PlatformOrder order = payableOrder("ORD-PAID", PlatformOrder.Status.CONFIRMED);
+        order.setPaymentStatus(PlatformOrder.PaymentStatus.PAID);
+        PaymentTransaction transaction = successfulTransaction(order, "PAY-1", BigDecimal.valueOf(600).setScale(2));
+
+        when(orderRepository.findByOrderNoForUpdate("ORD-PAID")).thenReturn(Optional.of(order));
+        when(paymentTransactionRepository.findByTransactionNo("PAY-1")).thenReturn(Optional.of(transaction));
+
+        BigDecimal amount = BigDecimal.valueOf(600).setScale(2);
+        var response = orderCenterService.handlePaymentCallback(new PaymentCallbackRequest(
+                "ORD-PAID", "PAY-1", "MOCK", amount, "SUCCESS",
+                signature("ORD-PAID", "PAY-1", amount, "SUCCESS")));
+
+        assertEquals("CONFIRMED", response.status());
+        assertEquals("PAID", response.paymentStatus());
+        assertEquals(1, response.paymentTransactions().size());
+        verify(inventoryLockRepository, never()).findByOrder(order);
+    }
+
+    @Test
+    void paymentCallbackWithMissingSignatureIsInvalid() {
+        boolean valid = orderCenterService.verifyCallbackSignature(
+                new PaymentCallbackRequest("ORD-1", "PAY-1", "MOCK", BigDecimal.TEN, "SUCCESS", null));
+
+        assertFalse(valid);
     }
 
     @Test
@@ -174,6 +249,25 @@ class OrderCenterServiceTest {
     }
 
     @Test
+    void hotelRoomOrderRejectsOverlappingLegacyBooking() {
+        Hotel hotel = hotel();
+        com.tibet.tourism.modules.hotel.domain.RoomType roomType = roomType(hotel);
+        when(orderRepository.findByUserIdAndIdempotencyKey(1L, "hotel-1")).thenReturn(Optional.empty());
+        when(hotelRepository.findById(20L)).thenReturn(Optional.of(hotel));
+        when(roomTypeRepository.findByIdForUpdate(30L)).thenReturn(Optional.of(roomType));
+        when(hotelBookingRepository.findOverlappingActiveBookingsForUpdate(
+                eq(30L), any(), eq(LocalDate.of(2026, 6, 1)), eq(LocalDate.of(2026, 6, 3))))
+                .thenReturn(List.of(new HotelBooking()));
+
+        IllegalStateException error = assertThrows(
+                IllegalStateException.class,
+                () -> orderCenterService.createOrder(user, hotelOrderRequest(), "hotel-1"));
+
+        assertEquals("Room type is unavailable for the selected dates", error.getMessage());
+        verify(inventoryLockRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
     void mockPaymentCallbackIsDisabledByDefault() {
         ReflectionTestUtils.setField(orderCenterService, "mockCallbackEnabled", false);
 
@@ -183,7 +277,7 @@ class OrderCenterServiceTest {
                         new PaymentCallbackRequest("ORD-1", "PAY-1", "MOCK", BigDecimal.TEN, "SUCCESS", "sig")));
 
         assertEquals("Mock payment callback is disabled", error.getMessage());
-        verify(orderRepository, never()).findByOrderNo(anyString());
+        verify(orderRepository, never()).findByOrderNoForUpdate(anyString());
     }
 
     @Test
@@ -196,7 +290,7 @@ class OrderCenterServiceTest {
         PlatformOrder order = new PlatformOrder();
         order.setUser(anotherUser);
         order.setOrderNo("ORD-OTHER");
-        when(orderRepository.findByOrderNo("ORD-OTHER")).thenReturn(Optional.of(order));
+        when(orderRepository.findByOrderNoForUpdate("ORD-OTHER")).thenReturn(Optional.of(order));
 
         assertThrows(
                 java.util.NoSuchElementException.class,
@@ -226,7 +320,7 @@ class OrderCenterServiceTest {
         order.setStatus(PlatformOrder.Status.EXPIRED);
         InventoryLock lock = new InventoryLock();
 
-        when(orderRepository.findByIdAndUserId(99L, 1L)).thenReturn(Optional.of(order));
+        when(orderRepository.findByIdAndUserIdForUpdate(99L, 1L)).thenReturn(Optional.of(order));
         when(inventoryLockRepository.findByOrder(order)).thenReturn(List.of(lock));
 
         orderCenterService.deleteClosedOrder(user, 99L);
@@ -242,15 +336,113 @@ class OrderCenterServiceTest {
         order.setUser(user);
         order.setStatus(PlatformOrder.Status.PENDING_PAYMENT);
 
-        when(orderRepository.findByIdAndUserId(99L, 1L)).thenReturn(Optional.of(order));
+        when(orderRepository.findByIdAndUserIdForUpdate(99L, 1L)).thenReturn(Optional.of(order));
 
         IllegalStateException error = assertThrows(
                 IllegalStateException.class,
                 () -> orderCenterService.deleteClosedOrder(user, 99L));
 
-        assertEquals("仅已关闭订单可以删除", error.getMessage());
+        assertEquals("Only closed orders can be deleted", error.getMessage());
         verify(inventoryLockRepository, never()).deleteAll(anyList());
         verify(orderRepository, never()).delete(any());
+    }
+
+    @Test
+    void getOrderExpiresPendingOrderAndReleasesInventoryLock() {
+        PlatformOrder order = payableOrder("ORD-STALE", PlatformOrder.Status.PENDING_PAYMENT);
+        order.setId(99L);
+        order.setExpiresAt(java.time.LocalDateTime.now().minusMinutes(1));
+        InventoryLock lock = new InventoryLock();
+        lock.setStatus(InventoryLock.Status.LOCKED);
+        lock.setActiveLockKey("HOTEL_ROOM:20:30:2026-06-01");
+
+        when(orderRepository.findByIdAndUserIdForUpdate(99L, 1L)).thenReturn(Optional.of(order));
+        when(inventoryLockRepository.findByOrder(order)).thenReturn(List.of(lock));
+
+        var response = orderCenterService.getOrder(user, 99L);
+
+        assertEquals("EXPIRED", response.status());
+        assertEquals(InventoryLock.Status.EXPIRED, lock.getStatus());
+        assertNull(lock.getActiveLockKey());
+    }
+
+    @Test
+    void refundRequestRejectsDuplicatePendingRefund() {
+        PlatformOrder order = paidOrderWithItem();
+        RefundOrder pending = new RefundOrder();
+        pending.setStatus(RefundOrder.Status.REQUESTED);
+        pending.setAmount(BigDecimal.valueOf(100));
+        order.addRefund(pending);
+        when(orderRepository.findByIdAndUserIdForUpdate(99L, 1L)).thenReturn(Optional.of(order));
+
+        IllegalStateException error = assertThrows(
+                IllegalStateException.class,
+                () -> orderCenterService.requestRefund(user, 99L, new com.tibet.tourism.modules.order.web.dto.RefundRequest()));
+
+        assertEquals("Refund already pending", error.getMessage());
+        assertEquals(1, order.getRefunds().size());
+    }
+
+    @Test
+    void refundRequestRejectsAmountAboveRemainingPaidAmount() {
+        PlatformOrder order = paidOrderWithItem();
+        RefundOrder completed = new RefundOrder();
+        completed.setStatus(RefundOrder.Status.COMPLETED);
+        completed.setAmount(BigDecimal.valueOf(600));
+        order.addRefund(completed);
+        when(orderRepository.findByIdAndUserIdForUpdate(99L, 1L)).thenReturn(Optional.of(order));
+
+        IllegalStateException error = assertThrows(
+                IllegalStateException.class,
+                () -> orderCenterService.requestRefund(user, 99L, new com.tibet.tourism.modules.order.web.dto.RefundRequest()));
+
+        assertEquals("Refund amount exceeds paid amount", error.getMessage());
+        assertEquals(1, order.getRefunds().size());
+    }
+
+    private PlatformOrder payableOrder(String orderNo, PlatformOrder.Status status) {
+        PlatformOrder order = new PlatformOrder();
+        order.setId(99L);
+        order.setUser(user);
+        order.setOrderNo(orderNo);
+        order.setStatus(status);
+        order.setPaymentStatus(PlatformOrder.PaymentStatus.UNPAID);
+        order.setProductSummary("Test order");
+        order.setTotalAmount(BigDecimal.valueOf(600));
+        order.setPayableAmount(BigDecimal.valueOf(600));
+
+        OrderItem item = new OrderItem();
+        item.setId(77L);
+        item.setProductType(OrderItem.ProductType.SCENIC_SPOT);
+        item.setProductId(10L);
+        item.setProductName("Test spot");
+        item.setServiceStartDate(LocalDate.of(2026, 6, 1));
+        item.setQuantity(2);
+        item.setUnitPrice(BigDecimal.valueOf(300));
+        item.setSubtotal(BigDecimal.valueOf(600));
+        item.setStatus(status == PlatformOrder.Status.CONFIRMED ? OrderItem.Status.CONFIRMED : OrderItem.Status.LOCKED);
+        order.addItem(item);
+        return order;
+    }
+
+    private PlatformOrder paidOrderWithItem() {
+        PlatformOrder order = payableOrder("ORD-REFUND", PlatformOrder.Status.CONFIRMED);
+        order.setPaymentStatus(PlatformOrder.PaymentStatus.PAID);
+        order.setPaidAt(java.time.LocalDateTime.now());
+        successfulTransaction(order, "PAY-REFUND", BigDecimal.valueOf(600));
+        return order;
+    }
+
+    private PaymentTransaction successfulTransaction(PlatformOrder order, String transactionNo, BigDecimal amount) {
+        PaymentTransaction transaction = new PaymentTransaction();
+        transaction.setTransactionNo(transactionNo);
+        transaction.setProvider("MOCK");
+        transaction.setAmount(amount);
+        transaction.setStatus(PaymentTransaction.Status.SUCCESS);
+        transaction.setSignatureValid(true);
+        transaction.setPaidAt(java.time.LocalDateTime.now());
+        order.addPaymentTransaction(transaction);
+        return transaction;
     }
 
     private CreateOrderRequest scenicOrderRequest() {

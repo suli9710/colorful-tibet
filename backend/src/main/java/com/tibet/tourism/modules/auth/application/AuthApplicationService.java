@@ -10,6 +10,7 @@ import com.tibet.tourism.modules.auth.domain.AuthFailureException;
 import com.tibet.tourism.modules.auth.domain.AuthForbiddenException;
 import com.tibet.tourism.modules.auth.domain.AuthRateLimitException;
 import com.tibet.tourism.modules.auth.domain.DuplicateRegistrationException;
+import com.tibet.tourism.modules.auth.domain.SecondaryAuthRequiredException;
 import com.tibet.tourism.modules.auth.web.dto.LoginRequest;
 import com.tibet.tourism.modules.auth.web.dto.RegisterRequest;
 import com.tibet.tourism.modules.user.domain.User;
@@ -271,7 +272,10 @@ public class AuthApplicationService {
         }
 
         String provided = loginRequest.getSecondaryPassword();
-        if (!StringUtils.hasText(provided) || !totpService.isValidCode(superAdminTotpSecret, provided)) {
+        if (!StringUtils.hasText(provided)) {
+            throw new SecondaryAuthRequiredException("Secondary authentication required");
+        }
+        if (!totpService.isValidCode(superAdminTotpSecret, provided)) {
             logger.warn("Rejected super-admin login with invalid TOTP code: username={}", user.getUsername());
             LoginAttemptService.LoginAttemptDecision failure = loginAttemptService.recordFailure(user.getUsername(), clientIp);
             if (!failure.allowed()) {

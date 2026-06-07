@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 @RestControllerAdvice
@@ -51,6 +52,12 @@ public class ApiExceptionHandler {
         return ResponseEntity.badRequest().body(Map.of("error", "请求体格式不正确"));
     }
 
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<Map<String, String>> handleUnsupportedMediaType(HttpMediaTypeNotSupportedException exception) {
+        return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
+                .body(Map.of("error", "不支持的请求内容类型"));
+    }
+
     @ExceptionHandler(AuthenticationRequiredException.class)
     public ResponseEntity<Map<String, String>> handleAuthenticationRequired(AuthenticationRequiredException exception) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", exception.getMessage()));
@@ -73,8 +80,8 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, String>> handleIllegalArgument(IllegalArgumentException exception) {
-        String message = exception.getMessage() == null ? "请求参数不合法" : exception.getMessage();
-        return ResponseEntity.badRequest().body(Map.of("error", message));
+        logger.warn("Rejected invalid API argument: {}", rootCauseMessage(exception));
+        return ResponseEntity.badRequest().body(Map.of("error", "请求参数不合法"));
     }
 
     @ExceptionHandler(AccessDeniedException.class)
@@ -90,8 +97,8 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<Map<String, String>> handleIllegalState(IllegalStateException exception) {
-        String message = exception.getMessage() == null ? "当前状态不允许该操作" : exception.getMessage();
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", message));
+        logger.warn("Rejected invalid API state: {}", rootCauseMessage(exception));
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", "当前状态不允许该操作"));
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)

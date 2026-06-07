@@ -44,16 +44,16 @@ public class PriceController {
         try {
             ScenicSpot spot = scenicSpotRepository.findById(Long.valueOf(spotId))
                 .orElseThrow(() -> new ResourceNotFoundException("景点不存在"));
-            
+
             PriceInfo priceInfo = priceFetchService.fetchPrice(spot);
-            
+
             if (priceInfo == null) {
                 return ResponseEntity.ok(Map.of(
                     "success", false,
                     "message", "未能获取到价格信息"
                 ));
             }
-            
+
             return ResponseEntity.ok(Map.of(
                 "success", true,
                 "priceInfo", priceInfo,
@@ -112,7 +112,7 @@ public class PriceController {
             return ResponseEntity.ok(priceBatchUpdateJobService.startJob(force));
         } catch (Exception e) {
             logger.error("Batch price update job start failed, force={}", force, e);
-            return ResponseEntity.badRequest().body(Map.of("error", "浠锋牸鏌ヨ澶辫触锛岃绋嶅悗閲嶈瘯"));
+            return ResponseEntity.badRequest().body(Map.of("error", "价格查询失败，请稍后重试"));
         }
     }
 

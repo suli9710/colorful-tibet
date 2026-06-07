@@ -125,9 +125,14 @@ const router = createRouter({
 router.beforeEach(async (to) => {
     const auth = useAuthStore()
     const requiresAuth = Boolean(to.meta.requiresAuth) || to.path.startsWith('/admin')
-    const isAuthenticated = requiresAuth ? await auth.ensureSession() : auth.hasValidSession()
+    const isAdminRoute = to.path.startsWith('/admin')
+    const isAuthenticated = isAdminRoute
+        ? await auth.refreshSession()
+        : requiresAuth
+          ? await auth.ensureSession()
+          : auth.hasValidSession()
 
-    if (to.path.startsWith('/admin') && !isAuthenticated) {
+    if (isAdminRoute && !isAuthenticated) {
         return '/login'
     }
 
@@ -135,7 +140,7 @@ router.beforeEach(async (to) => {
         return { path: '/profile', query: { changePassword: '1' } }
     }
 
-    if (to.path.startsWith('/admin') && !auth.isAdmin) {
+    if (isAdminRoute && !auth.isAdmin) {
         return '/'
     }
 

@@ -4,6 +4,7 @@ import com.tibet.tourism.common.validation.InputSanitizer;
 import com.tibet.tourism.modules.hotel.domain.Hotel;
 import com.tibet.tourism.modules.hotel.domain.HotelBooking;
 import com.tibet.tourism.modules.hotel.domain.RoomType;
+import com.tibet.tourism.modules.hotel.infra.HotelBookingRepository;
 import com.tibet.tourism.modules.hotel.infra.HotelRepository;
 import com.tibet.tourism.modules.hotel.infra.RoomTypeRepository;
 import com.tibet.tourism.modules.order.domain.Booking;
@@ -49,6 +50,7 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.Set;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import jakarta.annotation.PostConstruct;
@@ -58,6 +60,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -70,6 +73,14 @@ public class OrderCenterService {
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
     private static final int MIN_CALLBACK_SECRET_LENGTH = 32;
     private static final String DEV_CALLBACK_SECRET = "dev-payment-callback-secret";
+    private static final Set<InventoryLock.Status> ACTIVE_INVENTORY_STATUSES =
+            Set.of(InventoryLock.Status.LOCKED, InventoryLock.Status.CONFIRMED);
+    private static final Set<RefundOrder.Status> PENDING_REFUND_STATUSES =
+            Set.of(RefundOrder.Status.REQUESTED, RefundOrder.Status.APPROVED);
+    private static final Set<RefundOrder.Status> COUNTED_REFUND_STATUSES =
+            Set.of(RefundOrder.Status.REQUESTED, RefundOrder.Status.APPROVED, RefundOrder.Status.COMPLETED);
+    private static final Set<HotelBooking.Status> ACTIVE_HOTEL_BOOKING_STATUSES =
+            Set.of(HotelBooking.Status.PENDING, HotelBooking.Status.CONFIRMED);
 
     private final PlatformOrderRepository orderRepository;
     private final PaymentTransactionRepository paymentTransactionRepository;
@@ -78,6 +89,7 @@ public class OrderCenterService {
     private final ScenicSpotRepository scenicSpotRepository;
     private final HotelRepository hotelRepository;
     private final RoomTypeRepository roomTypeRepository;
+    private final HotelBookingRepository hotelBookingRepository;
 
     @Value("${app.payments.mock-callback-enabled:false}")
     private boolean mockCallbackEnabled;
@@ -97,7 +109,8 @@ public class OrderCenterService {
                               InventoryLockRepository inventoryLockRepository,
                               ScenicSpotRepository scenicSpotRepository,
                               HotelRepository hotelRepository,
-                              RoomTypeRepository roomTypeRepository) {
+                              RoomTypeRepository roomTypeRepository,
+                              HotelBookingRepository hotelBookingRepository) {
         this.orderRepository = orderRepository;
         this.paymentTransactionRepository = paymentTransactionRepository;
         this.cancellationPolicyRepository = cancellationPolicyRepository;
@@ -105,6 +118,7 @@ public class OrderCenterService {
         this.scenicSpotRepository = scenicSpotRepository;
         this.hotelRepository = hotelRepository;
         this.roomTypeRepository = roomTypeRepository;
+        this.hotelBookingRepository = hotelBookingRepository;
     }
 
     @PostConstruct
@@ -153,9 +167,9 @@ public class OrderCenterService {
         order.setOrderNo(nextBusinessNo("ORD"));
         order.setUser(user);
         order.setIdempotencyKey(idempotencyKey);
-        order.setCustomerName(InputSanitizer.optionalPlainText(request.getCustomerName(), 64, "联系人"));
-        order.setCustomerPhone(InputSanitizer.optionalPlainText(request.getCustomerPhone(), 32, "手机号"));
-        order.setCustomerNote(InputSanitizer.optionalTextBlock(request.getCustomerNote(), 500, "备注"));
+        order.setCustomerName(InputSanitizer.optionalPlainText(request.getCustomerName(), 64, "customer name"));
+        order.setCustomerPhone(InputSanitizer.optionalPlainText(request.getCustomerPhone(), 32, "customer phone"));
+        order.setCustomerNote(InputSanitizer.optionalTextBlock(request.getCustomerNote(), 500, "澶囨敞"));
         order.setLockedUntil(LocalDateTime.now().plusMinutes(LOCK_MINUTES));
         order.setExpiresAt(order.getLockedUntil());
 
@@ -172,30 +186,31 @@ public class OrderCenterService {
         order.setDiscountAmount(BigDecimal.ZERO);
         order.setPayableAmount(total);
         order.setProductSummary(buildSummary(order.getItems()));
-        order.addAuditLog(audit(user, "CREATE", null, order.getStatus().name(), "统一订单创建并锁定库存"));
+        order.addAuditLog(audit(user, "CREATE", null, order.getStatus().name(), "Unified order created and inventory locked"));
 
         PlatformOrder saved = orderRepository.save(order);
         createInventoryLocks(saved);
         return toResponse(saved);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public List<OrderResponse> getMyOrders(User user) {
         return orderRepository.findByUserIdOrderByCreatedAtDesc(user.getId()).stream()
+                .map(this::expireIfNeeded)
                 .map(this::toResponse)
                 .toList();
     }
 
     @Transactional
     public OrderResponse getOrder(User user, Long id) {
-        PlatformOrder order = orderRepository.findByIdAndUserId(id, user.getId())
+        PlatformOrder order = orderRepository.findByIdAndUserIdForUpdate(id, user.getId())
                 .orElseThrow(() -> new NoSuchElementException("Order not found"));
         return toResponse(expireIfNeeded(order));
     }
 
     @Transactional
     public OrderResponse cancelOrder(User user, Long id, CancelOrderRequest request) {
-        PlatformOrder order = orderRepository.findByIdAndUserId(id, user.getId())
+        PlatformOrder order = orderRepository.findByIdAndUserIdForUpdate(id, user.getId())
                 .orElseThrow(() -> new NoSuchElementException("Order not found"));
         expireIfNeeded(order);
         if (order.getStatus() == PlatformOrder.Status.CANCELLED || order.getStatus() == PlatformOrder.Status.EXPIRED) {
@@ -203,17 +218,18 @@ public class OrderCenterService {
         }
         if (order.getStatus() == PlatformOrder.Status.PENDING_PAYMENT) {
             transition(order, user, PlatformOrder.Status.CANCELLED,
-                    InputSanitizer.optionalTextBlock(request == null ? null : request.getReason(), 500, "取消原因"));
+                    InputSanitizer.optionalTextBlock(request == null ? null : request.getReason(), 500, "鍙栨秷鍘熷洜"));
             releaseLocks(order, InventoryLock.Status.RELEASED);
             order.setCancelledAt(LocalDateTime.now());
             order.getItems().forEach(item -> item.setStatus(OrderItem.Status.CANCELLED));
             return toResponse(order);
         }
 
-        RefundOrder refund = buildRefund(order, null, refundAmountForOrder(order),
-                request == null ? null : request.getReason());
+        BigDecimal amount = refundAmountForOrder(order);
+        ensureRefundAllowed(order, null, amount);
+        RefundOrder refund = buildRefund(order, null, amount, request == null ? null : request.getReason());
         order.addRefund(refund);
-        transition(order, user, PlatformOrder.Status.REFUND_PENDING, "已确认订单取消，等待退款处理");
+        transition(order, user, PlatformOrder.Status.REFUND_PENDING, "Confirmed order cancelled, refund pending");
         order.setCancelledAt(LocalDateTime.now());
         order.getItems().forEach(item -> item.setStatus(OrderItem.Status.REFUND_PENDING));
         return toResponse(order);
@@ -221,16 +237,18 @@ public class OrderCenterService {
 
     @Transactional
     public RefundResponse requestRefund(User user, Long id, RefundRequest request) {
-        PlatformOrder order = orderRepository.findByIdAndUserId(id, user.getId())
+        PlatformOrder order = orderRepository.findByIdAndUserIdForUpdate(id, user.getId())
                 .orElseThrow(() -> new NoSuchElementException("Order not found"));
+        expireIfNeeded(order);
         if (order.getPaymentStatus() == PlatformOrder.PaymentStatus.UNPAID) {
-            throw new IllegalStateException("未支付订单不能退款");
+            throw new IllegalStateException("Unpaid orders cannot be refunded");
         }
         OrderItem item = findOrderItem(order, request == null ? null : request.getOrderItemId());
         BigDecimal amount = item == null ? refundAmountForOrder(order) : refundAmountForItem(item);
+        ensureRefundAllowed(order, item, amount);
         RefundOrder refund = buildRefund(order, item, amount, request == null ? null : request.getReason());
         order.addRefund(refund);
-        transition(order, user, PlatformOrder.Status.REFUND_PENDING, "用户发起退款");
+        transition(order, user, PlatformOrder.Status.REFUND_PENDING, "Refund requested by user");
         if (item != null) {
             item.setStatus(OrderItem.Status.REFUND_PENDING);
         }
@@ -242,26 +260,26 @@ public class OrderCenterService {
         PlatformOrder order = orderRepository.findByIdAndUserId(id, user.getId())
                 .orElseThrow(() -> new NoSuchElementException("Order not found"));
         if (order.getPaymentStatus() == PlatformOrder.PaymentStatus.UNPAID) {
-            throw new IllegalStateException("未支付订单不能开票");
+            throw new IllegalStateException("Unpaid orders cannot request invoices");
         }
         Invoice invoice = new Invoice();
         invoice.setInvoiceNo(nextBusinessNo("INV"));
-        invoice.setInvoiceTitle(InputSanitizer.requiredPlainText(request.getInvoiceTitle(), 160, "发票抬头"));
-        invoice.setTaxNo(InputSanitizer.optionalPlainText(request.getTaxNo(), 64, "税号"));
+        invoice.setInvoiceTitle(InputSanitizer.requiredPlainText(request.getInvoiceTitle(), 160, "鍙戠エ鎶ご"));
+        invoice.setTaxNo(InputSanitizer.optionalPlainText(request.getTaxNo(), 64, "绋庡彿"));
         invoice.setAmount(order.getPayableAmount());
         invoice.setStatus(Invoice.Status.REQUESTED);
         order.addInvoice(invoice);
-        order.addAuditLog(audit(user, "INVOICE_REQUESTED", order.getStatus().name(), order.getStatus().name(), "用户申请开票"));
+        order.addAuditLog(audit(user, "INVOICE_REQUESTED", order.getStatus().name(), order.getStatus().name(), "Invoice requested by user"));
         return toInvoiceResponse(invoice);
     }
 
     @Transactional
     public void deleteClosedOrder(User user, Long id) {
-        PlatformOrder order = orderRepository.findByIdAndUserId(id, user.getId())
+        PlatformOrder order = orderRepository.findByIdAndUserIdForUpdate(id, user.getId())
                 .orElseThrow(() -> new NoSuchElementException("Order not found"));
         expireIfNeeded(order);
         if (!isClosedOrder(order)) {
-            throw new IllegalStateException("仅已关闭订单可以删除");
+            throw new IllegalStateException("Only closed orders can be deleted");
         }
 
         inventoryLockRepository.deleteAll(inventoryLockRepository.findByOrder(order));
@@ -280,7 +298,7 @@ public class OrderCenterService {
             throw new IllegalArgumentException("Mock payment callback only accepts MOCK provider");
         }
 
-        PlatformOrder order = orderRepository.findByOrderNo(request.orderNo())
+        PlatformOrder order = orderRepository.findByOrderNoForUpdate(request.orderNo())
                 .orElseThrow(() -> new NoSuchElementException("Order not found"));
         if (order.getUser() == null || !actor.getId().equals(order.getUser().getId())) {
             throw new NoSuchElementException("Order not found");
@@ -290,16 +308,28 @@ public class OrderCenterService {
 
     @Transactional
     public OrderResponse handlePaymentCallback(PaymentCallbackRequest request) {
-        PlatformOrder order = orderRepository.findByOrderNo(request.orderNo())
+        PlatformOrder order = orderRepository.findByOrderNoForUpdate(request.orderNo())
                 .orElseThrow(() -> new NoSuchElementException("Order not found"));
         return handlePaymentCallback(order, request);
     }
 
     private OrderResponse handlePaymentCallback(PlatformOrder order, PaymentCallbackRequest request) {
+        String transactionNo = InputSanitizer.requiredPlainText(request.transactionNo(), 64, "transactionNo");
+        Optional<PaymentTransaction> duplicate = paymentTransactionRepository.findByTransactionNo(transactionNo);
+        if (duplicate.isPresent()) {
+            PaymentTransaction existing = duplicate.get();
+            PlatformOrder existingOrder = existing.getOrder();
+            if (existingOrder == null || !order.getOrderNo().equals(existingOrder.getOrderNo())) {
+                throw new IllegalArgumentException("Payment transaction number already belongs to another order");
+            }
+            ensureSamePaymentCallback(existing, request);
+            return toResponse(expireIfNeeded(existingOrder));
+        }
+
         boolean signatureValid = verifyCallbackSignature(request);
         PaymentTransaction transaction = new PaymentTransaction();
-        transaction.setTransactionNo(InputSanitizer.requiredPlainText(request.transactionNo(), 64, "交易号"));
-        transaction.setProvider(InputSanitizer.requiredPlainText(request.provider(), 32, "支付渠道"));
+        transaction.setTransactionNo(transactionNo);
+        transaction.setProvider(InputSanitizer.requiredPlainText(request.provider(), 32, "payment provider"));
         transaction.setAmount(request.amount());
         transaction.setSignatureValid(signatureValid);
         transaction.setCallbackPayload(callbackPayloadSummary(request));
@@ -307,26 +337,38 @@ public class OrderCenterService {
         if (!signatureValid) {
             transaction.setStatus(PaymentTransaction.Status.FAILED);
             order.addPaymentTransaction(transaction);
-            order.addAuditLog(audit(null, "PAYMENT_CALLBACK_REJECTED", order.getStatus().name(), order.getStatus().name(), "支付回调签名无效"));
+            order.addAuditLog(audit(null, "PAYMENT_CALLBACK_REJECTED", order.getStatus().name(), order.getStatus().name(), "鏀粯鍥炶皟绛惧悕鏃犳晥"));
             throw new SecurityException("Invalid payment signature");
         }
 
+        expireIfNeeded(order);
         if (!sameAmount(order.getPayableAmount(), request.amount())) {
             transaction.setStatus(PaymentTransaction.Status.FAILED);
             order.addPaymentTransaction(transaction);
-            order.addAuditLog(audit(null, "PAYMENT_AMOUNT_MISMATCH", order.getStatus().name(), order.getStatus().name(), "支付金额不一致"));
+            order.addAuditLog(audit(null, "PAYMENT_AMOUNT_MISMATCH", order.getStatus().name(), order.getStatus().name(), "Payment amount mismatch"));
             throw new IllegalArgumentException("Payment amount mismatch");
         }
 
-        transaction.setStatus("SUCCESS".equals(request.status()) ? PaymentTransaction.Status.SUCCESS : PaymentTransaction.Status.FAILED);
+        transaction.setStatus(paymentStatusFromCallback(request));
         transaction.setPaidAt(LocalDateTime.now());
         order.addPaymentTransaction(transaction);
 
         if (transaction.getStatus() == PaymentTransaction.Status.SUCCESS) {
-            confirmPaidOrder(order, "支付回调验签成功");
+            if (canConfirmPayment(order)) {
+                confirmPaidOrder(order, "Payment callback verified");
+            } else if (order.getStatus() == PlatformOrder.Status.CONFIRMED
+                    && order.getPaymentStatus() == PlatformOrder.PaymentStatus.PAID) {
+                order.addAuditLog(audit(null, "PAYMENT_CALLBACK_IDEMPOTENT",
+                        order.getStatus().name(), order.getStatus().name(), "Order already paid"));
+            } else {
+                order.addAuditLog(audit(null, "PAYMENT_CALLBACK_IGNORED",
+                        order.getStatus().name(), order.getStatus().name(), "Late payment callback ignored"));
+            }
         } else {
-            order.setPaymentStatus(PlatformOrder.PaymentStatus.FAILED);
-            order.addAuditLog(audit(null, "PAYMENT_FAILED", order.getStatus().name(), order.getStatus().name(), "支付失败回调"));
+            if (order.getStatus() == PlatformOrder.Status.PENDING_PAYMENT) {
+                order.setPaymentStatus(PlatformOrder.PaymentStatus.FAILED);
+            }
+            order.addAuditLog(audit(null, "PAYMENT_FAILED", order.getStatus().name(), order.getStatus().name(), "鏀粯澶辫触鍥炶皟"));
         }
         return toResponse(order);
     }
@@ -363,7 +405,12 @@ public class OrderCenterService {
         if (confirmed) {
             addLegacyPaymentAndVoucher(order, item);
         }
-        return orderRepository.save(order);
+        PlatformOrder saved = orderRepository.save(order);
+        createInventoryLocks(saved);
+        if (confirmed) {
+            releaseLocks(saved, InventoryLock.Status.CONFIRMED);
+        }
+        return saved;
     }
 
     @Transactional
@@ -371,7 +418,14 @@ public class OrderCenterService {
         String idempotencyKey = "LEGACY_HOTEL_" + booking.getId();
         Optional<PlatformOrder> existing = orderRepository.findByUserIdAndIdempotencyKey(booking.getUser().getId(), idempotencyKey);
         if (existing.isPresent()) {
-            return existing.get();
+            PlatformOrder order = existing.get();
+            if (booking.getStatus() == HotelBooking.Status.CONFIRMED && canConfirmPayment(order)) {
+                order.getItems().stream().findFirst()
+                        .filter(item -> order.getPaymentTransactions().isEmpty())
+                        .ifPresent(item -> addLegacyPaymentAndVoucher(order, item));
+                confirmPaidOrder(order, "Legacy hotel booking confirmed");
+            }
+            return order;
         }
 
         boolean confirmed = booking.getStatus() == HotelBooking.Status.CONFIRMED;
@@ -380,18 +434,19 @@ public class OrderCenterService {
         order.setCustomerName(booking.getGuestName());
         order.setCustomerPhone(booking.getPhone());
         order.setCustomerNote(booking.getNote());
-        order.setProductSummary(booking.getHotel().getName() + " · " + booking.getRoomName());
+        order.setProductSummary(booking.getHotel().getName() + " 路 " + booking.getRoomName());
         order.setTotalAmount(defaultMoney(booking.getTotalPrice()));
         order.setPayableAmount(order.getTotalAmount());
 
         OrderItem item = new OrderItem();
         item.setProductType(OrderItem.ProductType.HOTEL_ROOM);
         item.setProductId(booking.getHotel().getId());
+        item.setSkuId(booking.getRoomTypeId());
         item.setProductName(booking.getHotel().getName());
         item.setSkuName(booking.getRoomName());
         item.setServiceStartDate(booking.getCheckInDate());
         item.setServiceEndDate(booking.getCheckOutDate());
-        item.setQuantity(booking.getGuests());
+        item.setQuantity(1);
         item.setUnitPrice(defaultMoney(booking.getRoomPrice()));
         item.setSubtotal(defaultMoney(booking.getTotalPrice()));
         item.setStatus(confirmed ? OrderItem.Status.CONFIRMED : OrderItem.Status.LOCKED);
@@ -401,7 +456,12 @@ public class OrderCenterService {
         if (confirmed) {
             addLegacyPaymentAndVoucher(order, item);
         }
-        return orderRepository.save(order);
+        PlatformOrder saved = orderRepository.save(order);
+        createInventoryLocks(saved);
+        if (confirmed) {
+            releaseLocks(saved, InventoryLock.Status.CONFIRMED);
+        }
+        return saved;
     }
 
     @Transactional
@@ -415,14 +475,45 @@ public class OrderCenterService {
             order.setCancelledAt(LocalDateTime.now());
             order.getItems().forEach(item -> item.setStatus(OrderItem.Status.CANCELLED));
             order.getVouchers().forEach(voucher -> voucher.setStatus(Voucher.Status.CANCELLED));
+            releaseLocks(order, InventoryLock.Status.RELEASED);
             order.addAuditLog(audit(actor, "LEGACY_CANCELLED", from.name(), order.getStatus().name(), reason));
         });
     }
 
+    public void ensureHotelRoomAvailable(Long hotelId, Long roomTypeId, LocalDate checkIn, LocalDate checkOut) {
+        if (hotelId == null || roomTypeId == null || checkIn == null || checkOut == null) {
+            return;
+        }
+        long nights = ChronoUnit.DAYS.between(checkIn, checkOut);
+        for (long i = 0; i < nights; i++) {
+            String activeLockKey = OrderItem.ProductType.HOTEL_ROOM + ":" + hotelId + ":" + roomTypeId + ":" + checkIn.plusDays(i);
+            releaseExpiredActiveLock(activeLockKey);
+            if (inventoryLockRepository.existsByActiveLockKey(activeLockKey)) {
+                throw new IllegalStateException("Room type is unavailable for the selected dates");
+            }
+        }
+    }
+
     public boolean verifyCallbackSignature(PaymentCallbackRequest request) {
+        if (request == null || !StringUtils.hasText(request.signature())) {
+            return false;
+        }
         String payload = request.orderNo() + "|" + request.transactionNo() + "|" + request.amount().setScale(2, RoundingMode.HALF_UP) + "|" + request.status();
         String expected = hmacSha256(payload, callbackSecret);
         return MessageDigest.isEqual(expected.getBytes(StandardCharsets.UTF_8), request.signature().getBytes(StandardCharsets.UTF_8));
+    }
+
+    private void ensureSamePaymentCallback(PaymentTransaction existing, PaymentCallbackRequest request) {
+        if (!StringUtils.hasText(existing.getProvider())
+                || !existing.getProvider().equalsIgnoreCase(request.provider())
+                || !sameAmount(existing.getAmount(), request.amount())
+                || existing.getStatus() != paymentStatusFromCallback(request)) {
+            throw new IllegalArgumentException("Payment transaction number already exists with different callback data");
+        }
+    }
+
+    private PaymentTransaction.Status paymentStatusFromCallback(PaymentCallbackRequest request) {
+        return "SUCCESS".equals(request.status()) ? PaymentTransaction.Status.SUCCESS : PaymentTransaction.Status.FAILED;
     }
 
     private OrderItem buildOrderItem(CreateOrderItemRequest request, int sortOrder) {
@@ -430,12 +521,12 @@ public class OrderCenterService {
         return switch (productType) {
             case SCENIC_SPOT -> scenicSpotOrderItem(request, sortOrder);
             case HOTEL_ROOM -> hotelRoomOrderItem(request, sortOrder);
-            default -> throw new IllegalArgumentException("当前商品类型暂未接入统一下单");
+            default -> throw new IllegalArgumentException("褰撳墠鍟嗗搧绫诲瀷鏆傛湭鎺ュ叆缁熶竴涓嬪崟");
         };
     }
 
     private OrderItem scenicSpotOrderItem(CreateOrderItemRequest request, int sortOrder) {
-        ScenicSpot spot = scenicSpotRepository.findById(request.getProductId())
+        ScenicSpot spot = scenicSpotRepository.findByIdForUpdate(request.getProductId())
                 .orElseThrow(() -> new NoSuchElementException("Spot not found"));
         int quantity = defaultQuantity(request.getQuantity());
         BigDecimal unitPrice = scenicSpotPrice(spot, request.getServiceStartDate());
@@ -453,23 +544,25 @@ public class OrderCenterService {
 
     private OrderItem hotelRoomOrderItem(CreateOrderItemRequest request, int sortOrder) {
         if (request.getSkuId() == null) {
-            throw new IllegalArgumentException("酒店房型不能为空");
+            throw new IllegalArgumentException("閰掑簵鎴垮瀷涓嶈兘涓虹┖");
         }
         Hotel hotel = hotelRepository.findById(request.getProductId())
                 .orElseThrow(() -> new NoSuchElementException("Hotel not found"));
         RoomType roomType = roomTypeRepository.findByIdForUpdate(request.getSkuId())
                 .orElseThrow(() -> new NoSuchElementException("Room type not found"));
         if (roomType.getHotel() == null || !hotel.getId().equals(roomType.getHotel().getId())) {
-            throw new IllegalArgumentException("房型不属于该酒店");
+            throw new IllegalArgumentException("鎴垮瀷涓嶅睘浜庤閰掑簵");
         }
         LocalDate checkIn = request.getServiceStartDate();
         LocalDate checkOut = request.getServiceEndDate();
         long nights = checkOut == null ? 0 : ChronoUnit.DAYS.between(checkIn, checkOut);
         if (nights < 1 || nights > 30) {
-            throw new IllegalArgumentException("酒店入住日期不合法");
+            throw new IllegalArgumentException("Invalid hotel stay dates");
         }
+        ensureNoLegacyHotelBookingOverlap(roomType, checkIn, checkOut);
         BigDecimal roomPrice = defaultMoney(roomType.getPrice());
-        BigDecimal subtotal = roomPrice.multiply(BigDecimal.valueOf(nights));
+        int quantity = defaultQuantity(request.getQuantity());
+        BigDecimal subtotal = roomPrice.multiply(BigDecimal.valueOf(nights)).multiply(BigDecimal.valueOf(quantity));
         BigDecimal serviceFee = subtotal.multiply(new BigDecimal("0.05")).setScale(0, RoundingMode.HALF_UP);
 
         OrderItem item = new OrderItem();
@@ -480,11 +573,19 @@ public class OrderCenterService {
         item.setSkuName(roomType.getName());
         item.setServiceStartDate(checkIn);
         item.setServiceEndDate(checkOut);
-        item.setQuantity(defaultQuantity(request.getQuantity()));
+        item.setQuantity(quantity);
         item.setUnitPrice(roomPrice);
         item.setSubtotal(subtotal.add(serviceFee));
         item.setSortOrder(sortOrder);
         return item;
+    }
+
+    private void ensureNoLegacyHotelBookingOverlap(RoomType roomType, LocalDate checkIn, LocalDate checkOut) {
+        List<HotelBooking> overlapping = hotelBookingRepository.findOverlappingActiveBookingsForUpdate(
+                roomType.getId(), ACTIVE_HOTEL_BOOKING_STATUSES, checkIn, checkOut);
+        if (!overlapping.isEmpty()) {
+            throw new IllegalStateException("Room type is unavailable for the selected dates");
+        }
     }
 
     private void attachCancellationPolicy(OrderItem item) {
@@ -518,6 +619,8 @@ public class OrderCenterService {
             if (inventoryLockRepository.existsByActiveLockKey(activeLockKey)) {
                 throw new IllegalStateException("Room type is unavailable for the selected dates");
             }
+        } else if (item.getProductType() == OrderItem.ProductType.SCENIC_SPOT) {
+            ensureScenicCapacityAvailable(item, serviceDate);
         }
         try {
             inventoryLockRepository.saveAndFlush(lock);
@@ -558,18 +661,79 @@ public class OrderCenterService {
         });
     }
 
+    private void ensureScenicCapacityAvailable(OrderItem item, LocalDate serviceDate) {
+        if (serviceDate == null || item.getProductId() == null) {
+            return;
+        }
+        releaseExpiredProductDateLocks(item.getProductType(), item.getProductId(), serviceDate);
+        ScenicSpot spot = scenicSpotRepository.findByIdForUpdate(item.getProductId())
+                .orElseThrow(() -> new NoSuchElementException("Spot not found"));
+        Integer capacity = spot.getNum();
+        if (capacity == null || capacity <= 0) {
+            return;
+        }
+        int reserved = inventoryLockRepository.findActiveProductDateLocksForUpdate(
+                        item.getProductType(),
+                        item.getProductId(),
+                        serviceDate,
+                        ACTIVE_INVENTORY_STATUSES)
+                .stream()
+                .map(InventoryLock::getQuantity)
+                .filter(quantity -> quantity != null)
+                .mapToInt(Integer::intValue)
+                .sum();
+        int requested = defaultQuantity(item.getQuantity());
+        if (reserved + requested > capacity) {
+            throw new IllegalStateException("Scenic spot capacity is unavailable for the selected date");
+        }
+    }
+
+    private void releaseExpiredProductDateLocks(OrderItem.ProductType productType, Long productId, LocalDate serviceDate) {
+        inventoryLockRepository.findActiveProductDateLocksForUpdate(
+                        productType,
+                        productId,
+                        serviceDate,
+                        Set.of(InventoryLock.Status.LOCKED))
+                .forEach(lock -> {
+                    if (lock.getExpiresAt() != null && lock.getExpiresAt().isBefore(LocalDateTime.now())) {
+                        lock.setStatus(InventoryLock.Status.EXPIRED);
+                        lock.setActiveLockKey(null);
+                        inventoryLockRepository.save(lock);
+                    }
+                });
+    }
+
     private PlatformOrder expireIfNeeded(PlatformOrder order) {
         if (order.getStatus() == PlatformOrder.Status.PENDING_PAYMENT
                 && order.getExpiresAt() != null
                 && order.getExpiresAt().isBefore(LocalDateTime.now())) {
-            transition(order, null, PlatformOrder.Status.EXPIRED, "库存锁超时释放");
+            transition(order, null, PlatformOrder.Status.EXPIRED, "Inventory lock expired");
             order.getItems().forEach(item -> item.setStatus(OrderItem.Status.EXPIRED));
             releaseLocks(order, InventoryLock.Status.EXPIRED);
         }
         return order;
     }
 
+    @Scheduled(fixedDelayString = "${app.orders.expiry-sweep-delay-ms:60000}")
+    @Transactional
+    public void expirePendingOrders() {
+        LocalDateTime now = LocalDateTime.now();
+        orderRepository.findByStatusAndExpiresAtBeforeForUpdate(PlatformOrder.Status.PENDING_PAYMENT, now)
+                .forEach(this::expireIfNeeded);
+        inventoryLockRepository.findExpiredLocks(InventoryLock.Status.LOCKED, now)
+                .forEach(lock -> {
+                    lock.setStatus(InventoryLock.Status.EXPIRED);
+                    lock.setActiveLockKey(null);
+                    inventoryLockRepository.save(lock);
+                });
+    }
+
     private void confirmPaidOrder(PlatformOrder order, String note) {
+        if (!canConfirmPayment(order)) {
+            order.addAuditLog(audit(null, "PAYMENT_CONFIRM_SKIPPED",
+                    order.getStatus().name(), order.getStatus().name(), "Order is not payable"));
+            return;
+        }
         PlatformOrder.Status from = order.getStatus();
         order.setStatus(PlatformOrder.Status.CONFIRMED);
         order.setPaymentStatus(PlatformOrder.PaymentStatus.PAID);
@@ -579,6 +743,11 @@ public class OrderCenterService {
         releaseLocks(order, InventoryLock.Status.CONFIRMED);
         issueVouchers(order);
         order.addAuditLog(audit(null, "PAYMENT_CONFIRMED", from.name(), order.getStatus().name(), note));
+    }
+
+    private boolean canConfirmPayment(PlatformOrder order) {
+        return order.getStatus() == PlatformOrder.Status.PENDING_PAYMENT
+                && order.getPaymentStatus() != PlatformOrder.PaymentStatus.PAID;
     }
 
     private void issueVouchers(PlatformOrder order) {
@@ -610,8 +779,64 @@ public class OrderCenterService {
         refund.setRefundNo(nextBusinessNo("RFD"));
         refund.setOrderItem(item);
         refund.setAmount(amount);
-        refund.setReason(InputSanitizer.optionalTextBlock(reason, 500, "退款原因"));
+        refund.setReason(InputSanitizer.optionalTextBlock(reason, 500, "refund reason"));
         return refund;
+    }
+
+    private void ensureRefundAllowed(PlatformOrder order, OrderItem item, BigDecimal requestedAmount) {
+        if (!isRefundableOrder(order)) {
+            throw new IllegalStateException("Order is not refundable");
+        }
+        if (hasPendingRefund(order, item)) {
+            throw new IllegalStateException("Refund already pending");
+        }
+        BigDecimal amount = defaultMoney(requestedAmount);
+        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalStateException("Refund amount must be greater than zero");
+        }
+        BigDecimal remaining = refundableAmount(order).subtract(countedRefundAmount(order));
+        if (amount.compareTo(remaining) > 0) {
+            throw new IllegalStateException("Refund amount exceeds paid amount");
+        }
+    }
+
+    private boolean isRefundableOrder(PlatformOrder order) {
+        boolean paid = order.getPaymentStatus() == PlatformOrder.PaymentStatus.PAID
+                || order.getPaymentStatus() == PlatformOrder.PaymentStatus.PARTIALLY_REFUNDED;
+        boolean active = order.getStatus() == PlatformOrder.Status.CONFIRMED
+                || order.getStatus() == PlatformOrder.Status.PAID;
+        return paid && active;
+    }
+
+    private boolean hasPendingRefund(PlatformOrder order, OrderItem item) {
+        return order.getRefunds().stream()
+                .filter(refund -> PENDING_REFUND_STATUSES.contains(refund.getStatus()))
+                .anyMatch(refund -> item == null
+                        || refund.getOrderItem() == null
+                        || refund.getOrderItem() == item
+                        || (refund.getOrderItem().getId() != null && refund.getOrderItem().getId().equals(item.getId())));
+    }
+
+    private BigDecimal countedRefundAmount(PlatformOrder order) {
+        return order.getRefunds().stream()
+                .filter(refund -> COUNTED_REFUND_STATUSES.contains(refund.getStatus()))
+                .map(refund -> defaultMoney(refund.getAmount()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private BigDecimal refundableAmount(PlatformOrder order) {
+        BigDecimal orderAmount = defaultMoney(order.getPayableAmount());
+        BigDecimal paidAmount = order.getPaymentTransactions().stream()
+                .filter(transaction -> transaction.getStatus() == PaymentTransaction.Status.SUCCESS)
+                .map(transaction -> defaultMoney(transaction.getAmount()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (paidAmount.compareTo(BigDecimal.ZERO) <= 0 && order.getPaidAt() != null) {
+            paidAmount = orderAmount;
+        }
+        if (orderAmount.compareTo(BigDecimal.ZERO) > 0 && paidAmount.compareTo(orderAmount) > 0) {
+            return orderAmount;
+        }
+        return paidAmount;
     }
 
     private BigDecimal refundAmountForOrder(PlatformOrder order) {
@@ -649,7 +874,7 @@ public class OrderCenterService {
         order.setConfirmedAt(LocalDateTime.now());
         order.setSourceType(sourceType);
         order.setSourceReferenceId(sourceReferenceId);
-        order.addAuditLog(audit(user, "LEGACY_MIRROR_CREATED", null, order.getStatus().name(), "旧预订写入统一订单中心"));
+        order.addAuditLog(audit(user, "LEGACY_MIRROR_CREATED", null, order.getStatus().name(), "鏃ч璁㈠啓鍏ョ粺涓€璁㈠崟涓績"));
         return order;
     }
 
@@ -672,7 +897,7 @@ public class OrderCenterService {
         order.setExpiresAt(order.getLockedUntil());
         order.setSourceType(sourceType);
         order.setSourceReferenceId(sourceReferenceId);
-        order.addAuditLog(audit(user, "LEGACY_MIRROR_CREATED", null, order.getStatus().name(), "旧预订写入统一订单中心，等待支付"));
+        order.addAuditLog(audit(user, "LEGACY_MIRROR_CREATED", null, order.getStatus().name(), "Legacy booking mirrored into order center, pending payment"));
         return order;
     }
 
@@ -729,12 +954,12 @@ public class OrderCenterService {
 
     private String buildSummary(List<OrderItem> items) {
         if (items.isEmpty()) {
-            return "旅行订单";
+            return "鏃呰璁㈠崟";
         }
         if (items.size() == 1) {
             return items.get(0).getProductName();
         }
-        return items.get(0).getProductName() + " 等 " + items.size() + " 项";
+        return items.get(0).getProductName() + " and " + items.size() + " items";
     }
 
     private boolean sameAmount(BigDecimal expected, BigDecimal actual) {
@@ -748,7 +973,7 @@ public class OrderCenterService {
     }
 
     private String normalizeIdempotencyKey(String value) {
-        return InputSanitizer.optionalPlainText(value, 96, "幂等键");
+        return InputSanitizer.optionalPlainText(value, 96, "idempotency key");
     }
 
     private int defaultQuantity(Integer quantity) {

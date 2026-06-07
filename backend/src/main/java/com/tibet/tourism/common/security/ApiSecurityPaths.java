@@ -18,10 +18,6 @@ public final class ApiSecurityPaths {
             "/api/spots/{id:\\d+}/similar",
             "/api/news",
             "/api/heritage",
-            "/api/heritage/{id:\\d+}",
-            "/api/heritage/{id:\\d+}/comments",
-            "/api/heritage/{id:\\d+}/inheritors",
-            "/api/heritage/{id:\\d+}/events",
             "/api/heritage/events/upcoming",
             "/api/tibet-specialty/culture-tips",
             "/api/tibet-specialty/phrasebook",
@@ -45,7 +41,6 @@ public final class ApiSecurityPaths {
     private static final Set<String> PUBLIC_POST_PATHS = Set.of(
             "/api/auth/login",
             "/api/auth/register",
-            "/api/auth/logout",
             "/api/guide/chat");
 
     private static final String[] ADMIN_API_PATHS = {

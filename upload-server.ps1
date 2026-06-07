@@ -75,11 +75,20 @@ $tarExcludes = @(
     "--exclude=./frontend/node_modules",
     "--exclude=./frontend/dist",
     "--exclude=./backend/target",
+    "--exclude=./backend/logs",
+    "--exclude=./logs",
+    "--exclude=./.startup",
+    "--exclude=./certs",
     "--exclude=./scrapler/.venv",
+    "--exclude=./.env",
+    "--exclude=./.env.*",
+    "--exclude=*/.env",
+    "--exclude=*/.env.*",
+    "--exclude=./*.log",
     "--exclude=./*.tar.gz"
 )
 
-$topLevelExcludes = @(".git", ".idea", ".vscode", "node_modules", "data", "logs", ".env")
+$topLevelExcludes = @(".git", ".idea", ".vscode", "node_modules", "data", "logs", ".env", ".startup", "certs")
 $tarIncludes = Get-ChildItem -LiteralPath $RepoRoot -Force |
     Where-Object {
         $topLevelExcludes -notcontains $_.Name -and
@@ -136,6 +145,19 @@ if [ ! -f "$PROJECT_DIR/.env" ]; then
   exit 1
 fi
 
+NGINX_CERT_DOMAIN=$(grep -E '^NGINX_CERT_DOMAIN=' "$PROJECT_DIR/.env" | tail -n 1 | cut -d= -f2- || true)
+if [ -z "$NGINX_CERT_DOMAIN" ]; then
+  echo "Refusing deployment: NGINX_CERT_DOMAIN must be configured." >&2
+  exit 1
+fi
+LE_CERT_DIR="/etc/letsencrypt/live/$NGINX_CERT_DOMAIN"
+for cert_file in fullchain.pem privkey.pem chain.pem; do
+  if [ ! -f "$LE_CERT_DIR/$cert_file" ]; then
+    echo "Refusing deployment: missing Let's Encrypt certificate file $LE_CERT_DIR/$cert_file." >&2
+    exit 1
+  fi
+done
+
 if ! grep -Eq '^(DOUBAO_API_KEY|ARK_API_KEY)=[^[:space:]]+' "$PROJECT_DIR/.env"; then
   echo "WARNING: DOUBAO_API_KEY/ARK_API_KEY is empty; AI route generation will use local fallback routes." >&2
 fi
@@ -191,6 +213,11 @@ fi
 echo "Prebuilding release before stopping current containers..."
 tar -xzf "$ARCHIVE" -C "$RELEASE_DIR"
 cp "$PROJECT_DIR/.env" "$RELEASE_DIR/.env"
+mkdir -p "$RELEASE_DIR/certs/$NGINX_CERT_DOMAIN"
+cp "$LE_CERT_DIR/fullchain.pem" "$LE_CERT_DIR/privkey.pem" "$LE_CERT_DIR/chain.pem" "$RELEASE_DIR/certs/$NGINX_CERT_DOMAIN/"
+chown -R 101:101 "$RELEASE_DIR/certs"
+chmod 750 "$RELEASE_DIR/certs" "$RELEASE_DIR/certs/$NGINX_CERT_DOMAIN"
+chmod 640 "$RELEASE_DIR/certs/$NGINX_CERT_DOMAIN/"*.pem
 cd "$RELEASE_DIR"
 docker compose -f docker-compose.prod.yml config --quiet
 COMPOSE_PROGRESS=plain BUILDKIT_PROGRESS=plain docker compose -p "$PREBUILD_PROJECT" -f docker-compose.prod.yml build
@@ -208,6 +235,17 @@ find "$PROJECT_DIR" -mindepth 1 -maxdepth 1 \
   -exec rm -rf -- {} +
 
 tar -xzf "$ARCHIVE" -C "$PROJECT_DIR"
+mkdir -p "$PROJECT_DIR/certs/$NGINX_CERT_DOMAIN"
+cp "$LE_CERT_DIR/fullchain.pem" "$LE_CERT_DIR/privkey.pem" "$LE_CERT_DIR/chain.pem" "$PROJECT_DIR/certs/$NGINX_CERT_DOMAIN/"
+chown -R 101:101 "$PROJECT_DIR/certs"
+chmod 750 "$PROJECT_DIR/certs" "$PROJECT_DIR/certs/$NGINX_CERT_DOMAIN"
+chmod 640 "$PROJECT_DIR/certs/$NGINX_CERT_DOMAIN/"*.pem
+find "$PROJECT_DIR" -mindepth 1 \
+  \( -path "$PROJECT_DIR/.env" -o -path "$PROJECT_DIR/certs" -o -path "$PROJECT_DIR/certs/*" -o -path "$PROJECT_DIR/data" -o -path "$PROJECT_DIR/data/*" -o -path "$PROJECT_DIR/logs" -o -path "$PROJECT_DIR/logs/*" \) -prune -o \
+  -type d -exec chmod 755 {} +
+find "$PROJECT_DIR" -mindepth 1 \
+  \( -path "$PROJECT_DIR/.env" -o -path "$PROJECT_DIR/certs" -o -path "$PROJECT_DIR/certs/*" -o -path "$PROJECT_DIR/data" -o -path "$PROJECT_DIR/data/*" -o -path "$PROJECT_DIR/logs" -o -path "$PROJECT_DIR/logs/*" \) -prune -o \
+  -type f -exec chmod 644 {} +
 chmod -R a+rwX "$PROJECT_DIR/data" "$PROJECT_DIR/logs"
 
 cd "$PROJECT_DIR"
@@ -244,7 +282,7 @@ wait_for_health colorful-tibet-frontend 180
 docker exec colorful-tibet-frontend nginx -t
 curl -fsS http://127.0.0.1:8080/actuator/health/readiness
 echo ""
-curl -fsS http://127.0.0.1/health
+curl -fsS http://127.0.0.1:80/health
 curl -fsS -I "$SITE_URL" | head -n 12
 
 echo "Pruning unused Docker build cache..."

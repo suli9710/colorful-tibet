@@ -229,6 +229,56 @@ class AiRouteGenerationJobServiceTest {
         assertThrows(IllegalArgumentException.class, () -> service.getJob(snapshot.jobId(), user));
     }
 
+    @Test
+    void rejectsJobLookupFromDifferentUserEvenForLargeBoxedIds() {
+        Executor directExecutor = Runnable::run;
+        AiRouteGenerationJobService service = new AiRouteGenerationJobService(
+                aiRouteService,
+                aiQuotaService,
+                aiRouteRecordService,
+                directExecutor,
+                new ObjectMapper()
+        );
+
+        User owner = new User();
+        owner.setId(1000L);
+        User other = new User();
+        other.setId(1000L);
+        AiRouteGenerateRequest request = new AiRouteGenerateRequest();
+        request.setDays(5);
+        request.setBudget("comfort");
+        request.setPreference("natural");
+
+        when(aiQuotaService.buildCacheKey(1000L, 5, "comfort", "natural", "zh")).thenReturn("cache-key");
+        when(aiQuotaService.getCachedRoute("cache-key")).thenReturn(null);
+        when(aiQuotaService.tryConsumeQuota(1000L)).thenReturn(new AiQuotaService.QuotaConsumptionResult(true, 19));
+        when(aiRouteRecordService.createRunningRecord(eq(owner), any(), eq(5), eq("comfort"), eq("natural"), eq("zh")))
+                .thenReturn(record(104L));
+        when(aiRouteRecordService.recordCompletedRoute(
+                eq(owner), any(), eq(5), eq("comfort"), eq("natural"), eq("zh"), eq("# Fresh route")))
+                .thenReturn(record(104L));
+
+        doAnswer(invocation -> {
+            AiRouteService.RouteStreamListener listener = invocation.getArgument(5);
+            listener.onDone("# Fresh route");
+            return "# Fresh route";
+        }).when(aiRouteService).streamRouteToListener(
+                eq(5),
+                eq("comfort"),
+                eq("natural"),
+                eq(owner),
+                eq("zh"),
+                any(AiRouteService.RouteStreamListener.class));
+
+        AiRouteJobSnapshot snapshot = service.startJob(request, owner, "zh");
+
+        assertEquals("COMPLETED", snapshot.status());
+        assertEquals("# Fresh route", service.getJob(snapshot.jobId(), other).content());
+
+        other.setId(1001L);
+        assertThrows(IllegalArgumentException.class, () -> service.getJob(snapshot.jobId(), other));
+    }
+
     private AiRouteJobSnapshot waitForStatus(AiRouteGenerationJobService service, String jobId,
                                              User user, String expectedStatus) throws InterruptedException {
         for (int i = 0; i < 40; i++) {

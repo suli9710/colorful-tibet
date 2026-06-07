@@ -123,11 +123,13 @@ import { motion } from 'motion-v'
 import { revealInitial, revealInView, revealTransition } from '../motion/presets'
 import api from '../api'
 import { useAuthStore } from '../stores/auth'
+import { useAuthGuard } from '../composables/useAuthGuard'
 
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
+const { requireAuth } = useAuthGuard()
 
 const question = ref<any>(null)
 const answers = ref<any[]>([])
@@ -192,10 +194,7 @@ const loadQuestion = async () => {
 
 const submitAnswer = async () => {
   if (!newAnswer.value.trim() || answering.value) return
-  if (!(await auth.ensureSession())) {
-    if (confirm(t('routePlanner.loginRequired'))) router.push('/login')
-    return
-  }
+  if (!(await requireAuth())) return
 
   answering.value = true
   try {
@@ -208,7 +207,7 @@ const submitAnswer = async () => {
     }
   } catch (error: any) {
     if (error.response?.status === 401) {
-      if (confirm(t('routePlanner.loginRequired'))) router.push('/login')
+      if (!(await requireAuth())) return
     } else {
       alert(t('questionDetail.answerFailed'))
     }
@@ -218,10 +217,7 @@ const submitAnswer = async () => {
 }
 
 const toggleLike = async () => {
-  if (!currentUserId.value) {
-    if (confirm(t('routePlanner.loginRequired'))) router.push('/login')
-    return
-  }
+  if (!(await requireAuth())) return
   try {
     if (isLiked.value) {
       await api.delete(`/community/questions/${question.value.id}/like`)
@@ -234,7 +230,7 @@ const toggleLike = async () => {
     }
   } catch (error: any) {
     if (error.response?.status === 401) {
-      if (confirm(t('routePlanner.loginRequired'))) router.push('/login')
+      if (!(await requireAuth())) return
     }
   }
 }

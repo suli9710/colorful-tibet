@@ -31,14 +31,14 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { marked } from 'marked'
-import DOMPurify from 'dompurify'
+import { sanitizeHtml } from '../utils/sanitize'
 import { getLegalMarkdown } from '../content/legal'
 
 const { t, locale } = useI18n()
 
 const renderedContent = computed(() => {
   const markdown = getLegalMarkdown('privacy', locale.value)
-  return DOMPurify.sanitize(marked(markdown) as string)
+  return sanitizeHtml(marked(markdown) as string)
 })
 </script>
 

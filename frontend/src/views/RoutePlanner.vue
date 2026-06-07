@@ -942,7 +942,7 @@
     :amount="pendingPaymentItem?.estimatedCost"
     recaptcha-action="itinerary_booking"
     @close="resetPendingItineraryBooking"
-    @paid="handleItineraryPaymentConfirmed"
+    @status-check="handleItineraryPaymentStatusCheck"
   />
 
   <MobileStickyActionBar
@@ -964,6 +964,7 @@ import { ref, computed, shallowRef, onBeforeUnmount, onMounted, watch } from 'vu
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { AnimatePresence, motion } from 'motion-v'
+import { marked } from 'marked'
 import {
   Bell,
   CalendarCheck,
@@ -984,7 +985,7 @@ import {
   Sparkles,
   Ticket
 } from 'lucide-vue-next'
-import DOMPurify from 'dompurify'
+import { sanitizeHtml } from '../utils/sanitize'
 import {
   getRouteGenerationJob,
   startRouteGenerationJob,
@@ -996,6 +997,7 @@ import PaymentModal from '../components/PaymentModal.vue'
 import MobileStickyActionBar from '../components/MobileStickyActionBar.vue'
 import { useRoutePlannerDraft, type RoutePlannerFormState } from '../composables/useRoutePlannerDraft'
 import { useBehaviorTracker } from '../composables/useBehaviorTracker'
+import { useAuthGuard } from '../composables/useAuthGuard'
 import { useAuthStore } from '../stores/auth'
 import { useRouteGenerationStore } from '../stores/routeGeneration'
 import {
@@ -1014,6 +1016,7 @@ const router = useRouter()
 const auth = useAuthStore()
 const generationStore = useRouteGenerationStore()
 const { encodeBehaviorData, reset: resetBehavior } = useBehaviorTracker()
+const { requireAuth } = useAuthGuard()
 
 interface RouteSummarySection {
   day: string
@@ -1183,9 +1186,9 @@ const defaultForm: RoutePlannerFormState = {
   preference: 'natural'
 }
 
-window.addEventListener('auth-expired', () => {
+const onAuthExpired = () => {
   if (window.location.pathname !== '/login') alert(t('routePlanner.authFailed'))
-})
+}
 
 const form = ref<RoutePlannerFormState>({ ...defaultForm })
 
@@ -1616,7 +1619,7 @@ const { persistRouteDraft, restoreRouteDraft } = useRoutePlannerDraft(
 )
 
 const renderMarkdownSync = (markdown: string) => {
-  renderedResult.value = DOMPurify.sanitize(markdown ? markdown.replace(/\n/g, '<br/>') : '')
+  renderedResult.value = sanitizeHtml(markdown ? String(marked.parse(markdown)) : '')
 }
 
 const ensureMarkdownWorker = () => {
@@ -1627,7 +1630,7 @@ const ensureMarkdownWorker = () => {
     const { id, html } = event.data
     if (id < latestAppliedRenderId) return
     latestAppliedRenderId = id
-    renderedResult.value = DOMPurify.sanitize(html)
+    renderedResult.value = sanitizeHtml(html)
   }
   markdownWorker.onerror = () => {
     markdownWorker?.terminate()
@@ -1709,9 +1712,7 @@ const refreshBookableItinerary = async () => {
 
 const generateBookableItinerary = async (versionType = 'default') => {
   if (!(await auth.ensureSession())) {
-    if (confirm(t('routePlanner.loginRequired'))) {
-      router.push('/login')
-    }
+    await requireAuth()
     return
   }
 
@@ -1951,9 +1952,7 @@ const resumeRouteJobFromDraft = async () => {
 
 const generateRoute = async () => {
   if (!(await auth.ensureSession())) {
-    if (confirm(t('routePlanner.loginRequired'))) {
-      router.push('/login')
-    }
+    await requireAuth()
     return
   }
 
@@ -2027,9 +2026,7 @@ const saveRoute = async () => {
   if (!result.value || saving.value) return
 
   if (!(await auth.ensureSession())) {
-    if (confirm(t('routePlanner.loginRequired'))) {
-      router.push('/login')
-    }
+    await requireAuth()
     return
   }
 
@@ -2102,9 +2099,7 @@ const shareRoute = async () => {
   if (!result.value) return
 
   if (!(await auth.ensureSession())) {
-    if (confirm(t('routePlanner.loginRequired'))) {
-      router.push('/login')
-    }
+    await requireAuth()
     return
   }
 
@@ -2122,9 +2117,7 @@ const shareRoute = async () => {
   } catch (error: any) {
     console.error('Share failed:', error)
     if (error.response && error.response.status === 401) {
-      if (confirm(t('routePlanner.loginExpired'))) {
-        router.push('/login')
-      }
+      await requireAuth()
     } else {
       alert(t('routePlanner.shareFailed'))
     }
@@ -2147,9 +2140,7 @@ const bookItineraryItem = async (item: ItineraryItem) => {
   if (!bookableItinerary.value || !isBookableItem(item)) return
 
   if (!(await auth.ensureSession())) {
-    if (confirm(t('routePlanner.loginRequired'))) {
-      router.push('/login')
-    }
+    await requireAuth()
     return
   }
 
@@ -2166,7 +2157,7 @@ const bookItineraryItem = async (item: ItineraryItem) => {
   showPaymentModal.value = true
 }
 
-const handleItineraryPaymentConfirmed = async (recaptchaToken = '') => {
+const handleItineraryPaymentStatusCheck = async (recaptchaToken = '') => {
   const item = pendingPaymentItem.value
   if (!item || !bookableItinerary.value) return
 
@@ -2222,6 +2213,7 @@ const downloadOfflinePackage = () => {
 watch(form, () => persistRouteDraft(), { deep: true })
 
 onMounted(async () => {
+  window.addEventListener('auth-expired', onAuthExpired)
   generationStore.acknowledgeResult()
   const hasSession = await auth.ensureSession()
   const restoredFromServer = hasSession ? await restoreLatestRouteFromServer() : false
@@ -2234,6 +2226,7 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  window.removeEventListener('auth-expired', onAuthExpired)
   if (streamAbortController.value) {
     streamAbortController.value.abort()
     streamAbortController.value = null

@@ -1,7 +1,6 @@
 package com.tibet.tourism.modules.admin.web;
 import com.tibet.tourism.common.validation.InputSanitizer;
-import com.tibet.tourism.common.validation.RequestParseUtils;
-import com.tibet.tourism.modules.admin.web.mapper.AdminDtoMapper;
+import com.tibet.tourism.modules.admin.web.dto.RouteManagementRequest;
 import com.tibet.tourism.modules.community.domain.SharedRoute;
 import com.tibet.tourism.modules.community.domain.TravelRoute;
 import com.tibet.tourism.modules.community.infra.RouteCommentRepository;
@@ -9,6 +8,7 @@ import com.tibet.tourism.modules.community.infra.RouteLikeRepository;
 import com.tibet.tourism.modules.community.infra.SharedRouteRepository;
 import com.tibet.tourism.modules.user.domain.User;
 import com.tibet.tourism.modules.user.infra.UserRepository;
+import jakarta.validation.Valid;
 import java.math.BigDecimal;
 import java.util.Map;
 import java.util.Optional;
@@ -21,7 +21,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
-import static com.tibet.tourism.common.validation.RequestParseUtils.*;
+import static com.tibet.tourism.common.validation.RequestParseUtils.isBlank;
 import static com.tibet.tourism.modules.admin.web.mapper.AdminDtoMapper.toAdminSharedRoute;
 
 @RestController
@@ -56,7 +56,7 @@ public class AdminRouteController {
 
     @PostMapping("/routes")
     @Transactional
-    public ResponseEntity<?> createRoute(@RequestBody Map<String, Object> request, Authentication authentication) {
+    public ResponseEntity<?> createRoute(@Valid @RequestBody RouteManagementRequest request, Authentication authentication) {
         SharedRoute route = new SharedRoute();
         route.setSourceType(SharedRoute.SourceType.OFFICIAL);
         route.setAuthor(findAuthenticatedUser(authentication).orElse(null));
@@ -71,7 +71,7 @@ public class AdminRouteController {
 
     @PutMapping("/routes/{id}")
     @Transactional
-    public ResponseEntity<?> updateRoute(@PathVariable Long id, @RequestBody Map<String, Object> request) {
+    public ResponseEntity<?> updateRoute(@PathVariable Long id, @Valid @RequestBody RouteManagementRequest request) {
         Optional<SharedRoute> routeOpt = sharedRouteRepository.findById(id);
         if (routeOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
@@ -97,55 +97,55 @@ public class AdminRouteController {
         return ResponseEntity.ok(Map.of("message", "删除成功"));
     }
 
-    private ResponseEntity<?> applyRouteManagementPayload(SharedRoute route, Map<String, Object> request, boolean creating) {
-        String title = firstStringValue(request, "title", "name");
-        if (creating || request.containsKey("title") || request.containsKey("name")) {
+    private ResponseEntity<?> applyRouteManagementPayload(SharedRoute route, RouteManagementRequest request, boolean creating) {
+        String title = request.effectiveTitle();
+        if (creating || request.hasTitleKey()) {
             if (isBlank(title)) {
                 return ResponseEntity.badRequest().body(Map.of("error", "线路名称不能为空"));
             }
             route.setTitle(InputSanitizer.requiredPlainText(title, 200, "线路名称"));
         }
 
-        String content = firstStringValue(request, "content", "description");
-        if (creating || request.containsKey("content") || request.containsKey("description")) {
+        String content = request.effectiveContent();
+        if (creating || request.hasContentKey()) {
             route.setContent(isBlank(content)
                     ? route.getTitle()
                     : InputSanitizer.requiredTextBlock(content, 12000, "线路内容"));
         }
 
-        if (creating || request.containsKey("days")) {
-            Integer days = integerValue(request.get("days"));
+        if (creating || request.getDays() != null) {
+            Integer days = request.getDays();
             if (days == null || days < 1 || days > 15) {
                 return ResponseEntity.badRequest().body(Map.of("error", "天数必须在1到15之间"));
             }
             route.setDays(days);
         }
 
-        if (request.containsKey("budget")) {
+        if (request.getBudget() != null) {
             route.setBudget(InputSanitizer.optionalAllowedValue(
-                    stringValue(request.get("budget")), ALLOWED_ROUTE_BUDGETS, "预算"));
+                    request.getBudget(), ALLOWED_ROUTE_BUDGETS, "预算"));
         } else if (creating && route.getBudget() == null) {
             route.setBudget(resolveBudgetLabel(route.getPrice()));
         }
 
-        if (request.containsKey("preference")) {
+        if (request.getPreference() != null) {
             route.setPreference(InputSanitizer.optionalAllowedValue(
-                    stringValue(request.get("preference")), ALLOWED_ROUTE_PREFERENCES, "旅行偏好"));
+                    request.getPreference(), ALLOWED_ROUTE_PREFERENCES, "旅行偏好"));
         } else if (creating && route.getPreference() == null) {
             route.setPreference("人文历史");
         }
 
-        if (request.containsKey("price")) {
-            BigDecimal price = decimalValue(request.get("price"));
+        if (request.getPrice() != null) {
+            BigDecimal price = request.getPrice();
             route.setPrice(price);
-            if (price != null && (!request.containsKey("budget") || isBlank(route.getBudget()))) {
+            if (request.getBudget() == null || isBlank(route.getBudget())) {
                 route.setBudget(resolveBudgetLabel(price));
             }
         }
 
-        if (request.containsKey("difficulty")) {
-            String difficulty = optionalStringValue(request.get("difficulty"));
-            if (difficulty == null) {
+        if (request.getDifficulty() != null) {
+            String difficulty = request.getDifficulty().trim();
+            if (difficulty.isEmpty()) {
                 route.setDifficulty(null);
             } else {
                 try {
@@ -156,11 +156,11 @@ public class AdminRouteController {
             }
         }
 
-        if (request.containsKey("temperature")) {
-            route.setTemperature(InputSanitizer.optionalPlainText(stringValue(request.get("temperature")), 100, "温度说明"));
+        if (request.getTemperature() != null) {
+            route.setTemperature(InputSanitizer.optionalPlainText(request.getTemperature(), 100, "温度说明"));
         }
-        if (request.containsKey("geography")) {
-            route.setGeography(InputSanitizer.optionalPlainText(stringValue(request.get("geography")), 100, "地理说明"));
+        if (request.getGeography() != null) {
+            route.setGeography(InputSanitizer.optionalPlainText(request.getGeography(), 100, "地理说明"));
         }
         return null;
     }

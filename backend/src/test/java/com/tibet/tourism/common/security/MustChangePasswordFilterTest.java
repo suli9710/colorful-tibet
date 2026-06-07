@@ -46,10 +46,37 @@ class MustChangePasswordFilterTest {
     }
 
     @Test
+    void blocksPublicApiWhenPasswordChangeRequired() throws Exception {
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(user(true)));
+
+        MockHttpServletResponse response = doFilter(apiRequest("GET", "/api/heritage"));
+
+        assertEquals(403, response.getStatus());
+    }
+
+    @Test
+    void allowsMeEndpointWhenPasswordChangeRequired() throws Exception {
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(user(true)));
+
+        MockHttpServletResponse response = doFilter(apiRequest("GET", "/api/auth/me"));
+
+        assertEquals(200, response.getStatus());
+    }
+
+    @Test
     void allowsChangePasswordEndpointWhenPasswordChangeRequired() throws Exception {
         when(userRepository.findByUsername("admin")).thenReturn(Optional.of(user(true)));
 
         MockHttpServletResponse response = doFilter(apiRequest("POST", "/api/auth/me/change-password"));
+
+        assertEquals(200, response.getStatus());
+    }
+
+    @Test
+    void allowsLogoutEndpointWhenPasswordChangeRequired() throws Exception {
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(user(true)));
+
+        MockHttpServletResponse response = doFilter(apiRequest("POST", "/api/auth/logout"));
 
         assertEquals(200, response.getStatus());
     }

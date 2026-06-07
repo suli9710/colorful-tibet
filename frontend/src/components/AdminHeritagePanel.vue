@@ -194,10 +194,11 @@
     <MotionModal
       :show="showItemModal"
       modal-key="admin-heritage-modal"
+      labelled-by="admin-heritage-modal-title"
       panel-class="max-w-3xl rounded-2xl bg-white p-4 sm:p-8 max-h-[90dvh] overflow-y-auto"
       @close="closeItemModal"
     >
-      <h2 class="mb-5 text-xl font-bold text-stone-800 sm:mb-6 sm:text-2xl">
+      <h2 id="admin-heritage-modal-title" class="mb-5 text-xl font-bold text-stone-800 sm:mb-6 sm:text-2xl">
         {{ editingItem?.id ? text('admin.editHeritage', '编辑非遗项目') : text('admin.createHeritage', '新增非遗') }}
       </h2>
 

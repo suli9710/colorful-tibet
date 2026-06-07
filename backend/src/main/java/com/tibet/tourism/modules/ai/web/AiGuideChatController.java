@@ -1,6 +1,7 @@
 package com.tibet.tourism.modules.ai.web;
 
 import com.tibet.tourism.common.security.JwtAuthSupport;
+import com.tibet.tourism.common.security.PiiMasker;
 import com.tibet.tourism.common.security.antibot.AntibotProperties;
 import com.tibet.tourism.common.security.antibot.RecaptchaService;
 import com.tibet.tourism.modules.ai.application.AiGuideChatService;
@@ -134,12 +135,12 @@ public class AiGuideChatController {
     private String resolveAnonymousClientKey(HttpServletRequest request) {
         String fingerprint = request.getHeader("X-Device-Fingerprint");
         if (fingerprint != null && !fingerprint.isBlank() && fingerprint.length() <= 256) {
-            return "fp:" + fingerprint.trim();
+            return "fp#" + PiiMasker.shortHash(fingerprint);
         }
         String remoteAddr = request.getRemoteAddr();
         String userAgent = request.getHeader("User-Agent");
-        return "ip:" + (remoteAddr == null ? "unknown" : remoteAddr)
-                + ":ua:" + (userAgent == null ? "" : userAgent);
+        return "ip#" + PiiMasker.shortHash(remoteAddr)
+                + ":ua#" + PiiMasker.shortHash(userAgent);
     }
 
     private String limitMessage(String reason) {
