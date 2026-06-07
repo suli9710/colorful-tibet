@@ -16,8 +16,10 @@ frontend/.vite/
 # Python
 scrapler/.venv/
 scrapler/__pycache__/
+__pycache__/
 scrapler/.pytest_cache/
 scrapler/**/*.py[cod]
+*.py[cod]
 
 # IDE
 .idea/
@@ -63,6 +65,7 @@ output/
 *.temp
 *.bak
 *.cache
+新建 文本文档.txt
 
 # Uploaded files
 backend/uploads/
