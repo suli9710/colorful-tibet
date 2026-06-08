@@ -36,8 +36,7 @@ public class RecommendationEvaluationService {
         int userLimit = Math.max(1, Math.min(requestedUserLimit <= 0 ? MAX_USER_LIMIT : requestedUserLimit, MAX_USER_LIMIT));
         long startTime = System.currentTimeMillis();
 
-        List<UserVisitHistory> histories = historyRepository.findAll(
-                PageRequest.of(0, MAX_EVALUATION_HISTORIES, Sort.by(Sort.Direction.DESC, "visitDate"))).getContent();
+        List<UserVisitHistory> histories = historyRepository.findRecentForRecommendation(MAX_EVALUATION_HISTORIES);
         List<ScenicSpot> spots = spotRepository.findAllWithoutTags(
                 PageRequest.of(0, MAX_EVALUATION_SPOTS, Sort.by("id"))).getContent();
         Map<Long, ScenicSpot> spotsById = spots.stream()

@@ -66,8 +66,19 @@ public class PiiBackfillRunner implements ApplicationRunner {
             if (!StringUtils.hasText(row.value())) {
                 continue;
             }
-            String plaintext = converter.convertToEntityAttribute(row.value());
-            String encrypted = converter.convertToDatabaseColumn(plaintext);
+            PiiCryptoConverter.BackfillValue backfillValue = converter.valueForBackfill(row.value());
+            if (!backfillValue.encryptable()) {
+                logger.atWarn()
+                        .addKeyValue("security_event", "pii_backfill_skip")
+                        .addKeyValue("table", table)
+                        .addKeyValue("column", column)
+                        .addKeyValue("row_id", row.id())
+                        .addKeyValue("version", backfillValue.encryptedVersion())
+                        .addKeyValue("reason", backfillValue.failureReason())
+                        .log("PII v2 backfill skipped encrypted value because it could not be decrypted");
+                continue;
+            }
+            String encrypted = converter.convertToDatabaseColumn(backfillValue.plaintext());
             jdbcTemplate.update("UPDATE " + table + " SET " + column + " = ? WHERE id = ?",
                     encrypted, row.id());
             migrated++;

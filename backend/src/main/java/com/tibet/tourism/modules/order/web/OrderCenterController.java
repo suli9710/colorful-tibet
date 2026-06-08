@@ -10,11 +10,17 @@ import com.tibet.tourism.modules.order.web.dto.CreateOrderRequest;
 import com.tibet.tourism.modules.order.web.dto.InvoiceRequest;
 import com.tibet.tourism.modules.order.web.dto.PaymentCallbackRequest;
 import com.tibet.tourism.modules.order.web.dto.RefundRequest;
+import com.tibet.tourism.modules.order.web.dto.RefundReviewRequest;
 import com.tibet.tourism.modules.user.domain.User;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -69,9 +75,11 @@ public class OrderCenterController {
 
     @GetMapping("/api/orders/my")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<?> myOrders(HttpServletRequest httpRequest) {
+    public ResponseEntity<?> myOrders(
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable,
+            HttpServletRequest httpRequest) {
         User user = jwtAuthSupport.resolveCurrentUser(httpRequest);
-        return ResponseEntity.ok(orderCenterService.getMyOrders(user));
+        return pagedContent(orderCenterService.getMyOrders(user, pageable));
     }
 
     @GetMapping("/api/orders/{id}")
@@ -108,6 +116,24 @@ public class OrderCenterController {
             return ResponseEntity.status(HttpStatus.CREATED).body(orderCenterService.requestRefund(user, id, request));
         } catch (NoSuchElementException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "订单不存在"));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", ORDER_ACTION_UNAVAILABLE));
+        }
+    }
+
+    @PostMapping("/api/admin/orders/{orderId}/refunds/{refundId}/review")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> reviewRefund(@PathVariable Long orderId,
+                                          @PathVariable Long refundId,
+                                          @Valid @RequestBody RefundReviewRequest request,
+                                          HttpServletRequest httpRequest) {
+        User user = jwtAuthSupport.resolveCurrentUser(httpRequest);
+        try {
+            return ResponseEntity.ok(orderCenterService.reviewRefund(user, orderId, refundId, request));
+        } catch (NoSuchElementException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "退款记录不存在"));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", ORDER_REQUEST_FAILED));
         } catch (IllegalStateException e) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", ORDER_ACTION_UNAVAILABLE));
         }
@@ -171,5 +197,14 @@ public class OrderCenterController {
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", PAYMENT_CALLBACK_FAILED));
         }
+    }
+
+    private <T> ResponseEntity<List<T>> pagedContent(Page<T> page) {
+        return ResponseEntity.ok()
+                .header("X-Page", String.valueOf(page.getNumber()))
+                .header("X-Size", String.valueOf(page.getSize()))
+                .header("X-Total-Elements", String.valueOf(page.getTotalElements()))
+                .header("X-Total-Pages", String.valueOf(page.getTotalPages()))
+                .body(page.getContent());
     }
 }

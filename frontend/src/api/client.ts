@@ -40,19 +40,13 @@ export const expireAuthSession = (redirectTo = '/login') => {
 }
 
 export function handleUnauthorizedResponse(error: any) {
-  const method = String(error.config?.method || '').toLowerCase()
-  const requestUrl = String(error.config?.url || '')
-
   if (import.meta.env.DEV) {
     console.error(`[401] ${summarizeClientError(error)}`)
   }
 
-  const isBookingCreate = method === 'post' && requestUrl.includes('/bookings')
-  const isAiRouteGenerate = method === 'post' && requestUrl.includes('/routes/generate')
-  const isRouteShare = method === 'post' && requestUrl.includes('/routes/share')
   const skipAuthRedirect = Boolean(error.config?.skipAuthRedirect)
 
-  if (!skipAuthRedirect && !isBookingCreate && !isAiRouteGenerate && !isRouteShare) {
+  if (!skipAuthRedirect) {
     const currentPath = window.location.pathname
     if (currentPath !== '/login') {
       expireAuthSession('/login')

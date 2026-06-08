@@ -1,9 +1,11 @@
 package com.tibet.tourism.modules.content.web;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -36,6 +38,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
@@ -43,6 +46,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 
@@ -208,22 +212,73 @@ class HeritageControllerPublicReadAccessTest {
 
     @Test
     void heritageInheritorsAllowAnonymousRead() throws Exception {
-        when(heritageService.getInheritorsByItemId(1L)).thenReturn(List.of(inheritor()));
+        when(heritageService.getInheritorsByItemId(eq(1L), any(Pageable.class)))
+                .thenAnswer(invocation -> new PageImpl<>(List.of(inheritor()), invocation.getArgument(1), 51));
 
-        mockMvc.perform(get("/api/heritage/1/inheritors"))
+        ResultActions result = mockMvc.perform(get("/api/heritage/1/inheritors"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id").value(20))
-                .andExpect(jsonPath("$[0].name").value("Tashi"));
+                .andExpect(jsonPath("$.content").isArray())
+                .andExpect(jsonPath("$.content[0].id").value(20))
+                .andExpect(jsonPath("$.content[0].name").value("Tashi"));
+
+        expectStablePageEnvelope(result, 0, 20, 51, 3);
+        Pageable pageable = captureInheritorPageable();
+        assertThat(pageable.getPageNumber()).isZero();
+        assertThat(pageable.getPageSize()).isEqualTo(20);
+        Sort.Order idSort = pageable.getSort().getOrderFor("id");
+        assertThat(idSort).isNotNull();
+        assertThat(idSort.isAscending()).isTrue();
+    }
+
+    @Test
+    void heritageInheritorsClampPageSizeToFifty() throws Exception {
+        when(heritageService.getInheritorsByItemId(eq(1L), any(Pageable.class)))
+                .thenAnswer(invocation -> new PageImpl<>(List.of(inheritor()), invocation.getArgument(1), 101));
+
+        ResultActions result = mockMvc.perform(get("/api/heritage/1/inheritors?size=500&page=2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].id").value(20));
+
+        expectStablePageEnvelope(result, 2, 50, 101, 3);
+        Pageable pageable = captureInheritorPageable();
+        assertThat(pageable.getPageNumber()).isEqualTo(2);
+        assertThat(pageable.getPageSize()).isEqualTo(50);
     }
 
     @Test
     void heritageEventsAllowAnonymousRead() throws Exception {
-        when(heritageService.getEventsByItemId(1L)).thenReturn(List.of(event()));
+        when(heritageService.getEventsByItemId(eq(1L), any(Pageable.class)))
+                .thenAnswer(invocation -> new PageImpl<>(List.of(event()), invocation.getArgument(1), 41));
 
-        mockMvc.perform(get("/api/heritage/1/events"))
+        ResultActions result = mockMvc.perform(get("/api/heritage/1/events"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id").value(30))
-                .andExpect(jsonPath("$[0].title").value("Workshop"));
+                .andExpect(jsonPath("$.content").isArray())
+                .andExpect(jsonPath("$.content[0].id").value(30))
+                .andExpect(jsonPath("$.content[0].title").value("Workshop"));
+
+        expectStablePageEnvelope(result, 0, 20, 41, 3);
+        Pageable pageable = captureEventPageable();
+        Sort.Order eventDateSort = pageable.getSort().getOrderFor("eventDate");
+        Sort.Order idSort = pageable.getSort().getOrderFor("id");
+        assertThat(eventDateSort).isNotNull();
+        assertThat(eventDateSort.isAscending()).isTrue();
+        assertThat(idSort).isNotNull();
+        assertThat(idSort.isAscending()).isTrue();
+    }
+
+    @Test
+    void heritageEventsClampPageSizeToFifty() throws Exception {
+        when(heritageService.getEventsByItemId(eq(1L), any(Pageable.class)))
+                .thenAnswer(invocation -> new PageImpl<>(List.of(event()), invocation.getArgument(1), 101));
+
+        ResultActions result = mockMvc.perform(get("/api/heritage/1/events?size=999&page=1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].id").value(30));
+
+        expectStablePageEnvelope(result, 1, 50, 101, 3);
+        Pageable pageable = captureEventPageable();
+        assertThat(pageable.getPageNumber()).isEqualTo(1);
+        assertThat(pageable.getPageSize()).isEqualTo(50);
     }
 
     @Test
@@ -259,6 +314,18 @@ class HeritageControllerPublicReadAccessTest {
                 .andExpect(jsonPath("$.first").doesNotExist())
                 .andExpect(jsonPath("$.last").doesNotExist())
                 .andExpect(jsonPath("$.empty").doesNotExist());
+    }
+
+    private Pageable captureInheritorPageable() {
+        ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
+        verify(heritageService).getInheritorsByItemId(eq(1L), captor.capture());
+        return captor.getValue();
+    }
+
+    private Pageable captureEventPageable() {
+        ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
+        verify(heritageService).getEventsByItemId(eq(1L), captor.capture());
+        return captor.getValue();
     }
 
     private static HeritageItem heritageItem() {

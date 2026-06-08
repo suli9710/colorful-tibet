@@ -127,7 +127,14 @@
           <div class="flex items-center space-x-6 text-xs text-white/50">
             <router-link to="/privacy" class="hover:text-tibet-yellow transition-colors">{{ t('footer.privacyPolicy') }}</router-link>
             <router-link to="/terms" class="hover:text-tibet-yellow transition-colors">{{ t('footer.terms') }}</router-link>
-            <a href="#" class="hover:text-tibet-yellow transition-colors">{{ t('footer.aboutUs') }}</a>
+            <button
+              type="button"
+              class="hover:text-tibet-yellow transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tibet-gold/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#1A1520]"
+              :aria-label="t('footer.aboutUs')"
+              @click="showContactModal = true"
+            >
+              {{ t('footer.aboutUs') }}
+            </button>
           </div>
         </div>
       </div>

@@ -10,8 +10,11 @@ import com.tibet.tourism.modules.order.domain.CancellationPolicy;
 import com.tibet.tourism.modules.order.domain.InventoryLock;
 import com.tibet.tourism.modules.order.domain.OrderItem;
 import com.tibet.tourism.modules.order.domain.PaymentTransaction;
+import com.tibet.tourism.modules.order.domain.PaymentTransactionReservation;
 import com.tibet.tourism.modules.order.domain.PlatformOrder;
 import com.tibet.tourism.modules.order.domain.RefundOrder;
+import com.tibet.tourism.modules.order.domain.Voucher;
+import com.tibet.tourism.modules.order.infra.BookingRepository;
 import com.tibet.tourism.modules.order.infra.CancellationPolicyRepository;
 import com.tibet.tourism.modules.order.infra.InventoryLockRepository;
 import com.tibet.tourism.modules.order.infra.PaymentTransactionRepository;
@@ -20,6 +23,7 @@ import com.tibet.tourism.modules.order.web.dto.CancelOrderRequest;
 import com.tibet.tourism.modules.order.web.dto.CreateOrderItemRequest;
 import com.tibet.tourism.modules.order.web.dto.CreateOrderRequest;
 import com.tibet.tourism.modules.order.web.dto.PaymentCallbackRequest;
+import com.tibet.tourism.modules.order.web.dto.RefundReviewRequest;
 import com.tibet.tourism.modules.spot.domain.ScenicSpot;
 import com.tibet.tourism.modules.spot.infra.ScenicSpotRepository;
 import com.tibet.tourism.modules.user.domain.User;
@@ -37,7 +41,12 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.Mock;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.mock.env.MockEnvironment;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Sort;
 import org.springframework.test.util.ReflectionTestUtils;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -47,7 +56,9 @@ import static org.mockito.Mockito.*;
 class OrderCenterServiceTest {
 
     @Mock private PlatformOrderRepository orderRepository;
+    @Mock private BookingRepository bookingRepository;
     @Mock private PaymentTransactionRepository paymentTransactionRepository;
+    @Mock private PaymentTransactionReservationService paymentTransactionReservationService;
     @Mock private PaymentCallbackAuditService paymentCallbackAuditService;
     @Mock private CancellationPolicyRepository cancellationPolicyRepository;
     @Mock private InventoryLockRepository inventoryLockRepository;
@@ -64,7 +75,9 @@ class OrderCenterServiceTest {
     void setUp() {
         orderCenterService = new OrderCenterService(
                 orderRepository,
+                bookingRepository,
                 paymentTransactionRepository,
+                paymentTransactionReservationService,
                 paymentCallbackAuditService,
                 cancellationPolicyRepository,
                 inventoryLockRepository,
@@ -74,6 +87,21 @@ class OrderCenterServiceTest {
                 hotelBookingRepository
         );
         ReflectionTestUtils.setField(orderCenterService, "callbackSecret", "test-secret");
+        lenient().when(paymentTransactionReservationService.reservePaymentTransaction(
+                        anyString(),
+                        anyString(),
+                        anyString(),
+                        any(BigDecimal.class),
+                        any(PaymentTransaction.Status.class)))
+                .thenReturn(true);
+        lenient().when(paymentTransactionReservationService.reserveRefundTransaction(
+                        anyString(),
+                        anyString(),
+                        anyString(),
+                        any(BigDecimal.class)))
+                .thenReturn(true);
+        lenient().when(paymentTransactionReservationService.findReservation(anyString()))
+                .thenReturn(Optional.empty());
 
         user = new User();
         user.setId(1L);
@@ -119,18 +147,81 @@ class OrderCenterServiceTest {
     }
 
     @Test
-    void emptyOrderUsesReadableDefaultSummary() {
+    void idempotencyRaceReturnsExistingOrderAfterUniqueConstraintFailure() {
+        PlatformOrder existing = new PlatformOrder();
+        existing.setUser(user);
+        existing.setOrderNo("ORD-RACE");
+        existing.setProductSummary("Existing order");
+        existing.setPayableAmount(BigDecimal.TEN);
+        when(orderRepository.findByUserIdAndIdempotencyKey(1L, "idem-1"))
+                .thenReturn(Optional.empty(), Optional.of(existing));
+        when(scenicSpotRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(spot));
+        when(orderRepository.save(any(PlatformOrder.class)))
+                .thenThrow(new DataIntegrityViolationException("duplicate idempotency key"));
+
+        var response = orderCenterService.createOrder(user, scenicOrderRequest(), "idem-1");
+
+        assertEquals("ORD-RACE", response.orderNo());
+        verify(inventoryLockRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void createOrderRejectsEmptyItemsBeforeRepositoryLookup() {
         CreateOrderRequest request = new CreateOrderRequest();
         request.setIdempotencyKey("empty-order");
         request.setCustomerName("Traveler");
         request.setItems(List.of());
 
-        when(orderRepository.findByUserIdAndIdempotencyKey(1L, "empty-order")).thenReturn(Optional.empty());
-        when(orderRepository.save(any(PlatformOrder.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        IllegalArgumentException error = assertThrows(
+                IllegalArgumentException.class,
+                () -> orderCenterService.createOrder(user, request, "empty-order"));
 
-        var response = orderCenterService.createOrder(user, request, "empty-order");
+        assertEquals("Order must contain at least one item", error.getMessage());
+        verify(orderRepository, never()).findByUserIdAndIdempotencyKey(any(), any());
+        verify(orderRepository, never()).save(any());
+    }
 
-        assertEquals("旅行订单", response.productSummary());
+    @Test
+    void createOrderRejectsTooManyItemsBeforeRepositoryLookup() {
+        CreateOrderItemRequest item = new CreateOrderItemRequest();
+        item.setProductType("SCENIC_SPOT");
+        item.setProductId(10L);
+        item.setServiceStartDate(LocalDate.of(2026, 6, 1));
+        item.setQuantity(1);
+
+        CreateOrderRequest request = new CreateOrderRequest();
+        request.setIdempotencyKey("too-many-items");
+        request.setCustomerName("Traveler");
+        request.setItems(java.util.stream.IntStream.range(0, CreateOrderRequest.MAX_ITEMS + 1)
+                .mapToObj(index -> item)
+                .toList());
+
+        IllegalArgumentException error = assertThrows(
+                IllegalArgumentException.class,
+                () -> orderCenterService.createOrder(user, request, "too-many-items"));
+
+        assertEquals("Order item count exceeds " + CreateOrderRequest.MAX_ITEMS, error.getMessage());
+        verify(orderRepository, never()).findByUserIdAndIdempotencyKey(any(), any());
+        verify(orderRepository, never()).save(any());
+    }
+
+    @Test
+    void getMyOrdersClampsPageSizeAndUsesDefaultSortForUnsafeSort() {
+        PlatformOrder order = payableOrder("ORD-PAGED", PlatformOrder.Status.CONFIRMED);
+        when(orderRepository.findByUserId(eq(1L), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(order), PageRequest.of(0, 50), 75));
+
+        var page = orderCenterService.getMyOrders(
+                user,
+                PageRequest.of(0, 500, Sort.by(Sort.Direction.ASC, "customerPhone")));
+
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(orderRepository).findByUserId(eq(1L), pageableCaptor.capture());
+        Pageable safePageable = pageableCaptor.getValue();
+        assertEquals(50, safePageable.getPageSize());
+        assertEquals(Sort.by(Sort.Direction.DESC, "createdAt"), safePageable.getSort());
+        assertEquals(75, page.getTotalElements());
+        assertEquals(1, page.getContent().size());
     }
 
     @Test
@@ -306,8 +397,16 @@ class OrderCenterServiceTest {
         assertEquals("CANCELLED", response.status());
         assertEquals("UNPAID", response.paymentStatus());
         assertEquals(0, response.vouchers().size());
-        assertEquals(1, response.paymentTransactions().size());
-        assertEquals("SUCCESS", response.paymentTransactions().get(0).status());
+        assertEquals(0, response.paymentTransactions().size());
+        ArgumentCaptor<PaymentTransaction> transactionCaptor = ArgumentCaptor.forClass(PaymentTransaction.class);
+        verify(paymentCallbackAuditService).recordRejectedCallback(
+                eq(order),
+                transactionCaptor.capture(),
+                eq("PAYMENT_CALLBACK_LATE_REJECTED"),
+                eq("Payment callback rejected: order is closed or no longer payable"));
+        assertEquals("PAY-LATE", transactionCaptor.getValue().getTransactionNo());
+        assertEquals(PaymentTransaction.Status.FAILED, transactionCaptor.getValue().getStatus());
+        assertTrue(transactionCaptor.getValue().getSignatureValid());
     }
 
     @Test
@@ -331,6 +430,12 @@ class OrderCenterServiceTest {
         assertEquals(InventoryLock.Status.EXPIRED, lock.getStatus());
         assertNull(lock.getActiveLockKey());
         assertEquals(0, response.vouchers().size());
+        assertEquals(0, response.paymentTransactions().size());
+        verify(paymentCallbackAuditService).recordRejectedCallback(
+                eq(order),
+                any(PaymentTransaction.class),
+                eq("PAYMENT_CALLBACK_LATE_REJECTED"),
+                eq("Payment callback rejected: order is closed or no longer payable"));
     }
 
     @Test
@@ -378,6 +483,74 @@ class OrderCenterServiceTest {
                 eq("Payment callback rejected: transaction belongs to another order"));
         assertEquals(PaymentTransaction.Status.FAILED, transactionCaptor.getValue().getStatus());
         assertTrue(transactionCaptor.getValue().getSignatureValid());
+    }
+
+    @Test
+    void paymentReservationRaceForAnotherOrderIsRejectedAndAudited() {
+        PlatformOrder order = payableOrder("ORD-CURRENT", PlatformOrder.Status.PENDING_PAYMENT);
+        PlatformOrder otherOrder = payableOrder("ORD-OTHER", PlatformOrder.Status.CONFIRMED);
+        PaymentTransaction existing = successfulTransaction(otherOrder, "PAY-RACE", BigDecimal.valueOf(600).setScale(2));
+
+        when(orderRepository.findByOrderNoForUpdate("ORD-CURRENT")).thenReturn(Optional.of(order));
+        when(paymentTransactionRepository.findByTransactionNo("PAY-RACE"))
+                .thenReturn(Optional.empty(), Optional.of(existing));
+        when(paymentTransactionReservationService.reservePaymentTransaction(
+                eq("PAY-RACE"),
+                eq("ORD-CURRENT"),
+                eq("MOCK"),
+                any(BigDecimal.class),
+                eq(PaymentTransaction.Status.SUCCESS))).thenReturn(false);
+
+        BigDecimal amount = BigDecimal.valueOf(600).setScale(2);
+        IllegalArgumentException error = assertThrows(
+                IllegalArgumentException.class,
+                () -> orderCenterService.handlePaymentCallback(new PaymentCallbackRequest(
+                        "ORD-CURRENT", "PAY-RACE", "MOCK", amount, "SUCCESS",
+                        signature("ORD-CURRENT", "PAY-RACE", amount, "SUCCESS"))));
+
+        assertEquals("Payment transaction number already belongs to another order", error.getMessage());
+        assertTrue(order.getPaymentTransactions().isEmpty());
+        verify(paymentCallbackAuditService).recordRejectedCallback(
+                eq(order),
+                any(PaymentTransaction.class),
+                eq("PAYMENT_CALLBACK_DUPLICATE_REJECTED"),
+                eq("Payment callback rejected: transaction belongs to another order"));
+    }
+
+    @Test
+    void paymentReservationLeftBySameOrderRetryCanComplete() {
+        PlatformOrder order = payableOrder("ORD-RETRY-RESERVED", PlatformOrder.Status.PENDING_PAYMENT);
+        BigDecimal amount = BigDecimal.valueOf(600).setScale(2);
+        PaymentTransactionReservation reservation = new PaymentTransactionReservation();
+        reservation.setTransactionNo("PAY-STALE");
+        reservation.setOrderNo("ORD-RETRY-RESERVED");
+        reservation.setUsageType(PaymentTransactionReservation.UsageType.PAYMENT);
+        reservation.setProvider("MOCK");
+        reservation.setAmount(amount);
+        reservation.setStatus(PaymentTransaction.Status.SUCCESS);
+
+        when(orderRepository.findByOrderNoForUpdate("ORD-RETRY-RESERVED")).thenReturn(Optional.of(order));
+        when(paymentTransactionRepository.findByTransactionNo("PAY-STALE"))
+                .thenReturn(Optional.empty(), Optional.empty());
+        when(paymentTransactionReservationService.reservePaymentTransaction(
+                eq("PAY-STALE"),
+                eq("ORD-RETRY-RESERVED"),
+                eq("MOCK"),
+                any(BigDecimal.class),
+                eq(PaymentTransaction.Status.SUCCESS))).thenReturn(false);
+        when(paymentTransactionReservationService.findReservation("PAY-STALE"))
+                .thenReturn(Optional.of(reservation));
+        when(inventoryLockRepository.findByOrder(order)).thenReturn(List.of());
+
+        var response = orderCenterService.handlePaymentCallback(new PaymentCallbackRequest(
+                "ORD-RETRY-RESERVED", "PAY-STALE", "MOCK", amount, "SUCCESS",
+                signature("ORD-RETRY-RESERVED", "PAY-STALE", amount, "SUCCESS")));
+
+        assertEquals("CONFIRMED", response.status());
+        assertEquals("PAID", response.paymentStatus());
+        assertTrue(order.getPaymentTransactions().stream()
+                .anyMatch(transaction -> "PAY-STALE".equals(transaction.getTransactionNo())
+                        && transaction.getStatus() == PaymentTransaction.Status.SUCCESS));
     }
 
     @Test
@@ -737,6 +910,8 @@ class OrderCenterServiceTest {
                 new com.tibet.tourism.modules.order.web.dto.RefundRequest());
 
         assertEquals(new BigDecimal("600"), response.amount());
+        assertTrue(order.getItems().stream().allMatch(itemStatus ->
+                itemStatus.getStatus() == OrderItem.Status.REFUND_PENDING));
     }
 
     @Test
@@ -771,6 +946,215 @@ class OrderCenterServiceTest {
 
         assertEquals("Refund amount exceeds paid amount", error.getMessage());
         assertEquals(1, order.getRefunds().size());
+    }
+
+    @Test
+    void adminApprovesAndCompletesFullRefund() {
+        PlatformOrder order = paidOrderWithItem();
+        RefundOrder refund = pendingRefund(order, null, BigDecimal.valueOf(600));
+        order.setStatus(PlatformOrder.Status.REFUND_PENDING);
+        order.getItems().forEach(item -> item.setStatus(OrderItem.Status.REFUND_PENDING));
+        when(orderRepository.findByIdForUpdate(99L)).thenReturn(Optional.of(order));
+
+        var approved = orderCenterService.reviewRefund(
+                adminUser(),
+                99L,
+                501L,
+                new RefundReviewRequest(RefundReviewRequest.Action.APPROVE, "Valid request", null));
+
+        assertEquals("REFUND_PENDING", approved.status());
+        assertEquals(RefundOrder.Status.APPROVED, refund.getStatus());
+        assertNull(refund.getProcessedAt());
+
+        var completed = orderCenterService.reviewRefund(
+                adminUser(),
+                99L,
+                501L,
+                new RefundReviewRequest(RefundReviewRequest.Action.COMPLETE, "Provider completed", "PROVIDER-RFD-1"));
+
+        assertEquals("REFUNDED", completed.status());
+        assertEquals("REFUNDED", completed.paymentStatus());
+        assertEquals(RefundOrder.Status.COMPLETED, refund.getStatus());
+        assertNotNull(refund.getProcessedAt());
+        assertTrue(order.getItems().stream().allMatch(item -> item.getStatus() == OrderItem.Status.REFUNDED));
+        assertTrue(order.getPaymentTransactions().stream().anyMatch(transaction ->
+                "PROVIDER-RFD-1".equals(transaction.getTransactionNo())
+                        && PaymentTransaction.Status.REFUNDED == transaction.getStatus()
+                        && BigDecimal.valueOf(600).compareTo(transaction.getAmount()) == 0));
+        assertTrue(order.getAuditLogs().stream().anyMatch(auditLog ->
+                "REFUND_COMPLETED".equals(auditLog.getAction())));
+    }
+
+    @Test
+    void adminRejectsRequestedRefundAndRestoresOrderState() {
+        PlatformOrder order = paidOrderWithItem();
+        RefundOrder refund = pendingRefund(order, order.getItems().get(0), BigDecimal.valueOf(600));
+        order.setStatus(PlatformOrder.Status.REFUND_PENDING);
+        order.setCancelledAt(java.time.LocalDateTime.now());
+        order.getItems().get(0).setStatus(OrderItem.Status.REFUND_PENDING);
+        when(orderRepository.findByIdForUpdate(99L)).thenReturn(Optional.of(order));
+
+        var response = orderCenterService.reviewRefund(
+                adminUser(),
+                99L,
+                501L,
+                new RefundReviewRequest(RefundReviewRequest.Action.REJECT, "Not eligible", null));
+
+        assertEquals("CONFIRMED", response.status());
+        assertEquals("PAID", response.paymentStatus());
+        assertEquals(RefundOrder.Status.REJECTED, refund.getStatus());
+        assertNotNull(refund.getProcessedAt());
+        assertNull(order.getCancelledAt());
+        assertEquals(OrderItem.Status.CONFIRMED, order.getItems().get(0).getStatus());
+        assertTrue(order.getAuditLogs().stream().anyMatch(auditLog ->
+                "REFUND_REJECTED".equals(auditLog.getAction())));
+    }
+
+    @Test
+    void adminCannotCompleteRefundBeforeApproval() {
+        PlatformOrder order = paidOrderWithItem();
+        pendingRefund(order, null, BigDecimal.valueOf(600));
+        order.setStatus(PlatformOrder.Status.REFUND_PENDING);
+        when(orderRepository.findByIdForUpdate(99L)).thenReturn(Optional.of(order));
+
+        IllegalStateException error = assertThrows(
+                IllegalStateException.class,
+                () -> orderCenterService.reviewRefund(
+                        adminUser(),
+                        99L,
+                        501L,
+                        new RefundReviewRequest(RefundReviewRequest.Action.COMPLETE, "too soon", null)));
+
+        assertEquals("Only approved refunds can be completed", error.getMessage());
+        assertTrue(order.getPaymentTransactions().stream()
+                .noneMatch(transaction -> transaction.getStatus() == PaymentTransaction.Status.REFUNDED));
+    }
+
+    @Test
+    void adminCannotCompleteRefundWithDuplicateProviderTransactionNo() {
+        PlatformOrder order = paidOrderWithItem();
+        RefundOrder refund = pendingRefund(order, null, BigDecimal.valueOf(600));
+        refund.setStatus(RefundOrder.Status.APPROVED);
+        order.setStatus(PlatformOrder.Status.REFUND_PENDING);
+        PaymentTransaction existing = new PaymentTransaction();
+        existing.setTransactionNo("PROVIDER-RFD-1");
+        when(orderRepository.findByIdForUpdate(99L)).thenReturn(Optional.of(order));
+        when(paymentTransactionRepository.findByTransactionNo("PROVIDER-RFD-1"))
+                .thenReturn(Optional.of(existing));
+
+        IllegalArgumentException error = assertThrows(
+                IllegalArgumentException.class,
+                () -> orderCenterService.reviewRefund(
+                        adminUser(),
+                        99L,
+                        501L,
+                        new RefundReviewRequest(RefundReviewRequest.Action.COMPLETE, "duplicate", "PROVIDER-RFD-1")));
+
+        assertEquals("Refund transaction number already exists", error.getMessage());
+        assertEquals(RefundOrder.Status.APPROVED, refund.getStatus());
+        assertNull(refund.getProcessedAt());
+        assertTrue(order.getPaymentTransactions().stream()
+                .noneMatch(transaction -> "PROVIDER-RFD-1".equals(transaction.getTransactionNo())));
+    }
+
+    @Test
+    void adminCannotCompleteRefundWhenProviderTransactionReservationIsClaimedConcurrently() {
+        PlatformOrder order = paidOrderWithItem();
+        RefundOrder refund = pendingRefund(order, null, BigDecimal.valueOf(600));
+        refund.setStatus(RefundOrder.Status.APPROVED);
+        order.setStatus(PlatformOrder.Status.REFUND_PENDING);
+        when(orderRepository.findByIdForUpdate(99L)).thenReturn(Optional.of(order));
+        when(paymentTransactionRepository.findByTransactionNo("PROVIDER-RFD-RACE"))
+                .thenReturn(Optional.empty());
+        when(paymentTransactionReservationService.reserveRefundTransaction(
+                eq("PROVIDER-RFD-RACE"),
+                eq("ORD-REFUND"),
+                eq("RFD-501"),
+                any(BigDecimal.class))).thenReturn(false);
+
+        IllegalArgumentException error = assertThrows(
+                IllegalArgumentException.class,
+                () -> orderCenterService.reviewRefund(
+                        adminUser(),
+                        99L,
+                        501L,
+                        new RefundReviewRequest(RefundReviewRequest.Action.COMPLETE, "provider race", "PROVIDER-RFD-RACE")));
+
+        assertEquals("Refund transaction number already exists", error.getMessage());
+        assertEquals(RefundOrder.Status.APPROVED, refund.getStatus());
+        assertNull(refund.getProcessedAt());
+        assertTrue(order.getPaymentTransactions().stream()
+                .noneMatch(transaction -> "PROVIDER-RFD-RACE".equals(transaction.getTransactionNo())));
+    }
+
+    @Test
+    void adminCompletesRefundWhenSameRefundReservationWasLeftByPriorAttempt() {
+        PlatformOrder order = paidOrderWithItem();
+        RefundOrder refund = pendingRefund(order, null, BigDecimal.valueOf(600));
+        refund.setStatus(RefundOrder.Status.APPROVED);
+        order.setStatus(PlatformOrder.Status.REFUND_PENDING);
+        PaymentTransactionReservation reservation = new PaymentTransactionReservation();
+        reservation.setTransactionNo("PROVIDER-RFD-STALE");
+        reservation.setOrderNo("ORD-REFUND");
+        reservation.setReferenceNo("RFD-501");
+        reservation.setUsageType(PaymentTransactionReservation.UsageType.REFUND);
+        reservation.setProvider("MANUAL_REFUND");
+        reservation.setAmount(BigDecimal.valueOf(600));
+        reservation.setStatus(PaymentTransaction.Status.REFUNDED);
+
+        when(orderRepository.findByIdForUpdate(99L)).thenReturn(Optional.of(order));
+        when(paymentTransactionRepository.findByTransactionNo("PROVIDER-RFD-STALE"))
+                .thenReturn(Optional.empty());
+        when(paymentTransactionReservationService.reserveRefundTransaction(
+                eq("PROVIDER-RFD-STALE"),
+                eq("ORD-REFUND"),
+                eq("RFD-501"),
+                any(BigDecimal.class))).thenReturn(false);
+        when(paymentTransactionReservationService.findReservation("PROVIDER-RFD-STALE"))
+                .thenReturn(Optional.of(reservation));
+
+        var response = orderCenterService.reviewRefund(
+                adminUser(),
+                99L,
+                501L,
+                new RefundReviewRequest(RefundReviewRequest.Action.COMPLETE, "provider retry", "PROVIDER-RFD-STALE"));
+
+        assertEquals("REFUNDED", response.status());
+        assertEquals(RefundOrder.Status.COMPLETED, refund.getStatus());
+        assertTrue(order.getPaymentTransactions().stream()
+                .anyMatch(transaction -> "PROVIDER-RFD-STALE".equals(transaction.getTransactionNo())
+                        && transaction.getStatus() == PaymentTransaction.Status.REFUNDED));
+    }
+
+    @Test
+    void adminCompletesCancellationRefundAsClosedPartialRefundAndReleasesEntitlements() {
+        PlatformOrder order = paidOrderWithItem();
+        OrderItem item = order.getItems().get(0);
+        RefundOrder refund = pendingRefund(order, null, BigDecimal.valueOf(300));
+        refund.setStatus(RefundOrder.Status.APPROVED);
+        order.setStatus(PlatformOrder.Status.REFUND_PENDING);
+        order.setCancelledAt(java.time.LocalDateTime.now());
+        item.setStatus(OrderItem.Status.REFUND_PENDING);
+        Voucher voucher = issuedVoucher(order, item);
+        InventoryLock lock = inventoryLock(order, item);
+        when(orderRepository.findByIdForUpdate(99L)).thenReturn(Optional.of(order));
+        when(paymentTransactionRepository.findByTransactionNo("PROVIDER-RFD-2")).thenReturn(Optional.empty());
+        when(inventoryLockRepository.findByOrder(order)).thenReturn(List.of(lock));
+
+        var response = orderCenterService.reviewRefund(
+                adminUser(),
+                99L,
+                501L,
+                new RefundReviewRequest(RefundReviewRequest.Action.COMPLETE, "Provider completed", "PROVIDER-RFD-2"));
+
+        assertEquals("CANCELLED", response.status());
+        assertEquals("PARTIALLY_REFUNDED", response.paymentStatus());
+        assertNotNull(order.getCancelledAt());
+        assertEquals(OrderItem.Status.REFUNDED, item.getStatus());
+        assertEquals(Voucher.Status.CANCELLED, voucher.getStatus());
+        assertEquals(InventoryLock.Status.RELEASED, lock.getStatus());
+        assertNull(lock.getActiveLockKey());
+        verify(inventoryLockRepository).save(lock);
     }
 
     private PlatformOrder payableOrder(String orderNo, PlatformOrder.Status status) {
@@ -816,6 +1200,43 @@ class OrderCenterServiceTest {
         transaction.setPaidAt(java.time.LocalDateTime.now());
         order.addPaymentTransaction(transaction);
         return transaction;
+    }
+
+    private RefundOrder pendingRefund(PlatformOrder order, OrderItem item, BigDecimal amount) {
+        RefundOrder refund = new RefundOrder();
+        refund.setId(501L);
+        refund.setRefundNo("RFD-501");
+        refund.setOrderItem(item);
+        refund.setAmount(amount);
+        refund.setStatus(RefundOrder.Status.REQUESTED);
+        order.addRefund(refund);
+        return refund;
+    }
+
+    private Voucher issuedVoucher(PlatformOrder order, OrderItem item) {
+        Voucher voucher = new Voucher();
+        voucher.setVoucherCode("VCH-1");
+        voucher.setOrderItem(item);
+        voucher.setStatus(Voucher.Status.ISSUED);
+        order.addVoucher(voucher);
+        return voucher;
+    }
+
+    private InventoryLock inventoryLock(PlatformOrder order, OrderItem item) {
+        InventoryLock lock = new InventoryLock();
+        lock.setOrder(order);
+        lock.setOrderItem(item);
+        lock.setStatus(InventoryLock.Status.CONFIRMED);
+        lock.setActiveLockKey("SCENIC_SPOT:10:2026-06-01");
+        return lock;
+    }
+
+    private User adminUser() {
+        User admin = new User();
+        admin.setId(9L);
+        admin.setUsername("admin");
+        admin.setRole(User.Role.ADMIN);
+        return admin;
     }
 
     private CancellationPolicy policy(int freeCancelBeforeHours, BigDecimal refundRate) {

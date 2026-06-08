@@ -64,3 +64,12 @@ groups:
         annotations:
           summary: High backend JVM heap usage
           description: Backend JVM heap usage is above 85 percent for 10 minutes.
+
+      - alert: PiiDecryptFailures
+        expr: sum(increase(pii_decrypt_failure_total{job="colorful-tibet-backend"}[5m])) > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: PII decrypt failures detected
+          description: PII decrypt failures occurred in the backend. Inspect logs for security_event=pii_decrypt_failure with version and reason labels.

@@ -65,6 +65,7 @@
                   v-model="form.checkInDate"
                   type="date"
                   autocomplete="off"
+                  :min="minCheckInDate"
                   class="w-full px-4 py-3 rounded-2xl border border-tibet-gold/25 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all"
                   :aria-describedby="dateHelpId"
                   :aria-invalid="dateInvalid"
@@ -78,6 +79,7 @@
                   v-model="form.checkOutDate"
                   type="date"
                   autocomplete="off"
+                  :min="minCheckOutDate"
                   class="w-full px-4 py-3 rounded-2xl border border-tibet-gold/25 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all"
                   :aria-describedby="dateHelpId"
                   :aria-invalid="dateInvalid"
@@ -86,7 +88,7 @@
               </div>
             </div>
             <p :id="dateHelpId" class="mt-3 text-xs leading-relaxed text-gray-500">
-              离店日期需要晚于入住日期，系统仅提交咨询意向，不在站内收款。
+              离店日期需要晚于入住日期，最长可提交 30 晚咨询；系统仅提交咨询意向，不在站内收款。
             </p>
             <div class="mt-4">
               <label for="hotel-booking-guests" class="block text-sm font-medium text-gray-700 mb-2">{{ t('hotel.guests') }}</label>
@@ -94,10 +96,14 @@
                 id="hotel-booking-guests"
                 v-model="form.guests"
                 class="w-full px-4 py-3 rounded-2xl border border-tibet-gold/25 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all"
-                :aria-describedby="dateHelpId"
+                :aria-describedby="guestHelpId"
+                :aria-invalid="guestsInvalid"
               >
-                <option v-for="n in 6" :key="n" :value="n">{{ n }}{{ t('hotel.guests') }}</option>
+                <option v-for="n in guestOptions" :key="n" :value="n">{{ n }}{{ t('hotel.guests') }}</option>
               </select>
+              <p :id="guestHelpId" class="mt-2 text-xs leading-relaxed text-gray-500">
+                当前房型建议 {{ selectedRoomCapacity }} 人内入住，超出人数请备注说明或更换房型。
+              </p>
             </div>
           </motion.div>
 
@@ -176,7 +182,7 @@
 
           <motion.button
             type="submit"
-            :disabled="submitting"
+            :disabled="submitting || bookingUnavailable"
             :aria-busy="submitting"
             :aria-describedby="bookingFormDescribedBy"
             class="hidden min-h-12 w-full py-4 rounded-full bg-tibet-red text-tibet-yellow font-bold text-lg hover:bg-tibet-red/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed md:block"
@@ -236,18 +242,25 @@
               <motion.div
                 v-if="selectedRoom"
                 key="booking-room-summary"
+                id="hotel-booking-summary"
+                role="status"
+                aria-live="polite"
                 class="mt-4 pt-4 border-t border-tibet-gold/20 space-y-2 text-sm"
                 :initial="{ opacity: 0, y: 12 }"
                 :animate="{ opacity: 1, y: 0 }"
                 :exit="{ opacity: 0, y: 8 }"
                 :transition="{ duration: 0.28, ease: motionEase }"
               >
-              <div class="flex justify-between"><span class="text-gray-500">{{ t('hotel.roomType') }}</span><span class="font-medium">{{ selectedRoom.name }}</span></div>
-              <div class="flex justify-between"><span class="text-gray-500">{{ t('hotel.perNight') }}</span><span class="font-medium">¥{{ selectedRoom.price }}</span></div>
-              <div class="flex justify-between"><span class="text-gray-500">{{ t('hotel.nights') }}</span><span class="font-medium">{{ nights }}{{ t('common.nightsUnit') }}</span></div>
-              <div class="flex justify-between"><span class="text-gray-500">{{ t('hotel.checkIn') }}</span><span class="font-medium">{{ form.checkInDate || '-' }}</span></div>
-              <div class="flex justify-between"><span class="text-gray-500">{{ t('hotel.checkOut') }}</span><span class="font-medium">{{ form.checkOutDate || '-' }}</span></div>
-              <div class="flex justify-between border-t border-tibet-gold/20 pt-2 mt-2">
+              <div class="flex justify-between gap-4"><span class="text-gray-500">{{ t('hotel.roomType') }}</span><span class="text-right font-medium">{{ selectedRoom.name }}</span></div>
+              <div class="flex justify-between gap-4"><span class="text-gray-500">{{ t('hotel.perNight') }}</span><span class="font-medium">¥{{ selectedRoom.price }}</span></div>
+              <div class="flex justify-between gap-4"><span class="text-gray-500">{{ t('hotel.nights') }}</span><span class="font-medium">{{ nights }}{{ t('common.nightsUnit') }}</span></div>
+              <div class="flex justify-between gap-4"><span class="text-gray-500">{{ t('hotel.checkIn') }}</span><span class="font-medium">{{ form.checkInDate || '-' }}</span></div>
+              <div class="flex justify-between gap-4"><span class="text-gray-500">{{ t('hotel.checkOut') }}</span><span class="font-medium">{{ form.checkOutDate || '-' }}</span></div>
+              <div class="flex justify-between gap-4"><span class="text-gray-500">房费小计</span><span class="font-medium">¥{{ roomSubtotal }}</span></div>
+              <div class="flex justify-between gap-4"><span class="text-gray-500">平台服务费</span><span class="font-medium">¥0</span></div>
+              <div class="flex justify-between gap-4"><span class="text-gray-500">今日应付</span><span class="font-medium text-emerald-700">¥0</span></div>
+              <div class="flex justify-between gap-4"><span class="text-gray-500">房态</span><span class="font-medium text-amber-700">{{ bookingAvailabilityLabel }}</span></div>
+              <div class="flex justify-between border-t border-tibet-gold/20 pt-2 mt-2 gap-4">
                 <span class="font-semibold">{{ t('hotel.referenceRoomFee') }}</span>
                 <motion.span
                   :key="totalPrice"
@@ -259,9 +272,23 @@
                   ¥{{ totalPrice }}
                 </motion.span>
               </div>
-              <p class="rounded-xl bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800">
-                {{ t('hotel.noPlatformPaymentHint') }}
-              </p>
+              <div class="space-y-2 pt-1">
+                <p v-for="item in bookingAssuranceItems" :key="item.title" class="rounded-xl px-3 py-2 text-xs leading-5" :class="item.className">
+                  <span class="font-semibold">{{ item.title }}</span> {{ item.description }}
+                </p>
+              </div>
+              </motion.div>
+              <motion.div
+                v-else
+                key="booking-room-unavailable"
+                class="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-relaxed text-amber-800"
+                role="alert"
+                :initial="{ opacity: 0, y: 12 }"
+                :animate="{ opacity: 1, y: 0 }"
+                :exit="{ opacity: 0, y: 8 }"
+                :transition="{ duration: 0.28, ease: motionEase }"
+              >
+                当前房型暂不可咨询，请返回酒店详情重新选择。
               </motion.div>
             </AnimatePresence>
           </motion.div>
@@ -276,7 +303,7 @@
     :title="`¥${totalPrice}`"
     :meta="selectedRoom?.name || hotel?.name"
     :primary-label="submitting ? t('common.submitting') : t('hotel.submitInquiry')"
-    :primary-disabled="submitting"
+    :primary-disabled="submitting || bookingUnavailable"
     @primary="submitBooking"
   />
 </template>
@@ -388,65 +415,193 @@ const form = ref({
   note: '',
 })
 
-const tonight = new Date()
-tonight.setDate(tonight.getDate() + 1)
-const tomorrow = new Date(tonight)
-tomorrow.setDate(tomorrow.getDate() + 1)
+const MAX_BOOKING_NIGHTS = 30
+const DEFAULT_ROOM_CAPACITY = 2
 
-const formatDate = (d: Date) => d.toISOString().split('T')[0]
+const padDatePart = (value: number) => String(value).padStart(2, '0')
+const formatDate = (d: Date) =>
+  `${d.getFullYear()}-${padDatePart(d.getMonth() + 1)}-${padDatePart(d.getDate())}`
 
-form.value.checkInDate = formatDate(tonight)
-form.value.checkOutDate = formatDate(tomorrow)
+const parseDateValue = (value: string) => {
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!match) return null
+  const [, year, month, day] = match
+  const parsed = new Date(Number(year), Number(month) - 1, Number(day))
+  return Number.isNaN(parsed.getTime()) ? null : parsed
+}
+
+const addDays = (date: Date, days: number) => {
+  const next = new Date(date)
+  next.setDate(next.getDate() + days)
+  return next
+}
+
+const today = new Date()
+const defaultCheckInDate = addDays(today, 1)
+const defaultCheckOutDate = addDays(defaultCheckInDate, 1)
+const minCheckInDate = formatDate(today)
+
+form.value.checkInDate = formatDate(defaultCheckInDate)
+form.value.checkOutDate = formatDate(defaultCheckOutDate)
+
+const minCheckOutDate = computed(() => {
+  const checkIn = parseDateValue(form.value.checkInDate)
+  return formatDate(addDays(checkIn || today, 1))
+})
 
 const nights = computed(() => {
   if (!form.value.checkInDate || !form.value.checkOutDate) return 0
-  const diff = new Date(form.value.checkOutDate).getTime() - new Date(form.value.checkInDate).getTime()
+  const checkIn = parseDateValue(form.value.checkInDate)
+  const checkOut = parseDateValue(form.value.checkOutDate)
+  if (!checkIn || !checkOut) return 0
+  const diff = checkOut.getTime() - checkIn.getTime()
   return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)))
 })
 
 const totalPrice = computed(() => {
-  const roomTotal = (selectedRoom.value?.price || 0) * nights.value
+  const roomTotal = (Number(selectedRoom.value?.price) || 0) * nights.value
   return roomTotal
 })
+const roomSubtotal = computed(() => totalPrice.value)
+const bookingAvailabilityLabel = computed(() => hotel.value?.available === false ? '暂满' : '需二次确认')
+
+const parseRoomCapacity = (room: any) => {
+  const explicitCapacity = Number(room?.capacity || room?.maxGuests)
+  if (Number.isFinite(explicitCapacity) && explicitCapacity > 0) return explicitCapacity
+
+  const text = [room?.desc, room?.amenities].filter(Boolean).join(' ')
+  const match = text.match(/(?:可住|适合)\s*(\d+)\s*人|(\d+)\s*人/)
+  const parsed = Number(match?.[1] || match?.[2])
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_ROOM_CAPACITY
+}
+
+const selectedRoomCapacity = computed(() =>
+  Math.min(6, Math.max(1, Math.round(parseRoomCapacity(selectedRoom.value))))
+)
+const guestOptions = computed(() =>
+  Array.from({ length: selectedRoomCapacity.value }, (_, index) => index + 1)
+)
+const bookingUnavailable = computed(() =>
+  !hotel.value || !selectedRoom.value || hotel.value.available === false
+)
+const bookingAssuranceItems = computed(() => [
+  {
+    title: '房态说明',
+    description: '提交后生成咨询单，客服或供应商确认房态后再推进预订。',
+    className: 'bg-blue-50 text-blue-800'
+  },
+  {
+    title: '费用说明',
+    description: '今日无需支付，参考房费按所选晚数估算，实际价格以供应商确认为准。',
+    className: 'bg-emerald-50 text-emerald-800'
+  },
+  {
+    title: '退改说明',
+    description: '确认前可在订单中心取消咨询；确认后的退改政策以酒店或第三方平台为准。',
+    className: 'bg-amber-50 text-amber-800'
+  },
+  {
+    title: '平台提示',
+    description: t('hotel.noPlatformPaymentHint'),
+    className: 'bg-gray-50 text-gray-700'
+  }
+])
 
 const submitting = ref(false)
 const submitError = ref('')
 const submitAttempted = ref(false)
 const bookingErrorId = 'hotel-booking-error-message'
 const dateHelpId = 'hotel-booking-date-help'
+const guestHelpId = 'hotel-booking-guest-help'
 const contactHelpId = 'hotel-booking-contact-help'
+const bookingSummaryId = 'hotel-booking-summary'
 const bookingValidationMessages = {
+  roomUnavailable: '当前房型暂不可咨询，请返回酒店详情重新选择',
   dateRequired: '请选择入住和离店日期',
+  checkInPast: '入住日期不能早于今天',
   dateRangeInvalid: '离店日期需要晚于入住日期',
+  nightsTooLong: '单次酒店咨询最多支持 30 晚',
+  guestsTooHigh: '入住人数超过当前房型建议容量，请调整人数或在备注中说明',
   guestNameRequired: '请填写预订人姓名',
-  phoneRequired: '请填写联系电话',
+  phoneRequired: '请填写可联系到的电话号码',
   securityVerificationFailed: '安全校验未通过，请稍后重试'
 }
-const dateInvalid = computed(() => submitAttempted.value && (!form.value.checkInDate || !form.value.checkOutDate || nights.value <= 0))
+const phoneDigits = computed(() => form.value.phone.replace(/\D/g, ''))
+const checkInBeforeToday = computed(() =>
+  Boolean(form.value.checkInDate && form.value.checkInDate < minCheckInDate)
+)
+const dateInvalid = computed(() =>
+  submitAttempted.value && (
+    !form.value.checkInDate ||
+    !form.value.checkOutDate ||
+    checkInBeforeToday.value ||
+    nights.value <= 0 ||
+    nights.value > MAX_BOOKING_NIGHTS
+  )
+)
+const guestsInvalid = computed(() => submitAttempted.value && Number(form.value.guests) > selectedRoomCapacity.value)
 const guestNameInvalid = computed(() => submitAttempted.value && !form.value.guestName.trim())
-const phoneInvalid = computed(() => submitAttempted.value && !form.value.phone.trim())
+const phoneInvalid = computed(() => submitAttempted.value && phoneDigits.value.length < 6)
 const bookingFormDescribedBy = computed(() =>
-  [dateHelpId, contactHelpId, submitError.value ? bookingErrorId : ''].filter(Boolean).join(' ')
+  [
+    dateHelpId,
+    guestHelpId,
+    contactHelpId,
+    selectedRoom.value ? bookingSummaryId : '',
+    submitError.value ? bookingErrorId : ''
+  ].filter(Boolean).join(' ')
 )
 
 const clearHotelOrderCache = clearHotelOrderClientStorage
 
+watch(selectedRoomCapacity, capacity => {
+  if (Number(form.value.guests) > capacity) {
+    form.value.guests = capacity
+  }
+})
+
+watch(
+  () => form.value.checkInDate,
+  () => {
+    if (!form.value.checkOutDate || form.value.checkOutDate <= form.value.checkInDate) {
+      form.value.checkOutDate = minCheckOutDate.value
+    }
+  }
+)
+
 const submitBooking = async () => {
+  if (submitting.value) return
   submitAttempted.value = true
   submitError.value = ''
+  if (bookingUnavailable.value) {
+    submitError.value = bookingValidationMessages.roomUnavailable
+    return
+  }
   if (!form.value.checkInDate || !form.value.checkOutDate) {
     submitError.value = bookingValidationMessages.dateRequired
+    return
+  }
+  if (checkInBeforeToday.value) {
+    submitError.value = bookingValidationMessages.checkInPast
     return
   }
   if (nights.value <= 0) {
     submitError.value = bookingValidationMessages.dateRangeInvalid
     return
   }
+  if (nights.value > MAX_BOOKING_NIGHTS) {
+    submitError.value = bookingValidationMessages.nightsTooLong
+    return
+  }
+  if (Number(form.value.guests) > selectedRoomCapacity.value) {
+    submitError.value = bookingValidationMessages.guestsTooHigh
+    return
+  }
   if (!form.value.guestName.trim()) {
     submitError.value = bookingValidationMessages.guestNameRequired
     return
   }
-  if (!form.value.phone.trim()) {
+  if (phoneDigits.value.length < 6) {
     submitError.value = bookingValidationMessages.phoneRequired
     return
   }

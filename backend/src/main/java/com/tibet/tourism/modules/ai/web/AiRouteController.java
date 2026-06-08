@@ -9,12 +9,18 @@ import com.tibet.tourism.modules.ai.application.AiRouteRecordService;
 import com.tibet.tourism.modules.ai.application.AiRouteService;
 import com.tibet.tourism.modules.ai.web.dto.AiRouteGenerateRequest;
 import com.tibet.tourism.modules.ai.web.dto.AiRouteGenerateResponse;
+import com.tibet.tourism.modules.ai.web.dto.AiRouteRecordSummaryResponse;
 import com.tibet.tourism.modules.user.domain.User;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -113,9 +119,18 @@ public class AiRouteController {
     }
 
     @GetMapping("/ai/saved")
-    public ResponseEntity<?> getSavedAiRoutes(HttpServletRequest httpServletRequest) {
+    public ResponseEntity<List<AiRouteRecordSummaryResponse>> getSavedAiRoutes(
+            HttpServletRequest httpServletRequest,
+            @PageableDefault(size = 20, sort = "updatedAt", direction = Sort.Direction.DESC) Pageable pageable) {
         User currentUser = jwtAuthSupport.resolveCurrentUser(httpServletRequest);
-        return ResponseEntity.ok(aiRouteRecordService.savedFor(currentUser));
+        return pagedContent(aiRouteRecordService.savedFor(currentUser, pageable));
+    }
+
+    @GetMapping("/ai/saved/{id}")
+    public ResponseEntity<?> getSavedAiRoute(@PathVariable Long id,
+                                             HttpServletRequest httpServletRequest) {
+        User currentUser = jwtAuthSupport.resolveCurrentUser(httpServletRequest);
+        return ResponseEntity.ok(aiRouteRecordService.savedDetailFor(id, currentUser));
     }
 
     @PostMapping("/ai/{id}/save")
@@ -222,5 +237,14 @@ public class AiRouteController {
 
     private String exceptionSummary(Exception exception) {
         return exception == null ? "unknown" : exception.getClass().getSimpleName();
+    }
+
+    private <T> ResponseEntity<List<T>> pagedContent(Page<T> page) {
+        return ResponseEntity.ok()
+                .header("X-Page", String.valueOf(page.getNumber()))
+                .header("X-Size", String.valueOf(page.getSize()))
+                .header("X-Total-Elements", String.valueOf(page.getTotalElements()))
+                .header("X-Total-Pages", String.valueOf(page.getTotalPages()))
+                .body(page.getContent());
     }
 }

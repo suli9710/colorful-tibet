@@ -3,6 +3,7 @@ package com.tibet.tourism.modules.community.web;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -17,6 +18,7 @@ import com.tibet.tourism.modules.user.infra.UserRepository;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,6 +28,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -94,6 +97,29 @@ class FavoriteControllerPrivacyTest {
         assertThat(json).doesNotContain("\"sessionVersion\"");
         assertThat(json).doesNotContain("\"password\"");
         assertThat(json).doesNotContain("fingerprint-secret");
+    }
+
+    @Test
+    void addFavoriteTreatsConcurrentDuplicateAsIdempotentSuccess() {
+        User user = user("traveler@example.com");
+        TravelRoute route = route();
+
+        authenticate("traveler@example.com");
+        when(userRepository.findByUsername("traveler@example.com")).thenReturn(Optional.of(user));
+        when(travelRouteRepository.findById(123L)).thenReturn(Optional.of(route));
+        when(favoriteRepository.existsByUserAndRoute(user, route)).thenReturn(false);
+        doThrow(new DataIntegrityViolationException("duplicate favorite"))
+                .when(favoriteRepository)
+                .saveAndFlush(any(Favorite.class));
+        when(favoriteRepository.countByRoute(route)).thenReturn(1L);
+
+        ResponseEntity<?> response = controller.addFavorite(123L);
+
+        assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
+        assertThat(response.getBody()).isInstanceOf(Map.class);
+        Map<?, ?> body = (Map<?, ?>) response.getBody();
+        assertThat(body.get("favorited")).isEqualTo(true);
+        assertThat(body.get("favoriteCount")).isEqualTo(1L);
     }
 
     private void authenticate(String username) {

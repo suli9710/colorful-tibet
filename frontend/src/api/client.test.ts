@@ -75,4 +75,42 @@ describe('API client unauthorized handling', () => {
     expect(mocks.clearTokenCache).not.toHaveBeenCalled()
     expect(dispatchEvent).not.toHaveBeenCalled()
   })
+
+  it('expires the auth session for protected booking cancellation 401 responses', async () => {
+    window.history.pushState({}, '', '/profile')
+    const dispatchEvent = vi.spyOn(window, 'dispatchEvent')
+    const { handleUnauthorizedResponse } = await import('./client')
+
+    handleUnauthorizedResponse({
+      config: {
+        method: 'post',
+        url: '/bookings/42/cancel'
+      }
+    })
+
+    expect(mocks.clearStoredAuth).toHaveBeenCalledOnce()
+    expect(mocks.clearTokenCache).toHaveBeenCalledOnce()
+    expect(dispatchEvent).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'auth-expired'
+    }))
+  })
+
+  it('expires the auth session for protected route share 401 responses', async () => {
+    window.history.pushState({}, '', '/routes')
+    const dispatchEvent = vi.spyOn(window, 'dispatchEvent')
+    const { handleUnauthorizedResponse } = await import('./client')
+
+    handleUnauthorizedResponse({
+      config: {
+        method: 'post',
+        url: '/routes/share'
+      }
+    })
+
+    expect(mocks.clearStoredAuth).toHaveBeenCalledOnce()
+    expect(mocks.clearTokenCache).toHaveBeenCalledOnce()
+    expect(dispatchEvent).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'auth-expired'
+    }))
+  })
 })

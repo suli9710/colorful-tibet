@@ -146,7 +146,7 @@ public class RecommendationService {
             }
         }
 
-        List<UserVisitHistory> currentUserHistory = historyRepository.findByUserId(userId);
+        List<UserVisitHistory> currentUserHistory = historyRepository.findRecentByUserId(userId);
         ctx.currentUserHistory = currentUserHistory;
         ctx.hasHistory = !currentUserHistory.isEmpty();
 

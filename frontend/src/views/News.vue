@@ -355,7 +355,7 @@ const filteredNews = computed(() => {
 })
 
 const resultSummaryText = computed(() => {
-  const base = t('news.resultSummary', '{count} 条资讯 · {category}', {
+  const base = t('news.resultSummary', {
     count: filteredNews.value.length,
     category: selectedCategoryLabel.value
   })

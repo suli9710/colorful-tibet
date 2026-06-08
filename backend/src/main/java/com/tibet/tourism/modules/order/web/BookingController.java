@@ -17,6 +17,10 @@ import java.math.BigDecimal;
 import java.time.MonthDay;
 import java.util.List;
 import java.util.Map;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -124,16 +128,14 @@ public class BookingController {
     }
 
     @GetMapping("/my")
-    public ResponseEntity<?> getMyBookings() {
+    public ResponseEntity<?> getMyBookings(
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         User user = getCurrentUser();
         if (user == null) {
             return ResponseEntity.status(401).body(ERROR_NOT_AUTHENTICATED);
         }
 
-        List<BookingResponse> bookings = bookingRepository.findByUserId(user.getId()).stream()
-                .map(BookingResponse::fromEntity)
-                .toList();
-        return ResponseEntity.ok(bookings);
+        return pagedContent(orderCenterService.getLegacySpotBookings(user, pageable));
     }
 
     @PostMapping("/{id}/cancel")
@@ -192,6 +194,15 @@ public class BookingController {
         return booking.getUser() != null
                 && user.getId() != null
                 && user.getId().equals(booking.getUser().getId());
+    }
+
+    private <T> ResponseEntity<List<T>> pagedContent(Page<T> page) {
+        return ResponseEntity.ok()
+                .header("X-Page", String.valueOf(page.getNumber()))
+                .header("X-Size", String.valueOf(page.getSize()))
+                .header("X-Total-Elements", String.valueOf(page.getTotalElements()))
+                .header("X-Total-Pages", String.valueOf(page.getTotalPages()))
+                .body(page.getContent());
     }
 
     private User getCurrentUser() {

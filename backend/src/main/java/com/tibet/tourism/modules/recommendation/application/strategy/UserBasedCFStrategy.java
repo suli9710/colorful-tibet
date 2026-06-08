@@ -31,7 +31,7 @@ public class UserBasedCFStrategy implements ScoringStrategy {
     @Override
     public Map<Long, Double> score(Long userId, List<UserVisitHistory> visitHistory, Set<Long> visitedSpotIds) {
         List<Long> visitedSpotList = new ArrayList<>(visitedSpotIds);
-        Map<Long, List<UserVisitHistory>> overlapHistoryByUser = historyRepository.findBySpotIdIn(visitedSpotList)
+        Map<Long, List<UserVisitHistory>> overlapHistoryByUser = historyRepository.findRecentBySpotIdIn(visitedSpotList)
                 .stream()
                 .filter(history -> !history.getUser().getId().equals(userId))
                 .collect(Collectors.groupingBy(history -> history.getUser().getId()));
@@ -64,7 +64,7 @@ public class UserBasedCFStrategy implements ScoringStrategy {
                 .map(Map.Entry::getKey)
                 .collect(Collectors.toList());
 
-        Map<Long, List<UserVisitHistory>> similarUserHistories = historyRepository.findByUserIdIn(similarUserIds)
+        Map<Long, List<UserVisitHistory>> similarUserHistories = historyRepository.findRecentByUserIdIn(similarUserIds)
                 .stream()
                 .collect(Collectors.groupingBy(history -> history.getUser().getId()));
 

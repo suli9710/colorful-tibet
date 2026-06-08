@@ -145,13 +145,14 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { motion, useReducedMotion } from 'motion-v'
 import api, { clearTokenCache, endpoints } from '../api'
 import { useAuthStore } from '../stores/auth'
 import { safeClientErrorMessage, summarizeClientError } from '../utils/errorMonitoring'
 import { getRecaptchaToken, isRecaptchaError, isRecaptchaV3Enabled } from '../utils/recaptcha'
+import { resolvePostLoginRedirect } from '../router/authRedirect'
 import {
   authCardAnimate,
   authCardInitial,
@@ -169,6 +170,7 @@ import {
 
 const { t } = useI18n()
 
+const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 const prefersReducedMotion = useReducedMotion()
@@ -266,7 +268,7 @@ const handleLogin = async () => {
       return
     }
 
-    router.push(user.role === 'ADMIN' ? '/admin' : '/')
+    router.push(resolvePostLoginRedirect(route.query.redirect, user.role))
   } catch (error: any) {
     if (isRecaptchaError(error)) {
       errorMessage.value = t('security.recaptchaFailed')

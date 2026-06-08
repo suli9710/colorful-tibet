@@ -14,12 +14,18 @@ import com.tibet.tourism.common.error.ResourceNotFoundException;
 import com.tibet.tourism.modules.ai.domain.AiRouteRecord;
 import com.tibet.tourism.modules.ai.infra.AiRouteRecordRepository;
 import com.tibet.tourism.modules.ai.web.dto.AiRouteRecordResponse;
+import com.tibet.tourism.modules.ai.web.dto.AiRouteRecordSummaryResponse;
 import com.tibet.tourism.modules.user.domain.User;
 import com.tibet.tourism.modules.user.infra.UserRepository;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -61,13 +67,13 @@ class AiRouteRecordServiceTest {
         assertEquals(55L, record.getId());
         assertEquals(user, record.getUser());
         assertEquals(AiRouteRecord.Status.COMPLETED, record.getStatus());
-        assertNull(record.getJobId());
+        assertEquals("job-1", record.getJobId());
         assertEquals("Lhasa route", record.getTitle());
         verify(routeRecordRepository).findFirstByUserIdAndJobIdOrderByUpdatedAtDesc(7L, "job-1");
     }
 
     @Test
-    void failedRouteClearsStoredJobIdAfterUsingJobLookup() {
+    void failedRouteRetainsStoredJobIdAfterUsingJobLookup() {
         User user = user(7L);
         AiRouteRecord record = record(44L, user, "# Partial route");
         record.setStatus(AiRouteRecord.Status.RUNNING);
@@ -81,7 +87,7 @@ class AiRouteRecordServiceTest {
         service.recordFailedRoute(user, "job-2", 4, "comfort", "natural", "zh", "failed");
 
         assertEquals(AiRouteRecord.Status.FAILED, record.getStatus());
-        assertNull(record.getJobId());
+        assertEquals("job-2", record.getJobId());
         verify(routeRecordRepository).findFirstByUserIdAndJobIdOrderByUpdatedAtDesc(7L, "job-2");
     }
 
@@ -127,7 +133,7 @@ class AiRouteRecordServiceTest {
     }
 
     @Test
-    void staleRunningCleanupMarksRecordsFailedAndClearsJobIds() {
+    void staleRunningCleanupMarksRecordsFailedAndRetainsJobIds() {
         User user = user(7L);
         AiRouteRecord titledRecord = record(41L, user, "# Old route\n\npartial");
         titledRecord.setStatus(AiRouteRecord.Status.RUNNING);
@@ -146,11 +152,11 @@ class AiRouteRecordServiceTest {
 
         assertEquals(2, recovered);
         assertEquals(AiRouteRecord.Status.FAILED, titledRecord.getStatus());
-        assertNull(titledRecord.getJobId());
+        assertEquals("job-old", titledRecord.getJobId());
         assertEquals("Old route", titledRecord.getTitle());
         assertTrue(titledRecord.getErrorMessage().contains("recovery window"));
         assertEquals(AiRouteRecord.Status.FAILED, emptyRecord.getStatus());
-        assertNull(emptyRecord.getJobId());
+        assertEquals("job-empty", emptyRecord.getJobId());
         assertEquals(AiRouteRecord.defaultTitle(emptyRecord.getDays()), emptyRecord.getTitle());
         ArgumentCaptor<LocalDateTime> cutoff = ArgumentCaptor.forClass(LocalDateTime.class);
         verify(routeRecordRepository).findByStatusAndUpdatedAtBeforeOrderByUpdatedAtAsc(
@@ -195,17 +201,80 @@ class AiRouteRecordServiceTest {
     @Test
     void savedListIsScopedToCurrentUser() {
         User user = user(7L);
-        AiRouteRecord record = record(1L, user, "# One");
-        record.setJobId("legacy-saved-job");
-        when(routeRecordRepository.findByUserAndManuallySavedTrueOrderByUpdatedAtDesc(user))
-                .thenReturn(List.of(record));
+        AiRouteRecordRepository.AiRouteRecordSummaryProjection record = summaryProjection(1L, "Route");
+        when(routeRecordRepository.findByUserAndManuallySavedTrue(eq(user), any(Pageable.class)))
+                .thenAnswer(invocation -> new PageImpl<>(
+                        List.of(record),
+                        invocation.getArgument(1),
+                        1));
 
-        List<AiRouteRecordResponse> saved = service.savedFor(user);
+        Page<AiRouteRecordSummaryResponse> saved = service.savedFor(user, PageRequest.of(0, 20));
 
-        assertEquals(1, saved.size());
-        assertEquals(1L, saved.get(0).id());
-        assertNull(saved.get(0).jobId());
-        verify(routeRecordRepository).findByUserAndManuallySavedTrueOrderByUpdatedAtDesc(user);
+        assertEquals(1, saved.getContent().size());
+        assertEquals(1L, saved.getContent().get(0).id());
+        verify(routeRecordRepository).findByUserAndManuallySavedTrue(eq(user), any(Pageable.class));
+    }
+
+    @Test
+    void savedListUsesBoundedStablePageableAndMapsSummaryProjection() {
+        User user = user(7L);
+        when(routeRecordRepository.findByUserAndManuallySavedTrue(eq(user), any(Pageable.class)))
+                .thenAnswer(invocation -> new PageImpl<>(
+                        List.of(summaryProjection(2L, "Saved Route")),
+                        invocation.getArgument(1),
+                        200));
+
+        Page<AiRouteRecordSummaryResponse> saved = service.savedFor(
+                user,
+                PageRequest.of(2, 500, Sort.by(Sort.Direction.DESC, "content")));
+
+        assertEquals(1, saved.getContent().size());
+        assertEquals(200, saved.getTotalElements());
+
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(routeRecordRepository).findByUserAndManuallySavedTrue(eq(user), pageableCaptor.capture());
+
+        Pageable safePageable = pageableCaptor.getValue();
+        assertEquals(2, safePageable.getPageNumber());
+        assertEquals(50, safePageable.getPageSize());
+        assertNull(safePageable.getSort().getOrderFor("content"));
+        assertEquals(Sort.Direction.DESC, safePageable.getSort().getOrderFor("updatedAt").getDirection());
+        assertEquals(Sort.Direction.DESC, safePageable.getSort().getOrderFor("id").getDirection());
+    }
+
+    @Test
+    void savedListDefaultsToFirstTwentyWhenPageableIsMissing() {
+        User user = user(7L);
+        when(routeRecordRepository.findByUserAndManuallySavedTrue(eq(user), any(Pageable.class)))
+                .thenAnswer(invocation -> new PageImpl<>(
+                        List.of(summaryProjection(3L, "Default Route")),
+                        invocation.getArgument(1),
+                        1));
+
+        service.savedFor(user, null);
+
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(routeRecordRepository).findByUserAndManuallySavedTrue(eq(user), pageableCaptor.capture());
+
+        Pageable safePageable = pageableCaptor.getValue();
+        assertEquals(0, safePageable.getPageNumber());
+        assertEquals(20, safePageable.getPageSize());
+        assertEquals(Sort.Direction.DESC, safePageable.getSort().getOrderFor("updatedAt").getDirection());
+        assertEquals(Sort.Direction.DESC, safePageable.getSort().getOrderFor("id").getDirection());
+    }
+
+    @Test
+    void savedDetailReturnsFullContentForOwnedSavedRecord() {
+        User user = user(7L);
+        AiRouteRecord record = record(31L, user, "# Saved route\n\nFull content");
+        when(routeRecordRepository.findByIdAndUserAndManuallySavedTrue(31L, user))
+                .thenReturn(Optional.of(record));
+
+        AiRouteRecordResponse response = service.savedDetailFor(31L, user);
+
+        assertEquals(31L, response.id());
+        assertEquals("# Saved route\n\nFull content", response.content());
+        verify(routeRecordRepository).findByIdAndUserAndManuallySavedTrue(31L, user);
     }
 
     private User user(Long id) {
@@ -227,5 +296,65 @@ class AiRouteRecordServiceTest {
         record.setLocale("zh");
         record.setStatus(AiRouteRecord.Status.COMPLETED);
         return record;
+    }
+
+    private AiRouteRecordRepository.AiRouteRecordSummaryProjection summaryProjection(Long id, String title) {
+        LocalDateTime now = LocalDateTime.of(2026, 6, 8, 12, 0);
+        return new AiRouteRecordRepository.AiRouteRecordSummaryProjection() {
+            @Override
+            public Long getId() {
+                return id;
+            }
+
+            @Override
+            public String getTitle() {
+                return title;
+            }
+
+            @Override
+            public Integer getDays() {
+                return 5;
+            }
+
+            @Override
+            public String getBudget() {
+                return "comfort";
+            }
+
+            @Override
+            public String getPreference() {
+                return "natural";
+            }
+
+            @Override
+            public String getLocale() {
+                return "zh";
+            }
+
+            @Override
+            public AiRouteRecord.Status getStatus() {
+                return AiRouteRecord.Status.COMPLETED;
+            }
+
+            @Override
+            public Boolean getManuallySaved() {
+                return true;
+            }
+
+            @Override
+            public String getErrorMessage() {
+                return null;
+            }
+
+            @Override
+            public LocalDateTime getCreatedAt() {
+                return now.minusDays(1);
+            }
+
+            @Override
+            public LocalDateTime getUpdatedAt() {
+                return now;
+            }
+        };
     }
 }

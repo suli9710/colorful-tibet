@@ -13,6 +13,7 @@ import com.tibet.tourism.modules.order.application.OrderCenterService;
 import com.tibet.tourism.modules.order.web.dto.CreateOrderRequest;
 import com.tibet.tourism.modules.order.web.dto.PaymentCallbackRequest;
 import com.tibet.tourism.modules.order.web.dto.RefundRequest;
+import com.tibet.tourism.modules.order.web.dto.RefundReviewRequest;
 import com.tibet.tourism.modules.user.domain.User;
 import java.math.BigDecimal;
 import java.util.Map;
@@ -67,6 +68,21 @@ class OrderCenterControllerPrivacyTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         assertBodyError(response, "Order action is not available")
                 .doesNotContain("Refund amount exceeds paid amount");
+    }
+
+    @Test
+    void refundReviewConflictDoesNotExposeServiceExceptionMessage() {
+        RefundReviewRequest request = new RefundReviewRequest(
+                RefundReviewRequest.Action.COMPLETE, "complete", "txn-secret");
+        when(orderCenterService.reviewRefund(eq(user), eq(7L), eq(5L), eq(request)))
+                .thenThrow(new IllegalStateException("Only approved refunds can be completed transaction=txn-secret"));
+
+        ResponseEntity<?> response = controller.reviewRefund(7L, 5L, request, httpRequest);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertBodyError(response, "Order action is not available")
+                .doesNotContain("Only approved refunds")
+                .doesNotContain("txn-secret");
     }
 
     @Test

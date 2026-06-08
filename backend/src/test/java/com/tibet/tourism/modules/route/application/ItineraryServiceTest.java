@@ -20,17 +20,22 @@ import com.tibet.tourism.modules.spot.infra.ScenicSpotRepository;
 import com.tibet.tourism.modules.user.domain.User;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.Mock;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -116,6 +121,52 @@ class ItineraryServiceTest {
     }
 
     @Test
+    void getMyItinerariesUsesBoundedPageableAndMapsPagedContent() {
+        Itinerary itinerary = savedItinerary(200L);
+        when(itineraryRepository.findByUserId(eq(user.getId()), any(Pageable.class)))
+                .thenAnswer(invocation -> new PageImpl<>(
+                        List.of(itinerary),
+                        invocation.getArgument(1),
+                        200));
+
+        var response = itineraryService.getMyItineraries(
+                user,
+                PageRequest.of(2, 500, Sort.by("title")));
+
+        assertEquals(1, response.getContent().size());
+        assertEquals(200, response.getTotalElements());
+
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(itineraryRepository).findByUserId(eq(user.getId()), pageableCaptor.capture());
+
+        Pageable safePageable = pageableCaptor.getValue();
+        assertEquals(2, safePageable.getPageNumber());
+        assertEquals(50, safePageable.getPageSize());
+        assertNull(safePageable.getSort().getOrderFor("title"));
+        assertEquals(Sort.Direction.DESC, safePageable.getSort().getOrderFor("createdAt").getDirection());
+    }
+
+    @Test
+    void getMyItinerariesDefaultsToFirstTwentyWhenPageableIsMissing() {
+        Itinerary itinerary = savedItinerary(201L);
+        when(itineraryRepository.findByUserId(eq(user.getId()), any(Pageable.class)))
+                .thenAnswer(invocation -> new PageImpl<>(
+                        List.of(itinerary),
+                        invocation.getArgument(1),
+                        1));
+
+        itineraryService.getMyItineraries(user, null);
+
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(itineraryRepository).findByUserId(eq(user.getId()), pageableCaptor.capture());
+
+        Pageable safePageable = pageableCaptor.getValue();
+        assertEquals(0, safePageable.getPageNumber());
+        assertEquals(20, safePageable.getPageSize());
+        assertEquals(Sort.Direction.DESC, safePageable.getSort().getOrderFor("createdAt").getDirection());
+    }
+
+    @Test
     void bookSpotItemCreatesBookingAndMarksItemBooked() {
         Itinerary itinerary = new Itinerary();
         itinerary.setId(100L);
@@ -152,5 +203,21 @@ class ItineraryServiceTest {
         assertEquals(900L, response.bookingId());
         assertEquals(ItineraryItem.BookingStatus.BOOKED, item.getBookingStatus());
         verify(itineraryItemRepository).save(item);
+    }
+
+    private Itinerary savedItinerary(Long id) {
+        Itinerary itinerary = new Itinerary();
+        itinerary.setId(id);
+        itinerary.setUser(user);
+        itinerary.setTitle("Lhasa itinerary");
+        itinerary.setDays(3);
+        itinerary.setStartDate(LocalDate.of(2026, 6, 1));
+        itinerary.setBudget("comfort");
+        itinerary.setPreference("cultural");
+        itinerary.setVersionType("default");
+        itinerary.setVersionLabel("standard");
+        itinerary.setTotalEstimatedCost(BigDecimal.valueOf(1200));
+        itinerary.setCreatedAt(LocalDateTime.of(2026, 5, 1, 10, 0));
+        return itinerary;
     }
 }

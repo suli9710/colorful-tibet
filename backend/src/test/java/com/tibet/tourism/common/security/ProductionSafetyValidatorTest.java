@@ -47,9 +47,47 @@ class ProductionSafetyValidatorTest {
 
     @Test
     void localProfileAllowsMissingScraplingApiKey() {
-        ProductionSafetyValidator validator = validator(false, false, false, false, "");
+        ProductionSafetyValidator validator = validator(false, false, false, false, "", false, false, "", "");
 
         assertThatCode(validator::validateProductionSafety).doesNotThrowAnyException();
+    }
+
+    @Test
+    void prodProfileRejectsDisabledRecaptcha() {
+        ProductionSafetyValidator validator =
+                validator(true, true, true, false, "scrapling-key", false, true, "site-key", "secret-key");
+
+        assertThatThrownBy(validator::validateProductionSafety)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("app.security.antibot.recaptcha.enabled=true");
+    }
+
+    @Test
+    void prodProfileRejectsRegistrationWithoutRecaptchaRequirement() {
+        ProductionSafetyValidator validator =
+                validator(true, true, true, false, "scrapling-key", true, false, "site-key", "secret-key");
+
+        assertThatThrownBy(validator::validateProductionSafety)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("app.security.registration-recaptcha-required=true");
+    }
+
+    @Test
+    void prodProfileRejectsPlaceholderRecaptchaKeys() {
+        ProductionSafetyValidator validator = validator(
+                true,
+                true,
+                true,
+                false,
+                "scrapling-key",
+                true,
+                true,
+                "replace-with-recaptcha-site-key",
+                "replace-with-recaptcha-secret-key");
+
+        assertThatThrownBy(validator::validateProductionSafety)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("app.security.antibot.recaptcha.site-key");
     }
 
     @Test
@@ -116,6 +154,30 @@ class ProductionSafetyValidatorTest {
         return validator(environment, cookieSecure, requireStrongSecrets, mockCallbackEnabled, scraplingApiKey);
     }
 
+    private ProductionSafetyValidator validator(
+            boolean prodProfile,
+            boolean cookieSecure,
+            boolean requireStrongSecrets,
+            boolean mockCallbackEnabled,
+            String scraplingApiKey,
+            boolean recaptchaEnabled,
+            boolean registrationRecaptchaRequired,
+            String recaptchaSiteKey,
+            String recaptchaSecretKey) {
+        MockEnvironment environment = new MockEnvironment();
+        environment.setActiveProfiles(prodProfile ? "prod" : "local");
+        return validator(
+                environment,
+                cookieSecure,
+                requireStrongSecrets,
+                mockCallbackEnabled,
+                scraplingApiKey,
+                recaptchaEnabled,
+                registrationRecaptchaRequired,
+                recaptchaSiteKey,
+                recaptchaSecretKey);
+    }
+
     private MockEnvironment localEnvironment() {
         MockEnvironment environment = new MockEnvironment();
         environment.setActiveProfiles("local");
@@ -133,6 +195,32 @@ class ProductionSafetyValidatorTest {
                 cookieSecure,
                 requireStrongSecrets,
                 mockCallbackEnabled,
-                scraplingApiKey);
+                scraplingApiKey,
+                true,
+                true,
+                "site-key",
+                "secret-key");
+    }
+
+    private ProductionSafetyValidator validator(
+            MockEnvironment environment,
+            boolean cookieSecure,
+            boolean requireStrongSecrets,
+            boolean mockCallbackEnabled,
+            String scraplingApiKey,
+            boolean recaptchaEnabled,
+            boolean registrationRecaptchaRequired,
+            String recaptchaSiteKey,
+            String recaptchaSecretKey) {
+        return new ProductionSafetyValidator(
+                environment,
+                cookieSecure,
+                requireStrongSecrets,
+                mockCallbackEnabled,
+                scraplingApiKey,
+                recaptchaEnabled,
+                registrationRecaptchaRequired,
+                recaptchaSiteKey,
+                recaptchaSecretKey);
     }
 }

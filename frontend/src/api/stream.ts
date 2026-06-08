@@ -56,6 +56,7 @@ export interface RouteGenerationJobCallbacks {
   onDelta?: (text: string, fullText: string) => void
   onReplace?: (content: string) => void
   onDone?: (content: string) => void
+  onInterrupted?: (content: string) => void
   onError?: (message: string) => void
 }
 
@@ -204,7 +205,7 @@ export async function streamRouteGenerationJob(
   let fullText = ''
 
   try {
-    await readJsonSseStream(response, {
+    const result = await readJsonSseStream(response, {
       onMessage: message => {
         const event = asObject(message.data)
         if (!event) return
@@ -249,6 +250,10 @@ export async function streamRouteGenerationJob(
         }
       }
     })
+
+    if (!result.stopped) {
+      callbacks.onInterrupted?.(fullText)
+    }
   } catch (error) {
     if (isAbortError(error)) return
     callbacks.onError?.(getStreamErrorMessage(error))

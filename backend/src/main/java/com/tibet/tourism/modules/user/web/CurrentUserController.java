@@ -12,6 +12,9 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -75,9 +78,11 @@ public class CurrentUserController {
     }
 
     @GetMapping("/me/comments")
-    public ResponseEntity<?> getMyComments(HttpServletRequest request) {
+    public ResponseEntity<?> getMyComments(
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable,
+            HttpServletRequest request) {
         try {
-            return ResponseEntity.ok(currentUserApplicationService.getComments(currentUserId(request)));
+            return ResponseEntity.ok(currentUserApplicationService.getComments(currentUserId(request), pageable));
         } catch (Exception exception) {
             return apiErrorResponder.authenticatedRequest(exception);
         }

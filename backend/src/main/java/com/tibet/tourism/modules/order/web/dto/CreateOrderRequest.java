@@ -6,6 +6,8 @@ import jakarta.validation.Valid;
 import java.util.List;
 
 public class CreateOrderRequest {
+    public static final int MAX_ITEMS = 20;
+
     @Size(max = 96)
     private String idempotencyKey;
 
@@ -20,6 +22,7 @@ public class CreateOrderRequest {
     private String customerNote;
 
     @NotEmpty
+    @Size(max = MAX_ITEMS)
     @Valid
     private List<CreateOrderItemRequest> items;
 

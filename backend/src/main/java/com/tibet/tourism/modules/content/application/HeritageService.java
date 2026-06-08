@@ -60,12 +60,12 @@ public class HeritageService {
         return heritageItemRepository.searchByCategoryAndKeyword(category, keyword, pageable);
     }
 
-    public List<HeritageInheritor> getInheritorsByItemId(Long itemId) {
-        return inheritorRepository.findByHeritageItemId(itemId);
+    public Page<HeritageInheritor> getInheritorsByItemId(Long itemId, Pageable pageable) {
+        return inheritorRepository.findByHeritageItemId(itemId, pageable);
     }
 
-    public List<HeritageEvent> getEventsByItemId(Long itemId) {
-        return eventRepository.findByHeritageItemId(itemId);
+    public Page<HeritageEvent> getEventsByItemId(Long itemId, Pageable pageable) {
+        return eventRepository.findByHeritageItemId(itemId, pageable);
     }
 
     public Page<HeritageEvent> getUpcomingEvents(Pageable pageable) {

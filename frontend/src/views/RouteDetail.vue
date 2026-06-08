@@ -58,7 +58,10 @@
         <!-- Comments -->
         <div class="glass-card rounded-2xl p-4 sm:rounded-3xl sm:p-8">
           <h3 class="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-            {{ t('routeDetail.comments') }} <span class="text-sm font-normal text-gray-500">({{ comments.length }})</span>
+            {{ t('routeDetail.comments') }}
+            <span class="text-sm font-normal text-gray-500">
+              ({{ comments.length }}<template v-if="commentsTotalElements > comments.length"> / {{ commentsTotalElements }}</template>)
+            </span>
           </h3>
           
           <!-- Add Comment -->
@@ -104,6 +107,26 @@
               {{ t('routeDetail.noComments') }}
             </div>
           </div>
+
+          <div
+            v-if="commentsTotalPages > 1"
+            class="mt-6 flex flex-wrap items-center justify-center gap-3"
+            role="navigation"
+            :aria-label="t('routeDetail.comments')"
+          >
+            <span class="text-sm text-gray-500" role="status" aria-live="polite">
+              {{ commentsPage + 1 }} / {{ commentsTotalPages }}
+            </span>
+            <button
+              type="button"
+              @click="loadNextCommentsPage"
+              :disabled="commentsLoadingMore || !hasMoreComments"
+              :aria-busy="commentsLoadingMore"
+              class="min-h-11 rounded-xl border border-tibet-gold/25 bg-white px-5 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-wait disabled:opacity-50"
+            >
+              {{ commentsLoadingMore ? t('common.loading') : t('community.nextPage') }}
+            </button>
+          </div>
         </div>
       </motion.div>
 
@@ -122,6 +145,7 @@ import { renderMarkdownToSafeHtml } from '../utils/sanitize'
 import { motion } from 'motion-v'
 import { revealInitial, revealInView, revealTransition } from '../motion/presets'
 import api, { endpoints } from '../api'
+import { hasNextPage, mergeUniqueById, readPaginatedResponse, type PageMetadata } from '../api/endpoints'
 import { useAuthStore } from '../stores/auth'
 import { showToast } from '../composables/useToast'
 import { showConfirm } from '../composables/useConfirm'
@@ -139,6 +163,14 @@ const routeId = Number(currentRoute.params.id)
 const loading = ref(true)
 const routeData = ref<any>(null)
 const comments = ref<any[]>([])
+const routeCommentsPageSize = 20
+const commentsPageInfo = ref<PageMetadata>({
+  page: 0,
+  size: routeCommentsPageSize,
+  totalElements: 0,
+  totalPages: 0
+})
+const commentsLoadingMore = ref(false)
 const isLiked = ref(false)
 const liking = ref(false)
 const newComment = ref('')
@@ -148,9 +180,35 @@ const currentUser = computed(() => auth.user)
 const renderedContent = computed(() => {
   return routeData.value ? renderMarkdownToSafeHtml(routeData.value.content) : ''
 })
+const commentsPage = computed(() => commentsPageInfo.value.page)
+const commentsTotalPages = computed(() => commentsPageInfo.value.totalPages)
+const commentsTotalElements = computed(() => commentsPageInfo.value.totalElements)
+const hasMoreComments = computed(() => hasNextPage(commentsPageInfo.value))
 
 const redirectToLogin = () => {
   router.push({ path: '/login', query: { redirect: currentRoute.fullPath } })
+}
+
+const applyCommentsPage = (response: any, append = false) => {
+  const page = readPaginatedResponse<any>(response, {
+    page: append ? commentsPageInfo.value.page + 1 : 0,
+    size: routeCommentsPageSize
+  })
+
+  comments.value = append ? mergeUniqueById(comments.value, page.content) : page.content
+  commentsPageInfo.value = {
+    page: page.page,
+    size: page.size || routeCommentsPageSize,
+    totalElements: page.totalElements,
+    totalPages: page.totalPages
+  }
+}
+
+const fetchCommentsPage = async (page = 0, append = false) => {
+  const response = await api.get(endpoints.routes.sharedComments(routeId), {
+    params: { page, size: routeCommentsPageSize }
+  })
+  applyCommentsPage(response, append)
 }
 
 const loadRouteDetail = async () => {
@@ -158,12 +216,14 @@ const loadRouteDetail = async () => {
   try {
     const [routeRes, commentsRes, likeRes] = await Promise.all([
       api.get(endpoints.routes.sharedDetail(routeId)),
-      api.get(endpoints.routes.sharedComments(routeId)),
+      api.get(endpoints.routes.sharedComments(routeId), {
+        params: { page: 0, size: routeCommentsPageSize }
+      }),
       api.get(endpoints.routes.sharedLikeStatus(routeId)).catch(() => ({ data: { liked: false } }))
     ])
     
     routeData.value = routeRes.data
-    comments.value = commentsRes.data
+    applyCommentsPage(commentsRes)
     isLiked.value = likeRes.data.liked
   } catch (error) {
     console.error('Failed to load route detail:', summarizeClientError(error))
@@ -204,6 +264,19 @@ const toggleLike = async () => {
   }
 }
 
+const loadNextCommentsPage = async () => {
+  if (commentsLoadingMore.value || !hasMoreComments.value) return
+  commentsLoadingMore.value = true
+  try {
+    await fetchCommentsPage(commentsPageInfo.value.page + 1, true)
+  } catch (error) {
+    console.error('Failed to load more route comments:', summarizeClientError(error))
+    showToast(t('routeDetail.commentFailed'), 'error')
+  } finally {
+    commentsLoadingMore.value = false
+  }
+}
+
 const submitComment = async () => {
   const content = newComment.value.trim()
   if (!content || submitting.value) return
@@ -219,8 +292,16 @@ const submitComment = async () => {
       content
     })
     
-    comments.value.unshift(response.data)
+    comments.value = [response.data, ...comments.value.filter(comment => comment.id !== response.data?.id)]
     routeData.value.commentCount++
+    commentsPageInfo.value = {
+      ...commentsPageInfo.value,
+      totalElements: commentsPageInfo.value.totalElements + 1,
+      totalPages: Math.max(
+        commentsPageInfo.value.totalPages,
+        Math.ceil((commentsPageInfo.value.totalElements + 1) / commentsPageInfo.value.size)
+      )
+    }
     newComment.value = ''
     showToast(t('routeDetail.commentSuccess'), 'success')
   } catch (error: any) {
@@ -262,6 +343,14 @@ const deleteComment = async (comment: any) => {
     comments.value = comments.value.filter(item => item.id !== comment.id)
     if (routeData.value?.commentCount > 0) {
       routeData.value.commentCount--
+    }
+    if (commentsPageInfo.value.totalElements > 0) {
+      const totalElements = commentsPageInfo.value.totalElements - 1
+      commentsPageInfo.value = {
+        ...commentsPageInfo.value,
+        totalElements,
+        totalPages: commentsPageInfo.value.size > 0 ? Math.ceil(totalElements / commentsPageInfo.value.size) : 0
+      }
     }
     showToast(t('routeDetail.deleteCommentSuccess'), 'success')
   } catch (error) {

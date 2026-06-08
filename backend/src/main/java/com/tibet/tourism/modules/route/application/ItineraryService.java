@@ -35,7 +35,9 @@ import java.time.MonthDay;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -48,6 +50,9 @@ public class ItineraryService {
     private static final Pattern ALTITUDE_PATTERN = Pattern.compile("(\\d{3,5})");
     private static final int ITINERARY_SPOT_LIMIT = 500;
     private static final int ITINERARY_HOTEL_LIMIT = 200;
+    private static final int DEFAULT_MY_ITINERARIES_PAGE_SIZE = 20;
+    private static final int MAX_MY_ITINERARIES_PAGE_SIZE = 50;
+    private static final Set<String> MY_ITINERARIES_SORT_FIELDS = Set.of("createdAt", "id");
 
     private final ItineraryRepository itineraryRepository;
     private final ItineraryItemRepository itineraryItemRepository;
@@ -95,10 +100,15 @@ public class ItineraryService {
     }
 
     @Transactional(readOnly = true)
-    public List<ItineraryResponse> getMyItineraries(User user) {
-        return itineraryRepository.findByUserIdOrderByCreatedAtDesc(user.getId()).stream()
-                .map(this::toResponse)
-                .toList();
+    public Page<ItineraryResponse> getMyItineraries(User user, Pageable pageable) {
+        Pageable safePageable = InputSanitizer.sanitizePageable(
+                pageable,
+                MY_ITINERARIES_SORT_FIELDS,
+                Sort.by(Sort.Direction.DESC, "createdAt").and(Sort.by(Sort.Direction.DESC, "id")),
+                DEFAULT_MY_ITINERARIES_PAGE_SIZE,
+                MAX_MY_ITINERARIES_PAGE_SIZE);
+        return itineraryRepository.findByUserId(user.getId(), safePageable)
+                .map(this::toResponse);
     }
 
     @Transactional(readOnly = true)

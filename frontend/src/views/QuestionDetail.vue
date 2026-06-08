@@ -68,7 +68,8 @@
         <!-- Answers Section -->
         <div class="mb-6">
           <h3 class="text-lg font-bold text-gray-900 mb-4">
-            {{ t('community.answers') }} ({{ answers.length }})
+            {{ t('community.answers') }}
+            ({{ answers.length }}<template v-if="answersTotalElements > answers.length"> / {{ answersTotalElements }}</template>)
           </h3>
 
           <div v-if="answers.length === 0" class="text-center py-8 text-gray-400 text-sm">
@@ -105,6 +106,26 @@
               </div>
             </div>
           </div>
+
+          <div
+            v-if="answersTotalPages > 1"
+            class="mt-6 flex flex-wrap items-center justify-center gap-3"
+            role="navigation"
+            :aria-label="t('community.answers')"
+          >
+            <span class="text-sm text-gray-500" role="status" aria-live="polite">
+              {{ answersPage + 1 }} / {{ answersTotalPages }}
+            </span>
+            <button
+              type="button"
+              @click="loadNextAnswersPage"
+              :disabled="answersLoadingMore || !hasMoreAnswers"
+              :aria-busy="answersLoadingMore"
+              class="min-h-11 rounded-xl border border-tibet-gold/25 bg-white px-5 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-wait disabled:opacity-50"
+            >
+              {{ answersLoadingMore ? t('common.loading') : t('community.nextPage') }}
+            </button>
+          </div>
         </div>
 
         <!-- Write Answer -->
@@ -137,6 +158,7 @@ import { useI18n } from 'vue-i18n'
 import { motion } from 'motion-v'
 import { revealInitial, revealInView, revealTransition } from '../motion/presets'
 import api, { endpoints } from '../api'
+import { hasNextPage, mergeUniqueById, readPaginatedResponse, type PageMetadata } from '../api/endpoints'
 import { useAuthStore } from '../stores/auth'
 import { useAuthGuard } from '../composables/useAuthGuard'
 import { showConfirm } from '../composables/useConfirm'
@@ -153,8 +175,16 @@ const { requireAuth } = useAuthGuard()
 
 const question = ref<any>(null)
 const answers = ref<any[]>([])
+const answersPageSize = 20
+const answersPageInfo = ref<PageMetadata>({
+  page: 0,
+  size: answersPageSize,
+  totalElements: 0,
+  totalPages: 0
+})
 const loading = ref(true)
 const answering = ref(false)
+const answersLoadingMore = ref(false)
 const newAnswer = ref('')
 const isLiked = ref(false)
 const liking = ref(false)
@@ -164,6 +194,10 @@ const deletingQuestion = ref(false)
 const isAuthor = computed(() => Boolean(question.value?.author?.owner))
 const isQuestionAuthor = isAuthor
 const isSubmitAnswerDisabled = computed(() => !newAnswer.value.trim() || answering.value)
+const answersPage = computed(() => answersPageInfo.value.page)
+const answersTotalPages = computed(() => answersPageInfo.value.totalPages)
+const answersTotalElements = computed(() => answersPageInfo.value.totalElements)
+const hasMoreAnswers = computed(() => hasNextPage(answersPageInfo.value))
 const questionLikeAccessibleName = computed(() => {
   const count = question.value?.likeCount ?? 0
 
@@ -196,16 +230,41 @@ const parseTags = (tagsStr: string): string[] => {
   return tagsStr.split(',').map(s => s.trim()).filter(Boolean)
 }
 
+const applyAnswersPage = (response: any, append = false) => {
+  const page = readPaginatedResponse<any>(response, {
+    page: append ? answersPageInfo.value.page + 1 : 0,
+    size: answersPageSize
+  })
+
+  answers.value = append ? mergeUniqueById(answers.value, page.content) : page.content
+  answersPageInfo.value = {
+    page: page.page,
+    size: page.size || answersPageSize,
+    totalElements: page.totalElements,
+    totalPages: page.totalPages
+  }
+}
+
+const fetchAnswersPage = async (page = 0, append = false) => {
+  if (!question.value) return
+  const response = await api.get(endpoints.community.questionAnswers(question.value.id), {
+    params: { page, size: answersPageSize }
+  })
+  applyAnswersPage(response, append)
+}
+
 const loadQuestion = async () => {
   loading.value = true
   try {
     const id = route.params.id
     const [qRes, aRes] = await Promise.all([
       api.get(endpoints.community.questionDetail(String(id))),
-      api.get(endpoints.community.questionAnswers(String(id)))
+      api.get(endpoints.community.questionAnswers(String(id)), {
+        params: { page: 0, size: answersPageSize }
+      })
     ])
     question.value = qRes.data
-    answers.value = aRes.data || []
+    applyAnswersPage(aRes)
 
     // Check like status
     if (auth.hasValidSession()) {
@@ -222,6 +281,19 @@ const loadQuestion = async () => {
   }
 }
 
+const loadNextAnswersPage = async () => {
+  if (answersLoadingMore.value || !hasMoreAnswers.value) return
+  answersLoadingMore.value = true
+  try {
+    await fetchAnswersPage(answersPageInfo.value.page + 1, true)
+  } catch (error) {
+    console.error('Failed to load more answers:', summarizeClientError(error))
+    showToast(t('questionDetail.answerFailed'), 'error')
+  } finally {
+    answersLoadingMore.value = false
+  }
+}
+
 const submitAnswer = async () => {
   const content = newAnswer.value.trim()
   if (!content || answering.value || !question.value) return
@@ -231,10 +303,9 @@ const submitAnswer = async () => {
 
     await api.post(endpoints.community.createQuestionAnswer(question.value.id), { content })
     newAnswer.value = ''
-    const aRes = await api.get(endpoints.community.questionAnswers(question.value.id))
-    answers.value = aRes.data || []
+    await fetchAnswersPage(0)
     if (question.value) {
-      question.value.answerCount = answers.value.length
+      question.value.answerCount = answersPageInfo.value.totalElements
     }
   } catch (error: any) {
     if (error.response?.status === 401) {

@@ -26,6 +26,7 @@ import com.tibet.tourism.modules.ai.application.AiRouteGenerationJobService;
 import com.tibet.tourism.modules.ai.application.AiRouteRecordService;
 import com.tibet.tourism.modules.ai.application.AiRouteService;
 import com.tibet.tourism.modules.ai.web.dto.AiRouteRecordResponse;
+import com.tibet.tourism.modules.ai.web.dto.AiRouteRecordSummaryResponse;
 import com.tibet.tourism.modules.user.domain.User;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDateTime;
@@ -37,6 +38,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -99,17 +103,37 @@ class AiRouteControllerStreamTest {
     }
 
     @Test
-    void savedAiRouteResponsesOmitJobId() throws Exception {
+    void savedAiRouteResponsesUseSummaryDtoWithoutContent() throws Exception {
         User user = new User();
         user.setId(42L);
 
         when(jwtAuthSupport.resolveCurrentUser(any(HttpServletRequest.class))).thenReturn(user);
-        when(aiRouteRecordService.savedFor(user)).thenReturn(List.of(
-                aiRouteRecord(null, "COMPLETED", true)));
+        when(aiRouteRecordService.savedFor(eq(user), any(Pageable.class))).thenReturn(new PageImpl<>(
+                List.of(aiRouteRecordSummary(true)),
+                PageRequest.of(0, 20),
+                1));
 
         mockMvc.perform(get("/api/routes/ai/saved"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].jobId").doesNotExist());
+                .andExpect(jsonPath("$[0].content").doesNotExist())
+                .andExpect(jsonPath("$[0].jobId").doesNotExist())
+                .andExpect(jsonPath("$[0].id").value(12L))
+                .andExpect(jsonPath("$[0].manuallySaved").value(true));
+    }
+
+    @Test
+    void savedAiRouteDetailReturnsFullContent() throws Exception {
+        User user = new User();
+        user.setId(42L);
+
+        when(jwtAuthSupport.resolveCurrentUser(any(HttpServletRequest.class))).thenReturn(user);
+        when(aiRouteRecordService.savedDetailFor(12L, user)).thenReturn(
+                aiRouteRecord(null, "COMPLETED", true));
+
+        mockMvc.perform(get("/api/routes/ai/saved/12"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(12L))
+                .andExpect(jsonPath("$.content").value("# Route"));
     }
 
     @Test
@@ -229,6 +253,22 @@ class AiRouteControllerStreamTest {
                 "natural",
                 "zh",
                 status,
+                manuallySaved,
+                null,
+                now,
+                now);
+    }
+
+    private AiRouteRecordSummaryResponse aiRouteRecordSummary(boolean manuallySaved) {
+        LocalDateTime now = LocalDateTime.of(2026, 6, 8, 12, 0);
+        return new AiRouteRecordSummaryResponse(
+                12L,
+                "Route",
+                5,
+                "comfort",
+                "natural",
+                "zh",
+                "COMPLETED",
                 manuallySaved,
                 null,
                 now,

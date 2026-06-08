@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface HeritageEventRepository extends JpaRepository<HeritageEvent, Long> {
     List<HeritageEvent> findByHeritageItemId(Long heritageItemId);
+    Page<HeritageEvent> findByHeritageItemId(Long heritageItemId, Pageable pageable);
     Page<HeritageEvent> findByEventDateGreaterThanEqualOrderByEventDateAsc(LocalDate date, Pageable pageable);
     void deleteByHeritageItemId(Long heritageItemId);
 }

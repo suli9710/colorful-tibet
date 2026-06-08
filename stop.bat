@@ -48,6 +48,11 @@ call :convert_project_path || (
     call :wait_before_exit
     exit /b 1
 )
+call :quote_wsl_project_path || (
+    echo Error: failed to quote WSL project path for bash.
+    call :wait_before_exit
+    exit /b 1
+)
 
 echo Project directory: %PROJECT_DIR%
 echo WSL distribution: %WSL_DISTRO%
@@ -56,13 +61,13 @@ echo.
 
 if "%DRY_RUN%"=="1" (
     echo Dry run only. Command that would be executed:
-    echo wsl.exe -d "%WSL_DISTRO%" --user root -- bash -lc "cd '%WSL_PROJECT_DIR%' && docker compose -f docker-compose.yml down"
+    echo wsl.exe -d "%WSL_DISTRO%" --user root -- bash -lc "cd %WSL_PROJECT_DIR_BASH% && docker compose -f docker-compose.yml down"
     call :wait_before_exit
     exit /b 0
 )
 
 echo Stopping Docker Compose services...
-wsl.exe -d "%WSL_DISTRO%" --user root -- bash -lc "cd '%WSL_PROJECT_DIR%' && docker compose -f docker-compose.yml down"
+wsl.exe -d "%WSL_DISTRO%" --user root -- bash -lc "cd %WSL_PROJECT_DIR_BASH% && docker compose -f docker-compose.yml down"
 if not "!ERRORLEVEL!"=="0" (
     echo.
     echo Error: docker compose down failed.
@@ -128,6 +133,12 @@ set "PROJECT_REST=%PROJECT_DIR:~2%"
 set "PROJECT_REST=%PROJECT_REST:\=/%"
 call :lower_drive "%DRIVE_LETTER%"
 set "WSL_PROJECT_DIR=/mnt/%LOWER_DRIVE%%PROJECT_REST%"
+exit /b 0
+
+:quote_wsl_project_path
+set "WSL_PROJECT_DIR_BASH="
+for /f "usebackq delims=" %%Q in (`powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$p=$env:WSL_PROJECT_DIR; if ($null -eq $p) { exit 1 }; $escaped = $p -replace [char]39, ([char]39 + '\' + [char]39 + [char]39); [Console]::Out.WriteLine(([char]39) + $escaped + ([char]39))"`) do set "WSL_PROJECT_DIR_BASH=%%Q"
+if not defined WSL_PROJECT_DIR_BASH exit /b 1
 exit /b 0
 
 :lower_drive

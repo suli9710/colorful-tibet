@@ -189,6 +189,7 @@
     "title": "资讯",
     "description": "获取最新的西藏旅游政策、活动和公告",
     "viewCount": "次阅读",
+    "resultSummary": "{count} 条资讯 · {category}",
     "category": {
       "policy": "政策",
       "event": "活动",
@@ -353,6 +354,7 @@
     "sharing": "分享中...",
     "shareToCommunity": "分享到社区",
     "generateFailed": "生成失败，请稍后重试",
+    "generationInterrupted": "连接已中断，已保留当前内容，可继续恢复生成。",
     "timeoutError": "AI 生成超时，请稍后重试。如果问题持续，请联系管理员。",
     "serviceUnavailable": "AI 服务暂时不可用，请稍后重试",
     "authFailed": "认证失败，请重新登录",

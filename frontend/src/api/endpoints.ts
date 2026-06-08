@@ -1,6 +1,101 @@
 import { authEndpoints } from './modules/auth'
 import { adminHeritageEndpoints, heritageEndpoints } from './modules/heritage'
 
+export interface PageMetadata {
+  page: number
+  size: number
+  totalElements: number
+  totalPages: number
+}
+
+export interface NormalizedPage<T> extends PageMetadata {
+  content: T[]
+}
+
+interface PaginatedHttpResponse {
+  data?: unknown
+  headers?: unknown
+}
+
+const headerValue = (headers: unknown, name: string) => {
+  if (!headers || typeof headers !== 'object') return undefined
+
+  const readableHeaders = headers as {
+    get?: (headerName: string) => unknown
+    [key: string]: unknown
+  }
+
+  const directValue = readableHeaders.get?.(name) ?? readableHeaders.get?.(name.toLowerCase())
+  if (directValue != null) return directValue
+
+  const matchingKey = Object.keys(readableHeaders).find(key => key.toLowerCase() === name.toLowerCase())
+  return matchingKey ? readableHeaders[matchingKey] : undefined
+}
+
+const numberValue = (value: unknown) => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : undefined
+  }
+
+  return undefined
+}
+
+const integerValue = (value: unknown, fallback: number) => {
+  const parsed = numberValue(value)
+  return parsed == null ? fallback : Math.max(0, Math.trunc(parsed))
+}
+
+export const readPaginatedResponse = <T>(
+  response: PaginatedHttpResponse,
+  fallback: Partial<PageMetadata> = {}
+): NormalizedPage<T> => {
+  const body = response.data
+  const bodyRecord = body && typeof body === 'object' && !Array.isArray(body)
+    ? body as Record<string, unknown>
+    : {}
+  const content = Array.isArray(body)
+    ? body as T[]
+    : Array.isArray(bodyRecord.content)
+      ? bodyRecord.content as T[]
+      : []
+
+  const fallbackSize = fallback.size ?? content.length
+  const page = integerValue(headerValue(response.headers, 'X-Page') ?? bodyRecord.page, fallback.page ?? 0)
+  const size = integerValue(headerValue(response.headers, 'X-Size') ?? bodyRecord.size, fallbackSize)
+  const totalElements = integerValue(
+    headerValue(response.headers, 'X-Total-Elements') ?? bodyRecord.totalElements,
+    fallback.totalElements ?? content.length
+  )
+  const totalPages = integerValue(
+    headerValue(response.headers, 'X-Total-Pages') ?? bodyRecord.totalPages,
+    fallback.totalPages ?? (size > 0 && totalElements > 0 ? Math.ceil(totalElements / size) : 0)
+  )
+
+  return {
+    content,
+    page,
+    size,
+    totalElements,
+    totalPages
+  }
+}
+
+export const hasNextPage = (page: PageMetadata) => page.page + 1 < page.totalPages
+
+export const mergeUniqueById = <T extends { id?: unknown }>(current: T[], next: T[]) => {
+  const seen = new Set(current.map(item => item.id))
+  return [
+    ...current,
+    ...next.filter(item => {
+      if (item.id == null || seen.has(item.id)) return false
+      seen.add(item.id)
+      return true
+    })
+  ]
+}
+
 export const endpoints = {
   auth: authEndpoints,
   guide: {
@@ -161,6 +256,8 @@ export const endpoints = {
     list: (spotId: number) => `/comments/spot/${spotId}`,
     create: '/comments',
     delete: (id: number) => `/comments/${id}`,
+    liked: (id: number) => `/comments/${id}/liked`,
+    like: (id: number) => `/comments/${id}/like`,
     uploadImage: '/comments/upload-image'
   }
 }

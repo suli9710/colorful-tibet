@@ -8,9 +8,13 @@ import java.util.List;
 import java.util.OptionalDouble;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import org.springframework.util.StringUtils;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.BodyInserters;
 
 @Service
 public class RecaptchaService {
@@ -40,12 +44,17 @@ public class RecaptchaService {
             return OptionalDouble.empty();
         }
         try {
+            MultiValueMap<String, String> formData = new LinkedMultiValueMap<>();
+            formData.add("secret", cfg.getSecretKey());
+            formData.add("response", token);
+            if (StringUtils.hasText(remoteIp)) {
+                formData.add("remoteip", remoteIp);
+            }
+
             JsonNode response = webClient.post()
-                    .uri(cfg.getVerifyUrl(), uriBuilder -> uriBuilder
-                            .queryParam("secret", cfg.getSecretKey())
-                            .queryParam("response", token)
-                            .queryParam("remoteip", remoteIp)
-                            .build())
+                    .uri(cfg.getVerifyUrl())
+                    .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                    .body(BodyInserters.fromFormData(formData))
                     .retrieve()
                     .bodyToMono(JsonNode.class)
                     .block(Duration.ofSeconds(3));

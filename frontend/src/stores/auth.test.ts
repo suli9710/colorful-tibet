@@ -46,6 +46,7 @@ function installBrowserStorage() {
   const windowStub = {
     localStorage,
     sessionStorage,
+    location: { origin: 'http://localhost' },
     addEventListener: vi.fn(),
     dispatchEvent: vi.fn()
   }
@@ -231,6 +232,35 @@ describe('auth store sensitive storage handling', () => {
       'private-account-name',
       'privacy-token'
     ])
+  })
+
+  it('refreshes the current session through the registered auth/me endpoint', async () => {
+    const { localStorage } = installBrowserStorage()
+    localStorage.setItem('locale', 'bo')
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      nickname: 'Fresh Traveler',
+      role: 'USER'
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const auth = useAuthStore()
+
+    await expect(auth.refreshSession()).resolves.toBe(true)
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/auth/me', {
+      credentials: 'include',
+      headers: {
+        Accept: 'application/json',
+        'Accept-Language': 'bo'
+      }
+    })
+    expect(auth.user).toEqual({
+      nickname: 'Fresh Traveler',
+      role: 'USER'
+    })
   })
 
   it('sanitizes legacy stored user records when restoring from storage', () => {

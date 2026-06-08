@@ -1,6 +1,7 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { clearAllRoutePlannerDrafts } from '../composables/useRoutePlannerDraft'
+import { endpoints } from '../api/endpoints'
 import { apiBaseURL, isSameOriginApi, normalizedApiBaseURL } from '../utils/apiOrigin'
 
 export interface AuthUser {
@@ -283,7 +284,7 @@ export const clearStoredAuth = () => {
 
 const fetchCurrentUser = async (): Promise<RawAuthUser> => {
   const locale = readStorage(getLocalStorage(), 'locale') || 'zh'
-  const response = await fetch(`${normalizedApiBaseURL()}/auth/me`, {
+  const response = await fetch(`${normalizedApiBaseURL()}${endpoints.auth.me}`, {
     credentials: sameOriginApi ? 'include' : 'omit',
     headers: {
       Accept: 'application/json',

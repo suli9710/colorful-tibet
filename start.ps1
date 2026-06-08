@@ -195,8 +195,8 @@ function Invoke-WslBash {
 function Get-ProjectCommand {
     param([Parameter(Mandatory = $true)][string]$Command)
 
-    $safeDir = $Script:WslProjectDir.Replace('"', '\"')
-    return 'cd "' + $safeDir + '" && ' + $Command
+    $safeDir = ConvertTo-BashSingleQuoted -Value $Script:WslProjectDir
+    return 'cd ' + $safeDir + ' && ' + $Command
 }
 
 function Convert-ToWslPath {

@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import { createLoginRedirect } from './authRedirect'
 
 const router = createRouter({
     history: createWebHistory(),
@@ -133,7 +134,7 @@ router.beforeEach(async (to) => {
           : auth.hasValidSession()
 
     if (isAdminRoute && !isAuthenticated) {
-        return '/login'
+        return createLoginRedirect(to.fullPath)
     }
 
     if (isAuthenticated && auth.user?.mustChangePassword && to.path !== '/profile') {
@@ -145,7 +146,7 @@ router.beforeEach(async (to) => {
     }
 
     if (to.meta.requiresAuth && !isAuthenticated) {
-        return '/login'
+        return createLoginRedirect(to.fullPath)
     }
 
     return true

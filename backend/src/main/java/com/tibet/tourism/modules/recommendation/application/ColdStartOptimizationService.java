@@ -50,7 +50,7 @@ public class ColdStartOptimizationService {
      * 判断用户是否为新用户（冷启动状态）
      */
     public boolean isNewUser(Long userId) {
-        List<UserVisitHistory> history = historyRepository.findByUserId(userId);
+        List<UserVisitHistory> history = historyRepository.findRecentByUserId(userId, NEW_USER_THRESHOLD);
         return history == null || history.size() < NEW_USER_THRESHOLD;
     }
     
@@ -59,7 +59,7 @@ public class ColdStartOptimizationService {
      */
     public boolean isNewItem(Long spotId) {
         try {
-            List<UserVisitHistory> history = historyRepository.findBySpotId(spotId);
+            List<UserVisitHistory> history = historyRepository.findRecentBySpotId(spotId, NEW_ITEM_THRESHOLD);
             return history == null || history.size() < NEW_ITEM_THRESHOLD;
         } catch (Exception e) {
             logger.warn("New item status check failed: spotId={}, error={}",
@@ -231,7 +231,7 @@ public class ColdStartOptimizationService {
         }
         
         // 基于内容相似度排序
-        List<UserVisitHistory> userHistory = historyRepository.findByUserId(userId);
+        List<UserVisitHistory> userHistory = historyRepository.findRecentByUserId(userId);
         if (!userHistory.isEmpty()) {
             // 获取用户偏好的标签
             Set<String> userTags = userHistory.stream()

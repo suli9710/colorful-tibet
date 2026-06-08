@@ -2,7 +2,9 @@ package com.tibet.tourism.modules.spot.application;
 
 import com.tibet.tourism.common.error.ResourceNotFoundException;
 import com.tibet.tourism.modules.spot.domain.ScenicSpot;
+import com.tibet.tourism.modules.spot.domain.SpotPriceObservation;
 import com.tibet.tourism.modules.spot.infra.ScenicSpotRepository;
+import com.tibet.tourism.modules.spot.infra.SpotPriceObservationRepository;
 import com.tibet.tourism.modules.spot.web.dto.PriceInfo;
 import java.math.BigDecimal;
 import org.springframework.stereotype.Service;
@@ -17,12 +19,15 @@ public class SingleSpotPriceUpdateService {
 
     private final ScenicSpotRepository scenicSpotRepository;
     private final PriceFetchService priceFetchService;
+    private final SpotPriceObservationRepository priceObservationRepository;
 
     public SingleSpotPriceUpdateService(
             ScenicSpotRepository scenicSpotRepository,
-            PriceFetchService priceFetchService) {
+            PriceFetchService priceFetchService,
+            SpotPriceObservationRepository priceObservationRepository) {
         this.scenicSpotRepository = scenicSpotRepository;
         this.priceFetchService = priceFetchService;
+        this.priceObservationRepository = priceObservationRepository;
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -46,7 +51,14 @@ public class SingleSpotPriceUpdateService {
                     null);
         }
 
-        if (!priceFetchService.isPublishablePrice(priceInfo)) {
+        boolean publishablePrice = priceFetchService.isPublishablePrice(priceInfo);
+        if (!publishablePrice) {
+            savePriceObservation(
+                    spot,
+                    priceInfo,
+                    false,
+                    SpotPriceObservation.Status.REVIEW_REQUIRED,
+                    "Reference-only or below publish confidence");
             return new PriceUpdateService.PriceUpdateResult(
                     false,
                     SKIPPED_REFERENCE_PRICE + ": fetched price is reference-only or below publish confidence",
@@ -62,6 +74,21 @@ public class SingleSpotPriceUpdateService {
         }
 
         scenicSpotRepository.save(spot);
+        savePriceObservation(spot, priceInfo, true, SpotPriceObservation.Status.PUBLISHED, "Published to scenic spot");
         return new PriceUpdateService.PriceUpdateResult(true, "PRICE_UPDATED", priceInfo);
+    }
+
+    private void savePriceObservation(
+            ScenicSpot spot,
+            PriceInfo priceInfo,
+            boolean publishable,
+            SpotPriceObservation.Status status,
+            String reviewReason) {
+        priceObservationRepository.save(SpotPriceObservation.from(
+                spot,
+                priceInfo,
+                publishable,
+                status,
+                reviewReason));
     }
 }

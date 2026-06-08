@@ -17,7 +17,7 @@ public interface RouteCommentRepository extends JpaRepository<RouteComment, Long
     
     // 获取路线的所有评论，按时间倒序（解决 N+1：一次性加载 user）
     @EntityGraph(attributePaths = {"user"})
-    List<RouteComment> findByRouteOrderByCreatedAtDesc(SharedRoute route);
+    Page<RouteComment> findByRoute(SharedRoute route, Pageable pageable);
 
     @EntityGraph(attributePaths = {"route", "user"})
     List<RouteComment> findAllByOrderByCreatedAtDesc();
@@ -31,6 +31,9 @@ public interface RouteCommentRepository extends JpaRepository<RouteComment, Long
     // 获取用户的所有评论，按时间倒序
     @EntityGraph(attributePaths = {"route"})
     List<RouteComment> findByUserOrderByCreatedAtDesc(User user);
+
+    @EntityGraph(attributePaths = {"route", "user"})
+    Page<RouteComment> findByUser(User user, Pageable pageable);
     
     // 统计用户评论数
     long countByUser(User user);
@@ -39,6 +42,10 @@ public interface RouteCommentRepository extends JpaRepository<RouteComment, Long
     void deleteByUser(User user);
 
     void deleteByRoute(SharedRoute route);
+
+    @Modifying
+    @Query("DELETE FROM RouteComment rc WHERE rc.route.id = :routeId")
+    void deleteByRouteId(@Param("routeId") Long routeId);
 
     @Modifying
     @Query("DELETE FROM RouteComment rc WHERE rc.route.author.id = :userId")

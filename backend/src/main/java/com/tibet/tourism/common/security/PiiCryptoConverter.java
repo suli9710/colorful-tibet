@@ -2,7 +2,10 @@ package com.tibet.tourism.common.security;
 
 import jakarta.persistence.AttributeConverter;
 import jakarta.persistence.Converter;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.util.Arrays;
@@ -10,10 +13,15 @@ import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.regex.Pattern;
 import javax.crypto.Cipher;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -21,8 +29,10 @@ import org.springframework.util.StringUtils;
 @Converter
 public class PiiCryptoConverter implements AttributeConverter<String, String> {
 
+    private static final Logger logger = LoggerFactory.getLogger(PiiCryptoConverter.class);
     private static final String PREFIX_V1 = "enc:v1:";
     private static final String PREFIX_V2 = "enc:v2:";
+    private static final String METRIC_DECRYPT_FAILURE = "pii_decrypt_failure_total";
     private static final String CIPHER = "AES/GCM/NoPadding";
     private static final int IV_BYTES = 12;
     private static final int TAG_BITS = 128;
@@ -33,6 +43,8 @@ public class PiiCryptoConverter implements AttributeConverter<String, String> {
     private static volatile Map<String, byte[]> encryptionKeys = Map.of();
     private static volatile String activeKid;
     private static volatile byte[] legacyV1Key;
+    private static volatile MeterRegistry meterRegistry;
+    private static final ConcurrentMap<String, Counter> decryptFailureCounters = new ConcurrentHashMap<>();
 
     static void configure(String rawKeys, String rawActiveKid, String legacyRawKey) {
         Map<String, byte[]> parsedKeys = parseKeys(rawKeys);
@@ -42,6 +54,11 @@ public class PiiCryptoConverter implements AttributeConverter<String, String> {
         encryptionKeys = parsedKeys;
         activeKid = parsedActiveKid;
         legacyV1Key = parsedLegacyKey;
+    }
+
+    static void configureMetrics(MeterRegistry registry) {
+        meterRegistry = registry;
+        decryptFailureCounters.clear();
     }
 
     @Override
@@ -72,58 +89,114 @@ public class PiiCryptoConverter implements AttributeConverter<String, String> {
             return dbData;
         }
         if (dbData.startsWith(PREFIX_V2)) {
-            return decryptV2(dbData);
+            DecryptOutcome outcome = decryptV2(dbData);
+            return requireDecrypted(outcome);
         }
         if (dbData.startsWith(PREFIX_V1)) {
-            return decryptV1(dbData);
+            DecryptOutcome outcome = decryptV1(dbData);
+            return requireDecrypted(outcome);
         }
         return dbData;
     }
 
-    private String decryptV2(String dbData) {
-        try {
-            int kidStart = PREFIX_V2.length();
-            int separator = dbData.indexOf(':', kidStart);
-            if (separator <= kidStart || separator == dbData.length() - 1) {
-                return dbData;
-            }
-            String kid = dbData.substring(kidStart, separator);
-            byte[] key = encryptionKeys.get(kid);
-            if (key == null) {
-                return dbData;
-            }
-            return decryptPayload(dbData.substring(separator + 1), key, "v2");
-        } catch (IllegalStateException e) {
-            return dbData;
-        }
+    static boolean hasLegacyV1Key() {
+        return legacyV1Key != null;
     }
 
-    private String decryptV1(String dbData) {
+    BackfillValue valueForBackfill(String dbData) {
+        if (!StringUtils.hasText(dbData)) {
+            return BackfillValue.plaintext(dbData);
+        }
+        if (dbData.startsWith(PREFIX_V2)) {
+            return BackfillValue.skip("v2", "already_encrypted");
+        }
+        if (!dbData.startsWith(PREFIX_V1)) {
+            return BackfillValue.plaintext(dbData);
+        }
+        DecryptOutcome outcome = decryptV1(dbData);
+        if (outcome.decrypted()) {
+            return BackfillValue.plaintext(outcome.plaintext());
+        }
+        return BackfillValue.skip(outcome.version(), outcome.reason());
+    }
+
+    private DecryptOutcome decryptV2(String dbData) {
+        int kidStart = PREFIX_V2.length();
+        int separator = dbData.indexOf(':', kidStart);
+        if (separator <= kidStart || separator == dbData.length() - 1) {
+            return decryptFailure("v2", "malformed_header");
+        }
+        String kid = dbData.substring(kidStart, separator);
+        if (!KEY_ID.matcher(kid).matches()) {
+            return decryptFailure("v2", "malformed_header");
+        }
+        byte[] key = encryptionKeys.get(kid);
+        if (key == null) {
+            return decryptFailure("v2", "missing_key");
+        }
+        return decryptPayload(dbData.substring(separator + 1), key, "v2");
+    }
+
+    private DecryptOutcome decryptV1(String dbData) {
         byte[] key = legacyV1Key;
         if (key == null) {
-            return dbData;
+            return decryptFailure("v1", "missing_key");
         }
-        try {
-            return decryptPayload(dbData.substring(PREFIX_V1.length()), key, "v1");
-        } catch (IllegalStateException e) {
-            return dbData;
-        }
+        return decryptPayload(dbData.substring(PREFIX_V1.length()), key, "v1");
     }
 
-    private String decryptPayload(String encodedPayload, byte[] key, String version) {
+    private DecryptOutcome decryptPayload(String encodedPayload, byte[] key, String version) {
+        byte[] payload;
         try {
-            byte[] payload = Base64.getUrlDecoder().decode(encodedPayload);
-            if (payload.length <= IV_BYTES) {
-                throw new IllegalStateException("PII payload is too short");
-            }
+            payload = Base64.getUrlDecoder().decode(encodedPayload);
+        } catch (IllegalArgumentException e) {
+            return decryptFailure(version, "malformed_payload");
+        }
+        if (payload.length <= IV_BYTES) {
+            return decryptFailure(version, "malformed_payload");
+        }
+        try {
             byte[] iv = Arrays.copyOfRange(payload, 0, IV_BYTES);
             byte[] encrypted = Arrays.copyOfRange(payload, IV_BYTES, payload.length);
             Cipher cipher = Cipher.getInstance(CIPHER);
             cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key, "AES"), new GCMParameterSpec(TAG_BITS, iv));
-            return new String(cipher.doFinal(encrypted), StandardCharsets.UTF_8);
-        } catch (Exception e) {
-            throw new IllegalStateException("Failed to decrypt PII field " + version, e);
+            return DecryptOutcome.decrypted(new String(cipher.doFinal(encrypted), StandardCharsets.UTF_8));
+        } catch (GeneralSecurityException e) {
+            return decryptFailure(version, "decrypt_error");
         }
+    }
+
+    private DecryptOutcome decryptFailure(String version, String reason) {
+        recordDecryptFailure(version, reason);
+        return DecryptOutcome.failed(version, reason);
+    }
+
+    private String requireDecrypted(DecryptOutcome outcome) {
+        if (outcome.decrypted()) {
+            return outcome.plaintext();
+        }
+        throw new IllegalStateException("Failed to decrypt encrypted PII field"
+                + " (version=" + outcome.version()
+                + ", reason=" + outcome.reason()
+                + "); check PII key configuration and pii_decrypt_failure_total.");
+    }
+
+    private void recordDecryptFailure(String version, String reason) {
+        MeterRegistry registry = meterRegistry;
+        if (registry != null) {
+            String counterKey = version + ":" + reason;
+            decryptFailureCounters.computeIfAbsent(counterKey, ignored -> Counter.builder(METRIC_DECRYPT_FAILURE)
+                    .description("PII decrypt failures by ciphertext version and failure reason")
+                    .tag("version", version)
+                    .tag("reason", reason)
+                    .register(registry))
+                    .increment();
+        }
+        logger.atWarn()
+                .addKeyValue("security_event", "pii_decrypt_failure")
+                .addKeyValue("version", version)
+                .addKeyValue("reason", reason)
+                .log("PII decrypt failure");
     }
 
     private static String requireActiveKid() {
@@ -185,6 +258,7 @@ public class PiiCryptoConverter implements AttributeConverter<String, String> {
         if (!StringUtils.hasText(legacyRawKey)) {
             return null;
         }
+        rejectPlaceholder(legacyRawKey, "Legacy PII encryption key");
         try {
             return MessageDigest.getInstance("SHA-256")
                     .digest(legacyRawKey.trim().getBytes(StandardCharsets.UTF_8));
@@ -217,13 +291,35 @@ public class PiiCryptoConverter implements AttributeConverter<String, String> {
         }
     }
 
+    record BackfillValue(boolean encryptable, String plaintext, String encryptedVersion, String failureReason) {
+        private static BackfillValue plaintext(String plaintext) {
+            return new BackfillValue(true, plaintext, null, null);
+        }
+
+        private static BackfillValue skip(String encryptedVersion, String failureReason) {
+            return new BackfillValue(false, null, encryptedVersion, failureReason);
+        }
+    }
+
+    private record DecryptOutcome(boolean decrypted, String plaintext, String version, String reason) {
+        private static DecryptOutcome decrypted(String plaintext) {
+            return new DecryptOutcome(true, plaintext, null, null);
+        }
+
+        private static DecryptOutcome failed(String version, String reason) {
+            return new DecryptOutcome(false, null, version, reason);
+        }
+    }
+
     @Component
     static class KeyInitializer {
         KeyInitializer(
                 @Value("${app.security.pii-keys:${PII_KEYS:}}") String rawKeys,
                 @Value("${app.security.pii-active-kid:${PII_ACTIVE_KID:}}") String activeKid,
-                @Value("${app.security.pii-encryption-key:${PII_ENCRYPTION_KEY:}}") String legacyRawKey) {
+                @Value("${app.security.pii-encryption-key:${PII_ENCRYPTION_KEY:}}") String legacyRawKey,
+                ObjectProvider<MeterRegistry> meterRegistryProvider) {
             PiiCryptoConverter.configure(rawKeys, activeKid, legacyRawKey);
+            PiiCryptoConverter.configureMetrics(meterRegistryProvider.getIfAvailable());
         }
     }
 }

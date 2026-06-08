@@ -14,12 +14,14 @@ import com.tibet.tourism.modules.order.application.OrderCenterService;
 import com.tibet.tourism.modules.order.domain.Booking;
 import com.tibet.tourism.modules.order.infra.BookingRepository;
 import com.tibet.tourism.modules.order.web.dto.BookingRequest;
+import com.tibet.tourism.modules.order.web.dto.BookingResponse;
 import com.tibet.tourism.modules.spot.domain.ScenicSpot;
 import com.tibet.tourism.modules.spot.infra.ScenicSpotRepository;
 import com.tibet.tourism.modules.user.domain.User;
 import com.tibet.tourism.modules.user.infra.UserRepository;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,6 +30,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -137,6 +142,30 @@ class BookingControllerAnonymousOwnerTest {
         assertEquals(spot, mirrored.getSpot());
         assertEquals(Booking.Status.PENDING, mirrored.getStatus());
         assertEquals(BigDecimal.valueOf(600), mirrored.getTotalPrice());
+    }
+
+    @Test
+    void getMyBookingsDelegatesPagedLookupAndKeepsLegacyArrayBody() {
+        BookingResponse booking = new BookingResponse(
+                88L,
+                null,
+                10L,
+                LocalDate.of(2026, 6, 1),
+                2,
+                BigDecimal.valueOf(600),
+                "PENDING",
+                null);
+        when(orderCenterService.getLegacySpotBookings(eq(user), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(booking), PageRequest.of(0, 20), 1));
+
+        ResponseEntity<?> response = controller.getMyBookings(PageRequest.of(0, 500));
+
+        assertEquals(200, response.getStatusCode().value());
+        @SuppressWarnings("unchecked")
+        List<BookingResponse> body = (List<BookingResponse>) response.getBody();
+        assertEquals(List.of(booking), body);
+        assertEquals("1", response.getHeaders().getFirst("X-Total-Elements"));
+        verify(orderCenterService).getLegacySpotBookings(eq(user), any(Pageable.class));
     }
 
     private Booking booking(Long id, User owner, Booking.Status status) {

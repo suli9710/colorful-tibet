@@ -2,6 +2,7 @@ package com.tibet.tourism.modules.community.infra;
 import com.tibet.tourism.modules.community.domain.TravelQuestion;
 import com.tibet.tourism.modules.user.domain.User;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -28,6 +29,9 @@ public interface TravelQuestionRepository extends JpaRepository<TravelQuestion, 
     Page<TravelQuestion> findAllByOrderByCreatedAtDesc(Pageable pageable);
 
     void deleteByAuthor(User author);
+
+    @Query("SELECT COALESCE(q.likeCount, 0) FROM TravelQuestion q WHERE q.id = :id")
+    Optional<Integer> findLikeCountById(@Param("id") Long id);
 
     // ── 原子计数更新（绕过乐观锁 read-modify-write 冲突） ──
 
