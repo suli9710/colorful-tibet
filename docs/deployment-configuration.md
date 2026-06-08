@@ -57,6 +57,12 @@ Docker Compose 展开变量时，宿主机环境变量和 `--env-file`/`.env` �
 
 上线评审应把 `PUBLIC_METRICS_ENABLED` 作为显式检查项，不能只凭默认值通过。
 
+## 运行时密钥暴露控制
+
+生产 Compose 不应把数据库或缓存密码放进长期可见的进程参数。`docker-compose.prod.yml` 中 Redis 通过容器启动时生成的受限临时配置文件读取转义后的 `requirepass`，启动后的主进程参数只包含配置文件路径；Redis healthcheck 使用 `REDISCLI_AUTH` 环境变量传递密码，不使用 `redis-cli -a`。生产 secret 应使用单行强随机值，不要使用包含换行符的多行值。
+
+MySQL healthcheck 使用 `--defaults-extra-file` 读取 root 凭据，并在每次检查退出时删除临时配置文件；本地和生产 Compose 都不要把 `mysqladmin -p...` 形式重新引入。生产主机上仍应限制 Docker socket、容器 exec 权限和宿主机 root 权限，因为这些权限本身足以读取容器环境变量或临时文件。
+
 ## Branch Protection 与 CI
 
 `.github/workflows/ci.yml` 已包含仓库噪声检查、Gitleaks、后端测试、Scrapler 测试、前端 typecheck/build/test/audit，以及 Docker 镜像构建、Trivy 扫描和 SBOM 产物。CI 是否不可绕过不由 YAML 单独保证，必须在 GitHub branch protection 或 repository ruleset 中启用。

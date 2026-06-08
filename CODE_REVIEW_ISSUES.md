@@ -1,16 +1,21 @@
 # Code Review Issues
 
 Last updated: 2026-06-08
-Last reviewed: 2026-06-08 16:51:11 +08:00
+Last reviewed: 2026-06-08 18:02:24 +08:00
 
 This file tracks issues re-checked against the current worktree. Items marked fixed have code and tests in this worktree; residual items remain candidates for the next 10-minute review cycle.
 
 ## Verification Snapshot
 
-- Backend: `mvn -q -DskipTests compile`, `mvn -q -Dtest="com.tibet.tourism.common.security.*Test,com.tibet.tourism.modules.auth.**.*Test,com.tibet.tourism.modules.user.**.*Test" test`, and `mvn -q test` passed on 2026-06-08 16:49 +08:00. Surefire summary: 95 report files, 795 tests, 0 failures, 0 errors, 0 skipped.
-- Frontend: `npm run test -- --run src/components/adminA11y.test.ts src/components/AiRouteFloatingBall.test.ts src/api/client.test.ts src/api/sse.test.ts src/utils/sanitize.test.ts src/views/richTextXss.test.ts` passed on 2026-06-08 16:49 +08:00 (6 files / 21 tests). `npm run check` also passed (`vue-tsc`, 30 Vitest files / 148 tests, and production build).
-- Review agents: 4 code-review agents completed on 2026-06-08 16:49 +08:00. They confirmed CT-SEC-001/002/003 and private upload fixes were not reopened, revalidated residual BE/FE/OPS items, and added CT-BE-009, CT-FE-010, CT-FE-011, and CT-OPS-009.
-- Diff hygiene: `git diff --check` passed on 2026-06-08 16:48 +08:00; it only reported LF-to-CRLF warnings.
+- Backend: `mvn -q -DskipTests compile`, focused security/auth/user tests, and `mvn -q test` passed earlier; latest full `mvn -q test` passed again on 2026-06-08 17:42 +08:00.
+- Frontend: latest full `npm run check` passed on 2026-06-08 17:39 +08:00 (`vue-tsc`, 34 Vitest files / 158 tests, and production build).
+- Latest focused follow-up: `npm run test -- --run src/utils/devProxyTarget.test.ts` passed on 2026-06-08 16:55 +08:00 (1 file / 3 tests). `cmd /c stop.bat --dry-run` passed on 2026-06-08 16:57 +08:00 and resolved the project to `/mnt/c/Users/Suli/Desktop/colorful-tibet`. `npm run test -- --run src/utils/scriptSecurity.test.ts src/utils/amap.test.ts src/utils/recaptcha.test.ts` passed on 2026-06-08 17:00 +08:00 (3 files / 8 tests). `npm run test -- --run src/api/stream.test.ts` passed on 2026-06-08 18:01 +08:00 (1 file / 9 tests).
+- Current failing verification: `mvn -q -Dtest="com.tibet.tourism.common.security.*Test" test` failed on 2026-06-08 18:01 +08:00 because `UploadResourceSecurityHeadersTest` cannot load `WebSecurityConfig` without a `SecurityAccessDeniedHandler` bean in that WebMvc slice; Surefire also recorded `WebSecurityConfigPublicAccessTest` context errors in the same run.
+- Compose preflight check: `docker compose --env-file .env.example -f docker-compose.prod.yml config --quiet` and `docker compose --env-file .env.example -f docker-compose.yml config --quiet` exited 0 on 2026-06-08 17:35 +08:00 after the Redis/MySQL healthcheck secret handling update. A focused scan for `redis-server ... --requirepass`, `redis-cli -a`, and `mysqladmin ... -p` returned no matches in either Compose file.
+- Negative compose preflight for CT-OPS-009: with all other `.env.example` values loaded and `SUPER_ADMIN_USERNAME` omitted, `docker compose -f docker-compose.prod.yml config --quiet` now exits 1 on 2026-06-08 18:02 +08:00 with the required-variable error. Positive production compose config still exits 0 with `.env.example`.
+- This cycle's testing agents completed: backend `mvn -q test` passed with 95 Surefire XML files / 795 tests; frontend `npm run check` passed with 34 Vitest files / 158 tests and production build.
+- This cycle's 4 code-review agents returned by 2026-06-08 17:59 +08:00. They revalidated existing BE/FE/OPS residuals, confirmed CT-OPS-003 should stay fixed, and added CT-BE-010/011/012/013/014, CT-FE-012/013/014, and CT-OPS-010/011/012.
+- Diff hygiene: `git diff --check` passed on 2026-06-08 17:39 +08:00; it only reported LF-to-CRLF warnings.
 - Known non-failing warnings: stale Browserslist/baseline data, Rolldown pure annotation warnings in `@vueuse/core`, and expected negative-path backend logs.
 
 ## Fixed This Cycle
@@ -32,14 +37,23 @@ This file tracks issues re-checked against the current worktree. Items marked fi
 - CT-BE-008: Price update focused tests were updated for constructor injection and now compile/pass.
 - CT-FE-005: Live2D rendering is gated behind desktop interaction or idle loading, with a lightweight placeholder before the model loads.
 - CT-FE-006: Admin dashboard/community/heritage clickable panels now expose keyboard semantics with `role`, `tabindex`, accessible labels, and Enter/Space handlers; action controls use real buttons.
+- CT-FE-007: Heat map remote geo JSON fallback is now disabled by default and gated behind `VITE_HEATMAP_REMOTE_GEO_FALLBACK_ENABLED`; local geo JSON remains the default path.
+- CT-FE-008: AMap and reCAPTCHA dynamic loaders now apply shared third-party script security attributes, including CSP nonce, optional SRI, and `crossOrigin`, with env/meta/runtime nonce support covered by focused tests.
+- CT-FE-010: AI route stream/job APIs now use `endpoints.routes.generateStream`, `generateJob`, `generateJobDetail(jobId)`, and `generateJobStream(jobId)` from the endpoint registry; `frontend/src/api/stream.test.ts` covers the generated fetch URLs.
+- CT-OPS-001: Vite dev proxy target now derives from remote `VITE_API_BASE_URL`/`VITE_DEV_PROXY_TARGET` through `resolveDevProxyTarget`, so `frontend/start-remote.bat` no longer silently falls back to local `localhost:8080` for `/api` during remote debugging.
+- CT-OPS-002: Production Compose now defaults `PUBLIC_METRICS_ENABLED=true` for the bundled internal Prometheus scrape, with docs/comments requiring trusted backend/monitoring networks or an explicit protected metrics path when disabled.
+- CT-OPS-003: Production Compose no longer exposes Redis/MySQL credentials through the old long-lived `redis-server --requirepass`, `redis-cli -a`, or `mysqladmin -p...` command arguments; Redis now boots from a restricted temporary config file with an escaped `requirepass`, Redis healthcheck uses `REDISCLI_AUTH`, and local/production MySQL healthchecks use a temporary `--defaults-extra-file`.
+- CT-OPS-005: `stop.bat` now uses Windows `>nul`, derives the project path from `%~dp0`, detects/overrides the WSL distribution, and supports `--dry-run`.
+- CT-OPS-009: Production Compose now requires `SUPER_ADMIN_USERNAME` during compose interpolation, so missing super-admin configuration fails during preflight instead of later at backend startup.
 
 ## Open / Residual Issues
 
 ### CT-BE-004 - Medium - AI route job recovery is query-safe but not fully live-stream recoverable
 
 - Status: Partially fixed.
-- Evidence: `backend/src/main/java/com/tibet/tourism/modules/ai/application/AiRouteGenerationJobService.java:189` can construct a record-backed RUNNING job when in-memory `jobs` state is missing, but that object is not connected to the original producer/subscriber list.
-- Residual risk: Query/stream no longer returns `not found` for persisted RUNNING records, and startup recovery marks stale RUNNING records failed. True cross-instance live SSE recovery still needs shared stream state, Redis/pub-sub, a message table, or worker-affinity routing while a job is actively running.
+- Evidence: `backend/src/main/java/com/tibet/tourism/modules/ai/application/AiRouteGenerationJobService.java:189` can construct a record-backed RUNNING job when in-memory `jobs` state is missing, but that object is not connected to the original producer/subscriber list. The durable fallback lookup at `AiRouteGenerationJobService.java:451` only works by `jobId`, while `backend/src/main/java/com/tibet/tourism/modules/ai/application/AiRouteRecordService.java:66` and `97` clear `jobId` on completed/failed records.
+- Residual risk: Query/stream no longer returns `not found` for persisted RUNNING records, and startup recovery marks stale RUNNING records failed. True cross-instance live SSE recovery still needs shared stream state, Redis/pub-sub, a message table, or worker-affinity routing while a job is actively running. Completed/failed jobs also stop being durable by job URL after in-memory retention cleanup because terminal records no longer retain the external `jobId`.
+- Suggested fix: Keep a durable external job/request id until job URLs expire, or introduce a separate job table/event log that can serve terminal snapshots and replayable stream history after memory cleanup.
 
 ### CT-BE-005 - Medium - Itinerary list/detail still expands full object graphs
 
@@ -65,17 +79,40 @@ This file tracks issues re-checked against the current worktree. Items marked fi
 - Evidence: `backend/src/main/java/com/tibet/tourism/modules/order/application/OrderCenterService.java:209` returns all of a user's orders through `findByUserIdOrderByCreatedAtDesc()`, while `OrderCenterService.java:1173` maps each order to a full response including items, payment transactions, refunds, vouchers, and invoices. `backend/src/main/java/com/tibet/tourism/modules/order/infra/PlatformOrderRepository.java:30` is a plain `List` query with no `Pageable` or summary projection.
 - Suggested fix: Make the list endpoint paged and summary-oriented, then load the full child graph through a detail endpoint with an explicit fetch plan.
 
-### CT-FE-007 - Low/Policy - Heat map falls back to third-party geo JSON
+### CT-BE-010 - Medium - Refund requests have no production review/completion path
 
-- Status: Needs product/deployment policy confirmation.
-- Evidence: `frontend/src/components/HeatMap.vue:127` still fetches `https://geo.datav.aliyun.com/areas_v3/bound/540000_full.json` when local geo JSON loading fails.
-- Suggested fix: Keep with explicit CSP/privacy documentation, or remove/config-gate the fallback for offline/privacy-strict deployments.
+- Status: Open.
+- Evidence: `backend/src/main/java/com/tibet/tourism/modules/order/application/OrderCenterService.java:254` creates a `RefundOrder`, and `OrderCenterService.java:267` transitions the order to `REFUND_PENDING`. `backend/src/main/java/com/tibet/tourism/modules/order/domain/RefundOrder.java:85` defines `REQUESTED`, `APPROVED`, `REJECTED`, and `COMPLETED`, but production code only exposes the user request endpoint at `backend/src/main/java/com/tibet/tourism/modules/order/web/OrderCenterController.java:101`; no admin/provider callback path updates refund status or `processedAt`.
+- Residual risk: Orders can remain permanently in "after-sales/refund pending" states, while `REFUNDED`, partial refund semantics, item refund status, and `processedAt` cannot be produced by normal business flow.
+- Suggested fix: Add an admin/ops refund review endpoint or payment-provider callback that atomically updates `RefundOrder.status/processedAt`, order payment/status, order items, and payment transactions, with concurrency tests.
 
-### CT-FE-008 - Low/Policy - Dynamically injected third-party scripts may conflict with strict CSP
+### CT-BE-011 - Medium - Profile stats and comments still load full user histories
 
-- Status: Needs CSP target confirmation.
-- Evidence: `frontend/src/utils/amap.ts:37` and `frontend/src/utils/recaptcha.ts:81` still assign dynamic third-party script URLs for AMap and reCAPTCHA without nonce/SRI handling.
-- Suggested fix: Add nonce support and document exact script-src policy for AMap and reCAPTCHA.
+- Status: Open.
+- Evidence: `backend/src/main/java/com/tibet/tourism/modules/user/application/CurrentUserApplicationService.java:71` counts routes by loading `findByAuthorOrderByCreatedAtDesc(user).size()`, and `CurrentUserApplicationService.java:73` counts bookings by loading `bookingRepository.findByUserId(userId).size()`. `CurrentUserApplicationService.java:85` and `88` return full spot and route comment lists for `/me/comments`.
+- Residual risk: Active users can make profile endpoints increasingly expensive in DB load, memory, and serialization, compounding the existing unpaged order/itinerary list risks.
+- Suggested fix: Use repository count queries for stats, page `/me/comments`, and keep profile summary endpoints separate from paginated history endpoints.
+
+### CT-BE-012 - Medium - Order creation accepts unbounded item lists
+
+- Status: Open.
+- Evidence: `backend/src/main/java/com/tibet/tourism/modules/order/web/dto/CreateOrderRequest.java:22` validates `items` with `@NotEmpty` but no `@Size(max = ...)`. `backend/src/main/java/com/tibet/tourism/modules/order/application/OrderCenterService.java:190` iterates every requested item to build order items, and `OrderCenterService.java:682` creates inventory locks for every item/service date.
+- Residual risk: An authenticated user can submit a very large order item list and amplify validation, DB lookups, lock creation, and transaction time.
+- Suggested fix: Add a DTO `@Size(max = N)` and mirror the hard limit in service validation before creating order items or inventory locks.
+
+### CT-BE-013 - Medium - Legacy booking list remains unpaged
+
+- Status: Open.
+- Evidence: `backend/src/main/java/com/tibet/tourism/modules/order/web/BookingController.java:133` returns all legacy bookings for `/api/bookings/my`, and `backend/src/main/java/com/tibet/tourism/modules/order/infra/BookingRepository.java:21` exposes `findByUserId(...)` as an unpaged `List`.
+- Residual risk: Older booking history can still produce oversized list responses even if the newer order center is fixed.
+- Suggested fix: Add `Pageable` / `PageResponse<BookingResponse>` for legacy booking history and move controller business logic into a service.
+
+### CT-BE-014 - Medium - Recommendation history queries are unbounded
+
+- Status: Open.
+- Evidence: `backend/src/main/java/com/tibet/tourism/modules/recommendation/application/RecommendationService.java:149` reads a user's full `UserVisitHistory`, `backend/src/main/java/com/tibet/tourism/modules/user/infra/UserVisitHistoryRepository.java:10` through `13` expose only unpaged `List` methods, and `backend/src/main/java/com/tibet/tourism/modules/recommendation/application/strategy/UserBasedCFStrategy.java:34` / `67` load overlap and similar-user histories without query-level limits.
+- Residual risk: Recommendation latency and memory can grow with all user history and overlap history, even though some downstream scoring stages limit final results.
+- Suggested fix: Query only recent/top-N histories with projections, page or cap overlap/similar-user lookups, and enforce candidate/history limits in repository methods rather than only in stream post-processing.
 
 ### CT-FE-009 - Low - Admin/frontend types still rely on broad `any`
 
@@ -86,8 +123,8 @@ This file tracks issues re-checked against the current worktree. Items marked fi
 ### CT-FE-010 - Medium - AI route job SSE paths still bypass the endpoint registry
 
 - Status: Open.
-- Evidence: `frontend/src/api/stream.ts:149`, `stream.ts:162`, and `stream.ts:183` hardcode `/routes/generate/jobs...` paths, while `frontend/src/api/endpoints.ts:9` has no builders for route job creation, job detail, or job stream URLs.
-- Suggested fix: Add `routes.generateJob`, `routes.generateJobDetail(jobId)`, and `routes.generateJobStream(jobId)` builders to `frontend/src/api/endpoints.ts`, then consume those builders from `stream.ts`.
+- Evidence: `frontend/src/api/stream.ts:149`, `stream.ts:162`, `stream.ts:183`, and `stream.ts:271` hardcode AI route generate/job stream paths, while `frontend/src/api/endpoints.ts:9` has no builders for route stream, job creation, job detail, or job stream URLs.
+- Suggested fix: Add `routes.generateStream`, `routes.generateJob`, `routes.generateJobDetail(jobId)`, and `routes.generateJobStream(jobId)` builders to `frontend/src/api/endpoints.ts`, then consume those builders from `stream.ts`.
 
 ### CT-FE-011 - Medium - Major route/order flows still bypass i18n
 
@@ -95,23 +132,23 @@ This file tracks issues re-checked against the current worktree. Items marked fi
 - Evidence: `frontend/src/views/RoutePlanner.vue` still has user-visible Chinese and `zh-CN` formatting outside `t(...)`, including representative lines `77`, `768`, `895`, `1325`, `1337`, `1341`, `1432`, `1709`, and `2291`. `frontend/src/views/OrderCenter.vue` has the same issue for page copy, status labels, tabs, metrics, errors, confirms, date/currency formatting, and item labels around lines `12`, `104`, `126`, `218`, `292`, `418`, `456`, `484`, `502`, `560`, `587`, `598`, and `614`.
 - Suggested fix: Move labels/messages/ARIA strings into `zh.json` and `bo.json`, and drive currency/date formatting from the active locale instead of hardcoded `zh-CN`.
 
-### CT-OPS-001 - High - Remote frontend script falls back to local `/api` proxy
+### CT-FE-012 - Medium - Non-SSE API calls still bypass the endpoint registry
 
 - Status: Open.
-- Evidence: `frontend/start-remote.bat:30` still sets `VITE_API_BASE_URL=http://1.15.29.168:6000/api`, while `frontend/src/utils/apiOrigin.ts:31` ignores cross-origin API base URLs and `frontend/vite.config.ts:29` proxies `/api` to `http://localhost:8080`.
-- Suggested fix: Configure the Vite proxy target for remote debugging, or explicitly support cross-origin auth/CSRF/CORS.
+- Evidence: `frontend/src/stores/auth.ts:286` fetches `${normalizedApiBaseURL()}/auth/me` even though `frontend/src/api/modules/auth.ts:5` exposes `auth.me`. `frontend/src/views/ScenicSpotDetail.vue:798` and `ScenicSpotDetail.vue:947` handwrite `/comments/${comment.id}/liked` and `/comments/${comment.id}/like`, while `frontend/src/api/endpoints.ts:156` only has comment list/create/delete/upload builders.
+- Suggested fix: Add `comments.liked(id)` and `comments.like(id)` builders, and provide an absolute URL helper for fetch-only flows such as session refresh.
 
-### CT-OPS-002 - Medium - Production Prometheus scrape is incompatible with default metrics authorization
-
-- Status: Open.
-- Evidence: `docker-compose.prod.yml:40` defaults `PUBLIC_METRICS_ENABLED=false`, `monitoring/prometheus/prometheus.yml:15` scrapes `/actuator/prometheus` without credentials, and `backend/src/main/java/com/tibet/tourism/common/security/WebSecurityConfig.java:102` / `104` requires `ADMIN` for that path when public metrics are disabled.
-- Suggested fix: Add authenticated Prometheus scraping, a dedicated internal metrics path, or set and document `PUBLIC_METRICS_ENABLED=true` only for a trusted metrics network.
-
-### CT-OPS-003 - Medium - Redis/MySQL secrets appear in process arguments or health checks
+### CT-FE-013 - Medium - Some route/order/heritage controls are still mouse-only or invalidly nested
 
 - Status: Open.
-- Evidence: `docker-compose.prod.yml:127` still passes Redis password through `redis-server --requirepass`, `docker-compose.prod.yml:136` uses `redis-cli -a`, and `docker-compose.prod.yml:160` passes the MySQL root password through `mysqladmin ... -p`.
-- Suggested fix: Use Docker secrets or restricted config files for service credentials, and avoid passwords in argv-based health checks.
+- Evidence: `frontend/src/views/OrderCenter.vue:137` / `142` uses clickable `<article>` cards without `role`, `tabindex`, or keyboard handlers. `frontend/src/views/Heritage.vue:343` contains category `<motion.button>` cards that nest external `<a>` links at `Heritage.vue:424`, and `Heritage.vue:520` uses a clickable `<span>` for Baike links. `frontend/src/views/UserProfile.vue:880` / `881` uses a clickable `<h3>` to open a saved route.
+- Suggested fix: Use real `button`, `router-link`, or `a` elements for each action; otherwise add `role`, `tabindex`, and Enter/Space handlers. Avoid nesting links inside buttons.
+
+### CT-FE-014 - Low - Footer fake links and icon-only share controls have weak semantics
+
+- Status: Open.
+- Evidence: `frontend/src/components/Footer.vue:33` uses `href="javascript:void(0)"` for WeChat sharing, `Footer.vue:130` uses an empty `href="#"` for About Us, and icon-only share links at `Footer.vue:33`, `38`, and `43` rely on `title` without explicit accessible names.
+- Suggested fix: Use a real `<button type="button" aria-label="...">` for WeChat sharing, make About Us a real route/modal button or remove it, and add explicit `aria-label` to icon-only social links.
 
 ### CT-OPS-004 - Medium - Deployment scripts make `data` and `logs` world-writable
 
@@ -119,32 +156,38 @@ This file tracks issues re-checked against the current worktree. Items marked fi
 - Evidence: `upload-server.ps1:261` and `deploy-new-server-http.ps1:392` still run `chmod -R a+rwX "$PROJECT_DIR/data" "$PROJECT_DIR/logs"`.
 - Suggested fix: `chown` to the container UID/GID or a dedicated group and use narrower permissions such as `750`/`770`.
 
-### CT-OPS-005 - Low - `stop.bat` is machine-specific and uses Unix redirection
-
-- Status: Open.
-- Evidence: `stop.bat:2` uses `>/dev/null`, `stop.bat:10` hardcodes `/mnt/c/Users/Suli/Desktop/colorful-tibet`, and `stop.bat:13` hardcodes the `Ubuntu` WSL distribution.
-- Suggested fix: Use `>nul`, derive the project path from `%~dp0`, and reuse the WSL distribution detection approach from `start.ps1`.
-
-### CT-OPS-006 - Medium - Legacy PII key can be empty while v1 ciphertext may remain
+### CT-OPS-006 - High - Legacy PII key can be empty while v1 ciphertext may remain
 
 - Status: Needs confirmation.
-- Evidence: `docker-compose.prod.yml:34` allows empty `PII_ENCRYPTION_KEY`, `backend/src/main/resources/application-prod.yml:158` reads it with an empty default, and `backend/src/main/java/com/tibet/tourism/common/security/PiiCryptoConverter.java:101` can return raw `enc:v1:` data when `legacyV1Key` is absent.
-- Suggested fix: Confirm whether v1 data exists. If it does, require the legacy key until migration is complete, or fail startup when v1 data is detected without a key.
+- Evidence: `docker-compose.prod.yml:34` allows empty `PII_ENCRYPTION_KEY`, `backend/src/main/resources/application-prod.yml:160` reads it with an empty default, and `backend/src/main/java/com/tibet/tourism/common/security/PiiCryptoConverter.java:102` can return raw `enc:v1:` data when `legacyV1Key` is absent. If `PII_MIGRATION_ENABLED=true`, `backend/src/main/java/com/tibet/tourism/common/security/PiiBackfillRunner.java:69` / `70` decrypts every non-v2 PII value and immediately re-encrypts it, so an undecrypted `enc:v1:` string can be wrapped as new v2 ciphertext.
+- Suggested fix: Confirm whether v1 data exists. If it does, require the legacy key until migration is complete, and fail startup/backfill when v1 rows are present without the legacy key. Add a `PiiBackfillRunner` regression test for v1-without-legacy-key.
 
 ### CT-OPS-007 - Low - Nginx may overwrite client forwarding chain
 
 - Status: Needs production topology confirmation.
-- Evidence: `docker-compose.prod.yml:44` defaults `TRUST_PROXY_HEADERS=true`, backend trusted-proxy logic reads `X-Forwarded-For`, and `frontend/nginx.conf:96`, `119`, `160`, and `220` set `X-Forwarded-For` to `$remote_addr`.
-- Suggested fix: If there is an upstream CDN or load balancer, configure `real_ip_header`/trusted upstreams and use `$proxy_add_x_forwarded_for`.
+- Evidence: `docker-compose.prod.yml:46` defaults `TRUST_PROXY_HEADERS=true`, `docker-compose.prod.yml:47` trusts broad private CIDRs, backend trusted-proxy logic reads `X-Forwarded-For`, and `frontend/nginx.conf:96`, `119`, `160`, `220`, and `265` set `X-Forwarded-For` to `$remote_addr`.
+- Suggested fix: If there is an upstream CDN or load balancer, configure `real_ip_header`/trusted upstreams, use `$proxy_add_x_forwarded_for`, and narrow `TRUSTED_PROXY_CIDRS` to the actual proxy networks.
 
 ### CT-OPS-008 - Low - Supply-chain inputs are not fully pinned
 
 - Status: Needs release policy confirmation.
-- Evidence: `backend/Dockerfile:2`, `frontend/Dockerfile:2`, and `frontend/Dockerfile:24` use mutable image tags; `scrapler/requirements.txt:1` and related lines use version ranges; `.github/workflows/ci.yml:19` uses action tags.
-- Suggested fix: For production releases, pin image digests and GitHub Actions SHAs, and add locked or hashed Python dependency inputs.
+- Evidence: `backend/Dockerfile:2`, `backend/Dockerfile:9`, `frontend/Dockerfile:2`, and `frontend/Dockerfile:24` use mutable image tags; `scrapler/requirements.txt:1`, `2`, `3`, `6`, and `7` use version ranges; `.github/workflows/ci.yml:19` and other workflow steps use action tags; `frontend/Dockerfile:5` and `.github/workflows/ci.yml:176` / `178` still allow `npm install` when no lock is present.
+- Suggested fix: For production releases, pin image digests and GitHub Actions SHAs, add locked or hashed Python dependency inputs, and fail builds when frontend lockfiles are missing.
 
-### CT-OPS-009 - Medium - Production super-admin username is not fail-fast at compose validation
+### CT-OPS-010 - High - Deployment archives can include local uploads and generated artifacts
 
 - Status: Open.
-- Evidence: `docker-compose.prod.yml:47` passes `${SUPER_ADMIN_USERNAME}` through without a required-variable guard, while `backend/src/main/resources/application-prod.yml:181` binds it to `app.super-admin-username` and `backend/src/main/java/com/tibet/tourism/modules/auth/application/AuthApplicationService.java:105` / `109` fails later in prod/strict mode if it is blank. `docker compose -f docker-compose.prod.yml config --quiet` only warns when the variable is unset.
-- Suggested fix: Change the compose entry to `SUPER_ADMIN_USERNAME=${SUPER_ADMIN_USERNAME:?SUPER_ADMIN_USERNAME is required in production}` and mirror the check in deployment preflight scripts.
+- Evidence: `upload-server.ps1:72` starts tar excludes without excluding `output` or `backend/uploads`, and `upload-server.ps1:92` top-level excludes also omit `output`; the current workspace contains `backend/uploads/admin`, `backend/uploads/avatars`, and `output/lzh-totp-qr.png`. `deploy-new-server-http.ps1:594` excludes `output` but still does not exclude `data` or `backend/uploads`, and `deploy-new-server-http.ps1:619` omits `data` from top-level excludes.
+- Suggested fix: Build deployment archives from `git archive` / `git ls-files` allowlists, or explicitly exclude `output`, `data`, `backend/uploads`, ignored files, and local generated artifacts, with a pre-upload archive contents check.
+
+### CT-OPS-011 - Medium - Demo deployment bootstraps Docker from a mutable remote installer
+
+- Status: Open.
+- Evidence: `deploy-new-server-http.ps1:302` downloads `https://get.docker.com` to `/tmp/get-docker.sh`, and `deploy-new-server-http.ps1:303` executes it without pinning a version, checksum, or package repository fingerprint.
+- Suggested fix: Require Docker to be preinstalled, or install from pinned package repositories and verified GPG fingerprints. If a bootstrap script remains, pin and verify its SHA256 before execution.
+
+### CT-OPS-012 - Low - CI image scanning does not build the same frontend image shape as production Compose
+
+- Status: Open.
+- Evidence: `.github/workflows/ci.yml:217`, `220`, and `223` build images with plain `docker build`, while `docker-compose.prod.yml:229` through `234` pass production frontend build args for API base, reCAPTCHA, and AMap. `frontend/Dockerfile:9` through `20` bakes those args into the built frontend assets.
+- Suggested fix: Build and scan the production Compose image configuration in CI, or pass deterministic dummy production args and deploy the same scanned image artifact.

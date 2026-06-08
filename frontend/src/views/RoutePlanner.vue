@@ -62,8 +62,20 @@
                 <p id="route-planner-status-message" class="mt-0.5 break-words text-sm">{{ routeStatusText }}</p>
               </div>
             </div>
-            <div v-if="errorMessage" class="flex shrink-0 flex-wrap gap-2 sm:justify-end">
+            <div v-if="errorMessage || canResumePausedRouteJob" class="flex shrink-0 flex-wrap gap-2 sm:justify-end">
               <button
+                v-if="canResumePausedRouteJob"
+                type="button"
+                class="min-h-11 rounded-xl bg-tibet-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-tibet-blue/90 disabled:cursor-not-allowed disabled:opacity-55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tibet-blue focus-visible:ring-offset-2"
+                :disabled="routeResumeLoading"
+                :aria-busy="routeResumeLoading"
+                aria-label="恢复 AI 路线生成"
+                @click="resumePausedRouteJob"
+              >
+                {{ routeResumeLoading ? '恢复中...' : '恢复生成' }}
+              </button>
+              <button
+                v-if="errorMessage"
                 type="button"
                 class="min-h-11 rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2"
                 :aria-label="t('routePlanner.regenerate')"
@@ -72,6 +84,7 @@
                 {{ t('routePlanner.regenerate') }}
               </button>
               <button
+                v-if="errorMessage"
                 type="button"
                 class="min-h-11 rounded-xl border border-rose-200 bg-white/75 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2"
                 aria-label="关闭路线规划错误提示"
@@ -287,13 +300,23 @@
                 :exit="{ opacity: 0, y: 8, scale: 0.98 }"
                 :transition="{ duration: 0.34, ease: motionEase }"
               >
-                <div class="flex items-center gap-3 mb-3">
-                  <span class="relative flex h-3 w-3">
-                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
-                    <span class="relative inline-flex rounded-full h-3 w-3 bg-tibet-turquoise"></span>
-                  </span>
-                  <span class="text-sm font-semibold text-tibet-blue">{{ routeGenerationStatusLabel }}</span>
-                  <span v-if="charCount > 0" class="ml-auto text-xs text-tibet-blue/70 font-mono">{{ charCount }} {{ t('routePlanner.charCountUnit') }}</span>
+                <div class="mb-3 flex flex-wrap items-center gap-3">
+                  <div class="flex min-w-0 flex-1 items-center gap-3">
+                    <span class="relative flex h-3 w-3 shrink-0">
+                      <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
+                      <span class="relative inline-flex rounded-full h-3 w-3 bg-tibet-turquoise"></span>
+                    </span>
+                    <span class="min-w-0 text-sm font-semibold text-tibet-blue">{{ routeGenerationStatusLabel }}</span>
+                  </div>
+                  <span v-if="charCount > 0" class="text-xs text-tibet-blue/70 font-mono">{{ charCount }} {{ t('routePlanner.charCountUnit') }}</span>
+                  <button
+                    type="button"
+                    class="min-h-9 rounded-xl border border-sky-200 bg-white/80 px-3 py-1.5 text-xs font-semibold text-tibet-blue transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tibet-blue/70 focus-visible:ring-offset-2"
+                    aria-label="停止等待 AI 路线生成"
+                    @click="pauseRouteGeneration"
+                  >
+                    停止等待
+                  </button>
                 </div>
                 <div class="h-1.5 rounded-full bg-tibet-gold/15 overflow-hidden">
                   <div
@@ -308,6 +331,9 @@
                   ></div>
                 </div>
                 <p class="mt-2 text-xs text-tibet-brown/60">{{ t('routePlanner.waitingTime') }}</p>
+                <p class="mt-1 text-xs leading-relaxed text-tibet-brown/55">
+                  可停止等待并保留当前片段，稍后从服务端状态恢复或重新生成。
+                </p>
               </motion.div>
             </AnimatePresence>
 
@@ -1096,7 +1122,7 @@ import { useAuthGuard } from '../composables/useAuthGuard'
 import { showToast } from '../composables/useToast'
 import { useAuthStore } from '../stores/auth'
 import { useRouteGenerationStore } from '../stores/routeGeneration'
-import { readBrowserStorage } from '../utils/browserStorage'
+import { readBrowserStorage, removeBrowserStorage, writeBrowserStorage } from '../utils/browserStorage'
 import { summarizeClientError } from '../utils/errorMonitoring'
 import { openExternalBooking } from '../utils/externalBooking'
 import {
@@ -1115,6 +1141,8 @@ const router = useRouter()
 const auth = useAuthStore()
 const generationStore = useRouteGenerationStore()
 const { requireAuth } = useAuthGuard()
+const PAUSED_ROUTE_JOB_STORAGE_KEY = 'colorful-tibet:route-planner:paused-job'
+const SAFE_ROUTE_JOB_ID_PATTERN = /^[A-Za-z0-9:_-]{1,160}$/
 
 interface RouteSummarySection {
   day: string
@@ -1404,6 +1432,8 @@ const generationElapsedSeconds = ref(0)
 const charCount = ref(0)
 const streamAbortController = ref<AbortController | null>(null)
 const activeRouteJobId = ref('')
+const pausedRouteJobId = ref('')
+const routeResumeLoading = ref(false)
 const currentAiRouteRecordId = ref<number | null>(null)
 const currentAiRouteManuallySaved = ref(false)
 const result = shallowRef('')
@@ -1430,9 +1460,36 @@ const routeStatusText = computed(() => errorMessage.value || statusMessage.value
 const daysValueLabel = computed(() => `${t('routePlanner.plannedDays')}：${form.value.days}${t('routePlanner.daysUnit')}`)
 const routeGenerationProgressLabel = computed(() => `${routeGenerationStatusLabel.value}，${routeGenerationProgressPercent.value}%`)
 const resultToggleLabel = computed(() => resultExpanded.value ? '收起路线全文' : '展开路线全文')
+const canResumePausedRouteJob = computed(() =>
+  Boolean(pausedRouteJobId.value && !loading.value && !streaming.value && !activeRouteJobId.value)
+)
 
 const dismissRouteError = () => {
   errorMessage.value = ''
+}
+
+const normalizeRouteJobId = (jobId: unknown) => {
+  if (typeof jobId !== 'string') return ''
+  const normalized = jobId.trim()
+  return SAFE_ROUTE_JOB_ID_PATTERN.test(normalized) ? normalized : ''
+}
+
+const rememberPausedRouteJob = (jobId: string) => {
+  const normalized = normalizeRouteJobId(jobId)
+  if (!normalized) return
+  pausedRouteJobId.value = normalized
+  writeBrowserStorage('sessionStorage', PAUSED_ROUTE_JOB_STORAGE_KEY, normalized)
+}
+
+const clearPausedRouteJob = (jobId = '') => {
+  if (jobId && pausedRouteJobId.value && pausedRouteJobId.value !== jobId) return
+  pausedRouteJobId.value = ''
+  removeBrowserStorage('sessionStorage', PAUSED_ROUTE_JOB_STORAGE_KEY)
+}
+
+const restorePausedRouteJob = () => {
+  pausedRouteJobId.value = normalizeRouteJobId(readBrowserStorage('sessionStorage', PAUSED_ROUTE_JOB_STORAGE_KEY, ''))
+  return pausedRouteJobId.value
 }
 
 const safeRouteFailureMessage = (error: unknown) => {
@@ -1921,6 +1978,19 @@ const applyAiRouteRecord = (record: AiRouteRecordResponse) => {
   }
 
   if (record.status === 'RUNNING' && record.jobId) {
+    if (pausedRouteJobId.value === record.jobId) {
+      activeRouteJobId.value = ''
+      loading.value = false
+      streaming.value = false
+      stopFirstTokenProgress()
+      statusMessage.value = record.content?.trim()
+        ? `已停止等待，已保留当前 ${record.content.trim().length} 字内容；可恢复生成或重新生成。`
+        : '已停止等待，可恢复生成或重新生成。'
+      errorMessage.value = ''
+      persistRouteDraft({ jobId: '', completed: false })
+      return true
+    }
+
     activeRouteJobId.value = record.jobId
     loading.value = true
     streaming.value = true
@@ -1940,6 +2010,9 @@ const applyAiRouteRecord = (record: AiRouteRecordResponse) => {
   loading.value = false
   streaming.value = false
   stopFirstTokenProgress()
+  if (record.jobId) {
+    clearPausedRouteJob(record.jobId)
+  }
 
   if (record.content?.trim()) {
     errorMessage.value = record.status === 'FAILED' ? t('routePlanner.generateFailed') : ''

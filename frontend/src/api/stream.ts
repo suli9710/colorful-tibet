@@ -1,4 +1,5 @@
 import { expireAuthSession } from './index'
+import { endpoints } from './endpoints'
 import { isAbortError, readJsonSseStream, type JsonSseMessage } from './sse'
 import { apiBaseURL, isSameOriginApi } from '../utils/apiOrigin'
 import { readBrowserStorage } from '../utils/browserStorage'
@@ -15,6 +16,10 @@ function readCookie(name: string): string {
 
 function getCurrentLocale(): string {
   return readBrowserStorage('localStorage', 'locale', 'zh') === 'bo' ? 'bo' : 'zh'
+}
+
+function apiUrl(endpoint: string): string {
+  return `${apiBaseURL}${endpoint}`
 }
 
 export interface StreamMeta {
@@ -146,7 +151,7 @@ export async function startRouteGenerationJob(
     headers['X-XSRF-TOKEN'] = csrfToken
   }
 
-  const response = await fetch(`${apiBaseURL}/routes/generate/jobs`, {
+  const response = await fetch(apiUrl(endpoints.routes.generateJob), {
     method: 'POST',
     credentials: sameOriginApi ? 'include' : 'omit',
     headers,
@@ -159,7 +164,7 @@ export async function startRouteGenerationJob(
 }
 
 export async function getRouteGenerationJob(jobId: string): Promise<RouteGenerationJobSnapshot> {
-  const response = await fetch(`${apiBaseURL}/routes/generate/jobs/${encodeURIComponent(jobId)}`, {
+  const response = await fetch(apiUrl(endpoints.routes.generateJobDetail(jobId)), {
     method: 'GET',
     credentials: sameOriginApi ? 'include' : 'omit',
     headers: {
@@ -180,7 +185,7 @@ export async function streamRouteGenerationJob(
 ): Promise<void> {
   let response: Response
   try {
-    response = await fetch(`${apiBaseURL}/routes/generate/jobs/${encodeURIComponent(jobId)}/stream`, {
+    response = await fetch(apiUrl(endpoints.routes.generateJobStream(jobId)), {
       method: 'GET',
       credentials: sameOriginApi ? 'include' : 'omit',
       headers: {
@@ -268,7 +273,7 @@ export async function generateRouteStream(
 
   let response: Response
   try {
-    response = await fetch(`${apiBaseURL}/routes/generate/stream`, {
+    response = await fetch(apiUrl(endpoints.routes.generateStream), {
       method: 'POST',
       credentials: sameOriginApi ? 'include' : 'omit',
       headers,

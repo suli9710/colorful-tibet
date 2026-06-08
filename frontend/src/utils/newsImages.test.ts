@@ -12,6 +12,10 @@ describe('news image fallback', () => {
     expect(resolveNewsImage({ id: 1, title: 'Policy' }, {})).toBe(NEWS_DEFAULT_IMAGE)
   })
 
+  it('uses a category image when one is available', () => {
+    expect(resolveNewsImage({ id: 3, title: 'Event', category: 'EVENT' }, {})).toBe('/heritage/雪顿节.jpg')
+  })
+
   it('switches to the fallback image after an image load error', () => {
     const failedImages: Record<string, boolean> = {}
     const item = { id: 2, imageUrl: '/images/news/policy.jpg', title: 'Policy' }

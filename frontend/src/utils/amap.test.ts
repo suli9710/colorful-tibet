@@ -23,10 +23,11 @@ describe('AMap script loader', () => {
     expect(script?.integrity).toBe('sha384-amap-hash')
     expect(script?.crossOrigin).toBe('anonymous')
 
-    window.AMap = { ready: true }
+    const amapWindow = window as unknown as Window & { AMap: unknown }
+    amapWindow.AMap = { ready: true }
     script?.dispatchEvent(new dom.window.Event('load'))
 
-    await expect(loaded).resolves.toBe(window.AMap)
+    await expect(loaded).resolves.toBe(amapWindow.AMap)
   })
 })
 

@@ -43,7 +43,7 @@ describe('third-party script security attributes', () => {
 
   it('can read a nonce from a trusted runtime global', () => {
     installDom()
-    window.__CSP_NONCE__ = 'runtime-nonce'
+    ;(window as Window & { __CSP_NONCE__?: string }).__CSP_NONCE__ = 'runtime-nonce'
 
     const script = document.createElement('script')
     applyThirdPartyScriptSecurity(script, 'recaptcha')

@@ -25,7 +25,6 @@ import org.springframework.core.Ordered;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -148,11 +147,12 @@ public class RequestRateLimitFilter extends OncePerRequestFilter {
         response.setHeader("X-RateLimit-Reset", String.valueOf(decision.resetEpochSeconds()));
 
         if (!decision.allowed()) {
-            response.setStatus(429);
             response.setHeader(HttpHeaders.RETRY_AFTER, String.valueOf(decision.retryAfterSeconds()));
-            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-            response.setCharacterEncoding("UTF-8");
-            response.getWriter().write("{\"error\":\"Too Many Requests\",\"message\":\"Request rate limit exceeded\"}");
+            SecurityErrorResponseWriter.writeJson(
+                    response,
+                    429,
+                    "Too Many Requests",
+                    "Request rate limit exceeded");
             return;
         }
 

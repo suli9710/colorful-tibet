@@ -17,44 +17,83 @@
           v-if="!loading && !errorMessage && spots.length"
           class="mt-5 inline-flex max-w-full items-center rounded-full border border-tibet-gold/20 bg-white/65 px-4 py-2 text-sm font-medium text-tibet-brown/75 shadow-sm backdrop-blur tibetan-font"
         >
-          {{ t('spots.resultSummary', { count: filteredSpots.length, category: selectedCategoryLabel }) }}
+          {{ resultSummaryText }}
         </div>
       </motion.div>
 
-      <!-- Filters -->
+      <!-- Search and filters -->
       <motion.div
-        class="-mx-4 mb-10 overflow-x-auto px-4 pb-2 sm:mx-0 sm:flex sm:justify-center sm:overflow-visible sm:px-0 sm:pb-0 sm:mb-12 will-change-transform"
+        class="mb-10 sm:mb-12 will-change-transform"
         :initial="revealInitial"
         :whileInView="revealInView"
         :inViewOptions="inViewOnce"
         :transition="revealTransition"
       >
-        <div class="tibet-panel flex w-max min-w-full space-x-2 rounded-full p-1.5 sm:min-w-0">
-          <motion.button 
-            v-for="cat in categories" 
-            :key="cat.value"
-            type="button"
-            @click="selectedCategory = cat.value"
-            :aria-pressed="selectedCategory === cat.value"
-            :aria-label="t('spots.filterByCategory', { category: cat.label })"
-            layout
-            :whileHover="{ y: -2, scale: 1.04 }"
-            :whilePress="{ scale: 0.94 }"
-            :class="[
-              'relative min-h-11 shrink-0 overflow-hidden rounded-full px-5 py-2.5 text-sm font-medium transition-all duration-300 ease-out-expo will-change-transform tibetan-font focus:outline-none focus:ring-2 focus:ring-tibet-gold/60 focus:ring-offset-2',
-              selectedCategory === cat.value 
-                ? 'bg-tibet-dark text-white shadow-md transform scale-105' 
-                : 'text-tibet-brown/80 hover:bg-tibet-gold/5 hover:text-tibet-dark hover:scale-105'
-            ]"
-          >
-            <span class="relative z-10">{{ cat.label }}</span>
-            <motion.span
-              v-if="selectedCategory === cat.value"
-              layoutId="spots-category-pill"
-              class="absolute inset-0 bg-gradient-to-r from-tibet-blue/20 to-tibet-red/20"
-              :transition="softSpring"
-            ></motion.span>
-          </motion.button>
+        <div class="tibet-panel rounded-3xl p-3 sm:p-4">
+          <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <form class="min-w-0 flex-1" role="search" @submit.prevent>
+              <label for="spot-search" class="sr-only">{{ t('common.search') }}</label>
+              <div class="relative">
+                <svg xmlns="http://www.w3.org/2000/svg" class="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-tibet-brown/35" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <input
+                  id="spot-search"
+                  v-model="searchKeyword"
+                  type="search"
+                  class="min-h-11 w-full rounded-2xl border border-tibet-gold/20 bg-white/80 py-3 pl-10 pr-12 text-sm text-tibet-dark outline-none transition placeholder:text-tibet-brown/35 focus:border-tibet-gold/60 focus:ring-2 focus:ring-tibet-gold/25 tibetan-font"
+                  :placeholder="t('spots.searchPlaceholder', '搜索景点、地区或标签')"
+                  :aria-label="t('spots.searchPlaceholder', '搜索景点、地区或标签')"
+                >
+                <button
+                  v-if="searchKeyword"
+                  type="button"
+                  class="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-tibet-brown/45 transition hover:bg-tibet-gold/10 hover:text-tibet-dark focus:outline-none focus:ring-2 focus:ring-tibet-gold/60"
+                  :aria-label="t('heritage.clearSearch', '清除')"
+                  @click="searchKeyword = ''"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                  </svg>
+                </button>
+              </div>
+            </form>
+
+            <div class="-mx-3 overflow-x-auto px-3 pb-1 sm:mx-0 sm:px-0 sm:pb-0">
+              <div class="flex w-max min-w-full gap-2 sm:min-w-0" role="group" :aria-label="t('spots.filterByCategory', { category: selectedCategoryLabel })">
+                <motion.button 
+                  v-for="cat in categories" 
+                  :key="cat.value"
+                  type="button"
+                  @click="selectedCategory = cat.value"
+                  :aria-pressed="selectedCategory === cat.value"
+                  :aria-label="t('spots.filterByCategory', { category: cat.label })"
+                  layout
+                  :whileHover="{ y: -2, scale: 1.04 }"
+                  :whilePress="{ scale: 0.94 }"
+                  :class="[
+                    'relative min-h-11 shrink-0 overflow-hidden rounded-full px-4 py-2.5 text-sm font-medium transition-all duration-300 ease-out-expo will-change-transform tibetan-font focus:outline-none focus:ring-2 focus:ring-tibet-gold/60 focus:ring-offset-2',
+                    selectedCategory === cat.value 
+                      ? 'bg-tibet-dark text-white shadow-md transform scale-105' 
+                      : 'bg-white/50 text-tibet-brown/80 hover:bg-tibet-gold/5 hover:text-tibet-dark hover:scale-105'
+                  ]"
+                >
+                  <span class="relative z-10 inline-flex items-center gap-2">
+                    {{ cat.label }}
+                    <span class="rounded-full px-2 py-0.5 text-[11px]" :class="selectedCategory === cat.value ? 'bg-white/15 text-white' : 'bg-tibet-gold/10 text-tibet-brown/55'">
+                      {{ cat.count }}
+                    </span>
+                  </span>
+                  <motion.span
+                    v-if="selectedCategory === cat.value"
+                    layoutId="spots-category-pill"
+                    class="absolute inset-0 bg-gradient-to-r from-tibet-blue/20 to-tibet-red/20"
+                    :transition="softSpring"
+                  ></motion.span>
+                </motion.button>
+              </div>
+            </div>
+          </div>
         </div>
       </motion.div>
 
@@ -154,10 +193,10 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
           <h3 class="text-lg font-bold text-gray-700 mb-2 tibetan-font">{{ t('spots.noCategoryTitle') }}</h3>
-          <p class="text-gray-500 mb-4 tibetan-font">{{ t('spots.noCategoryMessage') }}</p>
+          <p class="text-gray-500 mb-4 tibetan-font">{{ noResultsMessage }}</p>
           <button
             type="button"
-            @click="selectedCategory = 'ALL'"
+            @click="resetFilters"
             class="min-h-11 rounded-full bg-tibet-dark px-6 py-2 text-white transition-colors hover:bg-black focus:outline-none focus:ring-2 focus:ring-tibet-gold/60 focus:ring-offset-2 tibetan-font"
             :aria-label="t('spots.showAll')"
           >
@@ -225,7 +264,7 @@
             </div>
             
             <p class="mb-6 break-words text-tibet-brown/70 line-clamp-3 leading-relaxed tibetan-font">
-              {{ spot.description }}
+              {{ spot.description || t('spotDetail.noDescription') }}
             </p>
 
             <div v-if="spotHighlights(spot).length" class="mb-6 grid grid-cols-2 gap-2">
@@ -313,16 +352,38 @@ const spots = ref<ScenicSpot[]>([])
 const loading = ref(true)
 const errorMessage = ref('')
 const selectedCategory = ref<CategoryFilter>('ALL')
+const searchKeyword = ref('')
 const failedSpotImages = ref<Record<string, boolean>>({})
 
+const categoryCounts = computed<Record<CategoryFilter, number>>(() => ({
+  ALL: spots.value.length,
+  NATURAL: spots.value.filter(spot => spot.category === 'NATURAL').length,
+  CULTURAL: spots.value.filter(spot => spot.category === 'CULTURAL').length
+}))
+
 const categories = computed(() => [
-  { label: t('spots.category.all'), value: 'ALL' },
-  { label: t('spots.category.natural'), value: 'NATURAL' },
-  { label: t('spots.category.cultural'), value: 'CULTURAL' }
-] satisfies Array<{ label: string; value: CategoryFilter }>)
+  { label: t('spots.category.all'), value: 'ALL', count: categoryCounts.value.ALL },
+  { label: t('spots.category.natural'), value: 'NATURAL', count: categoryCounts.value.NATURAL },
+  { label: t('spots.category.cultural'), value: 'CULTURAL', count: categoryCounts.value.CULTURAL }
+] satisfies Array<{ label: string; value: CategoryFilter; count: number }>)
 
 const selectedCategoryLabel = computed(() => (
   categories.value.find(category => category.value === selectedCategory.value)?.label || t('spots.category.all')
+))
+
+const normalizedSearchKeyword = computed(() => searchKeyword.value.trim().toLocaleLowerCase())
+
+const resultSummaryText = computed(() => {
+  const base = t('spots.resultSummary', { count: filteredSpots.value.length, category: selectedCategoryLabel.value })
+  return normalizedSearchKeyword.value
+    ? `${base} · "${searchKeyword.value.trim()}"`
+    : base
+})
+
+const noResultsMessage = computed(() => (
+  normalizedSearchKeyword.value
+    ? t('spots.noSearchMessage', '没有找到匹配搜索条件的景点，请尝试更换关键词或查看全部景点。')
+    : t('spots.noCategoryMessage')
 ))
 
 const fetchSpots = async () => {
@@ -346,11 +407,32 @@ const fetchSpots = async () => {
 }
 
 const filteredSpots = computed(() => {
-  if (selectedCategory.value === 'ALL') {
-    return spots.value
-  }
-  return spots.value.filter(spot => spot.category === selectedCategory.value)
+  const keyword = normalizedSearchKeyword.value
+  return spots.value.filter((spot) => {
+    if (selectedCategory.value !== 'ALL' && spot.category !== selectedCategory.value) {
+      return false
+    }
+
+    if (!keyword) return true
+
+    return [
+      spot.name,
+      spot.description,
+      spot.location,
+      spot.category,
+      ...(spot.tags || []).map(tag => tag.tag)
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLocaleLowerCase()
+      .includes(keyword)
+  })
 })
+
+const resetFilters = () => {
+  selectedCategory.value = 'ALL'
+  searchKeyword.value = ''
+}
 
 const goToSpot = (spot: ScenicSpot) => {
   if (spot?.id == null) {

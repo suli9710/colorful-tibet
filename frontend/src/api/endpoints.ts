@@ -8,6 +8,10 @@ export const endpoints = {
   },
   routes: {
     generate: '/routes/generate',
+    generateStream: '/routes/generate/stream',
+    generateJob: '/routes/generate/jobs',
+    generateJobDetail: (jobId: string) => `/routes/generate/jobs/${encodeURIComponent(jobId)}`,
+    generateJobStream: (jobId: string) => `/routes/generate/jobs/${encodeURIComponent(jobId)}/stream`,
     share: '/routes/share',
     shared: '/routes/shared',
     sharedDetail: (id: number) => `/routes/shared/${id}`,
