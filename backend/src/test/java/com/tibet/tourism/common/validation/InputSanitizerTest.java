@@ -39,6 +39,8 @@ class InputSanitizerTest {
                 .isEqualTo("/uploads/avatars/user.png");
         assertThat(InputSanitizer.optionalLocalAvatarResourcePath("/images/users/default-avatar.webp", "avatarUrl"))
                 .isEqualTo("/images/users/default-avatar.webp");
+        assertThat(InputSanitizer.optionalLocalAvatarResourcePath("/avatars/u7.png", "avatarUrl"))
+                .isEqualTo("/avatars/u7.png");
 
         assertThatThrownBy(() -> InputSanitizer.optionalLocalAvatarResourcePath(
                 "https://cdn.example.com/avatar.png", "avatarUrl"))
@@ -48,6 +50,15 @@ class InputSanitizerTest {
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> InputSanitizer.optionalLocalAvatarResourcePath(
                 "/uploads/avatars/user.png?signature=secret", "avatarUrl"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> InputSanitizer.optionalLocalAvatarResourcePath(
+                "/avatars/../secret.png", "avatarUrl"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> InputSanitizer.optionalLocalAvatarResourcePath(
+                "/avatars/%2e%2e/secret.png", "avatarUrl"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> InputSanitizer.optionalLocalAvatarResourcePath(
+                "//avatars/u7.png", "avatarUrl"))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> InputSanitizer.optionalLocalAvatarResourcePath(
                 "javascript:alert(1)", "avatarUrl"))

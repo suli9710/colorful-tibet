@@ -298,7 +298,12 @@
       "answerFailed": "回答失败，请稍后重试",
       "acceptFailed": "采纳失败",
       "confirmDelete": "确定要删除这个问题吗？",
-      "deleteFailed": "删除失败"
+      "deleteFailed": "删除失败",
+      "likeQuestionAction": "点赞问题",
+      "unlikeQuestionAction": "取消点赞问题",
+      "likedState": "当前已点赞",
+      "notLikedState": "当前未点赞",
+      "likeQuestionAria": "{action}，{state}，{count} 次点赞"
     },
     "routePlanner": {
       "daysUnit": "天",
@@ -921,7 +926,12 @@
       "answerFailed": "ལན་སྤྲོད་མ་ཐུབ། ཏོག་ཙམ་རྗེས་སུ་བསྐྱར་ཚོད།",
       "acceptFailed": "ལན་ལེན་མ་ཐུབ།",
       "confirmDelete": "དྲི་བ་འདི་སུབ་ངེས་ཡིན་ནམ།",
-      "deleteFailed": "སུབ་མ་ཐུབ།"
+      "deleteFailed": "སུབ་མ་ཐུབ།",
+      "likeQuestionAction": "དྲི་བར་དགའ་རྟགས་སྤྲོད།",
+      "unlikeQuestionAction": "དྲི་བའི་དགའ་རྟགས་ཕྱིར་འཐེན།",
+      "likedState": "ད་ལྟ་དགའ་རྟགས་སྤྲད་ཟིན།",
+      "notLikedState": "ད་ལྟ་དགའ་རྟགས་སྤྲད་མེད།",
+      "likeQuestionAria": "{action} {state} དགའ་རྟགས་ {count} ཐེངས།"
     },
     "routePlanner": {
       "daysUnit": "ཉིན།",

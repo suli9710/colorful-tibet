@@ -135,6 +135,25 @@ class CurrentUserControllerContractTest {
     }
 
     @Test
+    void updateAvatarAcceptsLegacyLocalAvatarPath() throws Exception {
+        when(jwtAuthSupport.resolveCurrentUserId(any(HttpServletRequest.class))).thenReturn(7L);
+        when(currentUserApplicationService.updateAvatar(7L, "/avatars/u7.png"))
+                .thenReturn("/avatars/u7.png");
+
+        mockMvc.perform(put("/api/auth/me/avatar")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "avatarUrl": "/avatars/u7.png"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.avatarUrl").value("/avatars/u7.png"));
+
+        verify(currentUserApplicationService).updateAvatar(7L, "/avatars/u7.png");
+    }
+
+    @Test
     void unsafeAvatarUrlsReturnStableBadRequestWithoutCallingService() throws Exception {
         expectInvalidAvatarUrl("https://cdn.example.com/avatar.png", "cdn.example.com");
         expectInvalidAvatarUrl("https://cdn.example.com/avatar.png?utm_source=profile&signature=secret", "signature=secret");

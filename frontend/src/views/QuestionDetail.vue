@@ -165,11 +165,13 @@ const isAuthor = computed(() => Boolean(question.value?.author?.owner))
 const isQuestionAuthor = isAuthor
 const isSubmitAnswerDisabled = computed(() => !newAnswer.value.trim() || answering.value)
 const questionLikeAccessibleName = computed(() => {
-  const action = isLiked.value ? '取消点赞问题' : '点赞问题'
-  const state = isLiked.value ? '当前已点赞' : '当前未点赞'
   const count = question.value?.likeCount ?? 0
 
-  return `${action}，${state}，${count} 次点赞`
+  return t('questionDetail.likeQuestionAria', {
+    action: t(isLiked.value ? 'questionDetail.unlikeQuestionAction' : 'questionDetail.likeQuestionAction'),
+    state: t(isLiked.value ? 'questionDetail.likedState' : 'questionDetail.notLikedState'),
+    count
+  })
 })
 
 const normalizePublicUserName = (value: unknown) => typeof value === 'string' ? value.trim() : ''
