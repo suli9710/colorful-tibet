@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { AnimatePresence, LayoutGroup, motion } from 'motion-v'
 import api, { endpoints } from '@/api'
+import { hasNextPage, mergeUniqueById, readPaginatedResponse, type PageMetadata } from '@/api/endpoints'
 import { useAuthStore } from '@/stores/auth'
 import { applyHotelImageFallback, resolveHotelBookingImage } from '@/data/hotelImages'
 import MotionModal from '@/components/motion/MotionModal.vue'
@@ -30,6 +31,14 @@ const auth = useAuthStore()
 const userInfo = ref<any>(null)
 const stats = ref<any>(null)
 const myRoutes = ref<any[]>([])
+const myRoutesPageSize = 20
+const myRoutesPageInfo = ref<PageMetadata>({
+  page: 0,
+  size: myRoutesPageSize,
+  totalElements: 0,
+  totalPages: 0
+})
+const myRoutesLoadingMore = ref(false)
 const bookings = ref<any[]>([])
 const hotelBookings = ref<any[]>([])
 const spotComments = ref<any[]>([])
@@ -90,11 +99,16 @@ const profileAvatarUrl = computed(() =>
 const profileAvatarInitial = computed(() => profileDisplayName.value.charAt(0).toUpperCase())
 
 const profileTabs = computed<Array<{ id: ProfileTabId; label: string; count: number }>>(() => [
-  { id: 'routes', label: t('profile.myRoutesTab'), count: myRoutes.value.length },
+  { id: 'routes', label: t('profile.myRoutesTab'), count: myRoutesPageInfo.value.totalElements || myRoutes.value.length },
   { id: 'bookings', label: t('profile.myBookingsTab'), count: bookings.value.length },
   { id: 'hotel-bookings', label: t('profile.myHotelBookingsTab'), count: hotelBookings.value.length },
   { id: 'comments', label: t('profile.myCommentsTab'), count: spotComments.value.length + routeComments.value.length }
 ])
+
+const myRoutesPage = computed(() => myRoutesPageInfo.value.page)
+const myRoutesTotalPages = computed(() => myRoutesPageInfo.value.totalPages)
+const myRoutesTotalElements = computed(() => myRoutesPageInfo.value.totalElements)
+const hasMoreMyRoutes = computed(() => hasNextPage(myRoutesPageInfo.value))
 
 onMounted(async () => {
   if (!(await auth.ensureSession())) {
@@ -162,17 +176,52 @@ const fetchStats = async () => {
   }
 }
 
-const fetchMyRoutes = async () => {
+const applyMyRoutesPage = (response: any, append = false) => {
+  const page = readPaginatedResponse<any>(response, {
+    page: append ? myRoutesPageInfo.value.page + 1 : 0,
+    size: myRoutesPageSize
+  })
+
+  myRoutes.value = append ? mergeUniqueById(myRoutes.value, page.content) : page.content
+  myRoutesPageInfo.value = {
+    page: page.page,
+    size: page.size || myRoutesPageSize,
+    totalElements: page.totalElements,
+    totalPages: page.totalPages
+  }
+}
+
+const fetchMyRoutes = async (page = 0, append = false) => {
   try {
-    const response = await api.get(endpoints.routes.myRoutes)
-    myRoutes.value = response.data || []
+    const response = await api.get(endpoints.routes.myRoutes, {
+      params: { page, size: myRoutesPageSize }
+    })
+    applyMyRoutesPage(response, append)
   } catch (e: any) {
     console.error('Failed to fetch my routes:', summarizeClientError(e))
     // 如果是401错误，说明token无效，让响应拦截器处理跳转
     if (e.response?.status === 401) {
       throw e // 重新抛出，让响应拦截器处理
     }
-    myRoutes.value = []
+    if (!append) {
+      myRoutes.value = []
+      myRoutesPageInfo.value = {
+        page: 0,
+        size: myRoutesPageSize,
+        totalElements: 0,
+        totalPages: 0
+      }
+    }
+  }
+}
+
+const loadNextMyRoutesPage = async () => {
+  if (myRoutesLoadingMore.value || !hasMoreMyRoutes.value) return
+  myRoutesLoadingMore.value = true
+  try {
+    await fetchMyRoutes(myRoutesPageInfo.value.page + 1, true)
+  } finally {
+    myRoutesLoadingMore.value = false
   }
 }
 
@@ -864,7 +913,8 @@ const getAvatarUrl = (): string | undefined => profileAvatarUrl.value || undefin
             </router-link>
           </div>
 
-          <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <template v-else>
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <motion.div
               v-for="(route, index) in myRoutes"
               :key="route.id"
@@ -877,11 +927,13 @@ const getAvatarUrl = (): string | undefined => profileAvatarUrl.value || undefin
               :whileHover="{ y: -4, scale: 1.01 }"
             >
               <div class="flex justify-between items-start mb-4">
-                <h3 
-                  @click="router.push(`/community/${route.id}`)"
-                  class="min-w-0 flex-1 text-lg font-bold text-gray-900 group-hover:text-tibet-gold transition-colors duration-300 line-clamp-2 cursor-pointer sm:text-xl"
-                >
-                  {{ route.title }}
+                <h3 class="min-w-0 flex-1 text-lg font-bold text-gray-900 sm:text-xl">
+                  <router-link
+                    :to="`/community/${route.id}`"
+                    class="block line-clamp-2 rounded-lg transition-colors duration-300 group-hover:text-tibet-gold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tibet-gold/60 focus-visible:ring-offset-2"
+                  >
+                    {{ route.title }}
+                  </router-link>
                 </h3>
                 <motion.button
                   type="button"
@@ -930,6 +982,26 @@ const getAvatarUrl = (): string | undefined => profileAvatarUrl.value || undefin
               </div>
             </motion.div>
           </div>
+          <div
+            v-if="myRoutesTotalPages > 1"
+            class="mt-8 flex flex-wrap items-center justify-center gap-3"
+            role="navigation"
+            :aria-label="t('profile.myRoutesTab')"
+          >
+            <span class="text-sm text-gray-500" role="status" aria-live="polite">
+              {{ myRoutesPage + 1 }} / {{ myRoutesTotalPages }}
+            </span>
+            <button
+              type="button"
+              @click="loadNextMyRoutesPage"
+              :disabled="myRoutesLoadingMore || !hasMoreMyRoutes"
+              :aria-busy="myRoutesLoadingMore"
+              class="min-h-11 rounded-xl border border-tibet-gold/25 bg-white px-5 py-2 text-sm font-medium text-tibet-brown/80 transition-colors hover:bg-gray-50 disabled:cursor-wait disabled:opacity-50"
+            >
+              {{ myRoutesLoadingMore ? t('common.loading') : t('community.nextPage') }}
+            </button>
+          </div>
+          </template>
         </div>
 
         <!-- My Bookings -->

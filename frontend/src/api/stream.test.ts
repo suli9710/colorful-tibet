@@ -242,4 +242,25 @@ describe('route generation streams', () => {
     expect(deltas).toEqual([['base plus', 'base plus']])
     expect(done).toHaveBeenCalledWith('base plus')
   })
+
+  it('marks route job streams interrupted on clean EOF without a terminal event', async () => {
+    stubFetch(streamResponse([
+      'data: {"type":"snapshot","payload":{"jobId":"job-1","status":"RUNNING","content":"base","days":3,"budget":"comfort","preference":"natural","cached":false,"createdAt":"2026-06-08T00:00:00Z","updatedAt":"2026-06-08T00:00:00Z"}}\n\n',
+      'data: {"type":"delta","text":"base plus"}\n\n'
+    ]))
+
+    const done = vi.fn()
+    const interrupted = vi.fn()
+    const errors = vi.fn()
+
+    await streamRouteGenerationJob('job-1', {
+      onDone: done,
+      onInterrupted: interrupted,
+      onError: errors
+    })
+
+    expect(interrupted).toHaveBeenCalledWith('base plus')
+    expect(done).not.toHaveBeenCalled()
+    expect(errors).not.toHaveBeenCalled()
+  })
 })

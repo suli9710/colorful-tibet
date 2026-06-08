@@ -22,26 +22,64 @@ jobs:
         run: |
           set -euo pipefail
           noise_pattern='(^output/|^scrapler/\.venv/|(^|/)__pycache__/|\.pyc$|\.log$|(^|/)新建 文本文档\.txt$)'
-          mapfile -t forbidden < <(git ls-files | grep -E "$noise_pattern" || true)
+          extra_noise_patterns="$(mktemp)"
+          cat > "$extra_noise_patterns" <<'EOF'
+          ^"[^/]*$
+          ^'[^/]*$
+          ^"?%s[^/]*$
+          ^[^/]*;[^/]*$
+          EOF
+          mapfile -t forbidden < <({ git ls-files | grep -E "$noise_pattern" || true; git ls-files | grep -E -f "$extra_noise_patterns" || true; } | sort -u)
           if [ "${#forbidden[@]}" -gt 0 ]; then
             echo "::error title=Repository noise guard::Tracked generated/local-only files found"
             cat <<'EOF'
-Repository noise guard failed.
+          Repository noise guard failed.
 
-Tracked paths must not match generated or local-only patterns:
-  - output/
-  - scrapler/.venv/
-  - __pycache__/
-  - *.pyc
-  - *.log
-  - 新建 文本文档.txt
+          Tracked paths must not match generated or local-only patterns:
+            - output/
+            - scrapler/.venv/
+            - __pycache__/
+            - *.pyc
+            - *.log
+            - suspicious root shell fragments such as %s, quote-prefixed names, or semicolon leftovers
+            - 新建 文本文档.txt
 
-Blocked tracked paths:
-EOF
+          Blocked tracked paths:
+          EOF
             printf '  - %s\n' "${forbidden[@]}"
             echo "Remove these paths from Git and keep them covered by .gitignore."
             exit 1
           fi
+
+  workflow-lint:
+    name: Workflow lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install workflow linters
+        run: |
+          set -euo pipefail
+          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.8
+          python -m pip install --upgrade pip
+          python -m pip install yamllint==1.35.1
+
+      - name: Lint workflow YAML
+        run: |
+          set -euo pipefail
+          "$(go env GOPATH)/bin/actionlint" .github/workflows/ci.yml
+          yamllint -d "{extends: relaxed, rules: {line-length: disable, new-lines: disable, truthy: disable}}" .github/workflows/ci.yml
 
   secret-scan:
     name: Secret scan
@@ -206,6 +244,13 @@ EOF
       - backend
       - scrapler
       - frontend
+    env:
+      CI_VITE_API_BASE_URL: /api
+      CI_VITE_RECAPTCHA_ENABLED: 'true'
+      CI_VITE_RECAPTCHA_MODE: v3
+      CI_VITE_RECAPTCHA_SITE_KEY: ci-recaptcha-site-key
+      CI_VITE_AMAP_KEY: ci-amap-web-key
+      CI_VITE_AMAP_SECURITY_CODE: ci-amap-security-code
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -217,7 +262,16 @@ EOF
         run: docker build -t colorful-tibet-backend:ci ./backend
 
       - name: Build frontend image
-        run: docker build -t colorful-tibet-frontend:ci ./frontend
+        run: |
+          set -euo pipefail
+          docker build \
+            --build-arg VITE_API_BASE_URL="$CI_VITE_API_BASE_URL" \
+            --build-arg VITE_RECAPTCHA_ENABLED="$CI_VITE_RECAPTCHA_ENABLED" \
+            --build-arg VITE_RECAPTCHA_MODE="$CI_VITE_RECAPTCHA_MODE" \
+            --build-arg VITE_RECAPTCHA_SITE_KEY="$CI_VITE_RECAPTCHA_SITE_KEY" \
+            --build-arg VITE_AMAP_KEY="$CI_VITE_AMAP_KEY" \
+            --build-arg VITE_AMAP_SECURITY_CODE="$CI_VITE_AMAP_SECURITY_CODE" \
+            -t colorful-tibet-frontend:ci ./frontend
 
       - name: Build scrapler image
         run: docker build -t colorful-tibet-scrapler:ci ./scrapler

@@ -3,6 +3,10 @@ package com.tibet.tourism.common.security;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
@@ -12,6 +16,7 @@ import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 
 class PiiCryptoConverterTest {
 
@@ -21,6 +26,7 @@ class PiiCryptoConverterTest {
     @AfterEach
     void resetKeys() {
         PiiCryptoConverter.configure("", "", "");
+        PiiCryptoConverter.configureMetrics(null);
     }
 
     @Test
@@ -48,16 +54,83 @@ class PiiCryptoConverterTest {
     }
 
     @Test
-    void malformedEncryptedPrefixesReadAsPlaintextInsteadOfThrowing() {
+    void ordinaryPlaintextStillReadsAndBackfillsAsPlaintext() {
         PiiCryptoConverter.configure("kid1:" + KEY_32_BYTES_BASE64, "kid1", "");
         PiiCryptoConverter converter = new PiiCryptoConverter();
 
-        assertThat(converter.convertToEntityAttribute("enc:v2:kid1:not-a-real-ciphertext"))
-                .isEqualTo("enc:v2:kid1:not-a-real-ciphertext");
-        assertThat(converter.convertToEntityAttribute("enc:v2:missing-kid:not-a-real-ciphertext"))
-                .isEqualTo("enc:v2:missing-kid:not-a-real-ciphertext");
-        assertThat(converter.convertToEntityAttribute("enc:v1:not-a-real-ciphertext"))
-                .isEqualTo("enc:v1:not-a-real-ciphertext");
+        PiiCryptoConverter.BackfillValue backfillValue = converter.valueForBackfill("13900000000");
+
+        assertThat(converter.convertToEntityAttribute("13900000000")).isEqualTo("13900000000");
+        assertThat(backfillValue.encryptable()).isTrue();
+        assertThat(backfillValue.plaintext()).isEqualTo("13900000000");
+    }
+
+    @Test
+    void malformedEncryptedPrefixesFailClosedInsteadOfReturningCiphertext() {
+        PiiCryptoConverter.configure("kid1:" + KEY_32_BYTES_BASE64, "kid1", "");
+        PiiCryptoConverter converter = new PiiCryptoConverter();
+
+        assertThatThrownBy(() -> converter.convertToEntityAttribute("enc:v2:kid1:not-a-real-ciphertext"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Failed to decrypt encrypted PII field")
+                .hasMessageContaining("version=v2")
+                .hasMessageContaining("reason=malformed_payload")
+                .hasMessageNotContaining("not-a-real-ciphertext");
+        assertThatThrownBy(() -> converter.convertToEntityAttribute("enc:v2:missing-kid:not-a-real-ciphertext"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("version=v2")
+                .hasMessageContaining("reason=missing_key")
+                .hasMessageNotContaining("not-a-real-ciphertext");
+        assertThatThrownBy(() -> converter.convertToEntityAttribute("enc:v1:not-a-real-ciphertext"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("version=v1")
+                .hasMessageContaining("reason=missing_key")
+                .hasMessageNotContaining("not-a-real-ciphertext");
+    }
+
+    @Test
+    void decryptFailuresEmitMetricsAndStructuredSecurityLogsWithoutCiphertext() {
+        SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+        PiiCryptoConverter.configure("kid1:" + KEY_32_BYTES_BASE64, "kid1", "");
+        PiiCryptoConverter.configureMetrics(meterRegistry);
+        PiiCryptoConverter converter = new PiiCryptoConverter();
+        ListAppender<ILoggingEvent> appender = attachAppender();
+        String ciphertext = "enc:v2:missing-kid:not-a-real-ciphertext";
+
+        try {
+            assertThatThrownBy(() -> converter.convertToEntityAttribute(ciphertext))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("Failed to decrypt encrypted PII field")
+                    .hasMessageContaining("version=v2")
+                    .hasMessageContaining("reason=missing_key")
+                    .hasMessageNotContaining(ciphertext)
+                    .hasMessageNotContaining("not-a-real-ciphertext");
+
+            assertThat(meterRegistry.find("pii_decrypt_failure_total")
+                    .tag("version", "v2")
+                    .tag("reason", "missing_key")
+                    .counter()
+                    .count()).isEqualTo(1.0);
+            assertThat(appender.list).hasSize(1);
+            ILoggingEvent event = appender.list.get(0);
+            assertThat(event.getFormattedMessage()).isEqualTo("PII decrypt failure");
+            assertThat(event.getKeyValuePairs()).anySatisfy(pair -> {
+                assertThat(pair.key).isEqualTo("security_event");
+                assertThat(pair.value).isEqualTo("pii_decrypt_failure");
+            });
+            assertThat(event.getKeyValuePairs()).anySatisfy(pair -> {
+                assertThat(pair.key).isEqualTo("version");
+                assertThat(pair.value).isEqualTo("v2");
+            });
+            assertThat(event.getKeyValuePairs()).anySatisfy(pair -> {
+                assertThat(pair.key).isEqualTo("reason");
+                assertThat(pair.value).isEqualTo("missing_key");
+            });
+            assertThat(event.getFormattedMessage() + event.getKeyValuePairs()).doesNotContain(ciphertext);
+            assertThat(event.getFormattedMessage() + event.getKeyValuePairs()).doesNotContain("not-a-real-ciphertext");
+        } finally {
+            detachAppender(appender);
+        }
     }
 
     @Test
@@ -103,5 +176,18 @@ class PiiCryptoConverterTest {
         System.arraycopy(iv, 0, payload, 0, iv.length);
         System.arraycopy(encrypted, 0, payload, iv.length, encrypted.length);
         return "enc:v1:" + Base64.getUrlEncoder().withoutPadding().encodeToString(payload);
+    }
+
+    private ListAppender<ILoggingEvent> attachAppender() {
+        Logger logger = (Logger) LoggerFactory.getLogger(PiiCryptoConverter.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        return appender;
+    }
+
+    private void detachAppender(ListAppender<ILoggingEvent> appender) {
+        Logger logger = (Logger) LoggerFactory.getLogger(PiiCryptoConverter.class);
+        logger.detachAppender(appender);
     }
 }

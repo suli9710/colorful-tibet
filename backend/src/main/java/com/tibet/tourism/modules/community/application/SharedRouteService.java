@@ -21,6 +21,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -62,6 +63,8 @@ public class SharedRouteService {
     @Autowired
     private UserRepository userRepository;
 
+    public record LikeResult(boolean liked, int likeCount) {}
+
     // 分享路线
     @Transactional
     public SharedRoute shareRoute(Long userId, String title, String content, Integer days, String budget, String preference) {
@@ -80,6 +83,7 @@ public class SharedRouteService {
     }
 
     // 获取路线列表（带筛选）
+    @Transactional(readOnly = true)
     public Page<SharedRoute> getRoutes(Integer days, String budget, String preference, Pageable pageable) {
         String safeBudget = normalizeBudget(budget);
         String safePreference = normalizePreference(preference);
@@ -122,12 +126,14 @@ public class SharedRouteService {
             throw new UnauthorizedActionException("Unauthorized: You can only delete your own routes");
         }
 
+        likeRepository.deleteByRouteId(routeId);
+        commentRepository.deleteByRouteId(routeId);
         routeRepository.delete(route);
     }
 
     // 点赞路线
     @Transactional
-    public boolean likeRoute(Long routeId, Long userId) {
+    public LikeResult likeRoute(Long routeId, Long userId) {
         SharedRoute route = routeRepository.findById(routeId)
                 .orElseThrow(() -> new ResourceNotFoundException("Route not found"));
         
@@ -135,21 +141,24 @@ public class SharedRouteService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         if (likeRepository.existsByRouteAndUser(route, user)) {
-            return false; // 已经点赞过
+            return new LikeResult(true, readRouteLikeCount(routeId));
         }
 
         RouteLike like = new RouteLike();
         like.setRoute(route);
         like.setUser(user);
-        likeRepository.save(like);
-
-        routeRepository.incrementLikeCount(routeId);
-        return true;
+        try {
+            likeRepository.saveAndFlush(like);
+            routeRepository.incrementLikeCount(routeId);
+        } catch (DataIntegrityViolationException duplicate) {
+            // Concurrent duplicate like; the unique row already represents the desired state.
+        }
+        return new LikeResult(true, readRouteLikeCount(routeId));
     }
 
     // 取消点赞
     @Transactional
-    public boolean unlikeRoute(Long routeId, Long userId) {
+    public LikeResult unlikeRoute(Long routeId, Long userId) {
         SharedRoute route = routeRepository.findById(routeId)
                 .orElseThrow(() -> new ResourceNotFoundException("Route not found"));
         
@@ -158,13 +167,13 @@ public class SharedRouteService {
 
         Optional<RouteLike> like = likeRepository.findByRouteAndUser(route, user);
         if (like.isEmpty()) {
-            return false; // 未点赞
+            return new LikeResult(false, readRouteLikeCount(routeId));
         }
 
         likeRepository.delete(like.get());
 
         routeRepository.decrementLikeCount(routeId);
-        return true;
+        return new LikeResult(false, readRouteLikeCount(routeId));
     }
     
     // 检查用户是否点赞
@@ -199,10 +208,11 @@ public class SharedRouteService {
     }
 
     // 获取评论列表
-    public List<RouteComment> getComments(Long routeId) {
+    @Transactional(readOnly = true)
+    public Page<RouteComment> getComments(Long routeId, Pageable pageable) {
         SharedRoute route = routeRepository.findById(routeId)
                 .orElseThrow(() -> new ResourceNotFoundException("Route not found"));
-        return commentRepository.findByRouteOrderByCreatedAtDesc(route);
+        return commentRepository.findByRoute(route, pageable);
     }
 
     @Transactional
@@ -224,8 +234,14 @@ public class SharedRouteService {
     }
 
     // 获取用户创建的路线列表
-    public List<SharedRoute> getRoutesByAuthor(User author) {
-        return routeRepository.findByAuthorOrderByCreatedAtDesc(author);
+    @Transactional(readOnly = true)
+    public Page<SharedRoute> getRoutesByAuthor(User author, Pageable pageable) {
+        return routeRepository.findByAuthor(author, pageable);
+    }
+
+    private int readRouteLikeCount(Long routeId) {
+        return routeRepository.findLikeCountById(routeId)
+                .orElseThrow(() -> new ResourceNotFoundException("Route not found"));
     }
 
     private Integer validateDays(Integer days) {

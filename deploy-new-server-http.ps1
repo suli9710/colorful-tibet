@@ -11,7 +11,10 @@ param(
     [string]$DoubaoApiKey = "",
     [string]$AmapKey = "",
     [string]$AmapSecurityCode = "",
-    [string]$SshHostKeyFingerprint = ""
+    [string]$SshHostKeyFingerprint = "",
+    [switch]$BootstrapDocker,
+    [string]$DockerInstallScriptSha256 = "",
+    [string]$DockerInstallVersion = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -23,6 +26,17 @@ if (-not $DemoOnly) {
 Write-Warning "$scriptName is demo-only: it deploys over HTTP with SPRING_PROFILES_ACTIVE=local, REQUIRE_STRONG_SECRETS=false, and PAYMENT_MOCK_CALLBACK_ENABLED=true."
 
 $RepoRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+. (Join-Path $RepoRoot "scripts/New-DeploymentArchive.ps1")
+
+if ($BootstrapDocker) {
+    if ($DockerInstallScriptSha256 -notmatch '^[A-Fa-f0-9]{64}$') {
+        throw "-BootstrapDocker requires -DockerInstallScriptSha256 with the expected 64-character SHA256 of https://get.docker.com captured immediately before deployment."
+    }
+    if ([string]::IsNullOrWhiteSpace($DockerInstallVersion)) {
+        throw "-BootstrapDocker requires -DockerInstallVersion, for example the exact Docker Engine package version accepted by the convenience installer."
+    }
+}
+
 if (-not $SiteUrl) {
     $SiteUrl = "http://$HostName/"
 }
@@ -219,6 +233,7 @@ SCRAPLING_ALLOW_UNAUTHENTICATED=false
 FILE_UPLOAD_DIR=/app/data/uploads
 NGINX_SERVER_NAME=$HostName
 NGINX_CERT_DOMAIN=$HostName
+FRONTEND_HOST_BIND=0.0.0.0
 FRONTEND_HOST_PORT=80
 BACKEND_HOST_PORT=8080
 
@@ -267,6 +282,9 @@ function Write-RemoteScript {
     $loginLiteral = ConvertTo-ShellSingleQuoted $RemoteLogin
     $siteUrlLiteral = ConvertTo-ShellSingleQuoted $SiteUrl
     $regenerateValue = if ($RegenerateRemoteEnv) { "true" } else { "false" }
+    $bootstrapValue = if ($BootstrapDocker) { "true" } else { "false" }
+    $dockerInstallScriptSha256Literal = ConvertTo-ShellSingleQuoted $DockerInstallScriptSha256.ToLowerInvariant()
+    $dockerInstallVersionLiteral = ConvertTo-ShellSingleQuoted $DockerInstallVersion
 
     $remoteScriptContent = @'
 #!/usr/bin/env bash
@@ -278,12 +296,67 @@ ENV_UPLOAD=__ENV_UPLOAD__
 LOGIN_UPLOAD=__LOGIN_UPLOAD__
 SITE_URL=__SITE_URL__
 REGENERATE_ENV=__REGENERATE_ENV__
-COMPOSE_FILE="$PROJECT_DIR/docker-compose.yml"
+ALLOW_DOCKER_BOOTSTRAP=__ALLOW_DOCKER_BOOTSTRAP__
+DOCKER_INSTALL_SCRIPT_SHA256=__DOCKER_INSTALL_SCRIPT_SHA256__
+DOCKER_INSTALL_VERSION=__DOCKER_INSTALL_VERSION__
+ALLOWED_PROJECT_ROOT="/opt/colorful-tibet"
 
-case "$PROJECT_DIR" in
-  /opt/colorful-tibet|/opt/colorful-tibet/*) ;;
-  *) echo "Refusing unexpected project path: $PROJECT_DIR" >&2; exit 1 ;;
-esac
+validate_project_dir() {
+  if [ -z "$PROJECT_DIR" ] || [ "${PROJECT_DIR#/}" = "$PROJECT_DIR" ]; then
+    echo "Refusing non-absolute project path: $PROJECT_DIR" >&2
+    exit 1
+  fi
+
+  case "$PROJECT_DIR" in
+    *"/.."|*"/../"*|".."|"../"*|*"/."|*"/./"*|"."|"./"*|"//"*)
+      echo "Refusing non-normalized project path: $PROJECT_DIR" >&2
+      exit 1
+      ;;
+  esac
+
+  if ! command -v realpath >/dev/null 2>&1; then
+    echo "Refusing deployment: realpath is required for safe project path validation." >&2
+    exit 1
+  fi
+
+  RESOLVED_PROJECT_DIR=$(realpath -m -- "$PROJECT_DIR")
+  case "$RESOLVED_PROJECT_DIR" in
+    "$ALLOWED_PROJECT_ROOT"|"$ALLOWED_PROJECT_ROOT"/*) PROJECT_DIR="$RESOLVED_PROJECT_DIR" ;;
+    *) echo "Refusing project path outside $ALLOWED_PROJECT_ROOT: $PROJECT_DIR resolves to $RESOLVED_PROJECT_DIR" >&2; exit 1 ;;
+  esac
+}
+
+ensure_project_dir() {
+  mkdir -p "$PROJECT_DIR"
+  RESOLVED_PROJECT_DIR=$(realpath -e -- "$PROJECT_DIR")
+  case "$RESOLVED_PROJECT_DIR" in
+    "$ALLOWED_PROJECT_ROOT"|"$ALLOWED_PROJECT_ROOT"/*) PROJECT_DIR="$RESOLVED_PROJECT_DIR" ;;
+    *) echo "Refusing project path outside $ALLOWED_PROJECT_ROOT after creation: $RESOLVED_PROJECT_DIR" >&2; exit 1 ;;
+  esac
+}
+
+reject_project_symlinks() {
+  local name
+  for name in "$@"; do
+    if [ -L "$PROJECT_DIR/$name" ]; then
+      echo "Refusing deployment: $PROJECT_DIR/$name must not be a symlink." >&2
+      exit 1
+    fi
+  done
+}
+
+enter_project_dir() {
+  cd -P -- "$PROJECT_DIR"
+  CURRENT_PROJECT_DIR=$(pwd -P)
+  if [ "$CURRENT_PROJECT_DIR" != "$PROJECT_DIR" ]; then
+    echo "Refusing deployment: physical project directory changed from $PROJECT_DIR to $CURRENT_PROJECT_DIR." >&2
+    exit 1
+  fi
+}
+
+validate_project_dir
+ensure_project_dir
+COMPOSE_FILE="$PROJECT_DIR/docker-compose.yml"
 
 install_basic_tools() {
   if command -v apt-get >/dev/null 2>&1; then
@@ -298,22 +371,47 @@ install_basic_tools() {
 
 install_docker_if_needed() {
   if ! command -v docker >/dev/null 2>&1; then
+    if [ "$ALLOW_DOCKER_BOOTSTRAP" != "true" ]; then
+      cat >&2 <<'EOF'
+Docker is not installed on the server.
+Install Docker Engine with the Compose plugin before running this demo deployment.
+
+If this is an empty demo host and you accept the Docker convenience installer risk,
+rerun with -BootstrapDocker plus:
+  -DockerInstallScriptSha256 <sha256 of https://get.docker.com captured just before deployment>
+  -DockerInstallVersion <exact Docker Engine package version>
+EOF
+      exit 1
+    fi
+
+    if [ -z "$DOCKER_INSTALL_SCRIPT_SHA256" ] || [ -z "$DOCKER_INSTALL_VERSION" ]; then
+      echo "Refusing Docker bootstrap: checksum and Docker version are both required." >&2
+      exit 1
+    fi
+
     install_basic_tools
+    if ! command -v sha256sum >/dev/null 2>&1; then
+      echo "Refusing Docker bootstrap: sha256sum is required for installer verification." >&2
+      exit 1
+    fi
+
     curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
-    sh /tmp/get-docker.sh
+    ACTUAL_DOCKER_INSTALLER_SHA256=$(sha256sum /tmp/get-docker.sh | awk '{print tolower($1)}')
+    if [ "$ACTUAL_DOCKER_INSTALLER_SHA256" != "$DOCKER_INSTALL_SCRIPT_SHA256" ]; then
+      echo "Refusing Docker bootstrap: get.docker.com SHA256 mismatch." >&2
+      echo "Expected: $DOCKER_INSTALL_SCRIPT_SHA256" >&2
+      echo "Actual:   $ACTUAL_DOCKER_INSTALLER_SHA256" >&2
+      exit 1
+    fi
+
+    VERSION="$DOCKER_INSTALL_VERSION" sh /tmp/get-docker.sh
   fi
 
   systemctl enable --now docker >/dev/null 2>&1 || service docker start >/dev/null 2>&1 || true
 
   if ! docker compose version >/dev/null 2>&1; then
-    if command -v apt-get >/dev/null 2>&1; then
-      apt-get update
-      apt-get install -y docker-compose-plugin
-    elif command -v dnf >/dev/null 2>&1; then
-      dnf install -y docker-compose-plugin
-    elif command -v yum >/dev/null 2>&1; then
-      yum install -y docker-compose-plugin
-    fi
+    echo "Docker Compose plugin is not available. Install docker-compose-plugin and rerun deployment." >&2
+    exit 1
   fi
 
   docker --version
@@ -358,15 +456,18 @@ wait_for_health() {
 install_docker_if_needed
 open_host_firewall
 
-mkdir -p "$PROJECT_DIR" "$PROJECT_DIR/data" "$PROJECT_DIR/logs"
+reject_project_symlinks ".env" data logs certs
+mkdir -p "$PROJECT_DIR/data" "$PROJECT_DIR/logs"
 
 if [ -f "$COMPOSE_FILE" ]; then
   echo "Stopping existing containers..."
-  (cd "$PROJECT_DIR" && docker compose -f "$COMPOSE_FILE" down --remove-orphans) || true
+  (cd -P -- "$PROJECT_DIR" && docker compose -f "$COMPOSE_FILE" down --remove-orphans) || true
 fi
 
 echo "Replacing application files..."
-find "$PROJECT_DIR" -mindepth 1 -maxdepth 1 \
+reject_project_symlinks ".env" data logs certs
+enter_project_dir
+find . -mindepth 1 -maxdepth 1 \
   ! -name '.env' \
   ! -name 'data' \
   ! -name 'logs' \
@@ -374,6 +475,7 @@ find "$PROJECT_DIR" -mindepth 1 -maxdepth 1 \
   -exec rm -rf -- {} +
 
 tar -xzf "$ARCHIVE" -C "$PROJECT_DIR"
+reject_project_symlinks ".env" data logs certs
 
 if [ ! -f "$PROJECT_DIR/.env" ] || [ "$REGENERATE_ENV" = "true" ]; then
   cp "$ENV_UPLOAD" "$PROJECT_DIR/.env"
@@ -386,10 +488,15 @@ else
 fi
 
 mkdir -p "$PROJECT_DIR/data/uploads" "$PROJECT_DIR/logs"
-if [ -d "$PROJECT_DIR/backend/uploads" ]; then
-  cp -an "$PROJECT_DIR/backend/uploads/." "$PROJECT_DIR/data/uploads/" || true
-fi
-chmod -R a+rwX "$PROJECT_DIR/data" "$PROJECT_DIR/logs"
+BACKEND_APP_UID=$(grep -E '^BACKEND_APP_UID=' "$PROJECT_DIR/.env" | tail -n 1 | cut -d= -f2- || true)
+BACKEND_APP_GID=$(grep -E '^BACKEND_APP_GID=' "$PROJECT_DIR/.env" | tail -n 1 | cut -d= -f2- || true)
+BACKEND_APP_UID=${BACKEND_APP_UID:-10001}
+BACKEND_APP_GID=${BACKEND_APP_GID:-10001}
+case "$BACKEND_APP_UID" in ''|*[!0-9]*) echo "Invalid BACKEND_APP_UID: $BACKEND_APP_UID" >&2; exit 1 ;; esac
+case "$BACKEND_APP_GID" in ''|*[!0-9]*) echo "Invalid BACKEND_APP_GID: $BACKEND_APP_GID" >&2; exit 1 ;; esac
+chown -R "$BACKEND_APP_UID:$BACKEND_APP_GID" "$PROJECT_DIR/data" "$PROJECT_DIR/logs"
+find "$PROJECT_DIR/data" "$PROJECT_DIR/logs" -type d -exec chmod 750 {} +
+find "$PROJECT_DIR/data" "$PROJECT_DIR/logs" -type f -exec chmod 640 {} +
 
 cd "$PROJECT_DIR"
 docker compose -f "$COMPOSE_FILE" config --quiet
@@ -407,7 +514,17 @@ docker compose -f "$COMPOSE_FILE" ps
 curl -fsS http://127.0.0.1:8080/actuator/health/readiness
 echo ""
 curl -fsS http://127.0.0.1/health
-curl -fsSI --max-time 20 "$SITE_URL" | head -n 12 || echo "WARNING: public URL check failed from the server; check cloud firewall/security group for TCP 80."
+case "$SITE_URL" in
+  http://127.0.0.1*|https://127.0.0.1*|http://localhost*|https://localhost*|http://[[]::1[]]*|https://[[]::1[]]*) PUBLIC_SITE_URL=false ;;
+  *) PUBLIC_SITE_URL=true ;;
+esac
+if ! curl -fsSI --max-time 20 "$SITE_URL" | head -n 12; then
+  if [ "$PUBLIC_SITE_URL" = "true" ]; then
+    echo "Public URL check failed from the server; check cloud firewall/security group for TCP 80." >&2
+    exit 1
+  fi
+  echo "WARNING: local SiteUrl check failed from the server." >&2
+fi
 
 rm -f "$ARCHIVE" "$ENV_UPLOAD" "$LOGIN_UPLOAD" /tmp/colorful-tibet-http-deploy.sh /tmp/get-docker.sh
 echo "HTTP demo deployment completed."
@@ -419,6 +536,9 @@ echo "HTTP demo deployment completed."
     $remoteScriptContent = $remoteScriptContent.Replace("__LOGIN_UPLOAD__", $loginLiteral)
     $remoteScriptContent = $remoteScriptContent.Replace("__SITE_URL__", $siteUrlLiteral)
     $remoteScriptContent = $remoteScriptContent.Replace("__REGENERATE_ENV__", $regenerateValue)
+    $remoteScriptContent = $remoteScriptContent.Replace("__ALLOW_DOCKER_BOOTSTRAP__", $bootstrapValue)
+    $remoteScriptContent = $remoteScriptContent.Replace("__DOCKER_INSTALL_SCRIPT_SHA256__", $dockerInstallScriptSha256Literal)
+    $remoteScriptContent = $remoteScriptContent.Replace("__DOCKER_INSTALL_VERSION__", $dockerInstallVersionLiteral)
     $remoteScriptContent = $remoteScriptContent -replace "`r`n", "`n"
 
     $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
@@ -565,6 +685,7 @@ finally:
 }
 
 Assert-Command "tar"
+Assert-Command "git"
 Assert-Command "python"
 
 if (-not $SkipLocalChecks) {
@@ -591,51 +712,14 @@ try {
         Remove-Item -LiteralPath $ArchivePath -Force
     }
 
-    $tarExcludes = @(
-        "--exclude=./.git",
-        "--exclude=./.idea",
-        "--exclude=./.vscode",
-        "--exclude=./.claude",
-        "--exclude=./.cursor",
-        "--exclude=./node_modules",
-        "--exclude=./frontend/node_modules",
-        "--exclude=./frontend/dist",
-        "--exclude=./backend/target",
-        "--exclude=./backend/logs",
-        "--exclude=./logs",
-        "--exclude=./output",
-        "--exclude=./.startup",
-        "--exclude=./certs",
-        "--exclude=./scrapler/.venv",
-        "--exclude=./scrapler/__pycache__",
-        "--exclude=./.env",
-        "--exclude=./.env.*",
-        "--exclude=*/.env",
-        "--exclude=*/.env.*",
-        "--exclude=./*.log",
-        "--exclude=./*.tar.gz"
-    )
-
-    $topLevelExcludes = @(".git", ".idea", ".vscode", ".claude", ".cursor", "node_modules", "logs", "output", ".env", ".startup", "certs")
-    $tarIncludes = Get-ChildItem -LiteralPath $RepoRoot -Force |
-        Where-Object {
-            $topLevelExcludes -notcontains $_.Name -and
-            $_.Name -notlike "*.tar.gz"
-        } |
-        ForEach-Object { "./$($_.Name)" }
-
-    if (-not $tarIncludes) {
-        throw "No files found to upload."
-    }
-
     Write-Host "Generating first-deploy environment..." -ForegroundColor Cyan
     $secrets = New-SecretSet
     Write-DeploymentEnv $secrets
     Write-RemoteScript
     Write-Uploader
 
-    Write-Host "Packing project..." -ForegroundColor Cyan
-    Invoke-Native "tar" ($tarExcludes + @("-czf", $ArchivePath) + $tarIncludes) $RepoRoot
+    Write-Host "Packing project from Git-tracked allowlist..." -ForegroundColor Cyan
+    New-DeploymentArchive -RepoRoot $RepoRoot -ArchivePath $ArchivePath
 
     $env:COLORFUL_TIBET_DEPLOY_PASSWORD = $plainPassword
     Write-Host "Uploading and deploying to $User@$HostName..." -ForegroundColor Cyan

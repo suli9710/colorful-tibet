@@ -9,7 +9,9 @@ import static org.mockito.Mockito.when;
 
 import com.tibet.tourism.common.error.ResourceNotFoundException;
 import com.tibet.tourism.modules.spot.domain.ScenicSpot;
+import com.tibet.tourism.modules.spot.domain.SpotPriceObservation;
 import com.tibet.tourism.modules.spot.infra.ScenicSpotRepository;
+import com.tibet.tourism.modules.spot.infra.SpotPriceObservationRepository;
 import com.tibet.tourism.modules.spot.web.dto.PriceInfo;
 import java.lang.reflect.Method;
 import java.math.BigDecimal;
@@ -18,6 +20,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
@@ -38,13 +41,19 @@ class PriceUpdateServiceTest {
     @Mock
     private SingleSpotPriceUpdateService singleSpotPriceUpdateService;
 
+    @Mock
+    private SpotPriceObservationRepository priceObservationRepository;
+
     private PriceUpdateService service;
     private SingleSpotPriceUpdateService transactionalService;
 
     @BeforeEach
     void setUp() {
         service = new PriceUpdateService(scenicSpotRepository, singleSpotPriceUpdateService, Runnable::run);
-        transactionalService = new SingleSpotPriceUpdateService(scenicSpotRepository, priceFetchService);
+        transactionalService = new SingleSpotPriceUpdateService(
+                scenicSpotRepository,
+                priceFetchService,
+                priceObservationRepository);
         ReflectionTestUtils.setField(service, "maxBatchSpots", 1000);
     }
 
@@ -79,6 +88,46 @@ class PriceUpdateServiceTest {
         assertThat(result.getPriceInfo()).isSameAs(priceInfo);
         assertThat(spot.getTicketPrice()).isNull();
         verify(scenicSpotRepository, never()).save(any(ScenicSpot.class));
+
+        ArgumentCaptor<SpotPriceObservation> observationCaptor =
+                ArgumentCaptor.forClass(SpotPriceObservation.class);
+        verify(priceObservationRepository).save(observationCaptor.capture());
+        SpotPriceObservation observation = observationCaptor.getValue();
+        assertThat(observation.getSpot()).isSameAs(spot);
+        assertThat(observation.getBasePrice()).isEqualByComparingTo("200.00");
+        assertThat(observation.isReferenceOnly()).isTrue();
+        assertThat(observation.isPublishable()).isFalse();
+        assertThat(observation.getStatus()).isEqualTo(SpotPriceObservation.Status.REVIEW_REQUIRED);
+        assertThat(observation.getReviewReason()).contains("Reference-only");
+    }
+
+    @Test
+    void publishedPriceIsRecordedAsObservation() {
+        ScenicSpot spot = new ScenicSpot();
+        spot.setId(1L);
+        spot.setName("Potala Palace");
+
+        PriceInfo priceInfo = new PriceInfo(new BigDecimal("200.00"), "Scrapling verified");
+        priceInfo.setConfidence(0.95);
+
+        when(scenicSpotRepository.findById(1L)).thenReturn(Optional.of(spot));
+        when(priceFetchService.fetchPrice(spot)).thenReturn(priceInfo);
+        when(priceFetchService.isPublishablePrice(priceInfo)).thenReturn(true);
+
+        PriceUpdateService.PriceUpdateResult result = transactionalService.updateSpotPrice(1L, true);
+
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(spot.getTicketPrice()).isEqualByComparingTo("200.00");
+        verify(scenicSpotRepository).save(spot);
+
+        ArgumentCaptor<SpotPriceObservation> observationCaptor =
+                ArgumentCaptor.forClass(SpotPriceObservation.class);
+        verify(priceObservationRepository).save(observationCaptor.capture());
+        SpotPriceObservation observation = observationCaptor.getValue();
+        assertThat(observation.getSpot()).isSameAs(spot);
+        assertThat(observation.getSource()).isEqualTo("Scrapling verified");
+        assertThat(observation.isPublishable()).isTrue();
+        assertThat(observation.getStatus()).isEqualTo(SpotPriceObservation.Status.PUBLISHED);
     }
 
     @Test

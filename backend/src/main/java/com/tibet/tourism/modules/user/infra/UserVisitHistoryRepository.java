@@ -1,16 +1,71 @@
 package com.tibet.tourism.modules.user.infra;
-import com.tibet.tourism.modules.user.domain.User;
 import com.tibet.tourism.modules.user.domain.UserVisitHistory;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface UserVisitHistoryRepository extends JpaRepository<UserVisitHistory, Long> {
+    int DEFAULT_RECOMMENDATION_HISTORY_LIMIT = 200;
+
     List<UserVisitHistory> findByUserId(Long userId);
     List<UserVisitHistory> findBySpotId(Long spotId);
     List<UserVisitHistory> findBySpotIdIn(List<Long> spotIds);
     List<UserVisitHistory> findByUserIdIn(List<Long> userIds);
+
+    default List<UserVisitHistory> findRecentByUserId(Long userId) {
+        return findRecentByUserId(userId, DEFAULT_RECOMMENDATION_HISTORY_LIMIT);
+    }
+
+    default List<UserVisitHistory> findRecentByUserId(Long userId, int limit) {
+        return findRecentByUserId(userId, recentVisitPage(limit));
+    }
+
+    @Query("SELECT h FROM UserVisitHistory h WHERE h.user.id = :userId ORDER BY h.visitDate DESC, h.id DESC")
+    List<UserVisitHistory> findRecentByUserId(@Param("userId") Long userId, Pageable pageable);
+
+    default List<UserVisitHistory> findRecentBySpotId(Long spotId, int limit) {
+        return findRecentBySpotId(spotId, recentVisitPage(limit));
+    }
+
+    @Query("SELECT h FROM UserVisitHistory h WHERE h.spot.id = :spotId ORDER BY h.visitDate DESC, h.id DESC")
+    List<UserVisitHistory> findRecentBySpotId(@Param("spotId") Long spotId, Pageable pageable);
+
+    default List<UserVisitHistory> findRecentBySpotIdIn(Collection<Long> spotIds) {
+        if (spotIds == null || spotIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return findRecentBySpotIdIn(spotIds, recentVisitPage(DEFAULT_RECOMMENDATION_HISTORY_LIMIT));
+    }
+
+    @Query("SELECT h FROM UserVisitHistory h WHERE h.spot.id IN :spotIds ORDER BY h.visitDate DESC, h.id DESC")
+    List<UserVisitHistory> findRecentBySpotIdIn(@Param("spotIds") Collection<Long> spotIds, Pageable pageable);
+
+    default List<UserVisitHistory> findRecentByUserIdIn(Collection<Long> userIds) {
+        if (userIds == null || userIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return findRecentByUserIdIn(userIds, recentVisitPage(DEFAULT_RECOMMENDATION_HISTORY_LIMIT));
+    }
+
+    @Query("SELECT h FROM UserVisitHistory h WHERE h.user.id IN :userIds ORDER BY h.visitDate DESC, h.id DESC")
+    List<UserVisitHistory> findRecentByUserIdIn(@Param("userIds") Collection<Long> userIds, Pageable pageable);
+
+    default List<UserVisitHistory> findRecentForRecommendation(int limit) {
+        return findAll(recentVisitPage(limit)).getContent();
+    }
+
+    static PageRequest recentVisitPage(int limit) {
+        int boundedLimit = Math.max(1, limit);
+        return PageRequest.of(0, boundedLimit, Sort.by(
+                Sort.Order.desc("visitDate"),
+                Sort.Order.desc("id")));
+    }
 
     @Query("SELECT h.spot.id, COUNT(h) FROM UserVisitHistory h WHERE h.spot.id IN :spotIds GROUP BY h.spot.id")
     List<Object[]> countBySpotIds(@Param("spotIds") List<Long> spotIds);

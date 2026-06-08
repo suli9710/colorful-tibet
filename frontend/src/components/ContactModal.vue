@@ -4,6 +4,8 @@
       v-if="modelValue"
       key="contact-modal-backdrop"
       @click="close"
+      @keydown.esc.prevent="close"
+      @keydown.tab="handleTabKey"
       class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-md"
       :initial="{ opacity: 0 }"
       :animate="{ opacity: 1 }"
@@ -12,7 +14,12 @@
     >
         <motion.div
              key="contact-modal-panel"
+             ref="dialogPanel"
              @click.stop
+             role="dialog"
+             aria-modal="true"
+             aria-labelledby="contact-modal-title"
+             tabindex="-1"
              class="relative w-full max-w-lg overflow-hidden rounded-3xl shadow-2xl"
              :initial="{ opacity: 0, y: 24, scale: 0.96 }"
              :animate="{ opacity: 1, y: 0, scale: 1 }"
@@ -23,7 +30,10 @@
           <div class="absolute inset-0 tibet-cloud-pattern opacity-55"></div>
           
           <div class="relative z-10 p-8">
-            <motion.button @click="close"
+            <motion.button ref="closeButton"
+                    type="button"
+                    @click="close"
+                    :aria-label="closeDialogLabel"
                     :whileHover="{ scale: 1.08, rotate: 4 }"
                     :whileTap="{ scale: 0.9 }"
                     class="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-gray-200/50 hover:bg-gray-300/70 backdrop-blur-sm transition-all duration-200 active:scale-90 group">
@@ -47,7 +57,7 @@
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                 </svg>
               </motion.div>
-              <h2 class="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-tibet-red via-tibet-gold to-tibet-blue mb-2">
+              <h2 id="contact-modal-title" class="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-tibet-red via-tibet-gold to-tibet-blue mb-2">
                 {{ t('contact.title') }}
               </h2>
               <p class="text-sm text-gray-600">{{ t('contact.subtitle') }}</p>
@@ -76,7 +86,9 @@
                     <p class="text-lg font-semibold text-gray-900 mb-1">{{ t('footer.phone') }}</p>
                     <p class="text-xs text-gray-500">{{ t('contact.phoneHours') }}</p>
                   </div>
-                  <motion.button @click="copyToClipboard(t('footer.phone'))"
+                  <motion.button type="button"
+                          @click="copyToClipboard(t('footer.phone'))"
+                          :aria-label="copyPhoneLabel"
                           :whileHover="{ scale: 1.08 }"
                           :whileTap="{ scale: 0.9 }"
                           class="flex-shrink-0 w-8 h-8 rounded-lg bg-gray-100/50 hover:bg-gray-200/70 flex items-center justify-center transition-all duration-200 active:scale-90">
@@ -109,7 +121,9 @@
                     <p class="text-lg font-semibold text-gray-900 mb-1 break-all">{{ t('footer.email') }}</p>
                     <p class="text-xs text-gray-500">{{ t('contact.emailResponse') }}</p>
                   </div>
-                  <motion.button @click="copyToClipboard(t('footer.email'))"
+                  <motion.button type="button"
+                          @click="copyToClipboard(t('footer.email'))"
+                          :aria-label="copyEmailLabel"
                           :whileHover="{ scale: 1.08 }"
                           :whileTap="{ scale: 0.9 }"
                           class="flex-shrink-0 w-8 h-8 rounded-lg bg-gray-100/50 hover:bg-gray-200/70 flex items-center justify-center transition-all duration-200 active:scale-90">
@@ -181,7 +195,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { AnimatePresence, motion, useReducedMotion } from 'motion-v'
 import { cardTransition, motionEase } from '../motion/presets'
@@ -199,10 +213,105 @@ const emit = defineEmits<{
 const { t } = useI18n()
 const showToast = ref(false)
 const prefersReducedMotion = useReducedMotion()
+type MotionElementRef = HTMLElement | { $el?: HTMLElement }
+
+const dialogPanel = ref<MotionElementRef | null>(null)
+const closeButton = ref<MotionElementRef | null>(null)
+let previouslyFocusedElement: HTMLElement | null = null
+
+const focusableSelector = [
+  'a[href]',
+  'button:not([disabled])',
+  'textarea:not([disabled])',
+  'input:not([disabled])',
+  'select:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])'
+].join(',')
+
+const closeDialogLabel = computed(() => `${t('common.closeMenu')} ${t('contact.title')}`)
+const copyPhoneLabel = computed(() => `${t('routePlanner.copyText')} ${t('contact.phoneConsult')}`)
+const copyEmailLabel = computed(() => `${t('routePlanner.copyText')} ${t('contact.emailContact')}`)
+
+const resolveElement = (value: MotionElementRef | null) => {
+  if (value instanceof HTMLElement) return value
+  return value?.$el instanceof HTMLElement ? value.$el : null
+}
+
+const getDialogPanel = () => resolveElement(dialogPanel.value)
+
+const getFocusableElements = () => {
+  const panel = getDialogPanel()
+  if (!panel) return []
+
+  return Array.from(panel.querySelectorAll<HTMLElement>(focusableSelector))
+    .filter(element => !element.hasAttribute('disabled') && element.tabIndex !== -1)
+}
+
+const focusInitialElement = async () => {
+  await nextTick()
+  const panel = getDialogPanel()
+  const closeControl = resolveElement(closeButton.value)
+  ;(closeControl || getFocusableElements()[0] || panel)?.focus({ preventScroll: true })
+}
+
+const restoreFocus = () => {
+  const element = previouslyFocusedElement
+  previouslyFocusedElement = null
+  if (element && document.contains(element)) {
+    element.focus({ preventScroll: true })
+  }
+}
 
 const close = () => {
   emit('update:modelValue', false)
 }
+
+const handleTabKey = (event: KeyboardEvent) => {
+  const panel = getDialogPanel()
+  const focusable = getFocusableElements()
+  const first = focusable[0]
+  const last = focusable[focusable.length - 1]
+
+  if (!panel || !first || !last) {
+    event.preventDefault()
+    panel?.focus({ preventScroll: true })
+    return
+  }
+
+  const activeElement = document.activeElement
+
+  if (activeElement instanceof Node && !panel.contains(activeElement)) {
+    event.preventDefault()
+    first.focus({ preventScroll: true })
+    return
+  }
+
+  if (event.shiftKey && activeElement === first) {
+    event.preventDefault()
+    last.focus({ preventScroll: true })
+  } else if (!event.shiftKey && activeElement === last) {
+    event.preventDefault()
+    first.focus({ preventScroll: true })
+  }
+}
+
+watch(
+  () => props.modelValue,
+  isOpen => {
+    if (isOpen) {
+      previouslyFocusedElement = document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null
+      void focusInitialElement()
+      return
+    }
+
+    restoreFocus()
+  },
+  { flush: 'post' }
+)
+
+onBeforeUnmount(restoreFocus)
 
 const copyToClipboard = async (text: string) => {
   try {

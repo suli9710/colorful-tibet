@@ -19,7 +19,6 @@ import com.tibet.tourism.modules.user.domain.User;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,10 +41,13 @@ public class HeritageController {
             "id", "name", "category", "region", "protectionLevel", "viewCount", "likeCount", "commentCount", "createdAt");
     private static final Set<String> ALLOWED_HERITAGE_COMMENT_SORT_FIELDS = Set.of(
             "id", "createdAt", "rating");
+    private static final Set<String> ALLOWED_HERITAGE_INHERITOR_SORT_FIELDS = Set.of(
+            "id", "name", "level", "region", "createdAt");
     private static final Set<String> ALLOWED_HERITAGE_EVENT_SORT_FIELDS = Set.of(
             "id", "eventDate", "createdAt");
     private static final Sort DEFAULT_HERITAGE_ITEM_SORT = Sort.by("id");
     private static final Sort DEFAULT_HERITAGE_COMMENT_SORT = Sort.by(Sort.Direction.DESC, "createdAt").and(Sort.by("id"));
+    private static final Sort DEFAULT_HERITAGE_INHERITOR_SORT = Sort.by("id");
     private static final Sort DEFAULT_HERITAGE_EVENT_SORT = Sort.by(Sort.Direction.ASC, "eventDate").and(Sort.by("id"));
 
     @Autowired
@@ -217,26 +219,28 @@ public class HeritageController {
 
     // ---- 传承人 ----
     @GetMapping("/{id}/inheritors")
-    public ResponseEntity<List<HeritageInheritorDTO>> getInheritors(
+    public PageResponse<HeritageInheritorDTO> getInheritors(
             @PathVariable Long id,
-            @RequestParam(required = false, defaultValue = "zh") String locale) {
-        List<HeritageInheritorDTO> dtos = heritageService.getInheritorsByItemId(id)
-                .stream()
-                .map(i -> HeritageInheritorDTO.fromEntity(i, locale))
-                .toList();
-        return ResponseEntity.ok(dtos);
+            @RequestParam(required = false, defaultValue = "zh") String locale,
+            @PageableDefault(size = 20) Pageable pageable) {
+        Pageable safePageable = InputSanitizer.sanitizePageable(
+                pageable, ALLOWED_HERITAGE_INHERITOR_SORT_FIELDS, DEFAULT_HERITAGE_INHERITOR_SORT, 20, 50);
+        Page<HeritageInheritorDTO> inheritors = heritageService.getInheritorsByItemId(id, safePageable)
+                .map(i -> HeritageInheritorDTO.fromEntity(i, locale));
+        return PageResponse.from(inheritors);
     }
 
     // ---- 活动 ----
     @GetMapping("/{id}/events")
-    public ResponseEntity<List<HeritageEventDTO>> getEvents(
+    public PageResponse<HeritageEventDTO> getEvents(
             @PathVariable Long id,
-            @RequestParam(required = false, defaultValue = "zh") String locale) {
-        List<HeritageEventDTO> dtos = heritageService.getEventsByItemId(id)
-                .stream()
-                .map(e -> HeritageEventDTO.fromEntity(e, locale))
-                .toList();
-        return ResponseEntity.ok(dtos);
+            @RequestParam(required = false, defaultValue = "zh") String locale,
+            @PageableDefault(size = 20) Pageable pageable) {
+        Pageable safePageable = InputSanitizer.sanitizePageable(
+                pageable, ALLOWED_HERITAGE_EVENT_SORT_FIELDS, DEFAULT_HERITAGE_EVENT_SORT, 20, 50);
+        Page<HeritageEventDTO> events = heritageService.getEventsByItemId(id, safePageable)
+                .map(e -> HeritageEventDTO.fromEntity(e, locale));
+        return PageResponse.from(events);
     }
 
     @GetMapping("/events/upcoming")

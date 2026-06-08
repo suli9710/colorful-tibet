@@ -15,8 +15,10 @@ import com.tibet.tourism.modules.user.infra.UserRepository;
 import jakarta.persistence.criteria.Predicate;
 import java.util.*;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +26,15 @@ import org.springframework.util.StringUtils;
 
 @Service
 public class TravelQAService {
+
+    private static final int DEFAULT_ANSWER_PAGE_SIZE = 20;
+    private static final int MAX_ANSWER_PAGE_SIZE = 50;
+    private static final Set<String> ALLOWED_ANSWER_SORT_FIELDS = Set.of();
+    private static final Sort DEFAULT_ANSWER_SORT = Sort.by(
+            Sort.Order.desc("isAccepted"),
+            Sort.Order.desc("likeCount"),
+            Sort.Order.asc("createdAt"),
+            Sort.Order.asc("id"));
 
     @Autowired
     private TravelQuestionRepository questionRepository;
@@ -36,6 +47,8 @@ public class TravelQAService {
 
     @Autowired
     private UserRepository userRepository;
+
+    public record LikeResult(boolean liked, int likeCount) {}
 
     @Transactional
     public TravelQuestion askQuestion(Long userId, String title, String content, String tags) {
@@ -145,7 +158,7 @@ public class TravelQAService {
     }
 
     @Transactional
-    public boolean likeQuestion(Long questionId, Long userId) {
+    public LikeResult likeQuestion(Long questionId, Long userId) {
         TravelQuestion question = questionRepository.findById(questionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Question not found"));
 
@@ -153,20 +166,23 @@ public class TravelQAService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         if (likeRepository.existsByQuestionAndUser(question, user)) {
-            return false;
+            return new LikeResult(true, readQuestionLikeCount(questionId));
         }
 
         QuestionLike like = new QuestionLike();
         like.setQuestion(question);
         like.setUser(user);
-        likeRepository.save(like);
-
-        questionRepository.incrementLikeCount(questionId);
-        return true;
+        try {
+            likeRepository.saveAndFlush(like);
+            questionRepository.incrementLikeCount(questionId);
+        } catch (DataIntegrityViolationException duplicate) {
+            // Concurrent duplicate like; the unique row already represents the desired state.
+        }
+        return new LikeResult(true, readQuestionLikeCount(questionId));
     }
 
     @Transactional
-    public boolean unlikeQuestion(Long questionId, Long userId) {
+    public LikeResult unlikeQuestion(Long questionId, Long userId) {
         TravelQuestion question = questionRepository.findById(questionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Question not found"));
 
@@ -175,12 +191,12 @@ public class TravelQAService {
 
         Optional<QuestionLike> like = likeRepository.findByQuestionAndUser(question, user);
         if (like.isEmpty()) {
-            return false;
+            return new LikeResult(false, readQuestionLikeCount(questionId));
         }
 
         likeRepository.delete(like.get());
         questionRepository.decrementLikeCount(questionId);
-        return true;
+        return new LikeResult(false, readQuestionLikeCount(questionId));
     }
 
     public boolean isLikedByUser(Long questionId, Long userId) {
@@ -191,15 +207,27 @@ public class TravelQAService {
         return likeRepository.existsByQuestionAndUser(question, user);
     }
 
-    public List<TravelAnswer> getAnswers(Long questionId) {
+    @Transactional(readOnly = true)
+    public Page<TravelAnswer> getAnswers(Long questionId, Pageable pageable) {
         TravelQuestion question = questionRepository.findById(questionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Question not found"));
-        return answerRepository.findByQuestionOrderByIsAcceptedDescLikeCountDescCreatedAtAsc(question);
+        Pageable safePageable = InputSanitizer.sanitizePageable(
+                pageable,
+                ALLOWED_ANSWER_SORT_FIELDS,
+                DEFAULT_ANSWER_SORT,
+                DEFAULT_ANSWER_PAGE_SIZE,
+                MAX_ANSWER_PAGE_SIZE);
+        return answerRepository.findByQuestion(question, safePageable);
     }
 
     public List<TravelQuestion> getQuestionsByAuthor(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         return questionRepository.findByAuthorOrderByCreatedAtDesc(user);
+    }
+
+    private int readQuestionLikeCount(Long questionId) {
+        return questionRepository.findLikeCountById(questionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Question not found"));
     }
 }

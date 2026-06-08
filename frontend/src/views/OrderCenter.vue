@@ -137,9 +137,16 @@
           <article
             v-for="order in filteredOrders"
             :key="order.id"
-            class="cursor-pointer rounded-2xl border bg-white/80 p-4 shadow-sm transition"
+            role="button"
+            tabindex="0"
+            :aria-label="orderCardActionLabel(order)"
+            :aria-expanded="selectedOrderId === order.id"
+            aria-controls="order-detail-panel"
+            class="cursor-pointer rounded-2xl border bg-white/80 p-4 shadow-sm transition focus:outline-none focus:ring-2 focus:ring-tibet-gold/60 focus:ring-offset-2"
             :class="selectedOrderId === order.id ? 'border-tibet-red/35 ring-2 ring-tibet-red/10' : 'border-white/65 hover:border-tibet-gold/30 hover:bg-white/90'"
             @click="selectOrder(order.id)"
+            @keydown.enter.prevent="selectOrder(order.id)"
+            @keydown.space.prevent="selectOrder(order.id)"
           >
             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div class="min-w-0">
@@ -191,7 +198,7 @@
           </div>
         </section>
 
-        <aside v-if="selectedOrder" class="min-w-0 lg:sticky lg:top-28">
+        <aside v-if="selectedOrder" id="order-detail-panel" class="min-w-0 lg:sticky lg:top-28">
           <section class="overflow-hidden rounded-3xl border border-white/65 bg-white/85 shadow-lg shadow-slate-900/5">
             <div class="border-b border-tibet-gold/10 bg-white/55 px-5 py-4">
               <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -631,6 +638,9 @@ const itemSummary = (order: Order) => {
     .map(item => `${item.productName}${item.skuName ? ` - ${item.skuName}` : ''}`)
     .join(' / ')
 }
+
+const orderCardActionLabel = (order: Order) =>
+  `查看咨询详情：${order.productSummary || order.orderNo}`
 
 onMounted(async () => {
   if (!(await auth.ensureSession())) {

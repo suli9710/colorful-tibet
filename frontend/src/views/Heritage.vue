@@ -1096,7 +1096,7 @@ import type {
 import { useAuthStore } from '../stores/auth'
 import { useToast } from '../composables/useToast'
 import { createTextCardPopupContent } from '../utils/domText'
-import { summarizeClientError } from '../utils/errorMonitoring'
+import { safeClientErrorMessage, summarizeClientError } from '../utils/errorMonitoring'
 import type * as Leaflet from 'leaflet'
 import {
   cardExit,
@@ -1183,10 +1183,12 @@ const safeExternalUrl = (value?: string | null): string => {
 
 const heritageItems = ref<HeritageItem[]>([])
 const loading = ref(true)
+const heritageErrorMessage = ref('')
 const selectedItem = ref<HeritageItem | null>(null)
 
 const searchKeyword = ref('')
 const searchLoading = ref(false)
+const failedHeritageImages = ref<Record<string, boolean>>({})
 
 const itemComments = ref<HeritageCommentItem[]>([])
 const commentsLoading = ref(false)
@@ -1271,7 +1273,12 @@ const findMappedHeritageImage = (name?: string | null): string => {
   return match?.[1] || ''
 }
 
+const getHeritageImageKey = (item?: HeritageItem | null): string =>
+  String(item?.id || item?.imageUrl || item?.name || 'heritage-image')
+
 const resolveHeritageImage = (item?: HeritageItem | null): string => {
+  if (failedHeritageImages.value[getHeritageImageKey(item)]) return ''
+
   const mapped = findMappedHeritageImage(item?.name)
   if (mapped) return mapped
 
@@ -1279,9 +1286,8 @@ const resolveHeritageImage = (item?: HeritageItem | null): string => {
   return isGenericHeritageImage(imageUrl) ? '' : (imageUrl || '')
 }
 
-const applyHeritageImageFallback = (event: Event): void => {
-  const image = event.target as HTMLImageElement
-  image.style.display = 'none'
+const markHeritageImageFailed = (item?: HeritageItem | null): void => {
+  failedHeritageImages.value[getHeritageImageKey(item)] = true
 }
 
 // 地图相关
@@ -1957,18 +1963,23 @@ const openHeritageById = (id?: number) => {
 
 const fetchHeritageItems = async (keyword?: string) => {
   try {
+    heritageErrorMessage.value = ''
     const params: Record<string, string> = { size: '100' }
     if (keyword) params.keyword = keyword
     const response = await api.get(endpoints.heritage.list, { params })
     const items = response.data?.content || response.data || []
-    heritageItems.value = items
+    heritageItems.value = Array.isArray(items) ? items : []
     if (authStore.isLoggedIn) {
-      void fetchFeaturedInheritors(items)
+      void fetchFeaturedInheritors(heritageItems.value)
     } else {
       featuredInheritors.value = []
     }
   } catch (error) {
     console.error('Failed to fetch heritage items:', summarizeClientError(error))
+    heritageErrorMessage.value = safeClientErrorMessage(error, t('toast.pageLoadFailed'))
+    if (!heritageItems.value.length) {
+      featuredInheritors.value = []
+    }
   } finally {
     loading.value = false
     searchLoading.value = false

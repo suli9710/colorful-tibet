@@ -18,6 +18,9 @@ public interface TravelAnswerRepository extends JpaRepository<TravelAnswer, Long
     @EntityGraph(attributePaths = {"user"})
     List<TravelAnswer> findByQuestionOrderByIsAcceptedDescLikeCountDescCreatedAtAsc(TravelQuestion question);
 
+    @EntityGraph(attributePaths = {"user"})
+    Page<TravelAnswer> findByQuestion(TravelQuestion question, Pageable pageable);
+
     @EntityGraph(attributePaths = {"question", "user"})
     List<TravelAnswer> findAllByOrderByCreatedAtDesc();
 

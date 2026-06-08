@@ -2,17 +2,22 @@ package com.tibet.tourism.modules.route.web;
 import com.tibet.tourism.common.security.JwtAuthSupport;
 import com.tibet.tourism.common.security.SensitiveLogSanitizer;
 import com.tibet.tourism.modules.route.application.ItineraryService;
-import com.tibet.tourism.modules.route.domain.Itinerary;
 import com.tibet.tourism.modules.route.web.dto.itinerary.BookItineraryItemRequest;
 import com.tibet.tourism.modules.route.web.dto.itinerary.CreateItineraryVersionRequest;
 import com.tibet.tourism.modules.route.web.dto.itinerary.GenerateItineraryRequest;
+import com.tibet.tourism.modules.route.web.dto.itinerary.ItineraryResponse;
 import com.tibet.tourism.modules.user.domain.User;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -46,9 +51,11 @@ public class ItineraryController {
     }
 
     @GetMapping("/my")
-    public ResponseEntity<?> myItineraries(HttpServletRequest httpRequest) {
+    public ResponseEntity<List<ItineraryResponse>> myItineraries(
+            HttpServletRequest httpRequest,
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         User user = jwtAuthSupport.resolveCurrentUser(httpRequest);
-        return ResponseEntity.ok(itineraryService.getMyItineraries(user));
+        return pagedContent(itineraryService.getMyItineraries(user, pageable));
     }
 
     @GetMapping("/{id}")
@@ -112,5 +119,14 @@ public class ItineraryController {
                     id, itemId, SensitiveLogSanitizer.exceptionSummary(e));
             return ResponseEntity.badRequest().body(Map.of("error", INVALID_BOOKING_REQUEST_ERROR));
         }
+    }
+
+    private <T> ResponseEntity<List<T>> pagedContent(Page<T> page) {
+        return ResponseEntity.ok()
+                .header("X-Page", String.valueOf(page.getNumber()))
+                .header("X-Size", String.valueOf(page.getSize()))
+                .header("X-Total-Elements", String.valueOf(page.getTotalElements()))
+                .header("X-Total-Pages", String.valueOf(page.getTotalPages()))
+                .body(page.getContent());
     }
 }

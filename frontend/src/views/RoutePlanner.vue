@@ -1452,6 +1452,7 @@ let firstTokenProgressTimer: number | null = null
 let latestRenderJobId = 0
 let latestAppliedRenderId = 0
 let latestMarkdownSnapshot = ''
+let routeGenerationRequestId = 0
 
 const routeStatusRole = computed(() => errorMessage.value ? 'alert' : 'status')
 const routeStatusLive = computed(() => errorMessage.value ? 'assertive' : 'polite')
@@ -2075,8 +2076,26 @@ const finishRouteJob = async (jobId: string, content: string) => {
   await generateBookableItinerary()
 }
 
+const interruptRouteJob = (jobId: string, content: string) => {
+  if (!activeRouteJobId.value || activeRouteJobId.value !== jobId) return
+
+  stopFirstTokenProgress()
+  if (content.trim()) {
+    updateGeneratedRouteContent(content)
+  }
+  rememberPausedRouteJob(jobId)
+  streaming.value = false
+  loading.value = false
+  activeRouteJobId.value = ''
+  errorMessage.value = ''
+  statusMessage.value = t('routePlanner.generationInterrupted')
+  generationStore.cancelGeneration()
+  persistRouteDraft({ jobId, completed: false })
+}
+
 const applyRouteJobSnapshot = (snapshot: RouteGenerationJobSnapshot) => {
   if (!snapshot || (activeRouteJobId.value && snapshot.jobId !== activeRouteJobId.value)) return
+  if (pausedRouteJobId.value === snapshot.jobId && !loading.value && !streaming.value) return
 
   activeRouteJobId.value = snapshot.jobId
   if (snapshot.routeRecordId) {
@@ -2104,6 +2123,31 @@ const applyRouteJobSnapshot = (snapshot: RouteGenerationJobSnapshot) => {
   }
 }
 
+const pauseRouteGeneration = () => {
+  const jobId = activeRouteJobId.value
+  if (!loading.value && !streaming.value && !jobId) return
+
+  routeGenerationRequestId += 1
+  streamAbortController.value?.abort()
+  streamAbortController.value = null
+  stopFirstTokenProgress()
+  loading.value = false
+  streaming.value = false
+  activeRouteJobId.value = ''
+  errorMessage.value = ''
+  generationStore.cancelGeneration()
+
+  if (jobId) {
+    rememberPausedRouteJob(jobId)
+  }
+
+  const savedChars = result.value.trim().length
+  statusMessage.value = savedChars > 0
+    ? `已停止等待，已保留当前 ${savedChars} 字内容；可恢复生成、复制当前片段或重新生成。`
+    : '已停止等待，可恢复生成或重新生成。服务端可能仍在处理本次请求。'
+  persistRouteDraft({ jobId: '', completed: false })
+}
+
 const subscribeToRouteJob = async (jobId: string) => {
   const controller = new AbortController()
   streamAbortController.value?.abort()
@@ -2123,6 +2167,7 @@ const subscribeToRouteJob = async (jobId: string) => {
         updateGeneratedRouteContent(content, true)
       },
       onDone: content => void finishRouteJob(jobId, content),
+      onInterrupted: content => interruptRouteJob(jobId, content),
       onError: () => failRouteJob(t('routePlanner.generateFailed'))
     },
     controller.signal
@@ -2130,6 +2175,52 @@ const subscribeToRouteJob = async (jobId: string) => {
 
   if (streamAbortController.value === controller) {
     streamAbortController.value = null
+  }
+}
+
+const resumePausedRouteJob = async () => {
+  const jobId = normalizeRouteJobId(pausedRouteJobId.value)
+  if (!jobId || loading.value || streaming.value || activeRouteJobId.value || routeResumeLoading.value) return
+
+  const requestId = ++routeGenerationRequestId
+  routeResumeLoading.value = true
+  loading.value = true
+  streaming.value = true
+  activeRouteJobId.value = jobId
+  errorMessage.value = ''
+  statusMessage.value = '正在恢复 AI 路线生成...'
+  generationStore.startGeneration()
+  if (!result.value.trim()) {
+    startFirstTokenProgress()
+  }
+
+  try {
+    const snapshot = await getRouteGenerationJob(jobId)
+    if (requestId !== routeGenerationRequestId || !loading.value || !streaming.value) {
+      rememberPausedRouteJob(jobId)
+      return
+    }
+    clearPausedRouteJob(jobId)
+    applyRouteJobSnapshot(snapshot)
+    if (snapshot.status === 'RUNNING') {
+      await subscribeToRouteJob(snapshot.jobId)
+    }
+  } catch (error: any) {
+    if (requestId !== routeGenerationRequestId && !loading.value && !streaming.value) {
+      rememberPausedRouteJob(jobId)
+      return
+    }
+    console.error('Failed to resume route job:', summarizeClientError(error))
+    stopFirstTokenProgress()
+    loading.value = false
+    streaming.value = false
+    activeRouteJobId.value = ''
+    errorMessage.value = safeRouteFailureMessage(error)
+    statusMessage.value = '恢复生成失败，请稍后重试。'
+    generationStore.cancelGeneration()
+    persistRouteDraft({ jobId: '', completed: false })
+  } finally {
+    routeResumeLoading.value = false
   }
 }
 
@@ -2169,6 +2260,7 @@ const resumeRouteJobFromDraft = async () => {
 const generateRoute = async () => {
   if (loading.value || streaming.value || activeRouteJobId.value) return
 
+  const requestId = ++routeGenerationRequestId
   loading.value = true
   let hasSession = false
   try {
@@ -2185,6 +2277,7 @@ const generateRoute = async () => {
   streaming.value = true
   streamAbortController.value?.abort()
   streamAbortController.value = null
+  clearPausedRouteJob()
   result.value = ''
   renderedResult.value = ''
   resultExpanded.value = false
@@ -2205,12 +2298,24 @@ const generateRoute = async () => {
 
   try {
     const snapshot = await startRouteGenerationJob(form.value)
+    if (requestId !== routeGenerationRequestId || !loading.value || !streaming.value) {
+      if (snapshot.jobId) {
+        rememberPausedRouteJob(snapshot.jobId)
+      }
+      activeRouteJobId.value = ''
+      persistRouteDraft({ jobId: '', completed: false })
+      return
+    }
     activeRouteJobId.value = snapshot.jobId
     applyRouteJobSnapshot(snapshot)
     if (snapshot.status === 'RUNNING') {
       await subscribeToRouteJob(snapshot.jobId)
     }
   } catch (error: any) {
+    if (requestId !== routeGenerationRequestId && !loading.value && !streaming.value) {
+      persistRouteDraft({ jobId: '', completed: false })
+      return
+    }
     console.error('Failed to generate route:', summarizeClientError(error))
     stopFirstTokenProgress()
     errorMessage.value = safeRouteFailureMessage(error)
@@ -2404,6 +2509,7 @@ watch(form, () => persistRouteDraft(), { deep: true })
 onMounted(async () => {
   window.addEventListener('auth-expired', onAuthExpired)
   generationStore.acknowledgeResult()
+  restorePausedRouteJob()
   const hasSession = await auth.ensureSession()
   const restoredFromServer = hasSession ? await restoreLatestRouteFromServer() : false
   if (!restoredFromServer) {

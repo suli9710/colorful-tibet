@@ -10,6 +10,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 $RepoRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+. (Join-Path $RepoRoot "scripts/New-DeploymentArchive.ps1")
 $Remote = "${User}@${HostName}"
 $RemoteArchive = "/tmp/colorful-tibet-upload.tar.gz"
 $RemoteScript = "/tmp/colorful-tibet-upload.sh"
@@ -48,6 +49,7 @@ function ConvertTo-ShellSingleQuoted {
 }
 
 Assert-Command "tar"
+Assert-Command "git"
 Assert-Command "scp"
 Assert-Command "ssh"
 
@@ -69,40 +71,8 @@ if (Test-Path $ArchivePath) {
     Remove-Item -LiteralPath $ArchivePath -Force
 }
 
-$tarExcludes = @(
-    "--exclude=./.idea",
-    "--exclude=./.vscode",
-    "--exclude=./node_modules",
-    "--exclude=./frontend/node_modules",
-    "--exclude=./frontend/dist",
-    "--exclude=./backend/target",
-    "--exclude=./backend/logs",
-    "--exclude=./logs",
-    "--exclude=./.startup",
-    "--exclude=./certs",
-    "--exclude=./scrapler/.venv",
-    "--exclude=./.env",
-    "--exclude=./.env.*",
-    "--exclude=*/.env",
-    "--exclude=*/.env.*",
-    "--exclude=./*.log",
-    "--exclude=./*.tar.gz"
-)
-
-$topLevelExcludes = @(".git", ".idea", ".vscode", "node_modules", "data", "logs", ".env", ".startup", "certs")
-$tarIncludes = Get-ChildItem -LiteralPath $RepoRoot -Force |
-    Where-Object {
-        $topLevelExcludes -notcontains $_.Name -and
-        $_.Name -notlike "*.tar.gz"
-    } |
-    ForEach-Object { "./$($_.Name)" }
-
-if (-not $tarIncludes) {
-    throw "No files found to upload."
-}
-
-Write-Host "Packing project..." -ForegroundColor Cyan
-Invoke-Native "tar" ($tarExcludes + @("-czf", $ArchivePath) + $tarIncludes) $RepoRoot
+Write-Host "Packing project from Git-tracked allowlist..." -ForegroundColor Cyan
+New-DeploymentArchive -RepoRoot $RepoRoot -ArchivePath $ArchivePath
 
 $projectDirLiteral = ConvertTo-ShellSingleQuoted $RemoteProjectDir
 $archiveLiteral = ConvertTo-ShellSingleQuoted $RemoteArchive
@@ -117,9 +87,9 @@ PROJECT_DIR=__PROJECT_DIR__
 ARCHIVE=__ARCHIVE__
 REMOTE_SCRIPT=__REMOTE_SCRIPT__
 SITE_URL=__SITE_URL__
-COMPOSE_FILE="$PROJECT_DIR/docker-compose.prod.yml"
 RELEASE_DIR=$(mktemp -d /tmp/colorful-tibet-release.XXXXXX)
 PREBUILD_PROJECT="colorful-tibet-prebuild"
+ALLOWED_PROJECT_ROOT="/opt/colorful-tibet"
 
 cleanup() {
   if [ -f "$RELEASE_DIR/docker-compose.prod.yml" ]; then
@@ -129,22 +99,82 @@ cleanup() {
 }
 trap cleanup EXIT
 
-case "$PROJECT_DIR" in
-  /opt/colorful-tibet|/opt/colorful-tibet/*) ;;
-  *) echo "Refusing unexpected project path: $PROJECT_DIR" >&2; exit 1 ;;
-esac
+validate_project_dir() {
+  if [ -z "$PROJECT_DIR" ] || [ "${PROJECT_DIR#/}" = "$PROJECT_DIR" ]; then
+    echo "Refusing non-absolute project path: $PROJECT_DIR" >&2
+    exit 1
+  fi
+
+  case "$PROJECT_DIR" in
+    *"/.."|*"/../"*|".."|"../"*|*"/."|*"/./"*|"."|"./"*|"//"*)
+      echo "Refusing non-normalized project path: $PROJECT_DIR" >&2
+      exit 1
+      ;;
+  esac
+
+  if ! command -v realpath >/dev/null 2>&1; then
+    echo "Refusing deployment: realpath is required for safe project path validation." >&2
+    exit 1
+  fi
+
+  RESOLVED_PROJECT_DIR=$(realpath -m -- "$PROJECT_DIR")
+  case "$RESOLVED_PROJECT_DIR" in
+    "$ALLOWED_PROJECT_ROOT"|"$ALLOWED_PROJECT_ROOT"/*) PROJECT_DIR="$RESOLVED_PROJECT_DIR" ;;
+    *) echo "Refusing project path outside $ALLOWED_PROJECT_ROOT: $PROJECT_DIR resolves to $RESOLVED_PROJECT_DIR" >&2; exit 1 ;;
+  esac
+}
+
+ensure_project_dir() {
+  mkdir -p "$PROJECT_DIR"
+  RESOLVED_PROJECT_DIR=$(realpath -e -- "$PROJECT_DIR")
+  case "$RESOLVED_PROJECT_DIR" in
+    "$ALLOWED_PROJECT_ROOT"|"$ALLOWED_PROJECT_ROOT"/*) PROJECT_DIR="$RESOLVED_PROJECT_DIR" ;;
+    *) echo "Refusing project path outside $ALLOWED_PROJECT_ROOT after creation: $RESOLVED_PROJECT_DIR" >&2; exit 1 ;;
+  esac
+}
+
+reject_project_symlinks() {
+  local name
+  for name in "$@"; do
+    if [ -L "$PROJECT_DIR/$name" ]; then
+      echo "Refusing deployment: $PROJECT_DIR/$name must not be a symlink." >&2
+      exit 1
+    fi
+  done
+}
+
+enter_project_dir() {
+  cd -P -- "$PROJECT_DIR"
+  CURRENT_PROJECT_DIR=$(pwd -P)
+  if [ "$CURRENT_PROJECT_DIR" != "$PROJECT_DIR" ]; then
+    echo "Refusing deployment: physical project directory changed from $PROJECT_DIR to $CURRENT_PROJECT_DIR." >&2
+    exit 1
+  fi
+}
+
+validate_project_dir
+ensure_project_dir
+COMPOSE_FILE="$PROJECT_DIR/docker-compose.prod.yml"
 
 if ! command -v docker >/dev/null 2>&1; then
   echo "Docker is not installed on the server." >&2
   exit 1
 fi
 
+reject_project_symlinks ".env" data logs
 mkdir -p "$PROJECT_DIR/data" "$PROJECT_DIR/logs"
 
 if [ ! -f "$PROJECT_DIR/.env" ]; then
   echo "Missing $PROJECT_DIR/.env. Create production env first; upload will not invent secrets." >&2
   exit 1
 fi
+
+BACKEND_APP_UID=$(grep -E '^BACKEND_APP_UID=' "$PROJECT_DIR/.env" | tail -n 1 | cut -d= -f2- || true)
+BACKEND_APP_GID=$(grep -E '^BACKEND_APP_GID=' "$PROJECT_DIR/.env" | tail -n 1 | cut -d= -f2- || true)
+BACKEND_APP_UID=${BACKEND_APP_UID:-10001}
+BACKEND_APP_GID=${BACKEND_APP_GID:-10001}
+case "$BACKEND_APP_UID" in ''|*[!0-9]*) echo "Invalid BACKEND_APP_UID: $BACKEND_APP_UID" >&2; exit 1 ;; esac
+case "$BACKEND_APP_GID" in ''|*[!0-9]*) echo "Invalid BACKEND_APP_GID: $BACKEND_APP_GID" >&2; exit 1 ;; esac
 
 NGINX_CERT_DOMAIN=$(grep -E '^NGINX_CERT_DOMAIN=' "$PROJECT_DIR/.env" | tail -n 1 | cut -d= -f2- || true)
 if [ -z "$NGINX_CERT_DOMAIN" ]; then
@@ -222,6 +252,12 @@ if [ "$(printf '%s' "$PII_ACTIVE_KEY" | base64 -d 2>/dev/null | wc -c | tr -d ' 
   exit 1
 fi
 
+PII_LEGACY_KEY_VALUE=$(grep -E '^PII_ENCRYPTION_KEY=' "$PROJECT_DIR/.env" | tail -n 1 | cut -d= -f2- || true)
+if [ -n "$PII_LEGACY_KEY_VALUE" ] && printf '%s' "$PII_LEGACY_KEY_VALUE" | grep -Eiq 'change-me|changeme|replace-with|placeholder'; then
+  echo "Refusing deployment: PII_ENCRYPTION_KEY must not contain placeholder values when legacy v1 PII rows need it." >&2
+  exit 1
+fi
+
 echo "Prebuilding release before stopping current containers..."
 tar -xzf "$ARCHIVE" -C "$RELEASE_DIR"
 cp "$PROJECT_DIR/.env" "$RELEASE_DIR/.env"
@@ -240,13 +276,16 @@ if [ -f "$COMPOSE_FILE" ]; then
 fi
 
 echo "Replacing app files while preserving .env, data, and logs..."
-find "$PROJECT_DIR" -mindepth 1 -maxdepth 1 \
+reject_project_symlinks ".env" data logs
+enter_project_dir
+find . -mindepth 1 -maxdepth 1 \
   ! -name '.env' \
   ! -name 'data' \
   ! -name 'logs' \
   -exec rm -rf -- {} +
 
 tar -xzf "$ARCHIVE" -C "$PROJECT_DIR"
+reject_project_symlinks ".env" data logs certs
 mkdir -p "$PROJECT_DIR/certs/$NGINX_CERT_DOMAIN"
 cp "$LE_CERT_DIR/fullchain.pem" "$LE_CERT_DIR/privkey.pem" "$LE_CERT_DIR/chain.pem" "$PROJECT_DIR/certs/$NGINX_CERT_DOMAIN/"
 chown -R 101:101 "$PROJECT_DIR/certs"
@@ -258,7 +297,9 @@ find "$PROJECT_DIR" -mindepth 1 \
 find "$PROJECT_DIR" -mindepth 1 \
   \( -path "$PROJECT_DIR/.env" -o -path "$PROJECT_DIR/certs" -o -path "$PROJECT_DIR/certs/*" -o -path "$PROJECT_DIR/data" -o -path "$PROJECT_DIR/data/*" -o -path "$PROJECT_DIR/logs" -o -path "$PROJECT_DIR/logs/*" \) -prune -o \
   -type f -exec chmod 644 {} +
-chmod -R a+rwX "$PROJECT_DIR/data" "$PROJECT_DIR/logs"
+chown -R "$BACKEND_APP_UID:$BACKEND_APP_GID" "$PROJECT_DIR/data" "$PROJECT_DIR/logs"
+find "$PROJECT_DIR/data" "$PROJECT_DIR/logs" -type d -exec chmod 750 {} +
+find "$PROJECT_DIR/data" "$PROJECT_DIR/logs" -type f -exec chmod 640 {} +
 
 cd "$PROJECT_DIR"
 docker compose -f "$COMPOSE_FILE" config --quiet

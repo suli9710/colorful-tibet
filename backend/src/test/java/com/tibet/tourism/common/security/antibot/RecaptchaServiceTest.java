@@ -3,10 +3,19 @@ package com.tibet.tourism.common.security.antibot;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpServer;
+import java.net.InetSocketAddress;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.OptionalDouble;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
@@ -61,6 +70,36 @@ class RecaptchaServiceTest {
     }
 
     @Test
+    void verificationPostsSecretAndTokenInFormBodyNotQueryString() throws Exception {
+        CapturedRequest captured = new CapturedRequest();
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/recaptcha/api/siteverify", exchange -> handleSiteverify(exchange, captured));
+        server.start();
+
+        try {
+            String verifyUrl = "http://127.0.0.1:" + server.getAddress().getPort() + "/recaptcha/api/siteverify";
+            AntibotProperties properties = enabledProperties("form-secret value+&=", verifyUrl);
+            RecaptchaService service = new RecaptchaService(properties, WebClient.builder());
+
+            OptionalDouble result = service.verify("token value+&=", "203.0.113.10");
+
+            assertThat(result).isPresent();
+            assertThat(result.getAsDouble()).isEqualTo(0.82);
+            assertThat(captured.method.get()).isEqualTo("POST");
+            assertThat(captured.path.get()).isEqualTo("/recaptcha/api/siteverify");
+            assertThat(captured.rawQuery.get()).isNull();
+            assertThat(captured.contentType.get()).startsWith(MediaType.APPLICATION_FORM_URLENCODED_VALUE);
+
+            Map<String, String> form = parseFormBody(captured.body.get());
+            assertThat(form).containsEntry("secret", "form-secret value+&=");
+            assertThat(form).containsEntry("response", "token value+&=");
+            assertThat(form).containsEntry("remoteip", "203.0.113.10");
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
     void verificationSummaryOmitsRawProviderFields() throws Exception {
         String providerResponse = """
                 {
@@ -80,11 +119,9 @@ class RecaptchaServiceTest {
     }
 
     private RecaptchaService serviceWithResponse(String body) {
-        AntibotProperties properties = new AntibotProperties();
-        properties.setEnabled(true);
-        properties.getRecaptcha().setEnabled(true);
-        properties.getRecaptcha().setSecretKey("test-secret");
-        properties.getRecaptcha().setVerifyUrl("https://www.recaptcha.net/recaptcha/api/siteverify");
+        AntibotProperties properties = enabledProperties(
+                "test-secret",
+                "https://www.recaptcha.net/recaptcha/api/siteverify");
 
         WebClient.Builder builder = WebClient.builder().exchangeFunction(request ->
                 Mono.just(ClientResponse.create(HttpStatus.OK)
@@ -93,5 +130,52 @@ class RecaptchaServiceTest {
                         .build()));
 
         return new RecaptchaService(properties, builder);
+    }
+
+    private static AntibotProperties enabledProperties(String secretKey, String verifyUrl) {
+        AntibotProperties properties = new AntibotProperties();
+        properties.setEnabled(true);
+        properties.getRecaptcha().setEnabled(true);
+        properties.getRecaptcha().setSecretKey(secretKey);
+        properties.getRecaptcha().setVerifyUrl(verifyUrl);
+        return properties;
+    }
+
+    private static void handleSiteverify(HttpExchange exchange, CapturedRequest captured) throws java.io.IOException {
+        try {
+            captured.method.set(exchange.getRequestMethod());
+            captured.path.set(exchange.getRequestURI().getPath());
+            captured.rawQuery.set(exchange.getRequestURI().getRawQuery());
+            captured.contentType.set(exchange.getRequestHeaders().getFirst(HttpHeaders.CONTENT_TYPE));
+            captured.body.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+
+            byte[] response = "{\"success\":true,\"score\":0.82}".getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);
+            exchange.sendResponseHeaders(HttpStatus.OK.value(), response.length);
+            exchange.getResponseBody().write(response);
+        } finally {
+            exchange.close();
+        }
+    }
+
+    private static Map<String, String> parseFormBody(String body) {
+        Map<String, String> form = new LinkedHashMap<>();
+        for (String part : body.split("&")) {
+            String[] entry = part.split("=", 2);
+            String key = URLDecoder.decode(entry[0], StandardCharsets.UTF_8);
+            String value = entry.length == 2
+                    ? URLDecoder.decode(entry[1], StandardCharsets.UTF_8)
+                    : "";
+            form.put(key, value);
+        }
+        return form;
+    }
+
+    private static final class CapturedRequest {
+        private final AtomicReference<String> method = new AtomicReference<>();
+        private final AtomicReference<String> path = new AtomicReference<>();
+        private final AtomicReference<String> rawQuery = new AtomicReference<>();
+        private final AtomicReference<String> contentType = new AtomicReference<>();
+        private final AtomicReference<String> body = new AtomicReference<>();
     }
 }

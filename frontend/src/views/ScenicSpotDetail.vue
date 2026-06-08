@@ -783,6 +783,27 @@ const uploadingCommentImage = ref(false)
 const commentsLoading = ref(false)
 const commentsError = ref('')
 const commentImageFileName = computed(() => commentImageFile.value?.name || '')
+const likedStatusBatchSize = 6
+
+const hydrateCommentLikedStatuses = async (commentList: ScenicSpotCommentItem[]) => {
+  for (let index = 0; index < commentList.length; index += likedStatusBatchSize) {
+    const batch = commentList.slice(index, index + likedStatusBatchSize)
+    const results = await Promise.allSettled(
+      batch.map(async comment => {
+        const likedResponse = await api.get(endpoints.comments.liked(comment.id))
+        comment.liked = Boolean(likedResponse.data?.liked)
+      })
+    )
+
+    results.forEach((result, resultIndex) => {
+      if (result.status === 'rejected') {
+        const comment = batch[resultIndex]
+        console.error('Failed to check liked status:', summarizeClientError(result.reason))
+        comment.liked = false
+      }
+    })
+  }
+}
 
 const fetchComments = async () => {
   commentsLoading.value = true
@@ -793,15 +814,7 @@ const fetchComments = async () => {
     
     // 如果用户已登录，检查每条评论的点赞状态
     if (user.value) {
-      for (const comment of comments.value) {
-        try {
-          const likedResponse = await api.get(`/comments/${comment.id}/liked`)
-          comment.liked = likedResponse.data.liked
-        } catch (error) {
-          console.error('Failed to check liked status:', summarizeClientError(error))
-          comment.liked = false
-        }
-      }
+      await hydrateCommentLikedStatuses(comments.value)
     }
   } catch (error) {
     console.error('Failed to fetch comments:', summarizeClientError(error))
@@ -944,7 +957,7 @@ const toggleLike = async (comment: ScenicSpotCommentItem) => {
   }
   
   try {
-    const response = await api.post(`/comments/${comment.id}/like`)
+    const response = await api.post(endpoints.comments.like(comment.id))
     
     comment.liked = response.data.liked
     comment.likeCount = response.data.likeCount

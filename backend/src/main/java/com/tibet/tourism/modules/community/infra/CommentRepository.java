@@ -25,6 +25,10 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
 
     @EntityGraph(attributePaths = {"spot"})
     List<Comment> findByUserOrderByCreatedAtDesc(User user);
+
+    @EntityGraph(attributePaths = {"user", "spot"})
+    Page<Comment> findByUser(User user, Pageable pageable);
+
     long countByUser(User user);
     void deleteByUser(User user);
     void deleteBySpotId(Long spotId);

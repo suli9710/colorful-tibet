@@ -15,14 +15,17 @@ import com.tibet.tourism.modules.order.domain.Invoice;
 import com.tibet.tourism.modules.order.domain.OrderAuditLog;
 import com.tibet.tourism.modules.order.domain.OrderItem;
 import com.tibet.tourism.modules.order.domain.PaymentTransaction;
+import com.tibet.tourism.modules.order.domain.PaymentTransactionReservation;
 import com.tibet.tourism.modules.order.domain.PlatformOrder;
 import com.tibet.tourism.modules.order.domain.RefundOrder;
 import com.tibet.tourism.modules.order.domain.Voucher;
 import com.tibet.tourism.modules.order.infra.CancellationPolicyRepository;
 import com.tibet.tourism.modules.order.infra.InventoryLockRepository;
+import com.tibet.tourism.modules.order.infra.BookingRepository;
 import com.tibet.tourism.modules.order.infra.PaymentTransactionRepository;
 import com.tibet.tourism.modules.order.infra.PlatformOrderRepository;
 import com.tibet.tourism.modules.order.web.dto.CancelOrderRequest;
+import com.tibet.tourism.modules.order.web.dto.BookingResponse;
 import com.tibet.tourism.modules.order.web.dto.CreateOrderItemRequest;
 import com.tibet.tourism.modules.order.web.dto.CreateOrderRequest;
 import com.tibet.tourism.modules.order.web.dto.InvoiceRequest;
@@ -33,6 +36,7 @@ import com.tibet.tourism.modules.order.web.dto.PaymentCallbackRequest;
 import com.tibet.tourism.modules.order.web.dto.PaymentTransactionResponse;
 import com.tibet.tourism.modules.order.web.dto.RefundRequest;
 import com.tibet.tourism.modules.order.web.dto.RefundResponse;
+import com.tibet.tourism.modules.order.web.dto.RefundReviewRequest;
 import com.tibet.tourism.modules.order.web.dto.VoucherResponse;
 import com.tibet.tourism.modules.spot.domain.ScenicSpot;
 import com.tibet.tourism.modules.spot.infra.ScenicSpotRepository;
@@ -61,6 +65,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -74,6 +82,8 @@ public class OrderCenterService {
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
     private static final int MIN_CALLBACK_SECRET_LENGTH = 32;
     private static final String DEV_CALLBACK_SECRET = "dev-payment-callback-secret";
+    private static final int DEFAULT_PAGE_SIZE = 20;
+    private static final int MAX_PAGE_SIZE = 50;
     private static final Set<InventoryLock.Status> ACTIVE_INVENTORY_STATUSES =
             Set.of(InventoryLock.Status.LOCKED, InventoryLock.Status.CONFIRMED);
     private static final Set<RefundOrder.Status> PENDING_REFUND_STATUSES =
@@ -82,9 +92,15 @@ public class OrderCenterService {
             Set.of(RefundOrder.Status.REQUESTED, RefundOrder.Status.APPROVED, RefundOrder.Status.COMPLETED);
     private static final Set<HotelBooking.Status> ACTIVE_HOTEL_BOOKING_STATUSES =
             Set.of(HotelBooking.Status.PENDING, HotelBooking.Status.CONFIRMED);
+    private static final Set<String> ORDER_PAGE_SORT_FIELDS =
+            Set.of("id", "createdAt", "status", "paymentStatus");
+    private static final Set<String> BOOKING_PAGE_SORT_FIELDS =
+            Set.of("id", "createdAt", "visitDate", "status");
 
     private final PlatformOrderRepository orderRepository;
+    private final BookingRepository bookingRepository;
     private final PaymentTransactionRepository paymentTransactionRepository;
+    private final PaymentTransactionReservationService paymentTransactionReservationService;
     private final PaymentCallbackAuditService paymentCallbackAuditService;
     private final CancellationPolicyRepository cancellationPolicyRepository;
     private final InventoryLockRepository inventoryLockRepository;
@@ -106,16 +122,20 @@ public class OrderCenterService {
     private Environment environment;
 
     public OrderCenterService(PlatformOrderRepository orderRepository,
-                              PaymentTransactionRepository paymentTransactionRepository,
-                              PaymentCallbackAuditService paymentCallbackAuditService,
-                              CancellationPolicyRepository cancellationPolicyRepository,
+                               BookingRepository bookingRepository,
+                               PaymentTransactionRepository paymentTransactionRepository,
+                               PaymentTransactionReservationService paymentTransactionReservationService,
+                               PaymentCallbackAuditService paymentCallbackAuditService,
+                               CancellationPolicyRepository cancellationPolicyRepository,
                               InventoryLockRepository inventoryLockRepository,
                               ScenicSpotRepository scenicSpotRepository,
                               HotelRepository hotelRepository,
                               RoomTypeRepository roomTypeRepository,
                               HotelBookingRepository hotelBookingRepository) {
         this.orderRepository = orderRepository;
+        this.bookingRepository = bookingRepository;
         this.paymentTransactionRepository = paymentTransactionRepository;
+        this.paymentTransactionReservationService = paymentTransactionReservationService;
         this.paymentCallbackAuditService = paymentCallbackAuditService;
         this.cancellationPolicyRepository = cancellationPolicyRepository;
         this.inventoryLockRepository = inventoryLockRepository;
@@ -163,9 +183,29 @@ public class OrderCenterService {
         return user;
     }
 
+    private List<CreateOrderItemRequest> validateCreateOrderItems(CreateOrderRequest request) {
+        if (request == null || request.getItems() == null || request.getItems().isEmpty()) {
+            throw new IllegalArgumentException("Order must contain at least one item");
+        }
+        if (request.getItems().size() > CreateOrderRequest.MAX_ITEMS) {
+            throw new IllegalArgumentException("Order item count exceeds " + CreateOrderRequest.MAX_ITEMS);
+        }
+        return request.getItems();
+    }
+
+    private Pageable safePageable(Pageable pageable, Set<String> allowedSortFields, Sort defaultSort) {
+        return InputSanitizer.sanitizePageable(
+                pageable,
+                allowedSortFields,
+                defaultSort,
+                DEFAULT_PAGE_SIZE,
+                MAX_PAGE_SIZE);
+    }
+
     @Transactional
     public OrderResponse createOrder(User user, CreateOrderRequest request, String headerIdempotencyKey) {
         user = requireAuthenticatedUser(user);
+        List<CreateOrderItemRequest> orderItems = validateCreateOrderItems(request);
         String idempotencyKey = normalizeIdempotencyKey(
                 StringUtils.hasText(headerIdempotencyKey) ? headerIdempotencyKey : request.getIdempotencyKey());
         if (StringUtils.hasText(idempotencyKey)) {
@@ -187,7 +227,7 @@ public class OrderCenterService {
 
         BigDecimal total = BigDecimal.ZERO;
         int sortOrder = 0;
-        for (CreateOrderItemRequest itemRequest : request.getItems()) {
+        for (CreateOrderItemRequest itemRequest : orderItems) {
             OrderItem item = buildOrderItem(itemRequest, sortOrder++);
             attachCancellationPolicy(item);
             order.addItem(item);
@@ -200,18 +240,46 @@ public class OrderCenterService {
         order.setProductSummary(buildSummary(order.getItems()));
         order.addAuditLog(audit(user, "CREATE", null, order.getStatus().name(), "Unified order created and inventory locked"));
 
-        PlatformOrder saved = orderRepository.save(order);
+        PlatformOrder saved;
+        try {
+            saved = orderRepository.save(order);
+        } catch (DataIntegrityViolationException exception) {
+            if (StringUtils.hasText(idempotencyKey)) {
+                return orderRepository.findByUserIdAndIdempotencyKey(user.getId(), idempotencyKey)
+                        .map(existing -> toResponse(expireIfNeeded(existing)))
+                        .orElseThrow(() -> exception);
+            }
+            throw exception;
+        }
         createInventoryLocks(saved);
         return toResponse(saved);
     }
 
     @Transactional
     public List<OrderResponse> getMyOrders(User user) {
+        return getMyOrders(user, PageRequest.of(0, DEFAULT_PAGE_SIZE)).getContent();
+    }
+
+    @Transactional
+    public Page<OrderResponse> getMyOrders(User user, Pageable pageable) {
         user = requireAuthenticatedUser(user);
-        return orderRepository.findByUserIdOrderByCreatedAtDesc(user.getId()).stream()
-                .map(this::expireIfNeeded)
-                .map(this::toResponse)
-                .toList();
+        Pageable safePageable = safePageable(
+                pageable,
+                ORDER_PAGE_SORT_FIELDS,
+                Sort.by(Sort.Direction.DESC, "createdAt"));
+        return orderRepository.findByUserId(user.getId(), safePageable)
+                .map(order -> toResponse(expireIfNeeded(order)));
+    }
+
+    @Transactional(readOnly = true)
+    public Page<BookingResponse> getLegacySpotBookings(User user, Pageable pageable) {
+        user = requireAuthenticatedUser(user);
+        Pageable safePageable = safePageable(
+                pageable,
+                BOOKING_PAGE_SORT_FIELDS,
+                Sort.by(Sort.Direction.DESC, "createdAt"));
+        return bookingRepository.findByUserId(user.getId(), safePageable)
+                .map(BookingResponse::fromEntity);
     }
 
     @Transactional
@@ -267,8 +335,28 @@ public class OrderCenterService {
         transition(order, user, PlatformOrder.Status.REFUND_PENDING, "Refund requested by user");
         if (item != null) {
             item.setStatus(OrderItem.Status.REFUND_PENDING);
+        } else {
+            order.getItems().forEach(orderItem -> orderItem.setStatus(OrderItem.Status.REFUND_PENDING));
         }
         return toRefundResponse(refund);
+    }
+
+    @Transactional
+    public OrderResponse reviewRefund(User actor, Long orderId, Long refundId, RefundReviewRequest request) {
+        actor = requireAuthenticatedUser(actor);
+        if (request == null || request.action() == null) {
+            throw new IllegalArgumentException("Refund review action is required");
+        }
+        PlatformOrder order = orderRepository.findByIdForUpdate(orderId)
+                .orElseThrow(() -> new NoSuchElementException("Order not found"));
+        RefundOrder refund = findRefund(order, refundId);
+        String note = InputSanitizer.optionalTextBlock(request.note(), 500, "refund review note");
+
+        return switch (request.action()) {
+            case APPROVE -> toResponse(approveRefund(actor, order, refund, note));
+            case REJECT -> toResponse(rejectRefund(actor, order, refund, note));
+            case COMPLETE -> toResponse(completeRefund(actor, order, refund, request.providerTransactionNo(), note));
+        };
     }
 
     @Transactional
@@ -347,29 +435,7 @@ public class OrderCenterService {
 
         Optional<PaymentTransaction> duplicate = paymentTransactionRepository.findByTransactionNo(transactionNo);
         if (duplicate.isPresent()) {
-            PaymentTransaction existing = duplicate.get();
-            PlatformOrder existingOrder = existing.getOrder();
-            if (existingOrder == null || !order.getOrderNo().equals(existingOrder.getOrderNo())) {
-                transaction.setStatus(PaymentTransaction.Status.FAILED);
-                recordRejectedPaymentCallback(
-                        order,
-                        transaction,
-                        "PAYMENT_CALLBACK_DUPLICATE_REJECTED",
-                        "Payment callback rejected: transaction belongs to another order");
-                throw new IllegalArgumentException("Payment transaction number already belongs to another order");
-            }
-            try {
-                ensureSamePaymentCallback(existing, request);
-            } catch (IllegalArgumentException exception) {
-                transaction.setStatus(PaymentTransaction.Status.FAILED);
-                recordRejectedPaymentCallback(
-                        order,
-                        transaction,
-                        "PAYMENT_CALLBACK_DUPLICATE_REJECTED",
-                        "Payment callback rejected: duplicate transaction payload mismatch");
-                throw exception;
-            }
-            return toResponse(expireIfNeeded(existingOrder));
+            return handleExistingPaymentTransaction(order, request, transaction, duplicate.get());
         }
 
         expireIfNeeded(order);
@@ -383,8 +449,35 @@ public class OrderCenterService {
             throw new IllegalArgumentException("Payment amount mismatch");
         }
 
-        transaction.setStatus(paymentStatusFromCallback(request));
+        PaymentTransaction.Status callbackStatus = paymentStatusFromCallback(request);
+        transaction.setStatus(callbackStatus);
         transaction.setPaidAt(LocalDateTime.now());
+        if (callbackStatus == PaymentTransaction.Status.SUCCESS
+                && !canConfirmPayment(order)
+                && !(order.getStatus() == PlatformOrder.Status.CONFIRMED
+                        && order.getPaymentStatus() == PlatformOrder.PaymentStatus.PAID)) {
+            transaction.setStatus(PaymentTransaction.Status.FAILED);
+            recordRejectedPaymentCallback(
+                    order,
+                    transaction,
+                    "PAYMENT_CALLBACK_LATE_REJECTED",
+                    "Payment callback rejected: order is closed or no longer payable");
+            order.addAuditLog(audit(null, "PAYMENT_CALLBACK_LATE_REJECTED",
+                    order.getStatus().name(), order.getStatus().name(), "Late successful payment callback rejected"));
+            return toResponse(order);
+        }
+        if (!paymentTransactionReservationService.reservePaymentTransaction(
+                transactionNo,
+                order.getOrderNo(),
+                transaction.getProvider(),
+                transaction.getAmount(),
+                transaction.getStatus())) {
+            Optional<OrderResponse> conflictResponse =
+                    handlePaymentTransactionReservationConflict(order, request, transaction);
+            if (conflictResponse.isPresent()) {
+                return conflictResponse.get();
+            }
+        }
         order.addPaymentTransaction(transaction);
 
         if (transaction.getStatus() == PaymentTransaction.Status.SUCCESS) {
@@ -405,6 +498,81 @@ public class OrderCenterService {
             order.addAuditLog(audit(null, "PAYMENT_FAILED", order.getStatus().name(), order.getStatus().name(), "\u652f\u4ed8\u5931\u8d25\u56de\u8c03"));
         }
         return toResponse(order);
+    }
+
+    private OrderResponse handleExistingPaymentTransaction(
+            PlatformOrder order,
+            PaymentCallbackRequest request,
+            PaymentTransaction transaction,
+            PaymentTransaction existing) {
+        PlatformOrder existingOrder = existing.getOrder();
+        if (existingOrder == null || !order.getOrderNo().equals(existingOrder.getOrderNo())) {
+            transaction.setStatus(PaymentTransaction.Status.FAILED);
+            recordRejectedPaymentCallback(
+                    order,
+                    transaction,
+                    "PAYMENT_CALLBACK_DUPLICATE_REJECTED",
+                    "Payment callback rejected: transaction belongs to another order");
+            throw new IllegalArgumentException("Payment transaction number already belongs to another order");
+        }
+        try {
+            ensureSamePaymentCallback(existing, request);
+        } catch (IllegalArgumentException exception) {
+            transaction.setStatus(PaymentTransaction.Status.FAILED);
+            recordRejectedPaymentCallback(
+                    order,
+                    transaction,
+                    "PAYMENT_CALLBACK_DUPLICATE_REJECTED",
+                    "Payment callback rejected: duplicate transaction payload mismatch");
+            throw exception;
+        }
+        return toResponse(expireIfNeeded(existingOrder));
+    }
+
+    private Optional<OrderResponse> handlePaymentTransactionReservationConflict(
+            PlatformOrder order,
+            PaymentCallbackRequest request,
+            PaymentTransaction transaction) {
+        Optional<PaymentTransaction> duplicate =
+                paymentTransactionRepository.findByTransactionNo(transaction.getTransactionNo());
+        if (duplicate.isPresent()) {
+            return Optional.of(handleExistingPaymentTransaction(order, request, transaction, duplicate.get()));
+        }
+
+        Optional<PaymentTransactionReservation> reservation =
+                paymentTransactionReservationService.findReservation(transaction.getTransactionNo());
+        if (reservation.isPresent() && isSamePaymentReservation(reservation.get(), order, transaction)) {
+            return Optional.empty();
+        }
+        if (reservation.isPresent() && !order.getOrderNo().equals(reservation.get().getOrderNo())) {
+            transaction.setStatus(PaymentTransaction.Status.FAILED);
+            recordRejectedPaymentCallback(
+                    order,
+                    transaction,
+                    "PAYMENT_CALLBACK_DUPLICATE_REJECTED",
+                    "Payment callback rejected: transaction belongs to another order");
+            throw new IllegalArgumentException("Payment transaction number already belongs to another order");
+        }
+
+        transaction.setStatus(PaymentTransaction.Status.FAILED);
+        recordRejectedPaymentCallback(
+                order,
+                transaction,
+                "PAYMENT_CALLBACK_DUPLICATE_REJECTED",
+                "Payment callback rejected: transaction number already reserved");
+        throw new IllegalArgumentException("Payment transaction number already exists");
+    }
+
+    private boolean isSamePaymentReservation(
+            PaymentTransactionReservation reservation,
+            PlatformOrder order,
+            PaymentTransaction transaction) {
+        return reservation.getUsageType() == PaymentTransactionReservation.UsageType.PAYMENT
+                && order.getOrderNo().equals(reservation.getOrderNo())
+                && StringUtils.hasText(reservation.getProvider())
+                && reservation.getProvider().equalsIgnoreCase(transaction.getProvider())
+                && sameAmount(defaultMoney(reservation.getAmount()), defaultMoney(transaction.getAmount()))
+                && reservation.getStatus() == transaction.getStatus();
     }
 
     private void recordRejectedPaymentCallback(PlatformOrder order, PaymentTransaction transaction) {
@@ -866,6 +1034,250 @@ public class OrderCenterService {
         refund.setAmount(amount);
         refund.setReason(InputSanitizer.optionalTextBlock(reason, 500, "refund reason"));
         return refund;
+    }
+
+    private RefundOrder findRefund(PlatformOrder order, Long refundId) {
+        return order.getRefunds().stream()
+                .filter(refund -> refundId != null && refundId.equals(refund.getId()))
+                .findFirst()
+                .orElseThrow(() -> new NoSuchElementException("Refund not found"));
+    }
+
+    private PlatformOrder approveRefund(User actor, PlatformOrder order, RefundOrder refund, String note) {
+        if (refund.getStatus() == RefundOrder.Status.APPROVED) {
+            order.addAuditLog(audit(actor, "REFUND_APPROVE_IDEMPOTENT",
+                    order.getStatus().name(), order.getStatus().name(), "Refund already approved"));
+            return order;
+        }
+        if (refund.getStatus() != RefundOrder.Status.REQUESTED) {
+            throw new IllegalStateException("Only requested refunds can be approved");
+        }
+        refund.setStatus(RefundOrder.Status.APPROVED);
+        order.addAuditLog(audit(actor, "REFUND_APPROVED",
+                order.getStatus().name(), order.getStatus().name(), note));
+        return order;
+    }
+
+    private PlatformOrder rejectRefund(User actor, PlatformOrder order, RefundOrder refund, String note) {
+        if (refund.getStatus() == RefundOrder.Status.REJECTED) {
+            order.addAuditLog(audit(actor, "REFUND_REJECT_IDEMPOTENT",
+                    order.getStatus().name(), order.getStatus().name(), "Refund already rejected"));
+            return order;
+        }
+        if (refund.getStatus() == RefundOrder.Status.COMPLETED) {
+            throw new IllegalStateException("Completed refunds cannot be rejected");
+        }
+        PlatformOrder.Status previousStatus = order.getStatus();
+        refund.setStatus(RefundOrder.Status.REJECTED);
+        refund.setProcessedAt(LocalDateTime.now());
+        restoreRefundPendingItems(refund);
+        refreshOrderRefundState(order);
+        if (completedRefundAmount(order).compareTo(BigDecimal.ZERO) <= 0
+                && order.getRefunds().stream().noneMatch(activeRefund -> PENDING_REFUND_STATUSES.contains(activeRefund.getStatus()))) {
+            order.setCancelledAt(null);
+        }
+        order.addAuditLog(audit(actor, "REFUND_REJECTED",
+                previousStatus == null ? null : previousStatus.name(), order.getStatus().name(), note));
+        return order;
+    }
+
+    private PlatformOrder completeRefund(
+            User actor,
+            PlatformOrder order,
+            RefundOrder refund,
+            String providerTransactionNo,
+            String note) {
+        if (refund.getStatus() == RefundOrder.Status.COMPLETED) {
+            order.addAuditLog(audit(actor, "REFUND_COMPLETE_IDEMPOTENT",
+                    order.getStatus().name(), order.getStatus().name(), "Refund already completed"));
+            return order;
+        }
+        if (refund.getStatus() != RefundOrder.Status.APPROVED) {
+            throw new IllegalStateException("Only approved refunds can be completed");
+        }
+
+        String transactionNo = resolveRefundTransactionNo(providerTransactionNo, order, refund);
+        PlatformOrder.Status previousStatus = order.getStatus();
+        refund.setStatus(RefundOrder.Status.COMPLETED);
+        refund.setProcessedAt(LocalDateTime.now());
+        markRefundedItems(order, refund);
+        cancelRefundEntitlements(order, refund);
+        addManualRefundTransaction(order, refund, transactionNo);
+        refreshOrderRefundState(order);
+        order.addAuditLog(audit(actor, "REFUND_COMPLETED",
+                previousStatus == null ? null : previousStatus.name(), order.getStatus().name(), note));
+        return order;
+    }
+
+    private void restoreRefundPendingItems(RefundOrder refund) {
+        if (refund.getOrderItem() != null) {
+            if (refund.getOrderItem().getStatus() == OrderItem.Status.REFUND_PENDING) {
+                refund.getOrderItem().setStatus(OrderItem.Status.CONFIRMED);
+            }
+            return;
+        }
+        if (refund.getOrder() != null) {
+            refund.getOrder().getItems().stream()
+                    .filter(item -> item.getStatus() == OrderItem.Status.REFUND_PENDING)
+                    .forEach(item -> item.setStatus(OrderItem.Status.CONFIRMED));
+        }
+    }
+
+    private void markRefundedItems(PlatformOrder order, RefundOrder refund) {
+        if (refund.getOrderItem() != null) {
+            refund.getOrderItem().setStatus(OrderItem.Status.REFUNDED);
+            return;
+        }
+        order.getItems().forEach(item -> item.setStatus(OrderItem.Status.REFUNDED));
+    }
+
+    private void cancelRefundEntitlements(PlatformOrder order, RefundOrder refund) {
+        OrderItem refundedItem = refund.getOrderItem();
+        order.getVouchers().stream()
+                .filter(voucher -> refundedItem == null || sameOrderItem(voucher.getOrderItem(), refundedItem))
+                .filter(voucher -> voucher.getStatus() == Voucher.Status.ISSUED)
+                .forEach(voucher -> voucher.setStatus(Voucher.Status.CANCELLED));
+        releaseRefundLocks(order, refundedItem);
+    }
+
+    private void releaseRefundLocks(PlatformOrder order, OrderItem refundedItem) {
+        inventoryLockRepository.findByOrder(order).stream()
+                .filter(lock -> refundedItem == null || sameOrderItem(lock.getOrderItem(), refundedItem))
+                .forEach(lock -> {
+                    lock.setStatus(InventoryLock.Status.RELEASED);
+                    lock.setActiveLockKey(null);
+                    inventoryLockRepository.save(lock);
+                });
+    }
+
+    private boolean sameOrderItem(OrderItem left, OrderItem right) {
+        if (left == null || right == null) {
+            return left == right;
+        }
+        if (left == right) {
+            return true;
+        }
+        return left.getId() != null && left.getId().equals(right.getId());
+    }
+
+    private void addManualRefundTransaction(
+            PlatformOrder order,
+            RefundOrder refund,
+            String transactionNo) {
+        PaymentTransaction transaction = new PaymentTransaction();
+        transaction.setTransactionNo(transactionNo);
+        transaction.setProvider("MANUAL_REFUND");
+        transaction.setAmount(defaultMoney(refund.getAmount()));
+        transaction.setStatus(PaymentTransaction.Status.REFUNDED);
+        transaction.setSignatureValid(true);
+        transaction.setPaidAt(refund.getProcessedAt());
+        transaction.setRequestPayload("refundNoHash=" + paymentIdentifierLabel("refund", refund.getRefundNo()));
+        order.addPaymentTransaction(transaction);
+    }
+
+    private String resolveRefundTransactionNo(String providerTransactionNo, PlatformOrder order, RefundOrder refund) {
+        String transactionNo = InputSanitizer.optionalPlainText(
+                providerTransactionNo,
+                64,
+                "refund transaction number");
+        if (StringUtils.hasText(transactionNo)) {
+            ensureRefundTransactionNoAvailable(transactionNo, order, refund);
+            reserveRefundTransactionNo(order, refund, transactionNo);
+            return transactionNo;
+        }
+
+        for (int attempt = 0; attempt < 3; attempt++) {
+        String generated = nextBusinessNo("RFPAY");
+            if (paymentTransactionRepository.findByTransactionNo(generated).isEmpty()
+                    && tryReserveRefundTransactionNo(order, refund, generated)) {
+                return generated;
+            }
+        }
+        throw new IllegalStateException("Unable to allocate refund transaction number");
+    }
+
+    private void ensureRefundTransactionNoAvailable(String transactionNo, PlatformOrder order, RefundOrder refund) {
+        if (paymentTransactionRepository.findByTransactionNo(transactionNo).isPresent()) {
+            throw new IllegalArgumentException("Refund transaction number already exists");
+        }
+        Optional<PaymentTransactionReservation> reservation =
+                paymentTransactionReservationService.findReservation(transactionNo);
+        if (reservation.isPresent() && !isSameRefundReservation(reservation.get(), order, refund)) {
+            throw new IllegalArgumentException("Refund transaction number already exists");
+        }
+    }
+
+    private void reserveRefundTransactionNo(PlatformOrder order, RefundOrder refund, String transactionNo) {
+        if (!tryReserveRefundTransactionNo(order, refund, transactionNo)) {
+            throw new IllegalArgumentException("Refund transaction number already exists");
+        }
+    }
+
+    private boolean tryReserveRefundTransactionNo(PlatformOrder order, RefundOrder refund, String transactionNo) {
+        if (paymentTransactionReservationService.reserveRefundTransaction(
+                transactionNo,
+                order.getOrderNo(),
+                refund.getRefundNo(),
+                defaultMoney(refund.getAmount()))) {
+            return true;
+        }
+        return paymentTransactionReservationService.findReservation(transactionNo)
+                .filter(reservation -> isSameRefundReservation(reservation, order, refund))
+                .isPresent();
+    }
+
+    private boolean isSameRefundReservation(
+            PaymentTransactionReservation reservation,
+            PlatformOrder order,
+            RefundOrder refund) {
+        return reservation.getUsageType() == PaymentTransactionReservation.UsageType.REFUND
+                && order.getOrderNo().equals(reservation.getOrderNo())
+                && refund.getRefundNo().equals(reservation.getReferenceNo())
+                && sameAmount(defaultMoney(reservation.getAmount()), defaultMoney(refund.getAmount()))
+                && reservation.getStatus() == PaymentTransaction.Status.REFUNDED;
+    }
+
+    private void refreshOrderRefundState(PlatformOrder order) {
+        if (order.getRefunds().stream().anyMatch(refund -> PENDING_REFUND_STATUSES.contains(refund.getStatus()))) {
+            order.setStatus(PlatformOrder.Status.REFUND_PENDING);
+            return;
+        }
+
+        BigDecimal completed = completedRefundAmount(order);
+        BigDecimal payable = defaultMoney(order.getPayableAmount());
+        if (completed.compareTo(BigDecimal.ZERO) <= 0) {
+            order.setPaymentStatus(PlatformOrder.PaymentStatus.PAID);
+            order.setStatus(PlatformOrder.Status.CONFIRMED);
+            return;
+        }
+        if (payable.compareTo(BigDecimal.ZERO) > 0 && completed.compareTo(payable) >= 0) {
+            order.setPaymentStatus(PlatformOrder.PaymentStatus.REFUNDED);
+            order.setStatus(PlatformOrder.Status.REFUNDED);
+            return;
+        }
+        order.setPaymentStatus(PlatformOrder.PaymentStatus.PARTIALLY_REFUNDED);
+        if (allItemsClosedByRefund(order)) {
+            order.setStatus(PlatformOrder.Status.CANCELLED);
+            return;
+        }
+        order.setStatus(PlatformOrder.Status.CONFIRMED);
+        order.getItems().stream()
+                .filter(item -> item.getStatus() == OrderItem.Status.REFUND_PENDING)
+                .forEach(item -> item.setStatus(OrderItem.Status.CONFIRMED));
+    }
+
+    private boolean allItemsClosedByRefund(PlatformOrder order) {
+        return !order.getItems().isEmpty()
+                && order.getItems().stream().allMatch(item ->
+                        item.getStatus() == OrderItem.Status.REFUNDED
+                                || item.getStatus() == OrderItem.Status.CANCELLED);
+    }
+
+    private BigDecimal completedRefundAmount(PlatformOrder order) {
+        return order.getRefunds().stream()
+                .filter(refund -> refund.getStatus() == RefundOrder.Status.COMPLETED)
+                .map(refund -> defaultMoney(refund.getAmount()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     private void ensureRefundAllowed(PlatformOrder order, OrderItem item, BigDecimal requestedAmount) {

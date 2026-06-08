@@ -13,6 +13,7 @@ import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Set;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -76,7 +77,11 @@ public class FavoriteController {
         Favorite favorite = new Favorite();
         favorite.setUser(user);
         favorite.setRoute(route);
-        favoriteRepository.save(favorite);
+        try {
+            favoriteRepository.saveAndFlush(favorite);
+        } catch (DataIntegrityViolationException duplicate) {
+            // Concurrent duplicate favorite; the unique row already represents the desired state.
+        }
         long count = favoriteRepository.countByRoute(route);
         return ResponseEntity.ok(Map.of("message", "Favorite added", "favorited", true, "favoriteCount", count));
     }

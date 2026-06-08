@@ -3,12 +3,15 @@ package com.tibet.tourism.modules.user.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.tibet.tourism.common.api.PageResponse;
 import com.tibet.tourism.modules.community.domain.Comment;
 import com.tibet.tourism.modules.community.domain.RouteComment;
+import com.tibet.tourism.modules.community.domain.SharedRoute;
 import com.tibet.tourism.modules.community.infra.CommentRepository;
 import com.tibet.tourism.modules.community.infra.RouteCommentRepository;
 import com.tibet.tourism.modules.community.infra.SharedRouteRepository;
@@ -25,8 +28,14 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 
 @ExtendWith(MockitoExtension.class)
 class CurrentUserApplicationServiceTest {
@@ -107,15 +116,54 @@ class CurrentUserApplicationServiceTest {
         routeComment.setCreatedAt(LocalDateTime.parse("2026-01-02T04:04:05"));
 
         when(userRepository.findById(7L)).thenReturn(Optional.of(user));
-        when(commentRepository.findByUserOrderByCreatedAtDesc(user)).thenReturn(List.of(spotComment));
-        when(routeCommentRepository.findByUserOrderByCreatedAtDesc(user)).thenReturn(List.of(routeComment));
+        when(commentRepository.findByUser(eq(user), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(spotComment), PageRequest.of(0, 20), 1));
+        when(routeCommentRepository.findByUser(eq(user), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(routeComment), PageRequest.of(0, 20), 1));
 
         Map<String, Object> comments = service.getComments(7L);
 
         assertThat((List<?>) comments.get("spotComments")).hasOnlyElementsOfType(CommentDTO.class);
         assertThat((List<?>) comments.get("routeComments")).hasOnlyElementsOfType(RouteCommentResponse.class);
+        assertThat(comments.get("spotCommentsPage")).isInstanceOf(PageResponse.class);
+        assertThat(comments.get("routeCommentsPage")).isInstanceOf(PageResponse.class);
         assertThat(comments.get("spotComments").toString()).doesNotContain("hashed-password", "13800138000", "203.0.113.99");
         assertThat(comments.get("routeComments").toString()).doesNotContain("hashed-password", "13800138000", "203.0.113.99");
+    }
+
+    @Test
+    void getCommentsClampsRequestedPageSize() {
+        when(userRepository.findById(7L)).thenReturn(Optional.of(user));
+        when(commentRepository.findByUser(eq(user), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(), PageRequest.of(2, 50), 0));
+        when(routeCommentRepository.findByUser(eq(user), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(), PageRequest.of(2, 50), 0));
+
+        service.getComments(7L, PageRequest.of(2, 500));
+
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(commentRepository).findByUser(eq(user), pageableCaptor.capture());
+        assertThat(pageableCaptor.getValue().getPageNumber()).isEqualTo(2);
+        assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(50);
+    }
+
+    @Test
+    void getStatsUsesCountQueriesInsteadOfLoadingHistories() {
+        when(userRepository.findById(7L)).thenReturn(Optional.of(user));
+        when(sharedRouteRepository.count(ArgumentMatchers.<Specification<SharedRoute>>any()))
+                .thenReturn(3L);
+        when(routeCommentRepository.countByUser(user)).thenReturn(2L);
+        when(commentRepository.countByUser(user)).thenReturn(4L);
+        when(bookingRepository.countByUserId(7L)).thenReturn(5L);
+
+        Map<String, Object> stats = service.getStats(7L);
+
+        assertThat(stats)
+                .containsEntry("routeCount", 3L)
+                .containsEntry("commentCount", 6L)
+                .containsEntry("bookingCount", 5L);
+        verify(sharedRouteRepository, never()).findByAuthor(any(User.class), any(Pageable.class));
+        verify(bookingRepository, never()).findByUserId(7L);
     }
 
     @Test

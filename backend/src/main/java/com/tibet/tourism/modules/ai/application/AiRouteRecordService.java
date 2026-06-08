@@ -2,17 +2,24 @@ package com.tibet.tourism.modules.ai.application;
 
 import com.tibet.tourism.common.error.BusinessException;
 import com.tibet.tourism.common.error.ResourceNotFoundException;
+import com.tibet.tourism.common.validation.InputSanitizer;
 import com.tibet.tourism.modules.ai.domain.AiRouteRecord;
 import com.tibet.tourism.modules.ai.infra.AiRouteRecordRepository;
 import com.tibet.tourism.modules.ai.web.dto.AiRouteRecordResponse;
+import com.tibet.tourism.modules.ai.web.dto.AiRouteRecordSummaryResponse;
 import com.tibet.tourism.modules.user.domain.User;
 import com.tibet.tourism.modules.user.infra.UserRepository;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -25,9 +32,14 @@ public class AiRouteRecordService {
     private static final Logger log = LoggerFactory.getLogger(AiRouteRecordService.class);
     private static final int TITLE_MAX_LENGTH = 200;
     private static final int ERROR_MAX_LENGTH = 500;
+    private static final int DEFAULT_SAVED_ROUTES_PAGE_SIZE = 20;
+    private static final int MAX_SAVED_ROUTES_PAGE_SIZE = 50;
     private static final String STALE_RUNNING_ERROR =
             "AI route generation did not finish before the recovery window expired";
     private static final Pattern MARKDOWN_TITLE_PATTERN = Pattern.compile("(?m)^\\s*#\\s+(.+?)\\s*$");
+    private static final Set<String> SAVED_ROUTES_SORT_FIELDS = Set.of("updatedAt", "createdAt", "id");
+    private static final Sort SAVED_ROUTES_DEFAULT_SORT = Sort.by(Sort.Direction.DESC, "updatedAt")
+            .and(Sort.by(Sort.Direction.DESC, "id"));
 
     private final AiRouteRecordRepository routeRecordRepository;
     private final UserRepository userRepository;
@@ -63,7 +75,7 @@ public class AiRouteRecordService {
                                               String content) {
         AiRouteRecord record = findByJob(user.getId(), jobId).orElseGet(AiRouteRecord::new);
         record.setUser(userRepository.getReferenceById(user.getId()));
-        record.setJobId(null);
+        record.setJobId(blankToNull(jobId));
         record.setTitle(extractTitle(content, days));
         record.setContent(content == null ? "" : content.trim());
         record.setDays(days);
@@ -94,7 +106,7 @@ public class AiRouteRecordService {
                                   String preference, String locale, String errorMessage) {
         AiRouteRecord record = findByJob(user.getId(), jobId).orElseGet(AiRouteRecord::new);
         record.setUser(userRepository.getReferenceById(user.getId()));
-        record.setJobId(null);
+        record.setJobId(blankToNull(jobId));
         record.setTitle(hasContent(record.getContent()) ? extractTitle(record.getContent(), days) : AiRouteRecord.defaultTitle(days));
         record.setDays(days);
         record.setBudget(normalizeKey(budget));
@@ -112,11 +124,17 @@ public class AiRouteRecordService {
     }
 
     @Transactional(readOnly = true)
-    public List<AiRouteRecordResponse> savedFor(User user) {
-        return routeRecordRepository.findByUserAndManuallySavedTrueOrderByUpdatedAtDesc(user)
-                .stream()
+    public Page<AiRouteRecordSummaryResponse> savedFor(User user, Pageable pageable) {
+        Pageable safePageable = savedRoutesPageable(pageable);
+        return routeRecordRepository.findByUserAndManuallySavedTrue(user, safePageable)
+                .map(AiRouteRecordService::toSummaryResponse);
+    }
+
+    @Transactional(readOnly = true)
+    public AiRouteRecordResponse savedDetailFor(Long recordId, User user) {
+        return routeRecordRepository.findByIdAndUserAndManuallySavedTrue(recordId, user)
                 .map(AiRouteRecordResponse::from)
-                .toList();
+                .orElseThrow(() -> new ResourceNotFoundException("AI route record not found"));
     }
 
     @Transactional(readOnly = true)
@@ -135,7 +153,6 @@ public class AiRouteRecordService {
         }
 
         for (AiRouteRecord record : staleRecords) {
-            record.setJobId(null);
             record.setStatus(AiRouteRecord.Status.FAILED);
             record.setErrorMessage(STALE_RUNNING_ERROR);
             record.setTitle(hasContent(record.getContent())
@@ -164,6 +181,37 @@ public class AiRouteRecordService {
             return Optional.empty();
         }
         return routeRecordRepository.findFirstByUserIdAndJobIdOrderByUpdatedAtDesc(userId, jobId);
+    }
+
+    private static Pageable savedRoutesPageable(Pageable pageable) {
+        Pageable safePageable = InputSanitizer.sanitizePageable(
+                pageable,
+                SAVED_ROUTES_SORT_FIELDS,
+                SAVED_ROUTES_DEFAULT_SORT,
+                DEFAULT_SAVED_ROUTES_PAGE_SIZE,
+                MAX_SAVED_ROUTES_PAGE_SIZE);
+        Sort safeSort = safePageable.getSort();
+        if (safeSort.getOrderFor("id") == null) {
+            safeSort = safeSort.and(Sort.by(Sort.Direction.DESC, "id"));
+        }
+        return PageRequest.of(safePageable.getPageNumber(), safePageable.getPageSize(), safeSort);
+    }
+
+    private static AiRouteRecordSummaryResponse toSummaryResponse(
+            AiRouteRecordRepository.AiRouteRecordSummaryProjection record) {
+        return new AiRouteRecordSummaryResponse(
+                record.getId(),
+                record.getTitle(),
+                record.getDays(),
+                record.getBudget(),
+                record.getPreference(),
+                record.getLocale(),
+                record.getStatus() == null ? null : record.getStatus().name(),
+                Boolean.TRUE.equals(record.getManuallySaved()),
+                record.getErrorMessage(),
+                record.getCreatedAt(),
+                record.getUpdatedAt()
+        );
     }
 
     private static String extractTitle(String content, Integer days) {

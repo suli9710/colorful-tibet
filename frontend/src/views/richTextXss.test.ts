@@ -13,11 +13,13 @@ const fixtures = vi.hoisted(() => ({
 # 安全边界
 
 <script>alert('xss')</script>
+<svg><animate onbegin="alert('svg')" attributeName="x"></animate></svg>
 <iframe src="https://evil.example/embed"></iframe>
 <object data="https://evil.example/app.swf"></object>
 <img src="/images/safe.jpg" onerror="alert('image')" alt="safe image">
 <img src="https://tracker.example/pixel.png" alt="remote tracker">
 <img src="/uploads/routes/day-1.jpg" alt="local upload image">
+<img src="data:image/svg+xml;base64,PHN2ZyBvbmxvYWQ9YWxlcnQoMSk+" alt="svg data image">
 <a href="javascript:alert('bad')" onclick="alert('click')">bad link</a>
 
 [encoded bad](java&#x0d;script:alert('bad'))
@@ -323,5 +325,27 @@ describe('rich text XSS safeguards', () => {
     expectSafeExternalLink(root)
     expectNoRemoteTrackerImages(root)
     expectLocalUploadImage(root)
+  })
+
+  it('strips active DOMPurify payloads without relying on snapshots', () => {
+    const payload = `
+      <p>safe copy</p>
+      <a href="javascript:alert(1)">bad link</a>
+      <a href="java&#x0d;script:alert(2)">encoded bad link</a>
+      <img src="/uploads/routes/safe.jpg" onerror="alert(3)" alt="safe image">
+      <img src="data:image/svg+xml;base64,PHN2ZyBvbmxvYWQ9YWxlcnQoMSk+" alt="svg data image">
+      <svg><a href="javascript:alert(4)"><circle onload="alert(5)"></circle></a></svg>
+      <iframe srcdoc="<script>alert(6)</script>"></iframe>
+    `
+    const root = renderIntoDom(sanitizeHtml(payload))
+
+    expect(root.textContent).toContain('safe copy')
+    assertNoExecutableDom(root)
+    expect(root.querySelector('a[href]')).toBeNull()
+    const safeImage = root.querySelector('img[src="/uploads/routes/safe.jpg"]')
+    expect(safeImage).not.toBeNull()
+    expect(safeImage?.getAttribute('onerror')).toBeNull()
+    expect(root.querySelector('img[src^="data:image/svg"]')).toBeNull()
+    expect(root.innerHTML).not.toMatch(/javascript:|onerror|onload|srcdoc/i)
   })
 })

@@ -13,6 +13,7 @@ import com.tibet.tourism.modules.community.domain.SharedRoute;
 import com.tibet.tourism.modules.community.web.dto.RouteCommentResponse;
 import com.tibet.tourism.modules.community.web.dto.ShareRouteRequest;
 import com.tibet.tourism.modules.community.web.dto.SharedRouteResponse;
+import com.tibet.tourism.modules.community.web.dto.SharedRouteSummaryResponse;
 import com.tibet.tourism.modules.user.domain.User;
 import com.tibet.tourism.modules.user.infra.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
@@ -43,9 +44,11 @@ public class SharedRouteController {
     private static final String ERROR_PERMISSION_DENIED = "Permission denied";
     private static final String ERROR_NOT_FOUND = "Resource not found";
     private static final String ERROR_INVALID_REQUEST = "Invalid request";
+    private static final int DEFAULT_PAGE_SIZE = 20;
+    private static final int MAX_PAGE_SIZE = 50;
 
     private static final Set<String> ALLOWED_ROUTE_SORT_FIELDS = Set.of(
-            "createdAt", "updatedAt", "viewCount", "likeCount", "commentCount", "days");
+            "id", "createdAt", "updatedAt", "viewCount", "likeCount", "commentCount", "days");
 
     @Autowired
     private SharedRouteService routeService;
@@ -120,21 +123,17 @@ public class SharedRouteController {
             @RequestParam(required = false) String budget,
             @RequestParam(required = false) String preference,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "20") int size,
             @RequestParam(defaultValue = "createdAt") String sortField,
             HttpServletRequest request) {
 
         String safeSortField = InputSanitizer.safeSortField(sortField, ALLOWED_ROUTE_SORT_FIELDS, "createdAt");
-        Sort sort = Sort.by(Sort.Direction.DESC, safeSortField);
-        Pageable pageable = PageRequest.of(
-                InputSanitizer.normalizePage(page),
-                InputSanitizer.normalizePageSize(size, 10, 50),
-                sort);
+        Pageable pageable = boundedPageable(page, size, stableDescendingSort(safeSortField));
         
         Long currentUserId = getOptionalCurrentUserId(request);
-        Page<SharedRouteResponse> routes = routeService.getRoutes(days, budget, preference, pageable)
-                .map(route -> SharedRouteResponse.fromEntity(route, currentUserId));
-        return ResponseEntity.ok(PageResponse.from(routes));
+        Page<SharedRouteSummaryResponse> routes = routeService.getRoutes(days, budget, preference, pageable)
+                .map(route -> SharedRouteSummaryResponse.fromEntity(route, currentUserId));
+        return pagedEnvelope(routes);
     }
 
     // 获取路线详情
@@ -167,9 +166,8 @@ public class SharedRouteController {
     public ResponseEntity<?> likeRoute(@PathVariable Long id, HttpServletRequest request) {
         try {
             Long userId = getCurrentUserId(request);
-            boolean success = routeService.likeRoute(id, userId);
-            SharedRoute route = routeService.getRoute(id);
-            return ResponseEntity.ok(Map.of("liked", success, "likeCount", route.getLikeCount()));
+            SharedRouteService.LikeResult result = routeService.likeRoute(id, userId);
+            return ResponseEntity.ok(Map.of("liked", result.liked(), "likeCount", result.likeCount()));
         } catch (Exception e) {
             return safeBadRequest(e);
         }
@@ -181,9 +179,8 @@ public class SharedRouteController {
     public ResponseEntity<?> unlikeRoute(@PathVariable Long id, HttpServletRequest request) {
         try {
             Long userId = getCurrentUserId(request);
-            boolean success = routeService.unlikeRoute(id, userId);
-            SharedRoute route = routeService.getRoute(id);
-            return ResponseEntity.ok(Map.of("liked", !success, "likeCount", route.getLikeCount() == null ? 0L : route.getLikeCount()));
+            SharedRouteService.LikeResult result = routeService.unlikeRoute(id, userId);
+            return ResponseEntity.ok(Map.of("liked", result.liked(), "likeCount", result.likeCount()));
         } catch (Exception e) {
             return safeBadRequest(e);
         }
@@ -220,13 +217,17 @@ public class SharedRouteController {
 
     // 获取评论列表
     @GetMapping("/shared/{id}/comments")
-    public ResponseEntity<?> getComments(@PathVariable Long id, HttpServletRequest request) {
+    public ResponseEntity<?> getComments(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            HttpServletRequest request) {
         try {
             Long currentUserId = getOptionalCurrentUserId(request);
-            List<RouteCommentResponse> comments = routeService.getComments(id).stream()
-                    .map(comment -> RouteCommentResponse.fromEntity(comment, currentUserId))
-                    .toList();
-            return ResponseEntity.ok(comments);
+            Pageable pageable = boundedPageable(page, size, stableDescendingSort("createdAt"));
+            Page<RouteCommentResponse> comments = routeService.getComments(id, pageable)
+                    .map(comment -> RouteCommentResponse.fromEntity(comment, currentUserId));
+            return pagedContent(comments);
         } catch (Exception e) {
             return safeBadRequest(e);
         }
@@ -250,16 +251,49 @@ public class SharedRouteController {
     // 获取当前用户创建的路线列表
     @GetMapping("/my-routes")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<?> getMyRoutes(HttpServletRequest request) {
+    public ResponseEntity<?> getMyRoutes(
+            HttpServletRequest request,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
         try {
             User user = userRepository.findById(getCurrentUserId(request))
                     .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-            List<SharedRouteResponse> routes = routeService.getRoutesByAuthor(user).stream()
-                    .map(route -> SharedRouteResponse.fromEntity(route, user.getId()))
-                    .toList();
-            return ResponseEntity.ok(routes);
+            Pageable pageable = boundedPageable(page, size, stableDescendingSort("createdAt"));
+            Page<SharedRouteSummaryResponse> routes = routeService.getRoutesByAuthor(user, pageable)
+                    .map(route -> SharedRouteSummaryResponse.fromEntity(route, user.getId()));
+            return pagedContent(routes);
         } catch (Exception e) {
             return safeBadRequest(e);
         }
+    }
+
+    private Pageable boundedPageable(int page, int size, Sort sort) {
+        return PageRequest.of(
+                InputSanitizer.normalizePage(page),
+                InputSanitizer.normalizePageSize(size, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE),
+                sort);
+    }
+
+    private Sort stableDescendingSort(String primaryField) {
+        if ("id".equals(primaryField)) {
+            return Sort.by(Sort.Order.desc("id"));
+        }
+        return Sort.by(Sort.Order.desc(primaryField), Sort.Order.desc("id"));
+    }
+
+    private <T> ResponseEntity<PageResponse<T>> pagedEnvelope(Page<T> page) {
+        return pageHeaders(page).body(PageResponse.from(page));
+    }
+
+    private <T> ResponseEntity<List<T>> pagedContent(Page<T> page) {
+        return pageHeaders(page).body(page.getContent());
+    }
+
+    private ResponseEntity.BodyBuilder pageHeaders(Page<?> page) {
+        return ResponseEntity.ok()
+                .header("X-Page", String.valueOf(page.getNumber()))
+                .header("X-Size", String.valueOf(page.getSize()))
+                .header("X-Total-Elements", String.valueOf(page.getTotalElements()))
+                .header("X-Total-Pages", String.valueOf(page.getTotalPages()));
     }
 }

@@ -92,9 +92,7 @@ public class ItemBasedRecommendationService {
                 return true;
             }
 
-            List<UserVisitHistory> allHistories = historyRepository.findAll(
-                    PageRequest.of(0, Math.max(1, maxHistoriesForPrecompute), Sort.by(Sort.Direction.DESC, "visitDate")))
-                    .getContent();
+            List<UserVisitHistory> allHistories = historyRepository.findRecentForRecommendation(maxHistoriesForPrecompute);
             Map<Long, Map<Long, Double>> userItemMatrix = buildUserItemMatrix(allHistories);
             logger.info("Item similarity user-item matrix built: userCount={}, spotCount={}",
                     userItemMatrix.size(),
@@ -290,7 +288,7 @@ public class ItemBasedRecommendationService {
         }
 
         // 获取用户的历史访问记录（用于评分权重）
-        List<UserVisitHistory> userHistories = historyRepository.findByUserId(userId);
+        List<UserVisitHistory> userHistories = historyRepository.findRecentByUserId(userId);
         Map<Long, Double> userRatings = userHistories.stream()
                 .filter(h -> h.getSpot() != null && h.getSpot().getId() != null)
                 .collect(Collectors.toMap(

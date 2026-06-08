@@ -26,18 +26,30 @@ public class ProductionSafetyValidator {
     private final boolean requireStrongSecrets;
     private final boolean mockCallbackEnabled;
     private final String scraplingApiKey;
+    private final boolean recaptchaEnabled;
+    private final boolean registrationRecaptchaRequired;
+    private final String recaptchaSiteKey;
+    private final String recaptchaSecretKey;
 
     public ProductionSafetyValidator(
             Environment environment,
             @Value("${app.security.cookie-secure:true}") boolean cookieSecure,
             @Value("${app.security.require-strong-secrets:false}") boolean requireStrongSecrets,
             @Value("${app.payments.mock-callback-enabled:false}") boolean mockCallbackEnabled,
-            @Value("${scrapling.service.api-key:}") String scraplingApiKey) {
+            @Value("${scrapling.service.api-key:}") String scraplingApiKey,
+            @Value("${app.security.antibot.recaptcha.enabled:false}") boolean recaptchaEnabled,
+            @Value("${app.security.registration-recaptcha-required:false}") boolean registrationRecaptchaRequired,
+            @Value("${app.security.antibot.recaptcha.site-key:}") String recaptchaSiteKey,
+            @Value("${app.security.antibot.recaptcha.secret-key:}") String recaptchaSecretKey) {
         this.environment = environment;
         this.cookieSecure = cookieSecure;
         this.requireStrongSecrets = requireStrongSecrets;
         this.mockCallbackEnabled = mockCallbackEnabled;
         this.scraplingApiKey = scraplingApiKey;
+        this.recaptchaEnabled = recaptchaEnabled;
+        this.registrationRecaptchaRequired = registrationRecaptchaRequired;
+        this.recaptchaSiteKey = recaptchaSiteKey;
+        this.recaptchaSecretKey = recaptchaSecretKey;
     }
 
     @PostConstruct
@@ -47,7 +59,11 @@ public class ProductionSafetyValidator {
                 cookieSecure,
                 requireStrongSecrets,
                 mockCallbackEnabled,
-                scraplingApiKey);
+                scraplingApiKey,
+                recaptchaEnabled,
+                registrationRecaptchaRequired,
+                recaptchaSiteKey,
+                recaptchaSecretKey);
     }
 
     static void validate(
@@ -55,7 +71,11 @@ public class ProductionSafetyValidator {
             boolean cookieSecure,
             boolean requireStrongSecrets,
             boolean mockCallbackEnabled,
-            String scraplingApiKey) {
+            String scraplingApiKey,
+            boolean recaptchaEnabled,
+            boolean registrationRecaptchaRequired,
+            String recaptchaSiteKey,
+            String recaptchaSecretKey) {
         if (productionSafetyRequired) {
             if (!cookieSecure) {
                 throw new IllegalStateException("Production deployment requires app.security.cookie-secure=true");
@@ -71,7 +91,34 @@ public class ProductionSafetyValidator {
             if (!StringUtils.hasText(scraplingApiKey)) {
                 throw new IllegalStateException("Production deployment requires scrapling.service.api-key");
             }
+            if (!recaptchaEnabled) {
+                throw new IllegalStateException(
+                        "Production deployment requires app.security.antibot.recaptcha.enabled=true");
+            }
+            if (!registrationRecaptchaRequired) {
+                throw new IllegalStateException(
+                        "Production deployment requires app.security.registration-recaptcha-required=true");
+            }
+            if (isBlankOrPlaceholder(recaptchaSiteKey)) {
+                throw new IllegalStateException(
+                        "Production deployment requires app.security.antibot.recaptcha.site-key");
+            }
+            if (isBlankOrPlaceholder(recaptchaSecretKey)) {
+                throw new IllegalStateException(
+                        "Production deployment requires app.security.antibot.recaptcha.secret-key");
+            }
         }
+    }
+
+    private static boolean isBlankOrPlaceholder(String value) {
+        if (!StringUtils.hasText(value)) {
+            return true;
+        }
+        String normalizedValue = value.trim().toLowerCase(Locale.ROOT);
+        return normalizedValue.contains("replace-with")
+                || normalizedValue.contains("placeholder")
+                || normalizedValue.startsWith("changeme")
+                || normalizedValue.startsWith("change-me");
     }
 
     private static boolean isProductionSafetyRequired(Environment environment) {

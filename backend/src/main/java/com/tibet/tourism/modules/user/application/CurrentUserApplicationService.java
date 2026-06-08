@@ -1,7 +1,9 @@
 package com.tibet.tourism.modules.user.application;
+import com.tibet.tourism.common.api.PageResponse;
 import com.tibet.tourism.common.error.BusinessException;
 import com.tibet.tourism.common.error.ResourceNotFoundException;
 import com.tibet.tourism.common.validation.InputSanitizer;
+import com.tibet.tourism.modules.community.domain.SharedRoute;
 import com.tibet.tourism.modules.community.web.dto.CommentDTO;
 import com.tibet.tourism.modules.community.web.dto.RouteCommentResponse;
 import com.tibet.tourism.modules.community.infra.CommentRepository;
@@ -14,7 +16,13 @@ import com.tibet.tourism.modules.user.infra.UserRepository;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -22,6 +30,10 @@ import org.springframework.web.multipart.MultipartFile;
 
 @Service
 public class CurrentUserApplicationService {
+
+    private static final int DEFAULT_PAGE_SIZE = 20;
+    private static final int MAX_PAGE_SIZE = 50;
+    private static final Set<String> COMMENT_PAGE_SORT_FIELDS = Set.of("id", "createdAt");
 
     private final UserRepository userRepository;
     private final SharedRouteRepository sharedRouteRepository;
@@ -48,6 +60,7 @@ public class CurrentUserApplicationService {
         this.fileStorageService = fileStorageService;
     }
 
+    @Transactional(readOnly = true)
     public Map<String, Object> getProfile(Long userId) {
         User user = getUser(userId);
 
@@ -64,13 +77,14 @@ public class CurrentUserApplicationService {
         return response;
     }
 
+    @Transactional(readOnly = true)
     public Map<String, Object> getStats(Long userId) {
         User user = getUser(userId);
 
         Map<String, Object> stats = new HashMap<>();
-        stats.put("routeCount", sharedRouteRepository.findByAuthorOrderByCreatedAtDesc(user).size());
+        stats.put("routeCount", sharedRouteRepository.count(authorIs(user)));
         stats.put("commentCount", routeCommentRepository.countByUser(user) + commentRepository.countByUser(user));
-        stats.put("bookingCount", bookingRepository.findByUserId(userId).size());
+        stats.put("bookingCount", bookingRepository.countByUserId(userId));
         return stats;
     }
 
@@ -78,16 +92,32 @@ public class CurrentUserApplicationService {
         userService.changePassword(userId, oldPassword, newPassword);
     }
 
+    @Transactional(readOnly = true)
     public Map<String, Object> getComments(Long userId) {
-        User user = getUser(userId);
+        return getComments(userId, PageRequest.of(0, DEFAULT_PAGE_SIZE));
+    }
 
+    @Transactional(readOnly = true)
+    public Map<String, Object> getComments(Long userId, Pageable pageable) {
+        User user = getUser(userId);
+        Pageable safePageable = InputSanitizer.sanitizePageable(
+                pageable,
+                COMMENT_PAGE_SORT_FIELDS,
+                Sort.by(Sort.Direction.DESC, "createdAt"),
+                DEFAULT_PAGE_SIZE,
+                MAX_PAGE_SIZE);
+
+        Page<CommentDTO> spotComments = commentRepository.findByUser(user, safePageable)
+                .map(CommentDTO::fromEntity);
+        Page<RouteCommentResponse> routeComments = routeCommentRepository.findByUser(user, safePageable)
+                .map(RouteCommentResponse::fromEntity);
         Map<String, Object> comments = new HashMap<>();
-        comments.put("spotComments", commentRepository.findByUserOrderByCreatedAtDesc(user).stream()
-                .map(CommentDTO::fromEntity)
-                .toList());
-        comments.put("routeComments", routeCommentRepository.findByUserOrderByCreatedAtDesc(user).stream()
-                .map(RouteCommentResponse::fromEntity)
-                .toList());
+        comments.put("spotComments", spotComments.getContent());
+        comments.put("routeComments", routeComments.getContent());
+        comments.put("spotCommentsPage", PageResponse.from(spotComments));
+        comments.put("routeCommentsPage", PageResponse.from(routeComments));
+        comments.put("page", safePageable.getPageNumber());
+        comments.put("size", safePageable.getPageSize());
         return comments;
     }
 
@@ -147,5 +177,9 @@ public class CurrentUserApplicationService {
             return null;
         }
         return normalizedNickname;
+    }
+
+    private Specification<SharedRoute> authorIs(User user) {
+        return (root, query, criteriaBuilder) -> criteriaBuilder.equal(root.get("author"), user);
     }
 }

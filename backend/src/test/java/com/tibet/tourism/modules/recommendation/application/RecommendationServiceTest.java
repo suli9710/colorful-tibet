@@ -90,7 +90,7 @@ class RecommendationServiceTest {
 
     @Test
     void testRecommendForUserWithHistory() {
-        when(historyRepository.findByUserId(1L)).thenReturn(userHistories);
+        when(historyRepository.findRecentByUserId(1L)).thenReturn(userHistories);
         when(companionInferenceService.getCompanionType(1L)).thenReturn("ALONE");
         when(contentBasedStrategy.getTagProfile(eq(1L), anyList(), anySet())).thenReturn(Map.of("宫殿", 5.0));
         when(userBasedCFStrategy.score(eq(1L), anyList(), anySet())).thenReturn(Map.of(4L, 0.8));
@@ -103,11 +103,13 @@ class RecommendationServiceTest {
         assertNotNull(result);
         assertFalse(result.isEmpty());
         assertEquals(spot4.getId(), result.get(0).getId());
+        verify(historyRepository).findRecentByUserId(1L);
+        verify(historyRepository, never()).findByUserId(1L);
     }
 
     @Test
     void testRecommendForNewUser() {
-        when(historyRepository.findByUserId(1L)).thenReturn(Collections.emptyList());
+        when(historyRepository.findRecentByUserId(1L)).thenReturn(Collections.emptyList());
         lenient().when(companionInferenceService.getCompanionType(1L)).thenReturn(null);
         when(coldStartOptimizationService.hybridColdStartRecommendation(
                 eq(1L), isNull(), isNull(), isNull(), isNull(), isNull()))
@@ -121,7 +123,7 @@ class RecommendationServiceTest {
 
     @Test
     void testRecommendWithContextSeason() {
-        when(historyRepository.findByUserId(1L)).thenReturn(userHistories);
+        when(historyRepository.findRecentByUserId(1L)).thenReturn(userHistories);
         when(companionInferenceService.getCompanionType(1L)).thenReturn("ALONE");
         when(contentBasedStrategy.getTagProfile(eq(1L), anyList(), anySet())).thenReturn(Map.of("宫殿", 5.0));
         when(userBasedCFStrategy.score(eq(1L), anyList(), anySet())).thenReturn(Map.of(4L, 0.8));
@@ -146,7 +148,7 @@ class RecommendationServiceTest {
 
     @Test
     void testRecommendWithDebug() {
-        when(historyRepository.findByUserId(1L)).thenReturn(userHistories);
+        when(historyRepository.findRecentByUserId(1L)).thenReturn(userHistories);
         when(companionInferenceService.getCompanionType(1L)).thenReturn("ALONE");
         when(contentBasedStrategy.getTagProfile(eq(1L), anyList(), anySet())).thenReturn(Map.of("宫殿", 5.0));
         when(userBasedCFStrategy.score(eq(1L), anyList(), anySet())).thenReturn(Map.of(4L, 0.8));
@@ -171,7 +173,7 @@ class RecommendationServiceTest {
 
     @Test
     void testRecommendWithDebugSerializesRecommendationsAsPublicDtos() throws Exception {
-        when(historyRepository.findByUserId(1L)).thenReturn(userHistories);
+        when(historyRepository.findRecentByUserId(1L)).thenReturn(userHistories);
         when(companionInferenceService.getCompanionType(1L)).thenReturn("ALONE");
         when(contentBasedStrategy.getTagProfile(eq(1L), anyList(), anySet())).thenReturn(Map.of("瀹", 5.0));
         when(userBasedCFStrategy.score(eq(1L), anyList(), anySet())).thenReturn(Map.of(4L, 0.8));
@@ -199,7 +201,7 @@ class RecommendationServiceTest {
     @Test
     void testFallbackWhenNoVisitedSpotIds() {
         List<UserVisitHistory> badHistory = List.of(createHistory(testUser, new ScenicSpot(), 3, 1, 60, LocalDateTime.now()));
-        when(historyRepository.findByUserId(1L)).thenReturn(badHistory);
+        when(historyRepository.findRecentByUserId(1L)).thenReturn(badHistory);
         lenient().when(companionInferenceService.getCompanionType(1L)).thenReturn("ALONE");
         when(spotRepository.findAllWithoutTags(any())).thenReturn(new PageImpl<>(List.of(spot1, spot2, spot3)));
 

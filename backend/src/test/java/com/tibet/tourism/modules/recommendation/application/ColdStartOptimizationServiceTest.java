@@ -52,13 +52,13 @@ class ColdStartOptimizationServiceTest {
 
     @Test
     void testIsNewUser() {
-        when(historyRepository.findByUserId(1L)).thenReturn(Collections.emptyList());
+        when(historyRepository.findRecentByUserId(1L, 3)).thenReturn(Collections.emptyList());
         assertTrue(coldStartService.isNewUser(1L));
 
         List<UserVisitHistory> oneHistory = Arrays.asList(
                 createHistory(testUser, spot1, 5, LocalDateTime.now())
         );
-        when(historyRepository.findByUserId(1L)).thenReturn(oneHistory);
+        when(historyRepository.findRecentByUserId(1L, 3)).thenReturn(oneHistory);
         assertTrue(coldStartService.isNewUser(1L));
 
         List<UserVisitHistory> threeHistories = Arrays.asList(
@@ -66,8 +66,18 @@ class ColdStartOptimizationServiceTest {
                 createHistory(testUser, spot2, 4, LocalDateTime.now()),
                 createHistory(testUser, spot3, 5, LocalDateTime.now())
         );
-        when(historyRepository.findByUserId(1L)).thenReturn(threeHistories);
+        when(historyRepository.findRecentByUserId(1L, 3)).thenReturn(threeHistories);
         assertFalse(coldStartService.isNewUser(1L));
+    }
+
+    @Test
+    void testIsNewItemUsesRecentThresholdHistory() {
+        when(historyRepository.findRecentBySpotId(1L, 5)).thenReturn(Collections.emptyList());
+
+        assertTrue(coldStartService.isNewItem(1L));
+
+        verify(historyRepository).findRecentBySpotId(1L, 5);
+        verify(historyRepository, never()).findBySpotId(1L);
     }
 
     @Test

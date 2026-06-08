@@ -88,7 +88,6 @@ class OptionalLikeStatusRevocationTest {
     void logoutRevokedTokenMakesPublicQuestionLikeStatusAnonymous() throws Exception {
         AtomicBoolean revoked = new AtomicBoolean(false);
         User user = user();
-        TravelQuestion question = question(user);
 
         when(authApplicationService.login(any(LoginRequest.class), any(HttpServletRequest.class)))
                 .thenReturn(new LoginResult(TOKEN, "csrf-token", Map.of("id", 7L, "username", "alice")));
@@ -101,8 +100,7 @@ class OptionalLikeStatusRevocationTest {
             revoked.set(true);
             return null;
         }).when(tokenRevocationService).revoke(TOKEN);
-        when(qaService.likeQuestion(42L, 7L)).thenReturn(true);
-        when(qaService.getQuestion(42L)).thenReturn(question);
+        when(qaService.likeQuestion(42L, 7L)).thenReturn(new TravelQAService.LikeResult(true, 1));
         when(qaService.isLikedByUser(42L, 7L)).thenReturn(true);
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
                 "alice",

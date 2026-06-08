@@ -8,6 +8,8 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.tibet.tourism.modules.community.domain.RouteComment;
+import com.tibet.tourism.modules.community.domain.RouteLike;
 import com.tibet.tourism.modules.community.domain.SharedRoute;
 import com.tibet.tourism.modules.community.infra.CommentRepository;
 import com.tibet.tourism.modules.community.infra.RouteCommentRepository;
@@ -15,13 +17,16 @@ import com.tibet.tourism.modules.community.infra.RouteLikeRepository;
 import com.tibet.tourism.modules.community.infra.SharedRouteRepository;
 import com.tibet.tourism.modules.user.domain.User;
 import com.tibet.tourism.modules.user.infra.UserRepository;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -88,10 +93,94 @@ class SharedRouteServiceTest {
         verify(routeRepository, times(2)).findAll(any(Specification.class), any(Pageable.class));
     }
 
+    @Test
+    void getCommentsUsesPagedRepositoryLookup() {
+        SharedRoute route = new SharedRoute();
+        route.setId(99L);
+        RouteComment comment = new RouteComment();
+        comment.setId(300L);
+        Pageable pageable = PageRequest.of(2, 20);
+        when(routeRepository.findById(99L)).thenReturn(Optional.of(route));
+        when(commentRepository.findByRoute(route, pageable))
+                .thenReturn(new PageImpl<>(List.of(comment), pageable, 41));
+
+        Page<RouteComment> result = service.getComments(99L, pageable);
+
+        assertThat(result.getContent()).containsExactly(comment);
+        assertThat(result.getTotalElements()).isEqualTo(41);
+        verify(commentRepository).findByRoute(route, pageable);
+    }
+
+    @Test
+    void getRoutesByAuthorUsesPagedRepositoryLookup() {
+        User author = user();
+        SharedRoute route = new SharedRoute();
+        route.setId(100L);
+        Pageable pageable = PageRequest.of(0, 1);
+        when(routeRepository.findByAuthor(author, pageable))
+                .thenReturn(new PageImpl<>(List.of(route), pageable, 6));
+
+        Page<SharedRoute> result = service.getRoutesByAuthor(author, pageable);
+
+        assertThat(result.getContent()).containsExactly(route);
+        assertThat(result.getTotalElements()).isEqualTo(6);
+        verify(routeRepository).findByAuthor(author, pageable);
+    }
+
+    @Test
+    void likeRouteReturnsUpdatedCountWithoutIncrementingViews() {
+        User user = user();
+        SharedRoute route = sharedRoute(user);
+        when(routeRepository.findById(100L)).thenReturn(Optional.of(route));
+        when(userRepository.findById(7L)).thenReturn(Optional.of(user));
+        when(likeRepository.existsByRouteAndUser(route, user)).thenReturn(false);
+        when(likeRepository.saveAndFlush(any(RouteLike.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(routeRepository.findLikeCountById(100L)).thenReturn(Optional.of(3));
+
+        SharedRouteService.LikeResult result = service.likeRoute(100L, 7L);
+
+        assertThat(result.liked()).isTrue();
+        assertThat(result.likeCount()).isEqualTo(3);
+        verify(routeRepository).incrementLikeCount(100L);
+        verify(routeRepository, never()).incrementViewCount(100L);
+    }
+
+    @Test
+    void duplicateRouteLikeIsIdempotentAndDoesNotIncrementAgain() {
+        User user = user();
+        SharedRoute route = sharedRoute(user);
+        when(routeRepository.findById(100L)).thenReturn(Optional.of(route));
+        when(userRepository.findById(7L)).thenReturn(Optional.of(user));
+        when(likeRepository.existsByRouteAndUser(route, user)).thenReturn(false);
+        when(likeRepository.saveAndFlush(any(RouteLike.class)))
+                .thenThrow(new DataIntegrityViolationException("duplicate route like"));
+        when(routeRepository.findLikeCountById(100L)).thenReturn(Optional.of(1));
+
+        SharedRouteService.LikeResult result = service.likeRoute(100L, 7L);
+
+        assertThat(result.liked()).isTrue();
+        assertThat(result.likeCount()).isEqualTo(1);
+        verify(routeRepository, never()).incrementLikeCount(100L);
+        verify(routeRepository, never()).incrementViewCount(100L);
+    }
+
     private User user() {
         User user = new User();
         user.setId(7L);
         user.setUsername("traveler");
         return user;
+    }
+
+    private SharedRoute sharedRoute(User author) {
+        SharedRoute route = new SharedRoute();
+        route.setId(100L);
+        route.setAuthor(author);
+        route.setTitle("Lhasa route");
+        route.setContent("Route content");
+        route.setDays(3);
+        route.setViewCount(12);
+        route.setLikeCount(2);
+        route.setCommentCount(0);
+        return route;
     }
 }

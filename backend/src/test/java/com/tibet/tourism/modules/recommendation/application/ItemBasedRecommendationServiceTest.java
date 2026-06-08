@@ -60,7 +60,7 @@ class ItemBasedRecommendationServiceTest {
                 createHistory(user3, spot2, 4, 1, 60, LocalDateTime.now().minusDays(30)),
                 createHistory(user3, spot4, 4, 2, 120, LocalDateTime.now().minusDays(25))
         );
-        when(historyRepository.findAll(any(Pageable.class))).thenReturn(new PageImpl<>(allHistories));
+        when(historyRepository.findRecentForRecommendation(anyInt())).thenReturn(allHistories);
 
         itemBasedService.precomputeItemSimilarityMatrix();
 
@@ -81,11 +81,11 @@ class ItemBasedRecommendationServiceTest {
                 createHistory(user3, spot2, 4, 1, 60, LocalDateTime.now().minusDays(30)),
                 createHistory(user3, spot4, 4, 2, 120, LocalDateTime.now().minusDays(25))
         );
-        when(historyRepository.findAll(any(Pageable.class))).thenReturn(new PageImpl<>(allHistories));
+        when(historyRepository.findRecentForRecommendation(anyInt())).thenReturn(allHistories);
         itemBasedService.precomputeItemSimilarityMatrix();
 
         // 请求用户1的推荐，用户1已经访问了spot1和spot2
-        when(historyRepository.findByUserId(1L)).thenReturn(Arrays.asList(
+        when(historyRepository.findRecentByUserId(1L)).thenReturn(Arrays.asList(
                 createHistory(user1, spot1, 5, 3, 200, LocalDateTime.now().minusDays(10)),
                 createHistory(user1, spot2, 4, 2, 100, LocalDateTime.now().minusDays(20))
         ));

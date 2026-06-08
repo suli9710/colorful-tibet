@@ -18,7 +18,7 @@ public interface SharedRouteRepository extends JpaRepository<SharedRoute, Long>,
     
     // 获取用户分享的路线（解决 N+1：一次性加载 author）
     @EntityGraph(attributePaths = {"author"})
-    List<SharedRoute> findByAuthorOrderByCreatedAtDesc(User author);
+    Page<SharedRoute> findByAuthor(User author, Pageable pageable);
 
     @EntityGraph(attributePaths = {"author"})
     List<SharedRoute> findAllByOrderByCreatedAtDesc();
@@ -29,6 +29,9 @@ public interface SharedRouteRepository extends JpaRepository<SharedRoute, Long>,
     Optional<SharedRoute> findBySourceTypeAndSourceRouteId(SharedRoute.SourceType sourceType, Long sourceRouteId);
 
     long countBySourceType(SharedRoute.SourceType sourceType);
+
+    @Query("SELECT COALESCE(r.likeCount, 0) FROM SharedRoute r WHERE r.id = :id")
+    Optional<Integer> findLikeCountById(@Param("id") Long id);
     
     // 简单的筛选查询（更复杂的筛选将使用Specification）
     Page<SharedRoute> findByDays(Integer days, Pageable pageable);

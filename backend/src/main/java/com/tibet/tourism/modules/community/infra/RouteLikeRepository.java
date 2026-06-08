@@ -29,6 +29,10 @@ public interface RouteLikeRepository extends JpaRepository<RouteLike, Long> {
     void deleteByRoute(SharedRoute route);
 
     @Modifying
+    @Query("DELETE FROM RouteLike rl WHERE rl.route.id = :routeId")
+    void deleteByRouteId(@Param("routeId") Long routeId);
+
+    @Modifying
     @Query("DELETE FROM RouteLike rl WHERE rl.route.author.id = :userId")
     void deleteByRouteAuthorId(@Param("userId") Long userId);
 }

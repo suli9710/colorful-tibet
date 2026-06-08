@@ -2,6 +2,7 @@ package com.tibet.tourism.modules.community.web;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -33,6 +34,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -76,12 +78,14 @@ class CommunityPublicDtoTest {
 
         mockMvc.perform(get("/api/routes/shared"))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].content").doesNotExist())
                 .andExpect(jsonPath("$.content[0].author.id").doesNotExist())
                 .andExpect(jsonPath("$.content[0].author.owner").value(false))
                 .andExpect(jsonPath("$.content[0].author.username").doesNotExist())
                 .andExpect(jsonPath("$.content[0].author.phone").doesNotExist())
                 .andExpect(jsonPath("$.content[0].author.ipAddress").doesNotExist())
-                .andExpect(jsonPath("$.content[0].author.allowedLoginFingerprintHash").doesNotExist());
+                .andExpect(jsonPath("$.content[0].author.allowedLoginFingerprintHash").doesNotExist())
+                .andExpect(content().string(not(containsString("Route content"))));
     }
 
     @Test
@@ -93,6 +97,7 @@ class CommunityPublicDtoTest {
         mockMvc.perform(get("/api/routes/shared/100"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.author.id").doesNotExist())
+                .andExpect(jsonPath("$.content").value("Route content"))
                 .andExpect(jsonPath("$.author.owner").value(true))
                 .andExpect(jsonPath("$.author.nickname").value("Public Nickname"))
                 .andExpect(jsonPath("$.author.avatar").value("/avatars/u7.png"))
@@ -111,7 +116,8 @@ class CommunityPublicDtoTest {
         comment.setUser(publicUser());
         comment.setContent("Nice route");
         comment.setCreatedAt(LocalDateTime.parse("2026-01-02T03:04:05"));
-        when(routeService.getComments(100L)).thenReturn(List.of(comment));
+        when(routeService.getComments(eq(100L), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(comment), PageRequest.of(0, 20), 1));
 
         mockMvc.perform(get("/api/routes/shared/100/comments"))
                 .andExpect(status().isOk())
@@ -135,13 +141,15 @@ class CommunityPublicDtoTest {
 
         mockMvc.perform(get("/api/community/questions"))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].content").doesNotExist())
                 .andExpect(jsonPath("$.content[0].author.id").doesNotExist())
                 .andExpect(jsonPath("$.content[0].author.owner").value(false))
                 .andExpect(jsonPath("$.content[0].isResolved").value(false))
                 .andExpect(jsonPath("$.content[0].author.username").doesNotExist())
                 .andExpect(jsonPath("$.content[0].author.phone").doesNotExist())
                 .andExpect(jsonPath("$.content[0].author.ipAddress").doesNotExist())
-                .andExpect(jsonPath("$.content[0].author.allowedLoginFingerprintHash").doesNotExist());
+                .andExpect(jsonPath("$.content[0].author.allowedLoginFingerprintHash").doesNotExist())
+                .andExpect(content().string(not(containsString("Question content"))));
     }
 
     @Test
@@ -152,6 +160,7 @@ class CommunityPublicDtoTest {
 
         mockMvc.perform(get("/api/community/questions/200"))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").value("How to prepare?"))
                 .andExpect(jsonPath("$.author.id").doesNotExist())
                 .andExpect(jsonPath("$.author.owner").value(true))
                 .andExpect(jsonPath("$.author.nickname").value("Public Nickname"))
@@ -172,7 +181,8 @@ class CommunityPublicDtoTest {
         answer.setLikeCount(5);
         answer.setIsAccepted(true);
         answer.setCreatedAt(LocalDateTime.parse("2026-01-02T03:04:05"));
-        when(qaService.getAnswers(200L)).thenReturn(List.of(answer));
+        when(qaService.getAnswers(anyLong(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(answer)));
 
         mockMvc.perform(get("/api/community/questions/200/answers"))
                 .andExpect(status().isOk())

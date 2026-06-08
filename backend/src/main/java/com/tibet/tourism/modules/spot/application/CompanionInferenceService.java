@@ -8,8 +8,11 @@ import com.tibet.tourism.modules.user.infra.UserVisitHistoryRepository;
 import java.time.DayOfWeek;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,6 +26,7 @@ import org.springframework.stereotype.Service;
 public class CompanionInferenceService {
     
     private static final Logger logger = LoggerFactory.getLogger(CompanionInferenceService.class);
+    private static final int COMPANION_BOOKING_LIMIT = 50;
     
     @Autowired
     private BookingRepository bookingRepository;
@@ -71,9 +75,10 @@ public class CompanionInferenceService {
         // 4. 综合推断
         CompanionInference finalInference = combineInferences(bookingInference, patternInference, preferenceInference);
         
-        logger.info("✅ 推断完成: {} (置信度: {:.2f}%) - {}", 
-                finalInference.getCompanionType(), 
-                finalInference.getConfidence() * 100,
+        String confidencePercent = String.format(Locale.ROOT, "%.2f", finalInference.getConfidence() * 100);
+        logger.info("✅ 推断完成: {} (置信度: {}%) - {}",
+                finalInference.getCompanionType(),
+                confidencePercent,
                 finalInference.getReason());
         
         return finalInference;
@@ -83,7 +88,10 @@ public class CompanionInferenceService {
      * 基于预订票数推断
      */
     private CompanionInference inferFromBookings(Long userId) {
-        List<Booking> bookings = bookingRepository.findByUserId(userId);
+        List<Booking> bookings = bookingRepository.findByUserId(
+                userId,
+                PageRequest.of(0, COMPANION_BOOKING_LIMIT, Sort.by(Sort.Direction.DESC, "createdAt")))
+                .getContent();
         
         if (bookings.isEmpty()) {
             return new CompanionInference("ALONE", 0.3, "无预订记录，默认推断为独自旅行");
@@ -153,7 +161,7 @@ public class CompanionInferenceService {
      * 基于访问模式推断
      */
     private CompanionInference inferFromVisitPatterns(Long userId) {
-        List<UserVisitHistory> histories = historyRepository.findByUserId(userId);
+        List<UserVisitHistory> histories = historyRepository.findRecentByUserId(userId);
         
         if (histories.isEmpty()) {
             return new CompanionInference("ALONE", 0.3, "无访问记录");
@@ -227,7 +235,7 @@ public class CompanionInferenceService {
      * 基于景点偏好推断
      */
     private CompanionInference inferFromSpotPreferences(Long userId) {
-        List<UserVisitHistory> histories = historyRepository.findByUserId(userId);
+        List<UserVisitHistory> histories = historyRepository.findRecentByUserId(userId);
         
         if (histories.isEmpty()) {
             return new CompanionInference("ALONE", 0.3, "无访问记录");

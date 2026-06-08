@@ -12,11 +12,13 @@ import com.tibet.tourism.modules.community.domain.TravelAnswer;
 import com.tibet.tourism.modules.community.domain.TravelQuestion;
 import com.tibet.tourism.modules.community.web.dto.TravelAnswerResponse;
 import com.tibet.tourism.modules.community.web.dto.TravelQuestionResponse;
+import com.tibet.tourism.modules.community.web.dto.TravelQuestionSummaryResponse;
 import com.tibet.tourism.modules.user.domain.User;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,6 +26,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -39,6 +42,14 @@ public class TravelQAController {
     private static final String ERROR_PERMISSION_DENIED = "Permission denied";
     private static final String ERROR_NOT_FOUND = "Resource not found";
     private static final String ERROR_INVALID_REQUEST = "Invalid request";
+    private static final int DEFAULT_ANSWER_PAGE_SIZE = 20;
+    private static final int MAX_ANSWER_PAGE_SIZE = 50;
+    private static final Set<String> ALLOWED_ANSWER_SORT_FIELDS = Set.of();
+    private static final Sort DEFAULT_ANSWER_SORT = Sort.by(
+            Sort.Order.desc("isAccepted"),
+            Sort.Order.desc("likeCount"),
+            Sort.Order.asc("createdAt"),
+            Sort.Order.asc("id"));
 
     @Autowired
     private TravelQAService qaService;
@@ -80,6 +91,15 @@ public class TravelQAController {
             return ResponseEntity.badRequest().body(Map.of("error", ERROR_INVALID_REQUEST));
         }
         return ResponseEntity.badRequest().body(Map.of("error", "请求处理失败，请检查输入后重试"));
+    }
+
+    private <T> ResponseEntity<List<T>> pagedContent(Page<T> page) {
+        return ResponseEntity.ok()
+                .header("X-Page", String.valueOf(page.getNumber()))
+                .header("X-Size", String.valueOf(page.getSize()))
+                .header("X-Total-Elements", String.valueOf(page.getTotalElements()))
+                .header("X-Total-Pages", String.valueOf(page.getTotalPages()))
+                .body(page.getContent());
     }
 
     // 提问
@@ -124,8 +144,8 @@ public class TravelQAController {
                 InputSanitizer.normalizePageSize(size, 10, 50),
                 sorting);
         Long currentUserId = getOptionalCurrentUserId(request);
-        Page<TravelQuestionResponse> questions = qaService.getQuestions(tag, sort, status, pageable)
-                .map(question -> TravelQuestionResponse.fromEntity(question, currentUserId));
+        Page<TravelQuestionSummaryResponse> questions = qaService.getQuestions(tag, sort, status, pageable)
+                .map(question -> TravelQuestionSummaryResponse.fromEntity(question, currentUserId));
         return ResponseEntity.ok(PageResponse.from(questions));
     }
 
@@ -171,13 +191,21 @@ public class TravelQAController {
 
     // 获取回答列表
     @GetMapping("/{id}/answers")
-    public ResponseEntity<?> getAnswers(@PathVariable Long id, HttpServletRequest request) {
+    public ResponseEntity<?> getAnswers(
+            @PathVariable Long id,
+            @PageableDefault(size = DEFAULT_ANSWER_PAGE_SIZE) Pageable pageable,
+            HttpServletRequest request) {
         try {
             Long currentUserId = getOptionalCurrentUserId(request);
-            List<TravelAnswerResponse> answers = qaService.getAnswers(id).stream()
-                    .map(answer -> TravelAnswerResponse.fromEntity(answer, currentUserId))
-                    .toList();
-            return ResponseEntity.ok(answers);
+            Pageable safePageable = InputSanitizer.sanitizePageable(
+                    pageable,
+                    ALLOWED_ANSWER_SORT_FIELDS,
+                    DEFAULT_ANSWER_SORT,
+                    DEFAULT_ANSWER_PAGE_SIZE,
+                    MAX_ANSWER_PAGE_SIZE);
+            Page<TravelAnswerResponse> answers = qaService.getAnswers(id, safePageable)
+                    .map(answer -> TravelAnswerResponse.fromEntity(answer, currentUserId));
+            return pagedContent(answers);
         } catch (Exception e) {
             return safeBadRequest(e);
         }
@@ -201,9 +229,8 @@ public class TravelQAController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<?> likeQuestion(@PathVariable Long id, HttpServletRequest request) {
         try {
-            boolean liked = qaService.likeQuestion(id, getCurrentUserId(request));
-            TravelQuestion question = qaService.getQuestion(id);
-            return ResponseEntity.ok(Map.of("liked", liked, "likeCount", question.getLikeCount()));
+            TravelQAService.LikeResult result = qaService.likeQuestion(id, getCurrentUserId(request));
+            return ResponseEntity.ok(Map.of("liked", result.liked(), "likeCount", result.likeCount()));
         } catch (Exception e) {
             return safeBadRequest(e);
         }
@@ -214,9 +241,8 @@ public class TravelQAController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<?> unlikeQuestion(@PathVariable Long id, HttpServletRequest request) {
         try {
-            boolean unliked = qaService.unlikeQuestion(id, getCurrentUserId(request));
-            TravelQuestion question = qaService.getQuestion(id);
-            return ResponseEntity.ok(Map.of("liked", !unliked, "likeCount", question.getLikeCount()));
+            TravelQAService.LikeResult result = qaService.unlikeQuestion(id, getCurrentUserId(request));
+            return ResponseEntity.ok(Map.of("liked", result.liked(), "likeCount", result.likeCount()));
         } catch (Exception e) {
             return safeBadRequest(e);
         }
