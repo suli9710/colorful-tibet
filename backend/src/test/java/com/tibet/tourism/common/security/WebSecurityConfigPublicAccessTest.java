@@ -5,8 +5,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.mockito.Mockito.when;
 
 import com.tibet.tourism.modules.user.infra.UserRepository;
+import jakarta.servlet.http.Cookie;
 import java.util.Map;
 import java.util.stream.Stream;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -16,6 +18,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.userdetails.User;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -75,6 +78,26 @@ class WebSecurityConfigPublicAccessTest {
             throws Exception {
         mockMvc.perform(request.contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @ParameterizedTest
+    @MethodSource("deniedUploadRequests")
+    void privateUploadsAreNotPublicForAnonymousRequests(MockHttpServletRequestBuilder request) throws Exception {
+        mockMvc.perform(request)
+                .andExpect(status().isUnauthorized());
+    }
+
+    @ParameterizedTest
+    @MethodSource("deniedUploadRequests")
+    void privateUploadsDenyAuthenticatedUsers(MockHttpServletRequestBuilder request) throws Exception {
+        when(jwtUtils.validateJwtToken("valid-token")).thenReturn(true);
+        when(jwtUtils.getUserNameFromJwtToken("valid-token")).thenReturn("traveler");
+        when(userSessionVersionService.tokenMatchesCurrentSession("valid-token")).thenReturn(true);
+        when(userDetailsService.loadUserByUsername("traveler")).thenReturn(
+                User.withUsername("traveler").password("unused").roles("USER").build());
+
+        mockMvc.perform(request.cookie(new Cookie(CookieAuthConstants.AUTH_COOKIE_NAME, "valid-token")))
+                .andExpect(status().isForbidden());
     }
 
     private static Stream<MockHttpServletRequestBuilder> publicReadRequests() {
@@ -137,6 +160,12 @@ class WebSecurityConfigPublicAccessTest {
                 post("/api/community/questions"),
                 delete("/api/community/questions/1"),
                 post("/api/comments/spot/1"));
+    }
+
+    private static Stream<MockHttpServletRequestBuilder> deniedUploadRequests() {
+        return Stream.of(
+                get("/uploads/private"),
+                get("/uploads/private/order-voucher.jpg"));
     }
 
     @RestController
@@ -216,7 +245,8 @@ class WebSecurityConfigPublicAccessTest {
 
         @GetMapping({
                 "/api/routes/shared/1/like-status",
-                "/api/heritage/1/like-status"
+                "/api/heritage/1/like-status",
+                "/uploads/private/order-voucher.jpg"
         })
         public Map<String, String> protectedReadProbe() {
             return Map.of("status", "ok");

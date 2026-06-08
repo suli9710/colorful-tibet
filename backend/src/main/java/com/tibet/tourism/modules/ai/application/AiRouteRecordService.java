@@ -7,10 +7,14 @@ import com.tibet.tourism.modules.ai.infra.AiRouteRecordRepository;
 import com.tibet.tourism.modules.ai.web.dto.AiRouteRecordResponse;
 import com.tibet.tourism.modules.user.domain.User;
 import com.tibet.tourism.modules.user.infra.UserRepository;
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -18,8 +22,11 @@ import org.springframework.util.StringUtils;
 @Service
 public class AiRouteRecordService {
 
+    private static final Logger log = LoggerFactory.getLogger(AiRouteRecordService.class);
     private static final int TITLE_MAX_LENGTH = 200;
     private static final int ERROR_MAX_LENGTH = 500;
+    private static final String STALE_RUNNING_ERROR =
+            "AI route generation did not finish before the recovery window expired";
     private static final Pattern MARKDOWN_TITLE_PATTERN = Pattern.compile("(?m)^\\s*#\\s+(.+?)\\s*$");
 
     private final AiRouteRecordRepository routeRecordRepository;
@@ -110,6 +117,35 @@ public class AiRouteRecordService {
                 .stream()
                 .map(AiRouteRecordResponse::from)
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<AiRouteRecord> findJobRecord(Long userId, String jobId) {
+        return findByJob(userId, jobId);
+    }
+
+    @Transactional
+    public int failStaleRunningRecords(Duration staleTtl) {
+        Duration effectiveTtl = staleTtl == null || staleTtl.isNegative() ? Duration.ZERO : staleTtl;
+        LocalDateTime cutoff = LocalDateTime.now().minus(effectiveTtl);
+        List<AiRouteRecord> staleRecords = routeRecordRepository
+                .findByStatusAndUpdatedAtBeforeOrderByUpdatedAtAsc(AiRouteRecord.Status.RUNNING, cutoff);
+        if (staleRecords.isEmpty()) {
+            return 0;
+        }
+
+        for (AiRouteRecord record : staleRecords) {
+            record.setJobId(null);
+            record.setStatus(AiRouteRecord.Status.FAILED);
+            record.setErrorMessage(STALE_RUNNING_ERROR);
+            record.setTitle(hasContent(record.getContent())
+                    ? extractTitle(record.getContent(), record.getDays())
+                    : AiRouteRecord.defaultTitle(record.getDays()));
+        }
+        routeRecordRepository.saveAll(staleRecords);
+        log.warn("Marked {} stale AI route RUNNING records as FAILED during startup recovery; cutoff={}",
+                staleRecords.size(), cutoff);
+        return staleRecords.size();
     }
 
     @Transactional

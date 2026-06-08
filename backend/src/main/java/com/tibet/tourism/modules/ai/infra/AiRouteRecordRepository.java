@@ -2,6 +2,7 @@ package com.tibet.tourism.modules.ai.infra;
 
 import com.tibet.tourism.modules.ai.domain.AiRouteRecord;
 import com.tibet.tourism.modules.user.domain.User;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -21,6 +22,9 @@ public interface AiRouteRecordRepository extends JpaRepository<AiRouteRecord, Lo
     Optional<AiRouteRecord> findByIdAndUser(Long id, User user);
 
     Optional<AiRouteRecord> findFirstByUserIdAndJobIdOrderByUpdatedAtDesc(Long userId, String jobId);
+
+    List<AiRouteRecord> findByStatusAndUpdatedAtBeforeOrderByUpdatedAtAsc(
+            AiRouteRecord.Status status, LocalDateTime updatedBefore);
 
     void deleteByUserId(Long userId);
 }

@@ -14,7 +14,6 @@ import org.springframework.core.annotation.Order;
 import org.springframework.core.Ordered;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
-import org.springframework.util.PatternMatchUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.util.WebUtils;
@@ -25,9 +24,6 @@ public class CsrfCookieFilter extends OncePerRequestFilter {
 
     private static final Logger logger = LoggerFactory.getLogger(CsrfCookieFilter.class);
     private static final Set<String> SAFE_METHODS = Set.of("GET", "HEAD", "OPTIONS");
-    private static final Set<String> PUBLIC_STATE_CHANGING_PATHS = Set.of(
-            "/api/auth/login",
-            "/api/auth/register");
 
     private final CsrfTokenService csrfTokenService;
     private final Set<String> allowedOrigins;
@@ -39,6 +35,7 @@ public class CsrfCookieFilter extends OncePerRequestFilter {
         this.allowedOrigins = Arrays.stream(allowedOrigins.split(","))
                 .map(String::trim)
                 .filter(StringUtils::hasText)
+                .filter(origin -> !origin.contains("*"))
                 .collect(Collectors.toUnmodifiableSet());
     }
 
@@ -51,21 +48,34 @@ public class CsrfCookieFilter extends OncePerRequestFilter {
             return;
         }
 
-        if (PUBLIC_STATE_CHANGING_PATHS.contains(path)) {
+        String authToken = readCookie(request, CookieAuthConstants.AUTH_COOKIE_NAME);
+        if (ApiSecurityPaths.isPublicPostRequest(request.getMethod(), path)) {
+            if (StringUtils.hasText(authToken)
+                    && ApiSecurityPaths.requiresCsrfWhenAuthenticatedPublicPost(request.getMethod(), path)) {
+                enforceAuthenticatedCsrf(request, response, filterChain, authToken);
+                return;
+            }
             if (hasBrowserRequestMetadata(request) && !hasTrustedRequestMetadata(request)) {
-                reject(response, "Untrusted public auth request metadata");
+                reject(response, "Untrusted public POST request metadata");
                 return;
             }
             filterChain.doFilter(request, response);
             return;
         }
 
-        String authToken = readCookie(request, CookieAuthConstants.AUTH_COOKIE_NAME);
         if (!StringUtils.hasText(authToken)) {
             filterChain.doFilter(request, response);
             return;
         }
 
+        enforceAuthenticatedCsrf(request, response, filterChain, authToken);
+    }
+
+    private void enforceAuthenticatedCsrf(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            FilterChain filterChain,
+            String authToken) throws IOException, ServletException {
         if (!hasTrustedRequestMetadata(request)) {
             reject(response, "Untrusted CSRF request metadata");
             return;
@@ -101,7 +111,7 @@ public class CsrfCookieFilter extends OncePerRequestFilter {
         }
 
         return origin.equals(requestOrigin(request))
-                || allowedOrigins.stream().anyMatch(pattern -> PatternMatchUtils.simpleMatch(pattern, origin));
+                || allowedOrigins.contains(origin);
     }
 
     private boolean hasBrowserRequestMetadata(HttpServletRequest request) {

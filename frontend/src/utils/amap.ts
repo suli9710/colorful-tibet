@@ -1,3 +1,5 @@
+import { applyThirdPartyScriptSecurity } from './scriptSecurity'
+
 const AMAP_KEY = import.meta.env.VITE_AMAP_KEY
 const AMAP_SECURITY_CODE = import.meta.env.VITE_AMAP_SECURITY_CODE
 
@@ -28,6 +30,7 @@ export const loadAmap = () => {
     const existingScript = document.querySelector<HTMLScriptElement>('script[data-amap-loader="colorful-tibet"]')
 
     if (existingScript) {
+      applyThirdPartyScriptSecurity(existingScript, 'amap')
       existingScript.addEventListener('load', () => resolve((window as any).AMap), { once: true })
       existingScript.addEventListener('error', () => reject(new Error('Failed to load AMap script.')), { once: true })
       return
@@ -37,6 +40,7 @@ export const loadAmap = () => {
     script.src = `https://webapi.amap.com/maps?v=2.0&key=${AMAP_KEY}`
     script.async = true
     script.dataset.amapLoader = 'colorful-tibet'
+    applyThirdPartyScriptSecurity(script, 'amap')
     script.onload = () => resolve((window as any).AMap)
     script.onerror = () => reject(new Error('Failed to load AMap script.'))
     document.head.appendChild(script)

@@ -3,7 +3,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { Menu, X, LogOut } from 'lucide-vue-next'
-import api, { updateMemoizedLocale, clearTokenCache } from '../api/index'
+import api, { updateMemoizedLocale, clearTokenCache, endpoints } from '../api/index'
 import { useAuthStore } from '../stores/auth'
 
 const router = useRouter()
@@ -90,7 +90,7 @@ const switchLanguage = (lang: string) => {
 
 const logout = async () => {
   try {
-    await api.post('/auth/logout')
+    await api.post(endpoints.auth.logout)
   } finally {
     clearTokenCache()
     auth.logout()

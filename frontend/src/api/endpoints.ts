@@ -20,6 +20,17 @@ export const endpoints = {
     aiSaved: '/routes/ai/saved',
     saveAiRoute: (id: number) => `/routes/ai/${id}/save`
   },
+  community: {
+    questions: '/community/questions',
+    questionDetail: (id: number | string) => `/community/questions/${id}`,
+    questionAnswers: (id: number | string) => `/community/questions/${id}/answers`,
+    questionLike: (id: number | string) => `/community/questions/${id}/like`,
+    questionLikeStatus: (id: number | string) => `/community/questions/${id}/like-status`,
+    createQuestionAnswer: (id: number | string) => `/community/questions/${id}/answers`,
+    acceptQuestionAnswer: (questionId: number | string, answerId: number | string) =>
+      `/community/questions/${questionId}/answers/${answerId}/accept`,
+    deleteQuestion: (id: number | string) => `/community/questions/${id}`
+  },
   itineraries: {
     generate: '/itineraries/generate',
     my: '/itineraries/my',

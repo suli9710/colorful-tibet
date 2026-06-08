@@ -1,5 +1,6 @@
 package com.tibet.tourism.modules.route.domain;
 import jakarta.persistence.*;
+import org.hibernate.annotations.BatchSize;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -41,6 +42,7 @@ public class ItineraryDay {
 
     @OneToMany(mappedBy = "day", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("sortOrder ASC")
+    @BatchSize(size = 100)
     private List<ItineraryItem> items = new ArrayList<>();
 
     public void addItem(ItineraryItem item) {

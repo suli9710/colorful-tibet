@@ -18,7 +18,7 @@
 后端：
 
 - Java 17
-- Spring Boot
+- Spring Boot 3.5.12
 - Spring Security + JWT
 - Spring Data JPA
 - Flyway
@@ -29,7 +29,7 @@
 前端：
 
 - Vue 3
-- Vite 5
+- Vite 8
 - TypeScript
 - Pinia
 - Vue Router
@@ -226,8 +226,7 @@ docker compose down
 
 ```powershell
 cd frontend
-npm run typecheck
-npm run build
+npm run check
 
 cd ..\backend
 mvn -q test

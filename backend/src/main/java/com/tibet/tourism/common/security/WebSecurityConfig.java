@@ -108,6 +108,7 @@ public class WebSecurityConfig {
                     .requestMatchers("/error").permitAll()
                     .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
                     .requestMatchers("/actuator/info").hasRole("ADMIN")
+                    .requestMatchers("/uploads/private", "/uploads/private/**").denyAll()
                     .requestMatchers(ApiSecurityPaths.publicRequests()).permitAll()
                     .requestMatchers(ApiSecurityPaths.adminApiRequests()).hasRole("ADMIN")
                     .requestMatchers("/api/**").authenticated()

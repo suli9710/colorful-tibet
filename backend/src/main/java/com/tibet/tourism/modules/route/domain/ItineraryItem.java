@@ -3,6 +3,7 @@ import com.tibet.tourism.modules.hotel.domain.Hotel;
 import com.tibet.tourism.modules.hotel.domain.RoomType;
 import com.tibet.tourism.modules.spot.domain.ScenicSpot;
 import jakarta.persistence.*;
+import org.hibernate.annotations.BatchSize;
 import java.math.BigDecimal;
 
 @Entity
@@ -60,14 +61,17 @@ public class ItineraryItem {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "scenic_spot_id")
+    @BatchSize(size = 100)
     private ScenicSpot scenicSpot;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "hotel_id")
+    @BatchSize(size = 100)
     private Hotel hotel;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "room_type_id")
+    @BatchSize(size = 100)
     private RoomType roomType;
 
     @Column(name = "sort_order")

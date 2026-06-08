@@ -136,7 +136,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { motion } from 'motion-v'
 import { revealInitial, revealInView, revealTransition } from '../motion/presets'
-import api from '../api'
+import api, { endpoints } from '../api'
 import { useAuthStore } from '../stores/auth'
 import { useAuthGuard } from '../composables/useAuthGuard'
 import { showConfirm } from '../composables/useConfirm'
@@ -201,8 +201,8 @@ const loadQuestion = async () => {
   try {
     const id = route.params.id
     const [qRes, aRes] = await Promise.all([
-      api.get(`/community/questions/${id}`),
-      api.get(`/community/questions/${id}/answers`)
+      api.get(endpoints.community.questionDetail(String(id))),
+      api.get(endpoints.community.questionAnswers(String(id)))
     ])
     question.value = qRes.data
     answers.value = aRes.data || []
@@ -210,7 +210,7 @@ const loadQuestion = async () => {
     // Check like status
     if (auth.hasValidSession()) {
       try {
-        const likeRes = await api.get(`/community/questions/${id}/like-status`)
+        const likeRes = await api.get(endpoints.community.questionLikeStatus(String(id)))
         isLiked.value = likeRes.data.liked
       } catch { /* ignore */ }
     }
@@ -229,9 +229,9 @@ const submitAnswer = async () => {
   try {
     if (!(await requireAuth())) return
 
-    await api.post(`/community/questions/${question.value.id}/answers`, { content })
+    await api.post(endpoints.community.createQuestionAnswer(question.value.id), { content })
     newAnswer.value = ''
-    const aRes = await api.get(`/community/questions/${question.value.id}/answers`)
+    const aRes = await api.get(endpoints.community.questionAnswers(question.value.id))
     answers.value = aRes.data || []
     if (question.value) {
       question.value.answerCount = answers.value.length
@@ -254,11 +254,11 @@ const toggleLike = async () => {
     if (!(await requireAuth())) return
 
     if (isLiked.value) {
-      await api.delete(`/community/questions/${question.value.id}/like`)
+      await api.delete(endpoints.community.questionLike(question.value.id))
       isLiked.value = false
       question.value.likeCount = Math.max(0, (question.value.likeCount || 1) - 1)
     } else {
-      const res = await api.post(`/community/questions/${question.value.id}/like`)
+      const res = await api.post(endpoints.community.questionLike(question.value.id))
       isLiked.value = true
       question.value.likeCount = res.data.likeCount
     }
@@ -277,7 +277,7 @@ const acceptAnswer = async (answerId: number) => {
   try {
     if (!(await requireAuth())) return
 
-    await api.post(`/community/questions/${question.value.id}/answers/${answerId}/accept`)
+    await api.post(endpoints.community.acceptQuestionAnswer(question.value.id, answerId))
     question.value.isResolved = true
     await loadQuestion()
   } catch (error: any) {
@@ -301,7 +301,7 @@ const deleteQuestion = async () => {
     })
     if (!confirmed) return
 
-    await api.delete(`/community/questions/${question.value.id}`)
+    await api.delete(endpoints.community.deleteQuestion(question.value.id))
     router.push('/community')
   } catch (error: any) {
     showToast(t('questionDetail.deleteFailed'), 'error')

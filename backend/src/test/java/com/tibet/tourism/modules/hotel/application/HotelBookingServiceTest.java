@@ -21,6 +21,7 @@ import com.tibet.tourism.modules.hotel.domain.RoomType;
 import com.tibet.tourism.modules.hotel.infra.HotelBookingRepository;
 import com.tibet.tourism.modules.hotel.infra.HotelRepository;
 import com.tibet.tourism.modules.hotel.infra.RoomTypeRepository;
+import com.tibet.tourism.modules.hotel.web.dto.HotelBookingRequest;
 import com.tibet.tourism.modules.order.application.OrderCenterService;
 import com.tibet.tourism.modules.user.domain.User;
 import java.math.BigDecimal;
@@ -136,6 +137,42 @@ class HotelBookingServiceTest {
     }
 
     @Test
+    void createBookingMirrorsIntoUnifiedOrderCenter() {
+        Hotel hotel = publicHotelEntity();
+        RoomType roomType = roomType(hotel);
+        HotelBookingRequest request = hotelBookingRequest(hotel.getId(), roomType.getId());
+        when(hotelRepository.findById(hotel.getId())).thenReturn(Optional.of(hotel));
+        when(roomTypeRepository.findByIdForUpdate(roomType.getId())).thenReturn(Optional.of(roomType));
+        when(hotelBookingRepository.findOverlappingActiveBookingsForUpdate(
+                eq(roomType.getId()), any(), eq(request.getCheckInDate()), eq(request.getCheckOutDate())))
+                .thenReturn(List.of());
+        when(hotelBookingRepository.save(any(HotelBooking.class))).thenAnswer(invocation -> {
+            HotelBooking saved = invocation.getArgument(0);
+            saved.setId(77L);
+            return saved;
+        });
+
+        HotelBooking saved = hotelBookingService.createBooking(user, request);
+
+        assertEquals(77L, saved.getId());
+        assertEquals(HotelBooking.Status.PENDING, saved.getStatus());
+        verify(orderCenterService).createFromLegacyHotelBooking(saved);
+    }
+
+    @Test
+    void adminStatusCancelMirrorsIntoUnifiedOrderCenter() {
+        HotelBooking booking = booking(99L, user, HotelBooking.Status.CONFIRMED);
+        when(hotelBookingRepository.findById(99L)).thenReturn(Optional.of(booking));
+        when(hotelBookingRepository.save(booking)).thenReturn(booking);
+
+        hotelBookingService.updateStatus(admin, 99L, "cancelled");
+
+        assertEquals(HotelBooking.Status.CANCELLED, booking.getStatus());
+        verify(orderCenterService).cancelLegacyMirror(
+                eq(admin), eq("LEGACY_HOTEL_BOOKING"), eq(99L), anyString());
+    }
+
+    @Test
     void adminCanDeleteActiveHotelBooking() {
         HotelBooking booking = booking(99L, user, HotelBooking.Status.PENDING);
         when(hotelBookingRepository.findById(99L)).thenReturn(Optional.of(booking));
@@ -145,6 +182,7 @@ class HotelBookingServiceTest {
         assertEquals(HotelBooking.Status.CANCELLED, booking.getStatus());
         assertNotNull(booking.getDeletedAt());
         verify(hotelBookingRepository).save(booking);
+        verify(orderCenterService).cancelLegacyMirror(eq(admin), eq("LEGACY_HOTEL_BOOKING"), eq(99L), anyString());
     }
 
     @Test
@@ -283,5 +321,27 @@ class HotelBookingServiceTest {
         hotel.setFacilities("wifi, oxygen");
         hotel.setCreatedAt(LocalDateTime.parse("2026-06-01T12:00:00"));
         return hotel;
+    }
+
+    private RoomType roomType(Hotel hotel) {
+        RoomType roomType = new RoomType();
+        roomType.setId(6L);
+        roomType.setHotel(hotel);
+        roomType.setName("Deluxe King");
+        roomType.setPrice(new BigDecimal("880"));
+        roomType.setCapacity(2);
+        return roomType;
+    }
+
+    private HotelBookingRequest hotelBookingRequest(Long hotelId, Long roomId) {
+        HotelBookingRequest request = new HotelBookingRequest();
+        request.setHotelId(hotelId);
+        request.setRoomId(roomId);
+        request.setGuests(2);
+        request.setGuestName("Alice Zhang");
+        request.setPhone("13800138000");
+        request.setCheckInDate(LocalDate.now().plusDays(10));
+        request.setCheckOutDate(LocalDate.now().plusDays(12));
+        return request;
     }
 }

@@ -203,12 +203,12 @@ public class PriceFetchService {
 
                 String source = response.getOrDefault("source", "Scrapling").toString();
                 PriceInfo info = new PriceInfo(basePrice, source);
-                info.setReferenceOnly(true);
 
                 Object confidenceObj = response.get("confidence");
                 if (confidenceObj instanceof Number confNum) {
                     info.setConfidence(confNum.doubleValue());
                 }
+                info.setReferenceOnly(isReferenceOnlyResponse(response));
 
                 Object peakObj = response.get("peakSeasonPrice");
                 if (peakObj instanceof Number peakNum) {
@@ -238,6 +238,34 @@ public class PriceFetchService {
         private String endpoint(String path) {
             String normalized = serviceUrl.endsWith("/") ? serviceUrl.substring(0, serviceUrl.length() - 1) : serviceUrl;
             return normalized + path;
+        }
+
+        private boolean isReferenceOnlyResponse(Map<String, Object> response) {
+            Boolean referenceOnly = booleanValue(response.get("referenceOnly"));
+            if (Boolean.TRUE.equals(referenceOnly)) {
+                return true;
+            }
+            if (Boolean.FALSE.equals(referenceOnly)) {
+                return false;
+            }
+            Boolean publishable = booleanValue(response.get("publishable"));
+            return !Boolean.TRUE.equals(publishable);
+        }
+
+        private Boolean booleanValue(Object value) {
+            if (value instanceof Boolean bool) {
+                return bool;
+            }
+            if (value instanceof String text) {
+                String normalized = text.trim().toLowerCase(Locale.ROOT);
+                if ("true".equals(normalized)) {
+                    return true;
+                }
+                if ("false".equals(normalized)) {
+                    return false;
+                }
+            }
+            return null;
         }
     }
 

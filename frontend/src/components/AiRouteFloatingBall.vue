@@ -11,6 +11,11 @@ interface Live2DCharacterHandle {
   setMotion: (name: string) => boolean | undefined
 }
 
+type WindowWithIdleCallback = Window & {
+  requestIdleCallback?: (callback: () => void, options?: { timeout?: number }) => number
+  cancelIdleCallback?: (handle: number) => void
+}
+
 const Live2DCharacter = defineAsyncComponent(() => import('./Live2DCharacter.vue'))
 
 const router = useRouter()
@@ -20,7 +25,10 @@ const store = useRouteGenerationStore()
 const chatOpen = ref(false)
 const showBubble = ref(false)
 const live2dRef = ref<Live2DCharacterHandle>()
-const isDesktop = ref(true)
+const isDesktop = ref(false)
+const viewportReady = ref(false)
+const live2dRequested = ref(false)
+const live2dReady = ref(false)
 const hasShownInitialBubble = ref(false)
 
 const isOnRoutePlanner = computed(() => route.name === 'route-planner')
@@ -28,9 +36,13 @@ const visible = computed(() => !isOnRoutePlanner.value)
 const isIdle = computed(() => !store.isGenerating && !store.isCompleted)
 const isGenerating = computed(() => store.isGenerating)
 const isCompleted = computed(() => store.isCompleted)
+const showDesktopCharacterShell = computed(() => !viewportReady.value || isDesktop.value)
+const showMobileLiteButton = computed(() => viewportReady.value && !isDesktop.value)
+const shouldRenderLive2d = computed(() => isDesktop.value && live2dRequested.value)
 
 const charWidth = 150
 const charHeight = 163
+const idleLive2dDelay = 2200
 
 const greetings = [
   '想去西藏旅行吗？点我聊聊',
@@ -63,16 +75,78 @@ const currentMotion = computed(() => {
 
 let jumpCheckTimer: ReturnType<typeof setInterval> | null = null
 let hideBubbleTimer: number | undefined
+let idleLive2dHandle: number | undefined
+let idleLive2dUsesCallback = false
 let desktopMediaQuery: MediaQueryList | undefined
 
 function updateDesktopState(event?: MediaQueryListEvent) {
-  isDesktop.value = event?.matches ?? desktopMediaQuery?.matches ?? true
+  isDesktop.value = event?.matches ?? desktopMediaQuery?.matches ?? false
+  viewportReady.value = true
+  if (!isDesktop.value) {
+    cancelIdleLive2dLoad()
+    live2dReady.value = false
+    return
+  }
+  scheduleIdleLive2dLoad()
 }
 
 function clearHideBubbleTimer() {
   if (hideBubbleTimer) {
     window.clearTimeout(hideBubbleTimer)
     hideBubbleTimer = undefined
+  }
+}
+
+function cancelIdleLive2dLoad() {
+  if (idleLive2dHandle === undefined) return
+
+  const idleWindow = window as WindowWithIdleCallback
+  if (idleLive2dUsesCallback && idleWindow.cancelIdleCallback) {
+    idleWindow.cancelIdleCallback(idleLive2dHandle)
+  } else {
+    window.clearTimeout(idleLive2dHandle)
+  }
+
+  idleLive2dHandle = undefined
+  idleLive2dUsesCallback = false
+}
+
+function requestLive2dLoad() {
+  if (!isDesktop.value || live2dRequested.value) return
+
+  live2dRequested.value = true
+  cancelIdleLive2dLoad()
+}
+
+function scheduleIdleLive2dLoad() {
+  if (!isDesktop.value || !visible.value || !isIdle.value || live2dRequested.value || idleLive2dHandle !== undefined) {
+    return
+  }
+
+  const loadWhenIdle = () => {
+    idleLive2dHandle = undefined
+    idleLive2dUsesCallback = false
+    requestLive2dLoad()
+  }
+
+  idleLive2dUsesCallback = false
+  idleLive2dHandle = window.setTimeout(() => {
+    idleLive2dHandle = undefined
+    const idleWindow = window as WindowWithIdleCallback
+
+    if (idleWindow.requestIdleCallback) {
+      idleLive2dUsesCallback = true
+      idleLive2dHandle = idleWindow.requestIdleCallback(loadWhenIdle, { timeout: 7000 })
+      return
+    }
+
+    loadWhenIdle()
+  }, idleLive2dDelay)
+}
+
+function cueIdleWavingMotion() {
+  if (isIdle.value && !chatOpen.value) {
+    live2dRef.value?.setMotion('waving')
   }
 }
 
@@ -107,6 +181,20 @@ watch([visible, isIdle], ([v, idle]) => {
   }
 }, { immediate: true })
 
+watch([visible, isIdle, isDesktop], ([v, idle, desktop]) => {
+  if (!v || !desktop) {
+    cancelIdleLive2dLoad()
+    live2dReady.value = false
+    return
+  }
+
+  if (idle) {
+    scheduleIdleLive2dLoad()
+  } else {
+    cancelIdleLive2dLoad()
+  }
+}, { immediate: true })
+
 onMounted(() => {
   desktopMediaQuery = window.matchMedia('(min-width: 768px)')
   updateDesktopState()
@@ -116,10 +204,13 @@ onMounted(() => {
 onBeforeUnmount(() => {
   if (jumpCheckTimer) clearInterval(jumpCheckTimer)
   clearHideBubbleTimer()
+  cancelIdleLive2dLoad()
   desktopMediaQuery?.removeEventListener('change', updateDesktopState)
 })
 
 function handleClick() {
+  requestLive2dLoad()
+
   if (isIdle.value) {
     greetingIndex.value = (greetingIndex.value + 1) % greetings.length
     chatOpen.value = !chatOpen.value
@@ -139,12 +230,23 @@ function handleChatClose() {
   chatOpen.value = false
 }
 
-function onCharacterEnter() {
+function onLive2dReady(widget: Live2DCharacterHandle) {
+  live2dReady.value = true
+  widget.setMotion(currentMotion.value)
+}
+
+function onCharacterFocus() {
+  requestLive2dLoad()
   showBubble.value = true
   clearHideBubbleTimer()
-  if (isIdle.value && !chatOpen.value) {
-    live2dRef.value?.setMotion('waving')
-  }
+  cueIdleWavingMotion()
+}
+
+function onCharacterEnter() {
+  requestLive2dLoad()
+  showBubble.value = true
+  clearHideBubbleTimer()
+  cueIdleWavingMotion()
 }
 
 function onCharacterLeave() {
@@ -196,7 +298,7 @@ function onCharacterLeave() {
           'char-state-idle': isIdle,
           'char-state-generating': isGenerating,
           'char-state-completed': isCompleted,
-          'mobile-lite-btn': !isDesktop
+          'mobile-lite-btn': showMobileLiteButton
         }"
         :aria-label="buttonLabel"
         :title="buttonLabel"
@@ -207,16 +309,32 @@ function onCharacterLeave() {
         :whileHover="{ scale: 1.06 }"
         :whileTap="{ scale: 0.94 }"
         @click="handleClick"
+        @focus="onCharacterFocus"
         @mouseenter="onCharacterEnter"
         @mouseleave="onCharacterLeave"
       >
-        <Live2DCharacter
-          v-if="isDesktop"
-          ref="live2dRef"
-          :motion="currentMotion"
-          :width="charWidth"
-          :height="charHeight"
-        />
+        <template v-if="showDesktopCharacterShell">
+          <span
+            class="desktop-ai-placeholder"
+            :class="{
+              'desktop-ai-placeholder-loading': live2dRequested && !live2dReady,
+              'desktop-ai-placeholder-hidden': live2dReady
+            }"
+            aria-hidden="true"
+          >
+            <Bot class="desktop-ai-placeholder-icon" :size="32" :stroke-width="2.15" />
+            <span v-if="live2dRequested && !live2dReady" class="live2d-loading-ring"></span>
+          </span>
+          <Live2DCharacter
+            v-if="shouldRenderLive2d"
+            ref="live2dRef"
+            class="live2d-character-layer"
+            :motion="currentMotion"
+            :width="charWidth"
+            :height="charHeight"
+            @ready="onLive2dReady"
+          />
+        </template>
         <span v-else class="mobile-ai-icon" aria-hidden="true">
           <Bot :size="26" :stroke-width="2.2" />
         </span>
@@ -251,6 +369,65 @@ function onCharacterLeave() {
 
 .live2d-char-btn:hover {
   filter: drop-shadow(0 4px 12px rgba(245, 158, 11, 0.3));
+}
+
+.live2d-character-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+.desktop-ai-placeholder {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  color: #0f766e;
+  border: 1px solid rgba(15, 118, 110, 0.14);
+  border-radius: 46% 46% 50% 50%;
+  background:
+    radial-gradient(circle at 42% 30%, rgba(255, 247, 237, 0.96), rgba(240, 253, 250, 0.78) 56%, rgba(250, 204, 21, 0.16)),
+    linear-gradient(135deg, rgba(15, 118, 110, 0.1), rgba(217, 119, 6, 0.16));
+  box-shadow: inset 0 -12px 24px rgba(15, 118, 110, 0.08);
+  opacity: 1;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.desktop-ai-placeholder-hidden {
+  opacity: 0;
+}
+
+.desktop-ai-placeholder-icon {
+  position: relative;
+  z-index: 1;
+  filter: drop-shadow(0 3px 5px rgba(15, 118, 110, 0.18));
+}
+
+.live2d-loading-ring {
+  position: absolute;
+  width: 48px;
+  height: 48px;
+  border: 2px solid rgba(15, 118, 110, 0.18);
+  border-top-color: #d97706;
+  border-radius: 9999px;
+  animation: live2d-loading-spin 0.9s linear infinite;
+}
+
+.char-state-completed .desktop-ai-placeholder:not(.desktop-ai-placeholder-hidden) {
+  animation: placeholder-bounce 1.2s ease-in-out infinite;
+}
+
+@keyframes live2d-loading-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes placeholder-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
 }
 
 .mobile-lite-btn {

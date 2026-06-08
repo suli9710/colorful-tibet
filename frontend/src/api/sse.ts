@@ -7,6 +7,8 @@ export interface JsonSseMessage<T = unknown> {
 export interface ReadJsonSseOptions<T = unknown> {
   onMessage: (message: JsonSseMessage<T>) => boolean | void | Promise<boolean | void>
   onMalformedMessage?: (rawData: string, error: unknown) => void
+  maxBufferBytes?: number
+  maxFrameBytes?: number
 }
 
 export interface ReadJsonSseResult {
@@ -18,6 +20,18 @@ export interface ReadJsonSseResult {
 interface SseFrame {
   event?: string
   data: string
+}
+
+export const DEFAULT_SSE_MAX_BUFFER_BYTES = 1024 * 1024
+export const DEFAULT_SSE_MAX_FRAME_BYTES = 512 * 1024
+
+const textEncoder = new TextEncoder()
+
+export class SseStreamSizeError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'SseStreamSizeError'
+  }
 }
 
 export function isAbortError(error: unknown): boolean {
@@ -46,12 +60,28 @@ export async function readJsonSseStream<T = unknown>(
 
   const reader = response.body.getReader()
   const decoder = new TextDecoder()
+  const maxBufferBytes = normalizeByteLimit(options.maxBufferBytes, DEFAULT_SSE_MAX_BUFFER_BYTES)
+  const maxFrameBytes = normalizeByteLimit(options.maxFrameBytes, DEFAULT_SSE_MAX_FRAME_BYTES)
   let buffer = ''
   let stopped = false
   let eventCount = 0
   let malformedEventCount = 0
 
+  const byteLength = (value: string) => textEncoder.encode(value).byteLength
+  const assertBufferSize = () => {
+    if (byteLength(buffer) > maxBufferBytes) {
+      throw new SseStreamSizeError('SSE stream exceeded the safe buffer size limit.')
+    }
+  }
+  const assertFrameSize = (frameText: string) => {
+    if (byteLength(frameText) > maxFrameBytes) {
+      throw new SseStreamSizeError('SSE stream exceeded the safe frame size limit.')
+    }
+  }
+
   const processFrame = async (frameText: string) => {
+    assertFrameSize(frameText)
+
     const frame = parseSseFrame(frameText)
     if (!frame) return
 
@@ -84,20 +114,26 @@ export async function readJsonSseStream<T = unknown>(
       if (done) break
 
       buffer += decoder.decode(value, { stream: true })
+      assertBufferSize()
 
       let boundary = findFrameBoundary(buffer)
       while (boundary && !stopped) {
         const frameText = buffer.slice(0, boundary.index)
         buffer = buffer.slice(boundary.index + boundary.length)
         await processFrame(frameText)
+        assertBufferSize()
         boundary = findFrameBoundary(buffer)
       }
     }
 
     buffer += decoder.decode()
+    assertBufferSize()
     if (!stopped && buffer.trim()) {
       await processFrame(buffer)
     }
+  } catch (error) {
+    await reader.cancel(error).catch(() => undefined)
+    throw error
   } finally {
     reader.releaseLock()
   }
@@ -107,6 +143,10 @@ export async function readJsonSseStream<T = unknown>(
     eventCount,
     malformedEventCount
   }
+}
+
+function normalizeByteLimit(value: number | undefined, fallback: number): number {
+  return Number.isFinite(value) && Number(value) > 0 ? Math.floor(Number(value)) : fallback
 }
 
 function findFrameBoundary(buffer: string): { index: number; length: number } | null {

@@ -1,8 +1,15 @@
 <template>
   <div class="mt-8 overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
     <div
-      class="flex cursor-pointer flex-col gap-3 border-b border-stone-100 bg-gradient-to-r from-stone-50 to-white px-4 py-4 transition-colors hover:bg-stone-100/50 lg:flex-row lg:items-center lg:justify-between sm:px-6"
-      @click="showHeritage = !showHeritage"
+      class="flex cursor-pointer flex-col gap-3 border-b border-stone-100 bg-gradient-to-r from-stone-50 to-white px-4 py-4 transition-colors hover:bg-stone-100/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 lg:flex-row lg:items-center lg:justify-between sm:px-6"
+      role="button"
+      tabindex="0"
+      :aria-expanded="showHeritage"
+      aria-controls="admin-heritage-panel-content"
+      :aria-label="text('admin.heritageManagement', '闈為仐绠＄悊')"
+      @click="toggleHeritagePanel"
+      @keydown.enter="toggleHeritagePanelFromKeyboard"
+      @keydown.space="toggleHeritagePanelFromKeyboard"
     >
       <div class="flex min-w-0 items-center gap-3">
         <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-rose-100">
@@ -47,7 +54,7 @@
       <p>{{ text('admin.loadingHeritage', '正在加载非遗项目') }}</p>
     </div>
 
-    <div v-else-if="showHeritage" class="divide-y divide-stone-200">
+    <div v-else-if="showHeritage" id="admin-heritage-panel-content" class="divide-y divide-stone-200">
       <div v-for="item in filteredItems" :key="item.id" class="px-4 py-4 transition-colors hover:bg-stone-50 sm:px-6">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start">
           <div class="h-36 w-full flex-shrink-0 overflow-hidden rounded-lg bg-stone-100 lg:h-24 lg:w-28">
@@ -326,13 +333,15 @@ type EventForm = {
   contactInfo: string
 }
 
+type AdminListResponse<T> = T[] | { content?: T[] | null } | null | undefined
+
 const { t, te } = useI18n()
 const { showConfirm } = useConfirm()
 const { showToast } = useToast()
 
 const text = (key: string, fallback: string) => te(key) ? t(key) : fallback
 const adminPageParams = { page: 0, size: 100 }
-const toList = (value: any) => {
+const toList = <T>(value: AdminListResponse<T>): T[] => {
   if (Array.isArray(value)) return value
   if (Array.isArray(value?.content)) return value.content
   return []
@@ -417,11 +426,21 @@ const filteredItems = computed(() => {
   ].some(value => String(value || '').toLowerCase().includes(kw)))
 })
 
+const toggleHeritagePanel = () => {
+  showHeritage.value = !showHeritage.value
+}
+
+const toggleHeritagePanelFromKeyboard = (event: KeyboardEvent) => {
+  if (event.target !== event.currentTarget) return
+  event.preventDefault()
+  toggleHeritagePanel()
+}
+
 const fetchItems = async () => {
   loading.value = true
   try {
-    const response = await api.get(endpoints.adminHeritage.list, { params: adminPageParams })
-    items.value = toList(response.data)
+    const response = await api.get<AdminListResponse<HeritageItem>>(endpoints.adminHeritage.list, { params: adminPageParams })
+    items.value = toList<HeritageItem>(response.data)
   } catch (error) {
     console.error('Failed to fetch heritage items:', summarizeClientError(error))
     items.value = []

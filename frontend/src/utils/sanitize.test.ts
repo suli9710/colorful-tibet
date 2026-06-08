@@ -80,22 +80,43 @@ Day 1: Lhasa
     expect(clean).not.toContain('<p rel=')
   })
 
-  it('keeps image sources to fetchable web or relative URLs', () => {
+  it('keeps image sources to local, same-origin, or safe inline URLs', () => {
+    const sameOriginImage = `${window.location.origin}/uploads/comment/potala.jpg`
+    const pngData = 'data:image/png;base64,iVBORw0KGgo='
     const clean = sanitizeHtml(`
       <img src="https://images.example/potala.jpg" alt="remote">
+      <img src="${sameOriginImage}" alt="same origin">
+      <img src="/uploads/comment/potala.jpg" alt="upload">
       <img src="../images/potala.jpg" alt="relative">
+      <img src="${pngData}" alt="inline png">
       <img src="mailto:security@example.com" alt="mail">
       <img src="tel:+123456789" alt="phone">
       <img src="#preview" alt="fragment">
       <img src="?preview=1" alt="query">
     `)
 
-    expect(clean).toMatch(/<img[^>]+src="https:\/\/images\.example\/potala\.jpg"[^>]*>/)
+    expect(clean).not.toContain('images.example')
+    expect(clean).not.toContain('alt="remote"')
+    expect(clean).toContain(`src="${sameOriginImage}"`)
+    expect(clean).toMatch(/<img[^>]+src="\/uploads\/comment\/potala\.jpg"[^>]*>/)
     expect(clean).toMatch(/<img[^>]+src="\.\.\/images\/potala\.jpg"[^>]*>/)
+    expect(clean).toContain(`src="${pngData}"`)
     expect(clean).not.toContain('src="mailto:')
     expect(clean).not.toContain('src="tel:')
     expect(clean).not.toContain('src="#preview"')
     expect(clean).not.toContain('src="?preview=1"')
+  })
+
+  it('removes remote Markdown images while preserving local upload Markdown images', () => {
+    const clean = renderMarkdownToSafeHtml(`
+![remote tracker](https://tracker.example/pixel.png)
+![local upload](/uploads/routes/day-1.jpg)
+`)
+
+    expect(clean).not.toContain('tracker.example')
+    expect(clean).not.toContain('remote tracker')
+    expect(clean).toMatch(/<img[^>]+src="\/uploads\/routes\/day-1\.jpg"[^>]*>/)
+    expect(clean).toMatch(/<img[^>]+alt="local upload"[^>]*>/)
   })
 
   it('forbids dangerous rich embed tags and encoded unsafe protocols', () => {

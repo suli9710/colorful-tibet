@@ -19,6 +19,8 @@ let mapLoaded = false
 let resizeObserver: ResizeObserver | null = null
 type EChartsKit = ReturnType<typeof import('@/lib/echartsHeatMap').ensureHeatMapECharts>
 let echartsLoader: Promise<EChartsKit> | null = null
+const LOCAL_TIBET_GEO_JSON_URL = '/geo/540000_full.json'
+const DEFAULT_REMOTE_TIBET_GEO_JSON_URL = 'https://geo.datav.aliyun.com/areas_v3/bound/540000_full.json'
 
 const loadECharts = async () => {
   if (!echartsLoader) {
@@ -120,11 +122,28 @@ const handleChartClick = (params: any) => {
   goToSpot(params.data?.id)
 }
 
+const isTruthyEnvValue = (value: string | undefined): boolean =>
+  ['1', 'true', 'yes', 'on'].includes(String(value || '').trim().toLowerCase())
+
+const isRemoteGeoFallbackEnabled = (): boolean =>
+  isTruthyEnvValue(import.meta.env.VITE_HEATMAP_REMOTE_GEO_FALLBACK_ENABLED)
+
+const getRemoteGeoFallbackUrl = (): string =>
+  String(import.meta.env.VITE_HEATMAP_REMOTE_GEO_FALLBACK_URL || DEFAULT_REMOTE_TIBET_GEO_JSON_URL).trim()
+
 const loadTibetMapJson = async () => {
-  const localResponse = await fetch('/geo/540000_full.json')
+  const localResponse = await fetch(LOCAL_TIBET_GEO_JSON_URL)
   if (localResponse.ok) return localResponse.json()
 
-  const remoteResponse = await fetch('https://geo.datav.aliyun.com/areas_v3/bound/540000_full.json')
+  if (!isRemoteGeoFallbackEnabled()) {
+    console.warn('Local Tibet map data unavailable; remote geo JSON fallback is disabled.')
+    return null
+  }
+
+  const remoteGeoFallbackUrl = getRemoteGeoFallbackUrl()
+  if (!remoteGeoFallbackUrl) return null
+
+  const remoteResponse = await fetch(remoteGeoFallbackUrl)
   if (remoteResponse.ok) return remoteResponse.json()
 
   return null

@@ -177,7 +177,7 @@ import { ref, onMounted, computed } from 'vue'
 import { AnimatePresence, motion } from 'motion-v'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import api from '../api'
+import api, { endpoints } from '../api'
 import MotionBlock from '../components/motion/MotionBlock.vue'
 import { motionEase } from '../motion/presets'
 import { useAuthGuard } from '../composables/useAuthGuard'
@@ -217,7 +217,7 @@ const submitRoute = async () => {
 
   submitting.value = true
   try {
-    await api.post('/routes/share', {
+    await api.post(endpoints.routes.share, {
       title: form.value.title,
       content: form.value.content,
       days: form.value.days,

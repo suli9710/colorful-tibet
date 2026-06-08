@@ -13,6 +13,8 @@ rule_files:
 
 scrape_configs:
   - job_name: colorful-tibet-backend
+    # docker-compose.prod.yml defaults PUBLIC_METRICS_ENABLED=true so this
+    # internal scrape can read /actuator/prometheus without an ADMIN JWT.
     metrics_path: /actuator/prometheus
     static_configs:
       - targets:

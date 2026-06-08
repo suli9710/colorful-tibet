@@ -148,7 +148,7 @@ import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { motion, useReducedMotion } from 'motion-v'
-import api, { clearTokenCache } from '../api'
+import api, { clearTokenCache, endpoints } from '../api'
 import { useAuthStore } from '../stores/auth'
 import { safeClientErrorMessage, summarizeClientError } from '../utils/errorMonitoring'
 import { getRecaptchaToken, isRecaptchaError, isRecaptchaV3Enabled } from '../utils/recaptcha'
@@ -254,7 +254,7 @@ const handleLogin = async () => {
       ...(requiresSecondaryPassword.value ? { secondaryPassword: form.value.secondaryPassword } : {})
     }
     const recaptchaToken = isRecaptchaV3Enabled() ? await getRecaptchaToken('login') : ''
-    const { data: user } = await api.post('/auth/login', payload, {
+    const { data: user } = await api.post(endpoints.auth.login, payload, {
       headers: recaptchaToken ? { 'X-Recaptcha-Token': recaptchaToken } : {}
     })
 

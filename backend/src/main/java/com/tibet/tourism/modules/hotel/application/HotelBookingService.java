@@ -148,10 +148,16 @@ public class HotelBookingService {
         if (!StringUtils.hasText(status)) {
             throw new IllegalArgumentException("Invalid status");
         }
+        HotelBooking.Status previousStatus =
+                booking.getStatus() == null ? HotelBooking.Status.PENDING : booking.getStatus();
         transitionStatus(booking, HotelBooking.Status.valueOf(status.trim().toUpperCase()));
         HotelBooking saved = hotelBookingRepository.save(booking);
         if (saved.getStatus() == HotelBooking.Status.CONFIRMED) {
             orderCenterService.createFromLegacyHotelBooking(saved);
+        } else if (previousStatus != HotelBooking.Status.CANCELLED
+                && saved.getStatus() == HotelBooking.Status.CANCELLED) {
+            orderCenterService.cancelLegacyMirror(user, "LEGACY_HOTEL_BOOKING", saved.getId(),
+                    "Admin cancelled hotel booking");
         }
         return saved;
     }
@@ -182,11 +188,16 @@ public class HotelBookingService {
         if (!isAdmin && booking.getStatus() != HotelBooking.Status.CANCELLED) {
             throw new IllegalStateException("仅已取消酒店预订可以删除");
         }
-        if (isAdmin && booking.getStatus() != HotelBooking.Status.CANCELLED) {
+        boolean shouldCancelMirror = isAdmin && booking.getStatus() != HotelBooking.Status.CANCELLED;
+        if (shouldCancelMirror) {
             transitionStatus(booking, HotelBooking.Status.CANCELLED);
         }
         booking.setDeletedAt(LocalDateTime.now());
         hotelBookingRepository.save(booking);
+        if (shouldCancelMirror) {
+            orderCenterService.cancelLegacyMirror(user, "LEGACY_HOTEL_BOOKING", booking.getId(),
+                    "Admin deleted active hotel booking");
+        }
     }
 
     private HotelBooking findBookingForMutation(User user, Long id) {
