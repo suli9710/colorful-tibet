@@ -1,9 +1,11 @@
 package com.tibet.tourism.modules.community.web;
+import com.tibet.tourism.common.api.PageResponse;
 import com.tibet.tourism.common.error.AuthenticationRequiredException;
 import com.tibet.tourism.common.error.BusinessException;
 import com.tibet.tourism.common.error.ResourceNotFoundException;
 import com.tibet.tourism.common.error.UnauthorizedActionException;
 import com.tibet.tourism.common.security.JwtAuthSupport;
+import com.tibet.tourism.common.security.SensitiveLogSanitizer;
 import com.tibet.tourism.common.validation.InputSanitizer;
 import com.tibet.tourism.modules.community.application.TravelQAService;
 import com.tibet.tourism.modules.community.domain.TravelAnswer;
@@ -33,6 +35,10 @@ import org.springframework.web.bind.annotation.*;
 public class TravelQAController {
 
     private static final Logger logger = LoggerFactory.getLogger(TravelQAController.class);
+    private static final String ERROR_AUTHENTICATION_REQUIRED = "Authentication required";
+    private static final String ERROR_PERMISSION_DENIED = "Permission denied";
+    private static final String ERROR_NOT_FOUND = "Resource not found";
+    private static final String ERROR_INVALID_REQUEST = "Invalid request";
 
     @Autowired
     private TravelQAService qaService;
@@ -50,19 +56,28 @@ public class TravelQAController {
         }
     }
 
+    private Long getOptionalCurrentUserId(HttpServletRequest request) {
+        try {
+            Optional<User> currentUser = jwtAuthSupport.resolveOptionalCurrentUser(request);
+            return currentUser == null ? null : currentUser.map(User::getId).orElse(null);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     private ResponseEntity<Map<String, String>> safeBadRequest(Exception e) {
-        logger.warn("Community question request failed: {}", e.getMessage());
+        logger.warn("Community question request failed: {}", SensitiveLogSanitizer.exceptionSummary(e));
         if (e instanceof AuthenticationRequiredException) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", e.getMessage()));
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", ERROR_AUTHENTICATION_REQUIRED));
         }
         if (e instanceof UnauthorizedActionException || e instanceof SecurityException) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", e.getMessage()));
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", ERROR_PERMISSION_DENIED));
         }
         if (e instanceof ResourceNotFoundException) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", ERROR_NOT_FOUND));
         }
         if (e instanceof BusinessException || e instanceof IllegalArgumentException) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.badRequest().body(Map.of("error", ERROR_INVALID_REQUEST));
         }
         return ResponseEntity.badRequest().body(Map.of("error", "请求处理失败，请检查输入后重试"));
     }
@@ -72,13 +87,14 @@ public class TravelQAController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<?> askQuestion(@RequestBody Map<String, String> payload, HttpServletRequest request) {
         try {
+            long userId = getCurrentUserId(request);
             TravelQuestion question = qaService.askQuestion(
-                    getCurrentUserId(request),
+                    userId,
                     payload.get("title"),
                     payload.get("content"),
                     payload.get("tags")
             );
-            return ResponseEntity.ok(TravelQuestionResponse.fromEntity(question));
+            return ResponseEntity.ok(TravelQuestionResponse.fromEntity(question, userId));
         } catch (Exception e) {
             return safeBadRequest(e);
         }
@@ -91,7 +107,8 @@ public class TravelQAController {
             @RequestParam(required = false, defaultValue = "latest") String sort,
             @RequestParam(required = false) String status,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
+            @RequestParam(defaultValue = "10") int size,
+            HttpServletRequest request) {
 
         Sort sorting;
         if ("hot".equals(sort)) {
@@ -106,17 +123,18 @@ public class TravelQAController {
                 InputSanitizer.normalizePage(page),
                 InputSanitizer.normalizePageSize(size, 10, 50),
                 sorting);
+        Long currentUserId = getOptionalCurrentUserId(request);
         Page<TravelQuestionResponse> questions = qaService.getQuestions(tag, sort, status, pageable)
-                .map(TravelQuestionResponse::fromEntity);
-        return ResponseEntity.ok(questions);
+                .map(question -> TravelQuestionResponse.fromEntity(question, currentUserId));
+        return ResponseEntity.ok(PageResponse.from(questions));
     }
 
     // 问题详情
     @GetMapping("/{id}")
-    public ResponseEntity<?> getQuestion(@PathVariable Long id) {
+    public ResponseEntity<?> getQuestion(@PathVariable Long id, HttpServletRequest request) {
         try {
             TravelQuestion question = qaService.getQuestion(id);
-            return ResponseEntity.ok(TravelQuestionResponse.fromEntity(question));
+            return ResponseEntity.ok(TravelQuestionResponse.fromEntity(question, getOptionalCurrentUserId(request)));
         } catch (Exception e) {
             return ResponseEntity.notFound().build();
         }
@@ -139,12 +157,13 @@ public class TravelQAController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<?> answerQuestion(@PathVariable Long id, @RequestBody Map<String, String> payload, HttpServletRequest request) {
         try {
+            long userId = getCurrentUserId(request);
             TravelAnswer answer = qaService.answerQuestion(
                     id,
-                    getCurrentUserId(request),
+                    userId,
                     payload.get("content")
             );
-            return ResponseEntity.ok(TravelAnswerResponse.fromEntity(answer));
+            return ResponseEntity.ok(TravelAnswerResponse.fromEntity(answer, userId));
         } catch (Exception e) {
             return safeBadRequest(e);
         }
@@ -152,10 +171,11 @@ public class TravelQAController {
 
     // 获取回答列表
     @GetMapping("/{id}/answers")
-    public ResponseEntity<?> getAnswers(@PathVariable Long id) {
+    public ResponseEntity<?> getAnswers(@PathVariable Long id, HttpServletRequest request) {
         try {
+            Long currentUserId = getOptionalCurrentUserId(request);
             List<TravelAnswerResponse> answers = qaService.getAnswers(id).stream()
-                    .map(TravelAnswerResponse::fromEntity)
+                    .map(answer -> TravelAnswerResponse.fromEntity(answer, currentUserId))
                     .toList();
             return ResponseEntity.ok(answers);
         } catch (Exception e) {
@@ -168,8 +188,9 @@ public class TravelQAController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<?> acceptAnswer(@PathVariable Long questionId, @PathVariable Long answerId, HttpServletRequest request) {
         try {
-            TravelAnswer answer = qaService.acceptAnswer(questionId, answerId, getCurrentUserId(request));
-            return ResponseEntity.ok(TravelAnswerResponse.fromEntity(answer));
+            long userId = getCurrentUserId(request);
+            TravelAnswer answer = qaService.acceptAnswer(questionId, answerId, userId);
+            return ResponseEntity.ok(TravelAnswerResponse.fromEntity(answer, userId));
         } catch (Exception e) {
             return safeBadRequest(e);
         }

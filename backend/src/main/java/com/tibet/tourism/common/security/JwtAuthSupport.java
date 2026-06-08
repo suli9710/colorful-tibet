@@ -2,13 +2,17 @@ package com.tibet.tourism.common.security;
 import com.tibet.tourism.modules.user.domain.User;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Optional;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.util.WebUtils;
 
 @Component
 public class JwtAuthSupport {
+
+    private static final Logger logger = LoggerFactory.getLogger(JwtAuthSupport.class);
+    private static final String INVALID_TOKEN_ERROR = "Invalid or expired JWT token";
 
     private final JwtUtils jwtUtils;
     private final TokenRevocationService tokenRevocationService;
@@ -28,14 +32,17 @@ public class JwtAuthSupport {
         if (!StringUtils.hasText(token)) {
             throw new IllegalStateException("Missing JWT token");
         }
-        if (!jwtUtils.validateJwtToken(token)) {
-            throw new IllegalStateException("Invalid or expired JWT token");
+        if (!isUsableToken(token)) {
+            throw new IllegalStateException(INVALID_TOKEN_ERROR);
         }
-        if (tokenRevocationService.isRevoked(token)) {
-            throw new IllegalStateException("Revoked JWT token");
+        try {
+            return userSessionVersionService.resolveCurrentUser(token)
+                    .orElseThrow(() -> new IllegalStateException(INVALID_TOKEN_ERROR));
+        } catch (RuntimeException exception) {
+            logger.warn("Current user session lookup failed: {}",
+                    SensitiveLogSanitizer.exceptionSummary(exception));
+            throw new IllegalStateException(INVALID_TOKEN_ERROR);
         }
-        return userSessionVersionService.resolveCurrentUser(token)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found or session is stale"));
     }
 
     public Long resolveCurrentUserId(HttpServletRequest request) {
@@ -47,13 +54,25 @@ public class JwtAuthSupport {
         if (!StringUtils.hasText(token)) {
             return Optional.empty();
         }
-        if (!jwtUtils.validateJwtToken(token)) {
+        if (!isUsableToken(token)) {
             return Optional.empty();
         }
-        if (tokenRevocationService.isRevoked(token)) {
+        try {
+            return userSessionVersionService.resolveCurrentUser(token);
+        } catch (RuntimeException exception) {
+            logger.warn("Optional current user session lookup failed: {}",
+                    SensitiveLogSanitizer.exceptionSummary(exception));
             return Optional.empty();
         }
-        return userSessionVersionService.resolveCurrentUser(token);
+    }
+
+    private boolean isUsableToken(String token) {
+        try {
+            return jwtUtils.validateJwtToken(token) && !tokenRevocationService.isRevoked(token);
+        } catch (RuntimeException exception) {
+            logger.warn("JWT usability check failed: {}", SensitiveLogSanitizer.exceptionSummary(exception));
+            return false;
+        }
     }
 
     public String resolveToken(HttpServletRequest request) {

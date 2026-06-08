@@ -1,0 +1,54 @@
+import { describe, expect, it } from 'vitest'
+import routeCommunitySource from './RouteCommunity.vue?raw'
+
+describe('community list UX and accessibility guardrails', () => {
+  it('keeps the route/community switch exposed as real tabs', () => {
+    expect(routeCommunitySource).toContain('role="tablist"')
+    expect(routeCommunitySource.match(/role="tab"/g)?.length).toBe(2)
+    expect(routeCommunitySource).toContain(':aria-selected="activeTab === \'routes\'"')
+    expect(routeCommunitySource).toContain(':aria-selected="activeTab === \'qa\'"')
+    expect(routeCommunitySource).toContain('aria-controls="community-panel-routes"')
+    expect(routeCommunitySource).toContain('aria-controls="community-panel-qa"')
+    expect(routeCommunitySource.match(/role="tabpanel"/g)?.length).toBe(2)
+    expect(routeCommunitySource).toContain('aria-labelledby="community-tab-routes"')
+    expect(routeCommunitySource).toContain('aria-labelledby="community-tab-qa"')
+  })
+
+  it('keeps filters, paging, and creation actions labelled or titled', () => {
+    expect(routeCommunitySource).toContain(':aria-label="t(\'community.allDays\')"')
+    expect(routeCommunitySource).toContain(':aria-label="t(\'community.allBudget\')"')
+    expect(routeCommunitySource).toContain(':aria-label="t(\'community.allPreference\')"')
+    expect(routeCommunitySource).toContain(':aria-label="t(\'community.allTags\')"')
+    expect(routeCommunitySource).toContain(':aria-label="qaSortControlLabel"')
+    expect(routeCommunitySource).toContain(':aria-label="t(\'community.createMyRoute\')"')
+    expect(routeCommunitySource).toContain(':aria-label="t(\'community.askQuestion\')"')
+    expect(routeCommunitySource).toContain(':aria-label="routePreviousPageLabel"')
+    expect(routeCommunitySource).toContain(':aria-label="routeNextPageLabel"')
+    expect(routeCommunitySource).toContain(':aria-label="qaPreviousPageLabel"')
+    expect(routeCommunitySource).toContain(':aria-label="qaNextPageLabel"')
+    expect(routeCommunitySource).toContain('role="navigation"')
+    expect(routeCommunitySource).toContain('role="status"')
+    expect(routeCommunitySource).toContain('aria-live="polite"')
+  })
+
+  it('keeps clickable cards reachable and actionable from the keyboard', () => {
+    expect(routeCommunitySource.match(/role="button"/g)?.length).toBeGreaterThanOrEqual(2)
+    expect(routeCommunitySource.match(/tabindex="0"/g)?.length).toBeGreaterThanOrEqual(2)
+    expect(routeCommunitySource).toContain(':aria-label="getRouteCardLabel(route)"')
+    expect(routeCommunitySource).toContain(':aria-label="getQuestionCardLabel(q)"')
+    expect(routeCommunitySource).toContain('@keydown.enter.prevent="viewRoute(route.id)"')
+    expect(routeCommunitySource).toContain('@keydown.space.prevent="viewRoute(route.id)"')
+    expect(routeCommunitySource).toContain('@keydown.enter.prevent="viewQuestion(q.id)"')
+    expect(routeCommunitySource).toContain('@keydown.space.prevent="viewQuestion(q.id)"')
+  })
+
+  it('keeps compact card and control text from being squeezed', () => {
+    expect(routeCommunitySource).toContain('line-clamp-2 min-w-0 flex-1 break-words')
+    expect(routeCommunitySource).toContain('line-clamp-2 min-w-0 break-words')
+    expect(routeCommunitySource).toContain('max-w-full px-3 py-1.5 bg-gray-100 rounded-lg break-words')
+    expect(routeCommunitySource).toContain('flex min-w-0 flex-wrap')
+    expect(routeCommunitySource).toContain('whitespace-normal break-words')
+    expect(routeCommunitySource).toContain('min-h-11')
+    expect(routeCommunitySource).not.toContain('line-clamp-1')
+  })
+})

@@ -3,8 +3,9 @@ import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useReducedMotion } from 'motion-v'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
-import type { ECharts } from '@/lib/echarts'
+import type { ECharts } from '@/lib/echartsHeatMap'
 import api, { endpoints } from '@/api'
+import { summarizeClientError } from '@/utils/errorMonitoring'
 
 const { locale, t } = useI18n()
 const router = useRouter()
@@ -16,12 +17,12 @@ let chart: ECharts | null = null
 const zoomLevel = ref(1.0)
 let mapLoaded = false
 let resizeObserver: ResizeObserver | null = null
-type EChartsKit = ReturnType<typeof import('@/lib/echarts').ensureECharts>
+type EChartsKit = ReturnType<typeof import('@/lib/echartsHeatMap').ensureHeatMapECharts>
 let echartsLoader: Promise<EChartsKit> | null = null
 
 const loadECharts = async () => {
   if (!echartsLoader) {
-    echartsLoader = import('@/lib/echarts').then(module => module.ensureECharts())
+    echartsLoader = import('@/lib/echartsHeatMap').then(module => module.ensureHeatMapECharts())
   }
 
   return echartsLoader
@@ -96,7 +97,7 @@ const getHeatmapData = async (): Promise<HeatmapChartPoint[]> => {
     if (data.length) return data
     console.warn('Using fallback heatmap data because the heatmap response was empty.')
   } catch (error) {
-    console.warn('Using fallback heatmap data after request failed:', error)
+    console.warn('Using fallback heatmap data after request failed:', summarizeClientError(error))
   }
 
   return fallbackHeatmapData
@@ -308,14 +309,14 @@ onMounted(async () => {
           mapLoaded = true
         }
       } catch (e) {
-        console.warn('Failed to load Tibet map data, falling back to simple scatter plot', e)
+        console.warn('Failed to load Tibet map data, falling back to simple scatter plot', summarizeClientError(e))
       }
 
       await loadChartData()
     }
   } catch (error) {
     chartError.value = true
-    console.warn('Failed to initialize heatmap chart:', error)
+    console.warn('Failed to initialize heatmap chart:', summarizeClientError(error))
   }
 
   if (chartRef.value && typeof ResizeObserver !== 'undefined') {

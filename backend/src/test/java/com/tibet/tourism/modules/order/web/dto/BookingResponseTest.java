@@ -42,8 +42,12 @@ class BookingResponseTest {
                 .registerModule(new JavaTimeModule())
                 .writeValueAsString(BookingResponse.fromEntity(booking));
 
-        assertThat(json).contains("traveler", "Tibet Guest", "Potala Palace");
+        assertThat(json).contains("Potala Palace");
         assertThat(json)
+                .doesNotContain("user")
+                .doesNotContain("username")
+                .doesNotContain("traveler")
+                .doesNotContain("Tibet Guest")
                 .doesNotContain("phone")
                 .doesNotContain("18800001111")
                 .doesNotContain("ipAddress")

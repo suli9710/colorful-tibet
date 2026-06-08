@@ -55,11 +55,42 @@ export interface HeritageCommentItem {
   content: string
   imageUrl?: string
   rating?: number
-  userId: number
-  username: string
+  owner?: boolean
   nickname?: string
   avatar?: string
   createdAt: string
+}
+
+export interface ScenicSpotCommentItem {
+  id: number
+  content: string
+  imageUrl?: string
+  rating?: number
+  owner?: boolean
+  nickname?: string
+  avatar?: string
+  createdAt: string
+  liked?: boolean
+  likeCount?: number
+  user?: {
+    nickname?: string
+  } | null
+}
+
+export type AdminUserRole = 'ADMIN' | 'USER'
+
+export interface AdminUserSummary {
+  id: number
+  username: string
+  nickname?: string | null
+  role: AdminUserRole
+  createdAt?: string | null
+  locked: boolean
+  lockRemainingSeconds: number
+  failureCount: number
+  protectedAccount: boolean
+  deletable: boolean
+  roleMutable: boolean
 }
 
 export interface HeritageInheritorItem {

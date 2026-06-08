@@ -10,12 +10,16 @@ public record RouteCommentResponse(
         LocalDateTime createdAt
 ) {
     public static RouteCommentResponse fromEntity(RouteComment comment) {
+        return fromEntity(comment, null);
+    }
+
+    public static RouteCommentResponse fromEntity(RouteComment comment, Long currentUserId) {
         if (comment == null) {
             return null;
         }
         return new RouteCommentResponse(
                 comment.getId(),
-                PublicUserResponse.fromEntity(comment.getUser()),
+                PublicUserResponse.fromEntity(comment.getUser(), currentUserId),
                 comment.getContent(),
                 comment.getCreatedAt());
     }

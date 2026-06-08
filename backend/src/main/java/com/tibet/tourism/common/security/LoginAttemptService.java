@@ -19,6 +19,7 @@ public class LoginAttemptService {
 
     private static final Logger logger = LoggerFactory.getLogger(LoginAttemptService.class);
     private static final String REDIS_PREFIX = "brute-force:";
+    private static final String ACCOUNT_SCOPE = "acct:";
     private static final String PAIR_SCOPE = "pair:";
     private static final String IP_SCOPE = "ip:";
     private static final String NETWORK_SCOPE = "network:";
@@ -149,13 +150,13 @@ public class LoginAttemptService {
         boolean stepUpRequired = accountRecord.failures >= safeThreshold(accountStepUpAt);
 
         if (blocked != null) {
-            logger.warn("Login throttled: username={}, reason={}, accountFailures={}, retryAfterSeconds={}",
-                    username, blocked.reason(), accountRecord.failures, blocked.retryAfterSeconds());
+            logger.warn("Login throttled: user={}, reason={}, accountFailures={}, retryAfterSeconds={}",
+                    userLabel(username), blocked.reason(), accountRecord.failures, blocked.retryAfterSeconds());
             return blocked.withAccountState(stepUpRequired, accountRecord.failures);
         }
         if (stepUpRequired) {
-            logger.warn("Login account step-up required: username={}, accountFailures={}",
-                    username, accountRecord.failures);
+            logger.warn("Login account step-up required: user={}, accountFailures={}",
+                    userLabel(username), accountRecord.failures);
         }
         return LoginAttemptDecision.allowed(stepUpRequired, accountRecord.failures);
     }
@@ -236,9 +237,10 @@ public class LoginAttemptService {
                 if (redisRecord != null) {
                     return mergeMaxFailures(redisRecord, memory.get(key));
                 }
-                logger.debug("Ignoring unreadable brute-force Redis payload for key={}", key);
+                logger.debug("Ignoring unreadable brute-force Redis payload for keyHash={}", shortHash(key));
             } catch (Exception e) {
-                logger.debug("Redis unavailable for brute-force check; falling back to in-memory: {}", e.getMessage());
+                logger.debug("Redis unavailable for brute-force check; falling back to in-memory: {}",
+                        SensitiveLogSanitizer.exceptionSummary(e));
             }
         }
         return memory.get(key);
@@ -252,7 +254,9 @@ public class LoginAttemptService {
                     return fromRedisValue(value);
                 }
             } catch (Exception e) {
-                logger.debug("Redis read failed for brute-force key={}: {}", key, e.getMessage());
+                logger.debug("Redis read failed for brute-force keyHash={}: {}",
+                        shortHash(key),
+                        SensitiveLogSanitizer.exceptionSummary(e));
             }
         }
         return null;
@@ -263,7 +267,7 @@ public class LoginAttemptService {
             try {
                 redisTemplate.opsForValue().set(REDIS_PREFIX + key, record.toRedisValue(), MAX_LOCK_SECONDS, TimeUnit.SECONDS);
             } catch (Exception e) {
-                logger.debug("Redis unavailable for brute-force save: {}", e.getMessage());
+                logger.debug("Redis unavailable for brute-force save: {}", SensitiveLogSanitizer.exceptionSummary(e));
             }
         }
     }
@@ -280,7 +284,7 @@ public class LoginAttemptService {
             try {
                 redisTemplate.delete(REDIS_PREFIX + key);
             } catch (Exception e) {
-                logger.debug("Redis unavailable for brute-force delete: {}", e.getMessage());
+                logger.debug("Redis unavailable for brute-force delete: {}", SensitiveLogSanitizer.exceptionSummary(e));
             }
         }
         memory.remove(key);
@@ -293,7 +297,7 @@ public class LoginAttemptService {
     }
 
     private String accountKey(String username) {
-        return username.trim().toLowerCase();
+        return ACCOUNT_SCOPE + shortHash(normalizeUsername(username));
     }
 
     private String pairKey(String username, String clientIp) {
@@ -302,6 +306,14 @@ public class LoginAttemptService {
 
     private String pairKeyFromAccountKey(String accountKey, String clientIp) {
         return PAIR_SCOPE + accountKey + ":" + shortHash(normalizeClientIp(clientIp));
+    }
+
+    private String userLabel(String username) {
+        return "user#" + shortHash(normalizeUsername(username));
+    }
+
+    private String normalizeUsername(String username) {
+        return username == null ? "unknown" : username.trim().toLowerCase();
     }
 
     private String ipKey(String clientIp) {

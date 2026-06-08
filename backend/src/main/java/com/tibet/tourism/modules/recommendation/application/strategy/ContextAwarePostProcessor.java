@@ -39,7 +39,8 @@ public class ContextAwarePostProcessor {
             filteredScores.put(spotId, finalScore);
         }
 
-        logger.info("上下文过滤: 原始{}个 -> 过滤后{}个", candidateScores.size(), filteredScores.size());
+        logger.info("Context filtering completed: inputCount={}, outputCount={}",
+                candidateScores.size(), filteredScores.size());
         return filteredScores;
     }
 

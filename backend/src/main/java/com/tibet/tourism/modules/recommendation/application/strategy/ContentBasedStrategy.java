@@ -39,13 +39,13 @@ public class ContentBasedStrategy implements ScoringStrategy {
         if (tagProfile == null) {
             tagProfile = buildUserTagProfile(visitHistory, visitedSpotIds);
             cacheService.cacheTagProfile(userId, tagProfile);
-            logger.info("🏷️  构建用户标签画像: {} 个标签", tagProfile.size());
+            logger.info("Content tag profile built: tagCount={}", tagProfile.size());
         } else {
-            logger.info("🏷️  从缓存获取标签画像: {} 个标签", tagProfile.size());
+            logger.info("Content tag profile loaded from cache: tagCount={}", tagProfile.size());
         }
 
         Map<Long, Double> scores = scoreSpotsByTags(tagProfile, visitedSpotIds);
-        logger.info("🏷️  标签匹配生成 {} 个候选景点", scores.size());
+        logger.info("Content tag candidates generated: candidateCount={}", scores.size());
         return scores;
     }
 

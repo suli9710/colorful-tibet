@@ -1,7 +1,10 @@
 package com.tibet.tourism.common.security.antibot;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.tibet.tourism.common.security.PiiMasker;
+import com.tibet.tourism.common.security.SensitiveLogSanitizer;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.OptionalDouble;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,11 +58,44 @@ public class RecaptchaService {
                 log.debug("reCAPTCHA verification succeeded score={} for ip={}", score, PiiMasker.maskIp(remoteIp));
                 return OptionalDouble.of(score);
             }
-            log.warn("reCAPTCHA verification failed: {}", response);
+            log.warn("reCAPTCHA verification failed: {}", summarizeVerificationResponse(response));
             return OptionalDouble.empty();
         } catch (Exception e) {
-            log.warn("reCAPTCHA call failed: {}", e.getMessage());
+            log.warn("reCAPTCHA call failed: {}", SensitiveLogSanitizer.exceptionSummary(e));
             return OptionalDouble.empty();
         }
+    }
+
+    static String summarizeVerificationResponse(JsonNode response) {
+        if (response == null || response.isNull()) {
+            return "success=false,score=none,errorCodes=none";
+        }
+
+        String score = response.hasNonNull("score") && response.get("score").isNumber()
+                ? String.valueOf(response.get("score").asDouble())
+                : "none";
+        return "success=" + response.path("success").asBoolean(false)
+                + ",score=" + score
+                + ",errorCodes=" + summarizeErrorCodes(response.get("error-codes"));
+    }
+
+    private static String summarizeErrorCodes(JsonNode errorCodes) {
+        if (errorCodes == null || !errorCodes.isArray() || errorCodes.isEmpty()) {
+            return "none";
+        }
+
+        List<String> safeCodes = new ArrayList<>();
+        for (JsonNode errorCode : errorCodes) {
+            String code = errorCode.asText("");
+            if (code.matches("[A-Za-z0-9_-]{1,64}")) {
+                safeCodes.add(code);
+            } else {
+                safeCodes.add("invalid-code");
+            }
+            if (safeCodes.size() == 3) {
+                break;
+            }
+        }
+        return String.join(",", safeCodes);
     }
 }

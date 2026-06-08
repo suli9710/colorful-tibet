@@ -200,6 +200,34 @@ class AdminUserServiceTest {
         assertDeleteRejected(self, auth("admin"), 403);
     }
 
+    @Test
+    void actionPolicyUsesConfiguredSuperAdminUsername() {
+        ReflectionTestUtils.setField(service, "superAdminUsername", "configured-root");
+        User protectedAdmin = user(21L, "configured-root", User.Role.ADMIN);
+        User ordinaryUser = user(22L, "traveler", User.Role.USER);
+        User otherAdmin = user(23L, "admin2", User.Role.ADMIN);
+
+        AdminUserService.UserActionPolicy protectedPolicy = service.actionPolicyFor(
+                protectedAdmin, auth("configured-root"));
+        AdminUserService.UserActionPolicy ordinaryPolicy = service.actionPolicyFor(
+                ordinaryUser, auth("configured-root"));
+        AdminUserService.UserActionPolicy adminPolicy = service.actionPolicyFor(
+                otherAdmin, auth("configured-root"));
+        AdminUserService.UserActionPolicy nonSuperPolicy = service.actionPolicyFor(
+                ordinaryUser, auth("admin2"));
+
+        assertTrue(protectedPolicy.protectedAccount());
+        assertFalse(protectedPolicy.deletable());
+        assertFalse(protectedPolicy.roleMutable());
+        assertFalse(ordinaryPolicy.protectedAccount());
+        assertTrue(ordinaryPolicy.deletable());
+        assertTrue(ordinaryPolicy.roleMutable());
+        assertFalse(adminPolicy.deletable());
+        assertTrue(adminPolicy.roleMutable());
+        assertFalse(nonSuperPolicy.deletable());
+        assertFalse(nonSuperPolicy.roleMutable());
+    }
+
     private void assertDeleteRejected(User target, Authentication auth, int status) {
         AdminUserService.DeleteUserResult result = service.deleteUser(target, auth);
 

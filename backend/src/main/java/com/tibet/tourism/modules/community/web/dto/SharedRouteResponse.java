@@ -25,12 +25,16 @@ public record SharedRouteResponse(
         LocalDateTime updatedAt
 ) {
     public static SharedRouteResponse fromEntity(SharedRoute route) {
+        return fromEntity(route, null);
+    }
+
+    public static SharedRouteResponse fromEntity(SharedRoute route, Long currentUserId) {
         if (route == null) {
             return null;
         }
         return new SharedRouteResponse(
                 route.getId(),
-                PublicUserResponse.fromEntity(route.getAuthor()),
+                PublicUserResponse.fromEntity(route.getAuthor(), currentUserId),
                 route.getTitle(),
                 route.getContent(),
                 route.getDays(),

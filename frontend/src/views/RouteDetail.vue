@@ -31,7 +31,7 @@
 
         <!-- Content -->
         <div class="glass-card rounded-2xl p-4 mb-6 sm:rounded-3xl sm:p-8 sm:mb-8">
-          <div class="prose max-w-none overflow-x-auto prose-headings:text-tibet-dark prose-p:text-tibet-brown/80 prose-strong:text-tibet-gold sm:prose-lg">
+          <div class="prose route-detail-markdown max-w-none overflow-x-auto prose-headings:text-tibet-dark prose-p:text-tibet-brown/80 prose-strong:text-tibet-gold sm:prose-lg">
             <div v-html="renderedContent"></div>
           </div>
         </div>
@@ -40,15 +40,17 @@
         <div class="flex justify-center gap-3 mb-8 sm:gap-6 sm:mb-12">
           <button 
             @click="toggleLike" 
-            class="flex items-center gap-2 px-6 py-3 rounded-full transition-all duration-300 shadow-sm hover:shadow-md"
+            :disabled="liking"
+            :aria-busy="liking"
+            class="flex items-center gap-2 px-6 py-3 rounded-full transition-all duration-300 shadow-sm hover:shadow-md disabled:cursor-wait disabled:opacity-70"
             :class="isLiked ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-white text-gray-600 border border-tibet-gold/25 hover:bg-gray-50'"
           >
-            <span class="text-xl">{{ isLiked ? '❤️' : '🤍' }}</span>
+            <Heart class="h-5 w-5" :fill="isLiked ? 'currentColor' : 'none'" />
             <span class="font-medium">{{ routeData.likeCount }}</span>
           </button>
           
           <div class="flex items-center gap-2 px-6 py-3 bg-white text-gray-600 rounded-full border border-tibet-gold/25 shadow-sm">
-            <span class="text-xl">👁️</span>
+            <Eye class="h-5 w-5" />
             <span class="font-medium">{{ routeData.viewCount }}</span>
           </div>
         </div>
@@ -66,6 +68,7 @@
               rows="3"
               class="w-full px-4 py-3 rounded-xl bg-white/50 border border-tibet-gold/25 focus:border-tibet-gold outline-none transition-all resize-none mb-4"
               :placeholder="t('routeDetail.commentPlaceholder')"
+              :aria-label="t('routeDetail.commentPlaceholder')"
             ></textarea>
             <div class="flex justify-end">
               <button 
@@ -82,7 +85,7 @@
           <div class="space-y-6">
             <div v-for="comment in comments" :key="comment.id" class="border-b border-tibet-gold/20 last:border-0 pb-6 last:pb-0">
               <div class="flex flex-col gap-1 mb-2 sm:flex-row sm:items-start sm:justify-between">
-                <span class="font-medium text-gray-900">{{ comment.user?.username || t('routeDetail.anonymous') }}</span>
+                <span class="font-medium text-gray-900">{{ publicUserName(comment.user) }}</span>
                 <div class="flex flex-wrap items-center gap-3">
                   <span class="text-xs text-gray-500">{{ formatDate(comment.createdAt) }}</span>
                   <button
@@ -115,12 +118,16 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { marked } from 'marked'
-import { sanitizeHtml } from '../utils/sanitize'
+import { renderMarkdownToSafeHtml } from '../utils/sanitize'
 import { motion } from 'motion-v'
 import { revealInitial, revealInView, revealTransition } from '../motion/presets'
 import api, { endpoints } from '../api'
 import { useAuthStore } from '../stores/auth'
+import { showToast } from '../composables/useToast'
+import { showConfirm } from '../composables/useConfirm'
+import { readBrowserStorage } from '../utils/browserStorage'
+import { summarizeClientError } from '../utils/errorMonitoring'
+import { Eye, Heart } from 'lucide-vue-next'
 
 const { t } = useI18n()
 
@@ -133,13 +140,18 @@ const loading = ref(true)
 const routeData = ref<any>(null)
 const comments = ref<any[]>([])
 const isLiked = ref(false)
+const liking = ref(false)
 const newComment = ref('')
 const submitting = ref(false)
 const currentUser = computed(() => auth.user)
 
 const renderedContent = computed(() => {
-  return routeData.value ? sanitizeHtml(marked(routeData.value.content) as string) : ''
+  return routeData.value ? renderMarkdownToSafeHtml(routeData.value.content) : ''
 })
+
+const redirectToLogin = () => {
+  router.push({ path: '/login', query: { redirect: currentRoute.fullPath } })
+}
 
 const loadRouteDetail = async () => {
   loading.value = true
@@ -154,20 +166,23 @@ const loadRouteDetail = async () => {
     comments.value = commentsRes.data
     isLiked.value = likeRes.data.liked
   } catch (error) {
-    console.error('Failed to load route detail:', error)
+    console.error('Failed to load route detail:', summarizeClientError(error))
   } finally {
     loading.value = false
   }
 }
 
 const toggleLike = async () => {
-  if (!(await auth.ensureSession())) {
-    alert(t('routeDetail.loginRequiredLike'))
-    router.push('/login')
-    return
-  }
+  if (liking.value || !routeData.value) return
+  liking.value = true
 
   try {
+    if (!(await auth.ensureSession())) {
+      showToast(t('routeDetail.loginRequiredLike'), 'warning')
+      redirectToLogin()
+      return
+    }
+
     if (isLiked.value) {
       await api.delete(`/routes/shared/${routeId}/like`)
       routeData.value.likeCount--
@@ -179,37 +194,41 @@ const toggleLike = async () => {
     }
   } catch (error: any) {
     if (error.response?.status === 401) {
-      alert(t('routeDetail.loginRequiredLike'))
-      router.push('/login')
+      showToast(t('routeDetail.loginRequiredLike'), 'warning')
+      redirectToLogin()
     } else {
-      alert(t('routeDetail.operationFailed'))
+      showToast(t('routeDetail.operationFailed'), 'error')
     }
+  } finally {
+    liking.value = false
   }
 }
 
 const submitComment = async () => {
-  if (!newComment.value.trim()) return
-  if (!(await auth.ensureSession())) {
-    alert(t('routeDetail.loginRequiredComment'))
-    router.push('/login')
-    return
-  }
-  
+  const content = newComment.value.trim()
+  if (!content || submitting.value) return
   submitting.value = true
   try {
+    if (!(await auth.ensureSession())) {
+      showToast(t('routeDetail.loginRequiredComment'), 'warning')
+      redirectToLogin()
+      return
+    }
+
     const response = await api.post(`/routes/shared/${routeId}/comments`, {
-      content: newComment.value
+      content
     })
     
     comments.value.unshift(response.data)
     routeData.value.commentCount++
     newComment.value = ''
+    showToast(t('routeDetail.commentSuccess'), 'success')
   } catch (error: any) {
     if (error.response?.status === 401) {
-      alert(t('routeDetail.loginRequiredComment'))
-      router.push('/login')
+      showToast(t('routeDetail.loginRequiredComment'), 'warning')
+      redirectToLogin()
     } else {
-      alert(t('routeDetail.commentFailed'))
+      showToast(t('routeDetail.commentFailed'), 'error')
     }
   } finally {
     submitting.value = false
@@ -217,19 +236,26 @@ const submitComment = async () => {
 }
 
 const isOwnComment = (comment: any) => {
-  if (!currentUser.value || !comment?.user) return false
-  return Number(comment.user.id) === Number(currentUser.value.id) || comment.user.username === currentUser.value.username
+  return Boolean(currentUser.value && comment?.user?.owner)
 }
 
+const publicUserName = (user: any) => user?.nickname || t('routeDetail.anonymous')
+
 const routeAuthorName = (route: any) => {
-  if (route?.sourceType === 'OFFICIAL' && !route?.author?.username) {
+  if (route?.sourceType === 'OFFICIAL') {
     return t('community.officialRoute')
   }
-  return route?.author?.nickname || route?.author?.username || t('routeDetail.anonymous')
+  return publicUserName(route?.author)
 }
 
 const deleteComment = async (comment: any) => {
-  if (!confirm(t('routeDetail.confirmDeleteComment'))) return
+  const confirmed = await showConfirm({
+    message: t('routeDetail.confirmDeleteComment'),
+    confirmLabel: t('common.delete'),
+    cancelLabel: t('common.cancel'),
+    tone: 'danger'
+  })
+  if (!confirmed) return
 
   try {
     await api.delete(endpoints.routes.deleteSharedComment(Number(routeId), comment.id))
@@ -237,14 +263,15 @@ const deleteComment = async (comment: any) => {
     if (routeData.value?.commentCount > 0) {
       routeData.value.commentCount--
     }
+    showToast(t('routeDetail.deleteCommentSuccess'), 'success')
   } catch (error) {
-    console.error('Failed to delete comment:', error)
-    alert(t('routeDetail.deleteCommentFailed'))
+    console.error('Failed to delete comment:', summarizeClientError(error))
+    showToast(t('routeDetail.deleteCommentFailed'), 'error')
   }
 }
 
 const formatDate = (dateStr: string) => {
-  const locale = localStorage.getItem('locale') || 'zh'
+  const locale = readBrowserStorage('localStorage', 'locale', 'zh')
   return new Date(dateStr).toLocaleString(locale === 'bo' ? 'bo-CN' : 'zh-CN')
 }
 
@@ -253,3 +280,17 @@ onMounted(async () => {
   loadRouteDetail()
 })
 </script>
+
+<style scoped>
+.route-detail-markdown :deep(a),
+.route-detail-markdown :deep(code) {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.route-detail-markdown :deep(pre),
+.route-detail-markdown :deep(table) {
+  max-width: 100%;
+  overflow-x: auto;
+}
+</style>

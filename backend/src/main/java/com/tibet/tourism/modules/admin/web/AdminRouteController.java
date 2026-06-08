@@ -1,4 +1,5 @@
 package com.tibet.tourism.modules.admin.web;
+import com.tibet.tourism.common.api.PageResponse;
 import com.tibet.tourism.common.validation.InputSanitizer;
 import com.tibet.tourism.modules.admin.web.dto.RouteManagementRequest;
 import com.tibet.tourism.modules.community.domain.SharedRoute;
@@ -13,7 +14,6 @@ import java.math.BigDecimal;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
@@ -48,10 +48,10 @@ public class AdminRouteController {
     }
 
     @GetMapping("/routes")
-    public ResponseEntity<Page<Map<String, Object>>> getAllRoutes(
+    public ResponseEntity<PageResponse<Map<String, Object>>> getAllRoutes(
             @PageableDefault(size = 50) Pageable pageable) {
-        return ResponseEntity.ok(sharedRouteRepository.findAllByOrderByCreatedAtDesc(pageable)
-                .map(route -> toAdminSharedRoute(route)));
+        return ResponseEntity.ok(PageResponse.from(sharedRouteRepository.findAllByOrderByCreatedAtDesc(pageable)
+                .map(route -> toAdminSharedRoute(route))));
     }
 
     @PostMapping("/routes")

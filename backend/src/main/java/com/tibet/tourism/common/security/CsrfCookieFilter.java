@@ -46,9 +46,16 @@ public class CsrfCookieFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
         String path = request.getServletPath();
-        if (!path.startsWith("/api/")
-                || SAFE_METHODS.contains(request.getMethod())
-                || PUBLIC_STATE_CHANGING_PATHS.contains(path)) {
+        if (!path.startsWith("/api/") || SAFE_METHODS.contains(request.getMethod())) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        if (PUBLIC_STATE_CHANGING_PATHS.contains(path)) {
+            if (hasBrowserRequestMetadata(request) && !hasTrustedRequestMetadata(request)) {
+                reject(response, "Untrusted public auth request metadata");
+                return;
+            }
             filterChain.doFilter(request, response);
             return;
         }
@@ -95,6 +102,11 @@ public class CsrfCookieFilter extends OncePerRequestFilter {
 
         return origin.equals(requestOrigin(request))
                 || allowedOrigins.stream().anyMatch(pattern -> PatternMatchUtils.simpleMatch(pattern, origin));
+    }
+
+    private boolean hasBrowserRequestMetadata(HttpServletRequest request) {
+        return StringUtils.hasText(request.getHeader("Origin"))
+                || StringUtils.hasText(request.getHeader("Sec-Fetch-Site"));
     }
 
     private String requestOrigin(HttpServletRequest request) {

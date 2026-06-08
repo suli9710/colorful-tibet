@@ -1,5 +1,9 @@
 package com.tibet.tourism.common.security;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.springframework.mock.env.MockEnvironment;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -128,6 +132,29 @@ class JwtUtilsSecurityTest {
         assertThat(differentAudience.validateJwtToken(token)).isFalse();
     }
 
+    @Test
+    void invalidJwtLogDoesNotExposeTokenValue() {
+        JwtUtils jwtUtils = jwtUtils("d".repeat(64), 86_400_000, false);
+        jwtUtils.validateJwtConfiguration();
+        String invalidToken = "header.payload.signature-with-secret-value";
+        ListAppender<ILoggingEvent> appender = attachAppender();
+
+        try {
+            assertThat(jwtUtils.validateJwtToken(invalidToken)).isFalse();
+        } finally {
+            detachAppender(appender);
+        }
+
+        assertThat(appender.list).anySatisfy(event -> {
+            assertThat(event.getFormattedMessage()).contains("messageHash=");
+            assertThat(event.getFormattedMessage()).contains("type=");
+        });
+        assertThat(appender.list)
+                .extracting(ILoggingEvent::getFormattedMessage)
+                .noneMatch(message -> message.contains(invalidToken)
+                        || message.contains("signature-with-secret-value"));
+    }
+
     private JwtUtils jwtUtils(String secret, int expirationMs, boolean requireStrongSecrets, String... activeProfiles) {
         JwtUtils jwtUtils = new JwtUtils();
         MockEnvironment environment = new MockEnvironment();
@@ -146,5 +173,19 @@ class JwtUtilsSecurityTest {
         byte[] bytes = new byte[64];
         new SecureRandom(new byte[]{1, 2, 3, 4}).nextBytes(bytes);
         return Base64.getEncoder().encodeToString(bytes);
+    }
+
+    private ListAppender<ILoggingEvent> attachAppender() {
+        Logger logger = (Logger) LoggerFactory.getLogger(JwtUtils.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        return appender;
+    }
+
+    private void detachAppender(ListAppender<ILoggingEvent> appender) {
+        Logger logger = (Logger) LoggerFactory.getLogger(JwtUtils.class);
+        logger.detachAppender(appender);
+        appender.stop();
     }
 }

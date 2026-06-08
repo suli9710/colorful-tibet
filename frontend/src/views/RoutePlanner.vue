@@ -39,9 +39,15 @@
           :exit="{ opacity: 0, y: -8, scale: 0.98 }"
           :transition="{ duration: 0.36, ease: motionEase }"
         >
-          <div class="mx-auto max-w-3xl rounded-2xl border px-5 py-4 backdrop-blur-md"
-               :class="errorMessage ? 'border-rose-200 bg-rose-50/90 text-rose-700' : 'border-emerald-200 bg-emerald-50/90 text-emerald-700'">
-            <div class="flex items-center gap-3">
+          <div
+            class="mx-auto max-w-3xl rounded-2xl border px-5 py-4 backdrop-blur-md"
+            :class="errorMessage ? 'border-rose-200 bg-rose-50/90 text-rose-700' : 'border-emerald-200 bg-emerald-50/90 text-emerald-700'"
+            :role="routeStatusRole"
+            :aria-live="routeStatusLive"
+            aria-atomic="true"
+          >
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div class="flex min-w-0 items-center gap-3">
               <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
                     :class="errorMessage ? 'bg-rose-100 text-rose-600' : 'bg-emerald-100 text-emerald-600'">
                 <svg v-if="errorMessage" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -52,9 +58,28 @@
                 </svg>
               </span>
               <div class="min-w-0">
-                <p class="text-sm font-semibold">{{ errorMessage ? t('routePlanner.generationFailed') : t('routePlanner.statusHint') }}</p>
-                <p class="mt-0.5 text-sm">{{ errorMessage || statusMessage }}</p>
+                <p class="text-sm font-semibold">{{ routeStatusTitle }}</p>
+                <p id="route-planner-status-message" class="mt-0.5 break-words text-sm">{{ routeStatusText }}</p>
               </div>
+            </div>
+            <div v-if="errorMessage" class="flex shrink-0 flex-wrap gap-2 sm:justify-end">
+              <button
+                type="button"
+                class="min-h-11 rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2"
+                :aria-label="t('routePlanner.regenerate')"
+                @click="generateRoute"
+              >
+                {{ t('routePlanner.regenerate') }}
+              </button>
+              <button
+                type="button"
+                class="min-h-11 rounded-xl border border-rose-200 bg-white/75 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2"
+                aria-label="关闭路线规划错误提示"
+                @click="dismissRouteError"
+              >
+                我知道了
+              </button>
+            </div>
             </div>
           </div>
         </motion.div>
@@ -87,12 +112,14 @@
                 </div>
               </div>
 
-              <form @submit.prevent="generateRoute" class="p-6 space-y-6">
+              <form @submit.prevent="generateRoute" class="p-6 space-y-6" aria-describedby="route-planner-form-hint route-planner-status-message">
                 <!-- Days Selector -->
                 <motion.div layout>
                   <label class="block text-sm font-semibold text-tibet-dark/80 mb-3">{{ t('routePlanner.plannedDays') }}</label>
-                  <div class="flex items-stretch gap-0 rounded-2xl border border-tibet-gold/25 bg-white/70 overflow-hidden">
+                  <div class="flex items-stretch gap-0 rounded-2xl border border-tibet-gold/25 bg-white/70 overflow-hidden" role="group" :aria-label="t('routePlanner.plannedDays')">
                     <motion.button type="button" @click="adjustDays(-1)" :disabled="loading || form.days <= 1"
+                            aria-label="减少计划天数"
+                            aria-controls="route-planner-days-value"
                             :whileHover="{ backgroundColor: 'rgba(255, 255, 255, 0.82)' }"
                             :whileTap="{ scale: 0.94 }"
                             class="flex items-center justify-center w-12 shrink-0 text-xl text-tibet-brown/70 hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
@@ -105,10 +132,16 @@
                         :initial="{ opacity: 0, y: 8, scale: 0.94 }"
                         :animate="{ opacity: 1, y: 0, scale: 1 }"
                         :transition="{ duration: 0.22, ease: motionEase }"
+                        id="route-planner-days-value"
+                        role="status"
+                        aria-live="polite"
+                        :aria-label="daysValueLabel"
                       >{{ form.days }}</motion.span>
                       <span class="text-[10px] uppercase tracking-[0.2em] text-tibet-brown/50 mt-1">Days</span>
                     </div>
                     <motion.button type="button" @click="adjustDays(1)" :disabled="loading || form.days >= 30"
+                            aria-label="增加计划天数"
+                            aria-controls="route-planner-days-value"
                             :whileHover="{ backgroundColor: 'rgba(255, 255, 255, 0.82)' }"
                             :whileTap="{ scale: 0.94 }"
                             class="flex items-center justify-center w-12 shrink-0 text-xl text-tibet-brown/70 hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
@@ -123,8 +156,7 @@
                   <label class="block text-sm font-semibold text-tibet-dark/80 mb-3">{{ t('routePlanner.budgetRange') }}</label>
                   <div class="grid gap-2">
                     <motion.label v-for="opt in budgetOptions" :key="opt.value"
-                           @click="form.budget = opt.value"
-                           class="relative flex items-center gap-3 rounded-xl border-2 cursor-pointer transition-all duration-200 px-4 py-3"
+                           class="relative flex min-h-12 items-center gap-3 rounded-xl border-2 cursor-pointer transition-all duration-200 px-4 py-3 focus-within:ring-2 focus-within:ring-tibet-gold/60 focus-within:ring-offset-2"
                            layout
                            :whileHover="{ y: -2, scale: 1.01 }"
                            :whileTap="{ scale: 0.99 }"
@@ -132,13 +164,22 @@
                            :class="form.budget === opt.value
                              ? 'border-tibet-gold bg-amber-50/60 shadow-sm'
                              : 'border-tibet-gold/20 bg-white/60 hover:border-tibet-gold/25 hover:bg-white'">
+                      <input
+                        v-model="form.budget"
+                        class="sr-only"
+                        type="radio"
+                        name="route-budget"
+                        :value="opt.value"
+                        :disabled="loading"
+                        :aria-describedby="`route-budget-${opt.value}-desc`"
+                      >
                       <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sm"
                             :class="form.budget === opt.value ? 'bg-tibet-gold/15 text-tibet-gold' : 'bg-gray-100 text-gray-400'">
                         {{ opt.icon }}
                       </span>
                       <div class="flex-1 min-w-0">
                         <p class="text-sm font-semibold" :class="form.budget === opt.value ? 'text-tibet-dark' : 'text-tibet-brown/80'">{{ opt.label }}</p>
-                        <p class="text-xs text-tibet-brown/50 mt-0.5">{{ opt.desc }}</p>
+                        <p :id="`route-budget-${opt.value}-desc`" class="text-xs text-tibet-brown/50 mt-0.5">{{ opt.desc }}</p>
                       </div>
                       <motion.span v-if="form.budget === opt.value" class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-tibet-gold text-white"
                             :initial="{ opacity: 0, scale: 0.6, rotate: -20 }"
@@ -155,8 +196,7 @@
                   <label class="block text-sm font-semibold text-tibet-dark/80 mb-3">{{ t('routePlanner.preference') }}</label>
                   <div class="grid gap-2">
                     <motion.label v-for="opt in preferenceOptions" :key="opt.value"
-                           @click="form.preference = opt.value"
-                           class="relative flex items-center gap-3 rounded-xl border-2 cursor-pointer transition-all duration-200 px-4 py-3"
+                           class="relative flex min-h-12 items-center gap-3 rounded-xl border-2 cursor-pointer transition-all duration-200 px-4 py-3 focus-within:ring-2 focus-within:ring-tibet-blue/60 focus-within:ring-offset-2"
                            layout
                            :whileHover="{ y: -2, scale: 1.01 }"
                            :whileTap="{ scale: 0.99 }"
@@ -164,13 +204,22 @@
                            :class="form.preference === opt.value
                              ? 'border-tibet-blue bg-blue-50/60 shadow-sm'
                              : 'border-tibet-gold/20 bg-white/60 hover:border-tibet-gold/25 hover:bg-white'">
+                      <input
+                        v-model="form.preference"
+                        class="sr-only"
+                        type="radio"
+                        name="route-preference"
+                        :value="opt.value"
+                        :disabled="loading"
+                        :aria-describedby="`route-preference-${opt.value}-desc`"
+                      >
                       <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sm"
                             :class="form.preference === opt.value ? 'bg-tibet-blue/15 text-tibet-blue' : 'bg-gray-100 text-gray-400'">
                         {{ opt.icon }}
                       </span>
                       <div class="flex-1 min-w-0">
                         <p class="text-sm font-semibold" :class="form.preference === opt.value ? 'text-tibet-dark' : 'text-tibet-brown/80'">{{ opt.label }}</p>
-                        <p class="text-xs text-tibet-brown/50 mt-0.5">{{ opt.desc }}</p>
+                        <p :id="`route-preference-${opt.value}-desc`" class="text-xs text-tibet-brown/50 mt-0.5">{{ opt.desc }}</p>
                       </div>
                       <motion.span v-if="form.preference === opt.value" class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-tibet-blue text-white"
                             :initial="{ opacity: 0, scale: 0.6, rotate: -20 }"
@@ -187,9 +236,10 @@
                   <label class="block text-sm font-semibold text-tibet-dark/80 mb-3">{{ t('routePlanner.quickPresets') }}</label>
                   <div class="grid grid-cols-2 gap-2">
                     <motion.button type="button" v-for="preset in presets" :key="preset.label" @click="applyPreset(preset)" :disabled="loading"
+                            :aria-label="`套用${preset.label}预设，${preset.days}${t('routePlanner.daysUnit')}，${getBudgetShort(preset.budget)}`"
                             :whileHover="{ y: -2, scale: 1.01 }"
                             :whileTap="{ scale: 0.98 }"
-                            class="group flex flex-col items-start gap-0.5 rounded-xl border border-tibet-gold/20 bg-white/60 px-3.5 py-3 text-left transition-all hover:border-tibet-gold/40 hover:bg-amber-50/40 hover:shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">
+                            class="group flex min-h-12 flex-col items-start gap-0.5 rounded-xl border border-tibet-gold/20 bg-white/60 px-3.5 py-3 text-left transition-all hover:border-tibet-gold/40 hover:bg-amber-50/40 hover:shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">
                       <span class="text-xs font-semibold text-tibet-dark/80 group-hover:text-tibet-dark">{{ preset.label }}</span>
                       <span class="text-[11px] text-tibet-brown/50">{{ preset.days }}{{ t('routePlanner.daysUnit') }} · {{ getBudgetShort(preset.budget) }}</span>
                     </motion.button>
@@ -198,6 +248,8 @@
 
                 <!-- Generate Button -->
                 <motion.button type="submit" :disabled="loading"
+                        :aria-busy="loading"
+                        aria-describedby="route-planner-form-hint route-planner-status-message"
                         :whileHover="loading ? {} : { y: -2, scale: 1.01 }"
                         :whileTap="loading ? {} : { scale: 0.98 }"
                         class="w-full rounded-2xl bg-gradient-to-r from-tibet-red via-rose-600 to-tibet-gold px-6 py-4 font-bold text-white shadow-lg shadow-tibet-red/20 transition-all duration-300 hover:shadow-xl hover:shadow-tibet-red/25 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-3">
@@ -215,6 +267,9 @@
                     {{ t('routePlanner.generateRoute') }}
                   </span>
                 </motion.button>
+                <p id="route-planner-form-hint" class="text-xs leading-relaxed text-tibet-brown/55">
+                  仅临时保留天数、预算和偏好，生成内容不会写入本地草稿。
+                </p>
               </form>
             </motion.div>
 
@@ -224,6 +279,9 @@
                 v-if="loading"
                 key="route-planner-streaming"
                 class="glass-card rounded-2xl p-5 border border-sky-200/60 bg-sky-50/70"
+                role="status"
+                aria-live="polite"
+                :aria-busy="loading"
                 :initial="{ opacity: 0, y: 14, scale: 0.98 }"
                 :animate="{ opacity: 1, y: 0, scale: 1 }"
                 :exit="{ opacity: 0, y: 8, scale: 0.98 }"
@@ -242,6 +300,11 @@
                     class="h-full rounded-full bg-gradient-to-r from-tibet-blue via-tibet-turquoise to-tibet-gold relative overflow-hidden animate-shimmer-stream transition-[width] duration-700 ease-out"
                     :style="{ width: `${routeGenerationProgressPercent}%` }"
                     :class="{ 'animate-pulse': streaming }"
+                    role="progressbar"
+                    :aria-label="routeGenerationProgressLabel"
+                    aria-valuemin="0"
+                    aria-valuemax="100"
+                    :aria-valuenow="routeGenerationProgressPercent"
                   ></div>
                 </div>
                 <p class="mt-2 text-xs text-tibet-brown/60">{{ t('routePlanner.waitingTime') }}</p>
@@ -390,6 +453,8 @@
                 </div>
                 <div class="flex flex-wrap gap-1.5">
                   <motion.button v-if="!isLongRoute && resultShouldCollapse" @click="resultExpanded = !resultExpanded"
+                          :aria-expanded="resultExpanded"
+                          :aria-label="resultToggleLabel"
                           :whileHover="{ y: -1, scale: 1.02 }"
                           :whileTap="{ scale: 0.96 }"
                           class="inline-flex items-center gap-1.5 rounded-xl border border-tibet-blue/20 bg-white/80 px-3.5 py-2 text-xs font-medium text-tibet-blue transition-all hover:bg-sky-50">
@@ -398,6 +463,7 @@
                     {{ resultExpanded ? '收起全文' : '展开全文' }}
                   </motion.button>
                   <motion.button @click="copyResult" :disabled="copying"
+                          :aria-label="copying ? t('routePlanner.copying') : t('routePlanner.copyText')"
                           :whileHover="{ y: -1, scale: 1.02 }"
                           :whileTap="{ scale: 0.96 }"
                           class="inline-flex items-center gap-1.5 rounded-xl border border-tibet-gold/25 bg-white/80 px-3.5 py-2 text-xs font-medium text-gray-600 transition-all hover:bg-gray-50 hover:border-gray-300 disabled:opacity-50">
@@ -419,6 +485,16 @@
                     <p class="text-[11px] font-semibold text-tibet-brown/45">{{ stat.label }}</p>
                     <p class="mt-1 text-sm font-bold text-tibet-dark">{{ stat.value }}</p>
                   </div>
+                </div>
+
+                <div class="rounded-2xl border border-amber-200/80 bg-amber-50/75 px-4 py-3">
+                  <div class="mb-1.5 flex items-center gap-2 text-amber-800">
+                    <ShieldAlert class="h-4 w-4" />
+                    <h3 class="text-sm font-bold">{{ t('routePlanner.preTripCheckTitle') }}</h3>
+                  </div>
+                  <p class="text-xs leading-relaxed text-amber-800/80">
+                    {{ t('routePlanner.preTripCheckDesc') }}
+                  </p>
                 </div>
 
                 <div v-if="routeOverviewText" class="rounded-2xl border border-tibet-gold/15 bg-white/75 px-4 py-3">
@@ -479,6 +555,7 @@
                   <div
                     ref="routeResultReaderRef"
                     class="prose prose-slate route-result-prose route-result-prose-compact route-long-flow flow-root max-w-none prose-headings:text-tibet-dark prose-p:text-tibet-brown/80 prose-p:leading-relaxed prose-a:text-tibet-blue prose-strong:text-tibet-dark/90 prose-li:text-tibet-brown/80 prose-h2:border-b prose-h2:border-tibet-gold/20 prose-h2:pb-2 prose-h2:mt-8 prose-h2:mb-4 prose-img:rounded-2xl prose-img:shadow-md"
+                    tabindex="-1"
                   >
                     <div class="not-prose route-long-nav float-left mb-4 mr-5 w-[260px] rounded-2xl border border-white/70 bg-white/75 p-4 shadow-sm">
                       <div class="mb-3 flex items-center gap-2 text-tibet-dark">
@@ -491,6 +568,16 @@
                           <p class="text-[10px] font-semibold text-tibet-brown/45">{{ stat.label }}</p>
                           <p class="mt-1 truncate text-xs font-bold text-tibet-dark">{{ stat.value }}</p>
                         </div>
+                      </div>
+
+                      <div class="mt-3 rounded-2xl border border-amber-200/80 bg-amber-50/75 px-3 py-3">
+                        <div class="mb-1.5 flex items-center gap-2 text-amber-800">
+                          <ShieldAlert class="h-3.5 w-3.5" />
+                          <h4 class="text-xs font-bold">{{ t('routePlanner.preTripCheckTitle') }}</h4>
+                        </div>
+                        <p class="text-[11px] leading-relaxed text-amber-800/80">
+                          {{ t('routePlanner.preTripCheckCompactDesc') }}
+                        </p>
                       </div>
 
                       <div v-if="routeOverviewText" class="mt-3 rounded-2xl border border-tibet-gold/15 bg-white/75 px-3 py-3">
@@ -520,7 +607,8 @@
                             :key="day.day"
                             type="button"
                             @click="scrollToRouteDay(day.day)"
-                            class="w-full rounded-xl border border-tibet-gold/10 bg-white/70 px-3 py-2 text-left transition hover:border-tibet-blue/25 hover:bg-sky-50"
+                            :aria-label="`跳转到${day.day}：${day.title}`"
+                            class="min-h-11 w-full rounded-xl border border-tibet-gold/10 bg-white/70 px-3 py-2 text-left transition hover:border-tibet-blue/25 hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tibet-blue/60"
                           >
                             <p class="text-[11px] font-bold text-tibet-blue">{{ day.day }}</p>
                             <p class="mt-0.5 line-clamp-1 text-xs font-semibold text-tibet-dark">{{ day.title }}</p>
@@ -533,7 +621,8 @@
                           type="button"
                           @click="copyResult"
                           :disabled="copying"
-                          class="truncate rounded-xl border border-tibet-gold/20 bg-white/80 px-2 py-2 text-xs font-medium text-gray-600 transition hover:bg-gray-50 disabled:opacity-50"
+                          :aria-label="copying ? t('routePlanner.copying') : t('routePlanner.copyText')"
+                          class="min-h-11 truncate rounded-xl border border-tibet-gold/20 bg-white/80 px-2 py-2 text-xs font-medium text-gray-600 transition hover:bg-gray-50 disabled:opacity-50"
                         >
                           {{ t('routePlanner.copyText') }}
                         </button>
@@ -541,7 +630,8 @@
                           type="button"
                           @click="saveRoute"
                           :disabled="saving || !result"
-                          class="truncate rounded-xl border border-tibet-gold/20 bg-white/80 px-2 py-2 text-xs font-medium text-gray-600 transition hover:bg-gray-50 disabled:opacity-50"
+                          :aria-label="saving ? t('routePlanner.saving') : t('routePlanner.saveRoute')"
+                          class="min-h-11 truncate rounded-xl border border-tibet-gold/20 bg-white/80 px-2 py-2 text-xs font-medium text-gray-600 transition hover:bg-gray-50 disabled:opacity-50"
                         >
                           {{ t('routePlanner.saveRoute') }}
                         </button>
@@ -549,7 +639,8 @@
                           type="button"
                           @click="downloadRoute"
                           :disabled="!result"
-                          class="truncate rounded-xl border border-tibet-gold/20 bg-white/80 px-2 py-2 text-xs font-medium text-gray-600 transition hover:bg-gray-50 disabled:opacity-50"
+                          :aria-label="t('routePlanner.downloadMarkdown')"
+                          class="min-h-11 truncate rounded-xl border border-tibet-gold/20 bg-white/80 px-2 py-2 text-xs font-medium text-gray-600 transition hover:bg-gray-50 disabled:opacity-50"
                         >
                           {{ t('routePlanner.downloadMarkdown') }}
                         </button>
@@ -557,7 +648,8 @@
                           type="button"
                           @click="shareRoute"
                           :disabled="sharing || !result"
-                          class="truncate rounded-xl bg-tibet-blue px-2 py-2 text-xs font-semibold text-white transition hover:bg-tibet-blue/90 disabled:opacity-50"
+                          :aria-label="sharing ? t('routePlanner.sharing') : t('routePlanner.shareToCommunity')"
+                          class="min-h-11 truncate rounded-xl bg-tibet-blue px-2 py-2 text-xs font-semibold text-white transition hover:bg-tibet-blue/90 disabled:opacity-50"
                         >
                           {{ t('routePlanner.shareToCommunity') }}
                         </button>
@@ -580,6 +672,8 @@
                     <p class="text-xs text-tibet-brown/50">{{ t('routePlanner.routeShortReaderHint') }}</p>
                   </div>
                   <motion.button v-if="!isLongRoute && resultShouldCollapse" @click="resultExpanded = !resultExpanded"
+                          :aria-expanded="resultExpanded"
+                          :aria-label="resultToggleLabel"
                           :whileHover="{ y: -1, scale: 1.02 }"
                           :whileTap="{ scale: 0.96 }"
                           class="inline-flex items-center gap-1.5 rounded-xl border border-tibet-blue/20 bg-white/80 px-3.5 py-2 text-xs font-medium text-tibet-blue transition-all hover:bg-sky-50">
@@ -607,34 +701,41 @@
                 :class="{ 'xl:hidden': isLongRoute }"
               >
                 <motion.button @click="generateRoute" :disabled="loading"
+                        :aria-busy="loading"
+                        :aria-label="t('routePlanner.regenerate')"
                         :whileHover="{ y: -1, scale: 1.02 }"
                         :whileTap="{ scale: 0.96 }"
-                        class="inline-flex items-center gap-1.5 rounded-xl border border-tibet-gold/25 bg-white/80 px-4 py-2.5 text-sm font-medium text-gray-600 transition-all hover:bg-gray-50 disabled:opacity-50">
+                        class="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-tibet-gold/25 bg-white/80 px-4 py-2.5 text-sm font-medium text-gray-600 transition-all hover:bg-gray-50 disabled:opacity-50">
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                   </svg>
                   {{ t('routePlanner.regenerate') }}
                 </motion.button>
                 <motion.button @click="saveRoute" :disabled="saving || !result"
+                        :aria-busy="saving"
+                        :aria-label="saving ? t('routePlanner.saving') : t('routePlanner.saveRoute')"
                         :whileHover="{ y: -1, scale: 1.02 }"
                         :whileTap="{ scale: 0.96 }"
-                        class="inline-flex items-center gap-1.5 rounded-xl border border-tibet-gold/25 bg-white/80 px-4 py-2.5 text-sm font-medium text-gray-600 transition-all hover:bg-gray-50 disabled:opacity-50">
+                        class="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-tibet-gold/25 bg-white/80 px-4 py-2.5 text-sm font-medium text-gray-600 transition-all hover:bg-gray-50 disabled:opacity-50">
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
                   </svg>
                   {{ saving ? t('routePlanner.saving') : t('routePlanner.saveRoute') }}
                 </motion.button>
                 <motion.button @click="downloadRoute" :disabled="!result"
+                        :aria-label="t('routePlanner.downloadMarkdown')"
                         :whileHover="{ y: -1, scale: 1.02 }"
                         :whileTap="{ scale: 0.96 }"
-                        class="inline-flex items-center gap-1.5 rounded-xl border border-tibet-gold/25 bg-white/80 px-4 py-2.5 text-sm font-medium text-gray-600 transition-all hover:bg-gray-50 disabled:opacity-50">
+                        class="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-tibet-gold/25 bg-white/80 px-4 py-2.5 text-sm font-medium text-gray-600 transition-all hover:bg-gray-50 disabled:opacity-50">
                   <Download class="h-4 w-4" />
                   {{ t('routePlanner.downloadMarkdown') }}
                 </motion.button>
                 <motion.button @click="shareRoute" :disabled="sharing || !result"
+                        :aria-busy="sharing"
+                        :aria-label="sharing ? t('routePlanner.sharing') : t('routePlanner.shareToCommunity')"
                         :whileHover="{ y: -1, scale: 1.02 }"
                         :whileTap="{ scale: 0.96 }"
-                        class="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-tibet-blue to-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-tibet-blue/20 transition-all hover:from-tibet-blue/90 hover:to-indigo-700 hover:shadow-lg disabled:opacity-50">
+                        class="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-gradient-to-r from-tibet-blue to-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-tibet-blue/20 transition-all hover:from-tibet-blue/90 hover:to-indigo-700 hover:shadow-lg disabled:opacity-50">
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                   </svg>
@@ -683,9 +784,11 @@
                   :key="option.value"
                   @click="generateBookableItinerary(option.value)"
                   :disabled="!!itineraryVersionLoading"
+                  :aria-busy="itineraryVersionLoading === option.value"
+                  :aria-label="getItineraryVersionAriaLabel(option)"
                   :whileHover="{ y: -1, scale: 1.02 }"
                   :whileTap="{ scale: 0.96 }"
-                  class="inline-flex items-center gap-1.5 rounded-xl border border-tibet-gold/25 bg-white/80 px-3 py-2 text-xs font-medium text-gray-600 transition-all hover:bg-amber-50 disabled:opacity-50"
+                  class="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-tibet-gold/25 bg-white/80 px-3 py-2 text-xs font-medium text-gray-600 transition-all hover:bg-amber-50 disabled:opacity-50"
                 >
                   <Shuffle class="h-3.5 w-3.5" />
                   {{ itineraryVersionLoading === option.value ? '生成中' : option.label }}
@@ -693,7 +796,7 @@
               </div>
             </div>
 
-            <div v-if="itineraryLoading" class="p-8 text-center text-tibet-brown/60">
+            <div v-if="itineraryLoading" class="p-8 text-center text-tibet-brown/60" role="status" aria-live="polite" aria-busy="true">
               <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-tibet-gold mx-auto mb-3"></div>
               <p class="text-sm font-medium">正在把 AI 灵感转成可报价行程</p>
             </div>
@@ -756,9 +859,11 @@
                           v-if="isBookableItem(item)"
                           @click="bookItineraryItem(item)"
                           :disabled="itineraryBookingItemId === item.id"
+                          :aria-busy="itineraryBookingItemId === item.id"
+                          :aria-label="getExternalBookingAriaLabel(item)"
                           :whileHover="{ y: -1, scale: 1.02 }"
                           :whileTap="{ scale: 0.96 }"
-                          class="inline-flex items-center gap-1.5 rounded-xl bg-tibet-red px-3.5 py-2 text-xs font-semibold text-tibet-yellow shadow-md shadow-tibet-red/20 disabled:opacity-50"
+                          class="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-tibet-red px-3.5 py-2 text-xs font-semibold text-tibet-yellow shadow-md shadow-tibet-red/20 disabled:opacity-50"
                         >
                           <CalendarCheck class="h-3.5 w-3.5" />
                           {{ itineraryBookingItemId === item.id ? '打开中' : '去第三方' }}
@@ -794,16 +899,17 @@
               <motion.button
                 v-if="tibetTravelKit"
                 @click="downloadOfflinePackage"
+                aria-label="下载西藏深度旅行离线包"
                 :whileHover="{ y: -1, scale: 1.02 }"
                 :whileTap="{ scale: 0.96 }"
-                class="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-white/80 px-3.5 py-2 text-xs font-semibold text-emerald-700 transition-all hover:bg-emerald-50"
+                class="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-emerald-200 bg-white/80 px-3.5 py-2 text-xs font-semibold text-emerald-700 transition-all hover:bg-emerald-50"
               >
                 <Download class="h-3.5 w-3.5" />
                 离线包
               </motion.button>
             </div>
 
-            <div v-if="tibetTravelKitLoading" class="p-8 text-center text-tibet-brown/60">
+            <div v-if="tibetTravelKitLoading" class="p-8 text-center text-tibet-brown/60" role="status" aria-live="polite" aria-busy="true">
               <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-500 mx-auto mb-3"></div>
               <p class="text-sm font-medium">正在生成西藏目的地服务</p>
             </div>
@@ -956,7 +1062,6 @@ import { ref, computed, shallowRef, onBeforeUnmount, onMounted, watch } from 'vu
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { AnimatePresence, motion } from 'motion-v'
-import { marked } from 'marked'
 import {
   Bell,
   CalendarCheck,
@@ -977,7 +1082,7 @@ import {
   Sparkles,
   Ticket
 } from 'lucide-vue-next'
-import { sanitizeHtml } from '../utils/sanitize'
+import { renderMarkdownToSafeHtml, sanitizeHtml } from '../utils/sanitize'
 import {
   getRouteGenerationJob,
   startRouteGenerationJob,
@@ -988,8 +1093,11 @@ import api, { endpoints, type AiRouteRecordResponse } from '../api'
 import MobileStickyActionBar from '../components/MobileStickyActionBar.vue'
 import { useRoutePlannerDraft, type RoutePlannerFormState } from '../composables/useRoutePlannerDraft'
 import { useAuthGuard } from '../composables/useAuthGuard'
+import { showToast } from '../composables/useToast'
 import { useAuthStore } from '../stores/auth'
 import { useRouteGenerationStore } from '../stores/routeGeneration'
+import { readBrowserStorage } from '../utils/browserStorage'
+import { summarizeClientError } from '../utils/errorMonitoring'
 import { openExternalBooking } from '../utils/externalBooking'
 import {
   cardInitial,
@@ -1180,7 +1288,7 @@ const routeDraftPersistenceSuspended = ref(false)
 
 const onAuthExpired = () => {
   suspendRouteDraftPersistence()
-  if (window.location.pathname !== '/login') alert(t('routePlanner.authFailed'))
+  if (window.location.pathname !== '/login') showToast(t('routePlanner.authFailed'), 'warning')
 }
 
 const form = ref<RoutePlannerFormState>({ ...defaultForm })
@@ -1211,6 +1319,11 @@ const itineraryVersionOptions = [
   { value: 'hidden', label: '更小众' },
   { value: 'family', label: '老人小孩' }
 ]
+
+const getItineraryVersionAriaLabel = (option: { value: string; label: string }) =>
+  itineraryVersionLoading.value === option.value
+    ? `正在生成${option.label}版本行程`
+    : `生成${option.label}版本行程`
 
 const getBudgetShort = (key: string) => {
   if (key === 'economy') return t('routePlanner.budgetShort.economy')
@@ -1272,6 +1385,11 @@ const itemIcon = (type: string) => {
 const isBookableItem = (item: ItineraryItem) =>
   (item.bookingAction === 'BOOK_SPOT' || item.bookingAction === 'BOOK_HOTEL') && item.bookingStatus !== 'BOOKED'
 
+const getExternalBookingAriaLabel = (item: ItineraryItem) =>
+  itineraryBookingItemId.value === item.id
+    ? `正在打开${item.title}的第三方预订`
+    : `打开${item.title}的第三方预订`
+
 const loading = ref(false)
 const saving = ref(false)
 const sharing = ref(false)
@@ -1304,6 +1422,25 @@ let firstTokenProgressTimer: number | null = null
 let latestRenderJobId = 0
 let latestAppliedRenderId = 0
 let latestMarkdownSnapshot = ''
+
+const routeStatusRole = computed(() => errorMessage.value ? 'alert' : 'status')
+const routeStatusLive = computed(() => errorMessage.value ? 'assertive' : 'polite')
+const routeStatusTitle = computed(() => errorMessage.value ? t('routePlanner.generationFailed') : t('routePlanner.statusHint'))
+const routeStatusText = computed(() => errorMessage.value || statusMessage.value)
+const daysValueLabel = computed(() => `${t('routePlanner.plannedDays')}：${form.value.days}${t('routePlanner.daysUnit')}`)
+const routeGenerationProgressLabel = computed(() => `${routeGenerationStatusLabel.value}，${routeGenerationProgressPercent.value}%`)
+const resultToggleLabel = computed(() => resultExpanded.value ? '收起路线全文' : '展开路线全文')
+
+const dismissRouteError = () => {
+  errorMessage.value = ''
+}
+
+const safeRouteFailureMessage = (error: unknown) => {
+  const summary = summarizeClientError(error)
+  if (/abort|cancel/i.test(summary)) return t('routePlanner.generationCancelled')
+  if (/timeout/i.test(summary)) return t('routePlanner.timeoutError')
+  return t('routePlanner.generateFailed')
+}
 
 const stopFirstTokenProgress = () => {
   if (firstTokenProgressTimer !== null) {
@@ -1582,8 +1719,7 @@ const planningPulseItems = computed(() => {
 })
 
 const routeDraftStorageKey = computed(() => {
-  const userId = auth.user?.id
-  return userId ? `colorful-tibet:route-planner:draft:${userId}` : 'colorful-tibet:route-planner:draft:anonymous'
+  return auth.user ? 'colorful-tibet:route-planner:draft:session' : 'colorful-tibet:route-planner:draft:anonymous'
 })
 
 const {
@@ -1610,8 +1746,8 @@ const {
       resultExpanded.value = false
       scheduleMarkdownRender(restoredResult, true)
     },
-    onPersistError: error => console.warn('Failed to persist route planner draft:', error),
-    onRestoreError: error => console.warn('Failed to restore route planner draft:', error)
+    onPersistError: error => console.warn('Failed to persist route planner draft:', summarizeClientError(error)),
+    onRestoreError: error => console.warn('Failed to restore route planner draft:', summarizeClientError(error))
   }
 )
 
@@ -1626,7 +1762,7 @@ function suspendRouteDraftPersistence() {
 }
 
 const renderMarkdownSync = (markdown: string) => {
-  renderedResult.value = sanitizeHtml(markdown ? String(marked.parse(markdown)) : '')
+  renderedResult.value = renderMarkdownToSafeHtml(markdown)
 }
 
 const ensureMarkdownWorker = () => {
@@ -1704,7 +1840,7 @@ const fetchTibetTravelKit = async (itineraryId: number) => {
     const { data } = await api.get(endpoints.tibetSpecialty.travelKit(itineraryId))
     tibetTravelKit.value = data
   } catch (error: any) {
-    console.error('Failed to fetch Tibet travel kit:', error)
+    console.error('Failed to fetch Tibet travel kit:', summarizeClientError(error))
     tibetTravelKit.value = null
   } finally {
     tibetTravelKitLoading.value = false
@@ -1731,7 +1867,7 @@ const generateBookableItinerary = async (versionType = 'default') => {
   }
 
   try {
-    const locale = localStorage.getItem('locale') || 'zh'
+    const locale = readBrowserStorage('localStorage', 'locale', 'zh')
     const response = isVersion
       ? await api.post(endpoints.itineraries.createVersion(bookableItinerary.value!.id), { versionType })
       : await api.post(endpoints.itineraries.generate, {
@@ -1749,7 +1885,7 @@ const generateBookableItinerary = async (versionType = 'default') => {
     statusMessage.value = `已生成${response.data.versionLabel || '可预订'}行程，可查看报价并预订节点。`
     errorMessage.value = ''
   } catch (error: any) {
-    console.error('Failed to generate bookable itinerary:', error)
+    console.error('Failed to generate bookable itinerary:', summarizeClientError(error))
     errorMessage.value = t('routePlanner.generateFailed')
   } finally {
     itineraryLoading.value = false
@@ -1828,7 +1964,7 @@ const restoreLatestRouteFromServer = async () => {
     if (!latest) return false
     return applyAiRouteRecord(latest)
   } catch (error) {
-    console.warn('Failed to restore latest AI route:', error)
+    console.warn('Failed to restore latest AI route:', summarizeClientError(error))
     return false
   }
 }
@@ -1941,7 +2077,7 @@ const resumeRouteJobFromDraft = async () => {
       await subscribeToRouteJob(snapshot.jobId)
     }
   } catch (error: any) {
-    console.error('Failed to resume route job:', error)
+    console.error('Failed to resume route job:', summarizeClientError(error))
     if (result.value.trim()) {
       stopFirstTokenProgress()
       loading.value = false
@@ -1958,12 +2094,21 @@ const resumeRouteJobFromDraft = async () => {
 }
 
 const generateRoute = async () => {
-  if (!(await auth.ensureSession())) {
+  if (loading.value || streaming.value || activeRouteJobId.value) return
+
+  loading.value = true
+  let hasSession = false
+  try {
+    hasSession = await auth.ensureSession()
+  } catch (error) {
+    console.warn('Failed to verify route generation session:', summarizeClientError(error))
+  }
+  if (!hasSession) {
+    loading.value = false
     await requireAuth()
     return
   }
 
-  loading.value = true
   streaming.value = true
   streamAbortController.value?.abort()
   streamAbortController.value = null
@@ -1993,15 +2138,9 @@ const generateRoute = async () => {
       await subscribeToRouteJob(snapshot.jobId)
     }
   } catch (error: any) {
-    console.error('Failed to generate route:', error)
+    console.error('Failed to generate route:', summarizeClientError(error))
     stopFirstTokenProgress()
-    let message = t('routePlanner.generateFailed')
-    if (error.name === 'AbortError') {
-      message = t('routePlanner.generationCancelled')
-    } else if (error.message?.includes('timeout')) {
-      message = t('routePlanner.timeoutError')
-    }
-    errorMessage.value = message
+    errorMessage.value = safeRouteFailureMessage(error)
     statusMessage.value = t('routePlanner.routeGenFailedStatus')
     generationStore.cancelGeneration()
     loading.value = false
@@ -2021,7 +2160,7 @@ const copyResult = async () => {
     errorMessage.value = ''
     persistRouteDraft()
   } catch (error) {
-    console.error('Copy failed:', error)
+    console.error('Copy failed:', summarizeClientError(error))
     errorMessage.value = t('routePlanner.copyFailed')
     persistRouteDraft()
   } finally {
@@ -2058,7 +2197,7 @@ const saveRoute = async () => {
     errorMessage.value = ''
     persistRouteDraft()
   } catch (error: any) {
-    console.error('Failed to save AI route record:', error)
+    console.error('Failed to save AI route record:', summarizeClientError(error))
     errorMessage.value = t('routePlanner.saveFailed')
     persistRouteDraft()
   } finally {
@@ -2103,14 +2242,21 @@ const communityPreferenceValue = (key: string) => {
 }
 
 const shareRoute = async () => {
-  if (!result.value) return
+  if (!result.value || sharing.value) return
 
-  if (!(await auth.ensureSession())) {
+  sharing.value = true
+  let hasSession = false
+  try {
+    hasSession = await auth.ensureSession()
+  } catch (error) {
+    console.warn('Failed to verify route share session:', summarizeClientError(error))
+  }
+  if (!hasSession) {
+    sharing.value = false
     await requireAuth()
     return
   }
 
-  sharing.value = true
   try {
     await api.post('/routes/share', {
       title: t('routePlanner.routeTitle', { days: form.value.days, preference: getPreferenceText(form.value.preference) }),
@@ -2119,14 +2265,14 @@ const shareRoute = async () => {
       budget: communityBudgetValue(form.value.budget),
       preference: communityPreferenceValue(form.value.preference)
     })
-    alert(t('routePlanner.shareSuccess'))
+    showToast(t('routePlanner.shareSuccess'), 'success')
     router.push('/community')
   } catch (error: any) {
-    console.error('Share failed:', error)
+    console.error('Share failed:', summarizeClientError(error))
     if (error.response && error.response.status === 401) {
       await requireAuth()
     } else {
-      alert(t('routePlanner.shareFailed'))
+      showToast(t('routePlanner.shareFailed'), 'error')
     }
   } finally {
     sharing.value = false
@@ -2328,6 +2474,17 @@ onBeforeUnmount(() => {
 .route-result-prose :deep(ol) {
   margin-top: 0.45rem;
   margin-bottom: 0.85rem;
+}
+
+.route-result-prose :deep(a),
+.route-result-prose :deep(code) {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.route-result-prose :deep(pre) {
+  max-width: 100%;
+  overflow-x: auto;
 }
 
 .route-result-prose-compact :deep(h1) {

@@ -3,6 +3,8 @@ import com.tibet.tourism.common.logging.IpLocationService;
 import com.tibet.tourism.common.security.CsrfTokenService;
 import com.tibet.tourism.common.security.JwtUtils;
 import com.tibet.tourism.common.security.LoginAttemptService;
+import com.tibet.tourism.common.security.PiiMasker;
+import com.tibet.tourism.common.security.SensitiveLogSanitizer;
 import com.tibet.tourism.common.security.antibot.AntibotProperties;
 import com.tibet.tourism.common.security.antibot.RecaptchaService;
 import com.tibet.tourism.common.validation.InputSanitizer;
@@ -126,13 +128,19 @@ public class AuthApplicationService {
     }
 
     public LoginResult login(LoginRequest loginRequest, HttpServletRequest request) {
-        String username = loginRequest.getUsername().trim();
+        String username = loginRequest == null || loginRequest.getUsername() == null
+                ? ""
+                : loginRequest.getUsername().trim();
+        String password = loginRequest == null ? "" : loginRequest.getPassword();
+        if (!StringUtils.hasText(username) || !StringUtils.hasText(password)) {
+            throw new AuthFailureException(GENERIC_LOGIN_ERROR);
+        }
         String clientIp = resolveClientIp(request);
 
         LoginAttemptService.LoginAttemptDecision throttle = loginAttemptService.evaluate(username, clientIp);
         if (!throttle.allowed()) {
-            logger.warn("Blocked login attempt by throttle: username={}, reason={}, retryAfter={}s",
-                    username, throttle.reason(), throttle.retryAfterSeconds());
+            logger.warn("Blocked login attempt by throttle: user={}, reason={}, retryAfter={}s",
+                    userLogLabel(username), throttle.reason(), throttle.retryAfterSeconds());
             throw new AuthRateLimitException(RATE_LIMIT_ERROR, throttle.retryAfterSeconds());
         }
 
@@ -141,16 +149,26 @@ public class AuthApplicationService {
             authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(username, loginRequest.getPassword()));
         } catch (AuthenticationException exception) {
-            logger.warn("Login failed for username={}", username);
+            logger.warn("Login failed for user={}", userLogLabel(username));
             LoginAttemptService.LoginAttemptDecision failure = loginAttemptService.recordFailure(username, clientIp);
             if (!failure.allowed()) {
                 throw new AuthRateLimitException(RATE_LIMIT_ERROR, failure.retryAfterSeconds());
             }
             throw new AuthFailureException(GENERIC_LOGIN_ERROR);
+        } catch (RuntimeException exception) {
+            logger.warn("Login authentication provider failed for user={}: {}",
+                    userLogLabel(username),
+                    SensitiveLogSanitizer.exceptionSummary(exception));
+            throw new AuthFailureException(GENERIC_LOGIN_ERROR);
         }
 
         UserDetails userDetails = (UserDetails) authentication.getPrincipal();
-        User user = userRepository.findByUsername(userDetails.getUsername()).orElseThrow();
+        User user = userRepository.findByUsername(userDetails.getUsername())
+                .orElseThrow(() -> {
+                    logger.warn("Authenticated principal missing backing user: user={}",
+                            userLogLabel(userDetails.getUsername()));
+                    return new AuthFailureException(GENERIC_LOGIN_ERROR);
+                });
 
         enforceSuperAdminControls(user, loginRequest, clientIp);
         enforceAccountStepUpIfNeeded(user, throttle, request, clientIp);
@@ -163,9 +181,12 @@ public class AuthApplicationService {
         String csrfToken = csrfTokenService.generateToken(jwt);
 
         Map<String, Object> response = new HashMap<>();
-        response.put("id", user.getId());
-        response.put("username", user.getUsername());
-        response.put("nickname", user.getNickname());
+        String nickname = publicNickname(user);
+        if (nickname != null) {
+            response.put("nickname", nickname);
+        }
+        response.put("avatar", user.getAvatar());
+        response.put("avatarUrl", user.getAvatar());
         response.put("role", user.getRole());
         response.put("mustChangePassword", Boolean.TRUE.equals(user.getMustChangePassword()));
 
@@ -174,34 +195,38 @@ public class AuthApplicationService {
 
     @Transactional
     public void register(RegisterRequest signUpRequest, HttpServletRequest request) {
+        if (signUpRequest == null) {
+            throw new IllegalArgumentException(REGISTRATION_FAILED);
+        }
         enforceRegistrationRecaptcha(request);
 
         String username = signUpRequest.getUsername() == null ? "" : signUpRequest.getUsername().trim();
         String nickname = InputSanitizer.optionalPlainText(signUpRequest.getNickname(), 32, "nickname");
         String plainPassword = signUpRequest.getPassword();
 
-        logger.debug("Register payload received. username={}, nickname={}, passwordEmpty={}",
-                username, nickname, !StringUtils.hasText(plainPassword));
+        logger.debug("Register payload received. user={}, nicknamePresent={}, passwordEmpty={}",
+                userLogLabel(username), StringUtils.hasText(nickname), !StringUtils.hasText(plainPassword));
 
         InputSanitizer.validatePassword(plainPassword);
         if (!SAFE_USERNAME.matcher(username).matches()) {
             throw new IllegalArgumentException(REGISTRATION_FAILED);
         }
 
+        String encodedPassword = passwordEncoder.encode(plainPassword);
         if (userRepository.existsByUsernameIgnoreCase(username)) {
             throw new DuplicateRegistrationException(REGISTRATION_FAILED);
         }
 
         User user = new User();
         user.setUsername(username);
-        user.setPassword(passwordEncoder.encode(plainPassword));
-        user.setNickname(StringUtils.hasText(nickname) ? nickname : username);
+        user.setPassword(encodedPassword);
+        user.setNickname(registrationNickname(username, nickname));
         user.setRole(User.Role.USER);
 
         try {
             userRepository.saveAndFlush(user);
         } catch (DataIntegrityViolationException exception) {
-            logger.warn("Registration failed due to duplicate key: username={}", username);
+            logger.warn("Registration failed due to duplicate key: user={}", userLogLabel(username));
             throw new DuplicateRegistrationException(REGISTRATION_FAILED);
         }
     }
@@ -216,7 +241,8 @@ public class AuthApplicationService {
             user.setLastLoginAt(LocalDateTime.now());
             userRepository.save(user);
         } catch (Exception exception) {
-            logger.debug("Failed to update user IP location", exception);
+            logger.debug("Failed to update user IP location: {}",
+                    SensitiveLogSanitizer.exceptionSummary(exception));
         }
     }
 
@@ -225,7 +251,8 @@ public class AuthApplicationService {
             String clientIp = ipLocationService.getClientIpAddress(request);
             return StringUtils.hasText(clientIp) ? clientIp : "unknown";
         } catch (Exception e) {
-            logger.debug("Failed to resolve client IP for login throttle", e);
+            logger.debug("Failed to resolve client IP for login throttle: {}",
+                    SensitiveLogSanitizer.exceptionSummary(e));
             return "unknown";
         }
     }
@@ -238,8 +265,8 @@ public class AuthApplicationService {
             return;
         }
         if (!isRecaptchaConfigured()) {
-            logger.warn("Login account step-up skipped because reCAPTCHA is not configured: username={}, failures={}",
-                    user.getUsername(), throttle.accountFailures());
+            logger.warn("Login account step-up skipped because reCAPTCHA is not configured: user={}, failures={}",
+                    userLogLabel(user.getUsername()), throttle.accountFailures());
             return;
         }
 
@@ -247,8 +274,8 @@ public class AuthApplicationService {
         OptionalDouble score = recaptchaService.verify(token, clientIp);
         double minScore = antibotProperties.getRecaptcha().getMinScore();
         if (score.isEmpty() || score.getAsDouble() < minScore) {
-            logger.warn("Login account step-up rejected: username={}, recaptchaScore={}, minScore={}",
-                    user.getUsername(), score.isPresent() ? score.getAsDouble() : null, minScore);
+            logger.warn("Login account step-up rejected: user={}, recaptchaScore={}, minScore={}",
+                    userLogLabel(user.getUsername()), score.isPresent() ? score.getAsDouble() : null, minScore);
             throw new AuthForbiddenException(STEP_UP_ERROR);
         }
     }
@@ -276,7 +303,7 @@ public class AuthApplicationService {
         double minScore = antibotProperties.getRecaptcha().getMinScore();
         if (score.isEmpty() || score.getAsDouble() < minScore) {
             logger.warn("Registration rejected by reCAPTCHA: ip={}, score={}, minScore={}",
-                    clientIp, score.isPresent() ? score.getAsDouble() : null, minScore);
+                    PiiMasker.maskIp(clientIp), score.isPresent() ? score.getAsDouble() : null, minScore);
             throw new AuthForbiddenException(REGISTRATION_FAILED);
         }
     }
@@ -292,7 +319,8 @@ public class AuthApplicationService {
 
     private void enforceSuperAdminTotp(User user, LoginRequest loginRequest, String clientIp) {
         if (!StringUtils.hasText(superAdminTotpSecret)) {
-            logger.error("Super-admin TOTP secret is not configured: username={}", user.getUsername());
+            logger.error("Super-admin TOTP secret is not configured: user={}",
+                    userLogLabel(user.getUsername()));
             throw new AuthForbiddenException(GENERIC_LOGIN_ERROR);
         }
 
@@ -300,13 +328,14 @@ public class AuthApplicationService {
         if (!StringUtils.hasText(provided)) {
             throw new SecondaryAuthRequiredException("Secondary authentication required");
         }
-        if (!totpService.isValidCode(superAdminTotpSecret, provided)) {
-            logger.warn("Rejected super-admin login with invalid TOTP code: username={}", user.getUsername());
+        if (!totpService.isValidCode(superAdminTotpSecret, provided.trim())) {
+            logger.warn("Rejected super-admin login with invalid TOTP code: user={}",
+                    userLogLabel(user.getUsername()));
             LoginAttemptService.LoginAttemptDecision failure = loginAttemptService.recordFailure(user.getUsername(), clientIp);
             if (!failure.allowed()) {
                 throw new AuthRateLimitException(RATE_LIMIT_ERROR, failure.retryAfterSeconds());
             }
-            throw new AuthForbiddenException(GENERIC_LOGIN_ERROR);
+            throw new AuthFailureException(GENERIC_LOGIN_ERROR);
         }
     }
 
@@ -314,9 +343,37 @@ public class AuthApplicationService {
         if (user.getRole() == User.Role.ADMIN) {
             return;
         }
-        logger.error("Configured super-admin account is not ADMIN; refusing login until role is fixed out of band: username={}",
-                user.getUsername());
+        logger.error("Configured super-admin account is not ADMIN; refusing login until role is fixed out of band: user={}",
+                userLogLabel(user.getUsername()));
         throw new AuthForbiddenException(GENERIC_LOGIN_ERROR);
+    }
+
+    private String userLogLabel(String username) {
+        return "user#" + PiiMasker.shortHash(username);
+    }
+
+    private String publicNickname(User user) {
+        String nickname = user.getNickname();
+        if (!StringUtils.hasText(nickname)) {
+            return null;
+        }
+        String normalizedNickname = nickname.trim();
+        String username = user.getUsername();
+        if (StringUtils.hasText(username) && normalizedNickname.equalsIgnoreCase(username.trim())) {
+            return null;
+        }
+        return normalizedNickname;
+    }
+
+    private String registrationNickname(String username, String nickname) {
+        if (!StringUtils.hasText(nickname)) {
+            return null;
+        }
+        String normalizedNickname = nickname.trim();
+        if (StringUtils.hasText(username) && normalizedNickname.equalsIgnoreCase(username.trim())) {
+            return null;
+        }
+        return normalizedNickname;
     }
 
     private boolean isProdProfileActive() {

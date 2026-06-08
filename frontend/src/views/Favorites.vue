@@ -7,18 +7,32 @@
         :animate="revealInView"
         :transition="revealTransition"
       >
-        <h1 class="text-3xl font-bold text-stone-800 mb-3 sm:text-4xl sm:mb-4">{{ t('favorites.title') }}</h1>
-        <p class="text-base text-stone-600 sm:text-lg">{{ t('favorites.subtitle') }}</p>
+        <h1 class="text-3xl font-bold text-stone-800 mb-3 sm:text-4xl sm:mb-4">{{ favoriteLabel('title') }}</h1>
+        <p class="text-base text-stone-600 sm:text-lg">{{ favoriteLabel('subtitle') }}</p>
       </motion.div>
 
-      <div v-if="loading" class="flex justify-center h-64">
+      <div v-if="loading" role="status" aria-live="polite" class="flex h-64 items-center justify-center">
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
+        <span class="sr-only">{{ t('common.loading') }}</span>
+      </div>
+
+      <div v-else-if="errorMessage" role="alert" class="rounded-2xl border border-rose-200 bg-rose-50 px-6 py-10 text-center">
+        <p class="text-base font-semibold text-rose-800">收藏列表加载失败</p>
+        <p class="mx-auto mt-2 max-w-md text-sm leading-6 text-rose-700">{{ errorMessage }}</p>
+        <button
+          type="button"
+          class="mt-5 rounded-lg bg-red-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-50"
+          :disabled="loading"
+          @click="fetchFavorites(currentPage)"
+        >
+          重新加载
+        </button>
       </div>
 
       <div v-else-if="favorites.length === 0" class="text-center py-16">
-        <p class="text-stone-500 text-lg">{{ t('favorites.empty') }}</p>
+        <p class="text-stone-500 text-lg">{{ favoriteLabel('empty') }}</p>
         <router-link to="/route-planner" class="mt-4 inline-block px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">
-          {{ t('favorites.goExplore') }}
+          {{ favoriteLabel('goExplore') }}
         </router-link>
       </div>
 
@@ -35,7 +49,7 @@
         >
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0 flex-1">
-              <h3 class="text-lg font-bold text-stone-800">{{ fav.route?.name || t('favorites.unknownRoute') }}</h3>
+              <h3 class="text-lg font-bold text-stone-800">{{ fav.route?.name || favoriteLabel('unknownRoute') }}</h3>
               <p class="break-words text-sm text-stone-500 mt-1">{{ fav.route?.description?.substring(0, 100) }}...</p>
               <div class="flex flex-wrap items-center gap-2 mt-3 text-sm text-stone-600 sm:gap-4">
                 <span>{{ t('admin.daysValue', { count: fav.route?.days || 0 }) }}</span>
@@ -49,9 +63,11 @@
               </div>
             </div>
             <motion.button
+              type="button"
               @click="removeFavorite(fav.route?.id)"
               class="shrink-0 text-red-500 hover:text-red-700"
-              :title="t('favorites.remove')"
+              :title="favoriteLabel('remove')"
+              :aria-label="favoriteLabel('remove')"
               :whileHover="{ scale: 1.2 }"
               :whilePress="{ scale: 0.9 }"
             >
@@ -64,7 +80,7 @@
       </div>
 
       <div v-if="totalPages > 1" class="flex justify-center mt-8 gap-2 overflow-x-auto pb-1">
-        <button v-for="page in totalPages" :key="page" @click="fetchFavorites(page - 1)"
+        <button v-for="page in totalPages" :key="page" type="button" @click="fetchFavorites(page - 1)"
           :class="currentPage === page - 1 ? 'bg-red-600 text-white' : 'bg-white text-stone-600 hover:bg-stone-100'"
           class="px-4 py-2 rounded-lg border transition-colors">{{ page }}</button>
       </div>
@@ -78,33 +94,59 @@ import { useI18n } from 'vue-i18n'
 import { motion } from 'motion-v'
 import { revealInitial, revealInView, revealTransition, cardInitial, cardInView, cardTransition, inViewOnce } from '../motion/presets'
 import api, { endpoints } from '../api'
+import { showToast } from '../composables/useToast'
+import { safeClientErrorMessage, summarizeClientError } from '../utils/errorMonitoring'
 
 const { t } = useI18n()
+const favoriteFallbacks = {
+  title: '我的收藏',
+  subtitle: '继续查看你收藏过的西藏路线',
+  empty: '还没有收藏路线',
+  goExplore: '去规划路线',
+  unknownRoute: '未命名路线',
+  remove: '取消收藏',
+  operationFailed: '操作失败，请稍后重试'
+} as const
+const favoriteLabel = (key: keyof typeof favoriteFallbacks) => {
+  const i18nKey = `favorites.${key}`
+  const translated = t(i18nKey)
+  return translated === i18nKey ? favoriteFallbacks[key] : translated
+}
 const favorites = ref<any[]>([])
 const loading = ref(true)
 const currentPage = ref(0)
 const totalPages = ref(1)
+const errorMessage = ref('')
 
 const fetchFavorites = async (page = 0) => {
   loading.value = true
+  errorMessage.value = ''
   try {
     const response = await api.get(endpoints.favorites.list, { params: { page, size: 20 } })
     favorites.value = response.data?.content || (Array.isArray(response.data) ? response.data : [])
     totalPages.value = response.data?.totalPages || 1
     currentPage.value = page
   } catch (e) {
+    console.error('Failed to fetch favorites:', summarizeClientError(e))
+    errorMessage.value = safeClientErrorMessage(e, '收藏列表加载失败，请稍后重试')
     favorites.value = []
   } finally {
     loading.value = false
   }
 }
 
-const removeFavorite = async (routeId: number) => {
+const removeFavorite = async (routeId?: number) => {
+  if (!routeId) {
+    showToast(favoriteLabel('operationFailed'), 'warning')
+    return
+  }
+
   try {
     await api.delete(endpoints.favorites.remove(routeId))
     favorites.value = favorites.value.filter(f => f.route?.id !== routeId)
   } catch (e) {
-    alert(t('favorites.operationFailed'))
+    console.error('Failed to remove favorite:', summarizeClientError(e))
+    showToast(safeClientErrorMessage(e, favoriteLabel('operationFailed')), 'error')
   }
 }
 

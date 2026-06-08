@@ -1,4 +1,5 @@
 package com.tibet.tourism.modules.admin.web;
+import com.tibet.tourism.common.api.PageResponse;
 import com.tibet.tourism.common.validation.InputSanitizer;
 import com.tibet.tourism.modules.admin.web.dto.ScenicSpotRequest;
 import com.tibet.tourism.modules.community.domain.Comment;
@@ -13,9 +14,11 @@ import com.tibet.tourism.modules.spot.infra.SpotTagRepository;
 import com.tibet.tourism.modules.user.domain.User;
 import com.tibet.tourism.modules.user.infra.UserVisitHistoryRepository;
 import jakarta.validation.Valid;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Optional;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
@@ -55,9 +58,9 @@ public class AdminScenicSpotController {
     }
 
     @GetMapping("/spots")
-    public ResponseEntity<Page<ScenicSpot>> getAllSpots(
+    public ResponseEntity<PageResponse<ScenicSpotResponse>> getAllSpots(
             @PageableDefault(size = 50, sort = "id", direction = Sort.Direction.ASC) Pageable pageable) {
-        return ResponseEntity.ok(scenicSpotRepository.findAllWithoutTags(pageable));
+        return ResponseEntity.ok(PageResponse.from(scenicSpotRepository.findAllWithoutTags(pageable).map(ScenicSpotResponse::from)));
     }
 
     @PutMapping("/spots/{id}")
@@ -124,7 +127,7 @@ public class AdminScenicSpotController {
         if (request.getLongitude() != null) spot.setLongitude(request.getLongitude());
 
         scenicSpotRepository.save(spot);
-        return ResponseEntity.ok(spot);
+        return ResponseEntity.ok(ScenicSpotResponse.from(spot));
     }
 
     @PostMapping("/spots")
@@ -178,7 +181,7 @@ public class AdminScenicSpotController {
         if (request.getLocation() != null) spot.setLocation(InputSanitizer.optionalPlainText(request.getLocation(), 200, "位置"));
 
         scenicSpotRepository.save(spot);
-        return ResponseEntity.ok(spot);
+        return ResponseEntity.ok(ScenicSpotResponse.from(spot));
     }
 
     @DeleteMapping("/spots/{id}")
@@ -195,5 +198,59 @@ public class AdminScenicSpotController {
         tagRepository.deleteBySpotId(id);
         scenicSpotRepository.deleteById(id);
         return ResponseEntity.ok(Map.of("message", "删除成功"));
+    }
+    public record ScenicSpotResponse(
+            Long id,
+            String name,
+            String nameTibetan,
+            String description,
+            String descriptionTibetan,
+            String imageUrl,
+            String altitude,
+            String location,
+            ScenicSpot.Category category,
+            BigDecimal ticketPrice,
+            BigDecimal peakSeasonPrice,
+            BigDecimal offSeasonPrice,
+            LocalDate peakStartDate,
+            LocalDate peakEndDate,
+            LocalDate freeStartDate,
+            LocalDate freeEndDate,
+            BigDecimal rating,
+            BigDecimal latitude,
+            BigDecimal longitude,
+            Integer visitCount,
+            Integer num,
+            String openInfo,
+            String entryTime,
+            LocalDateTime createdAt
+    ) {
+        private static ScenicSpotResponse from(ScenicSpot spot) {
+            return new ScenicSpotResponse(
+                    spot.getId(),
+                    spot.getName(),
+                    spot.getNameTibetan(),
+                    spot.getDescription(),
+                    spot.getDescriptionTibetan(),
+                    spot.getImageUrl(),
+                    spot.getAltitude(),
+                    spot.getLocation(),
+                    spot.getCategory(),
+                    spot.getTicketPrice(),
+                    spot.getPeakSeasonPrice(),
+                    spot.getOffSeasonPrice(),
+                    spot.getPeakStartDate(),
+                    spot.getPeakEndDate(),
+                    spot.getFreeStartDate(),
+                    spot.getFreeEndDate(),
+                    spot.getRating(),
+                    spot.getLatitude(),
+                    spot.getLongitude(),
+                    spot.getVisitCount(),
+                    spot.getNum(),
+                    spot.getOpenInfo(),
+                    spot.getEntryTime(),
+                    spot.getCreatedAt());
+        }
     }
 }

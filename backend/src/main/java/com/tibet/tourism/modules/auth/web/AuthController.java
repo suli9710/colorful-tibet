@@ -1,5 +1,6 @@
 package com.tibet.tourism.modules.auth.web;
 import com.tibet.tourism.common.security.CookieAuthConstants;
+import com.tibet.tourism.common.security.SensitiveLogSanitizer;
 import com.tibet.tourism.common.security.TokenRevocationService;
 import com.tibet.tourism.common.security.UserSessionVersionService;
 import com.tibet.tourism.modules.auth.application.AuthApplicationService;
@@ -21,6 +22,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -32,7 +35,14 @@ import org.springframework.web.util.WebUtils;
 @RequestMapping("/api/auth")
 public class AuthController {
 
+    private static final Logger logger = LoggerFactory.getLogger(AuthController.class);
     private static final Duration AUTH_COOKIE_MAX_AGE = Duration.ofDays(1);
+    private static final String LOGIN_ERROR = "Invalid username or password";
+    private static final String RATE_LIMIT_ERROR = "Too many requests, please try again later";
+    private static final String SECONDARY_AUTH_REQUIRED = "Secondary authentication required";
+    private static final String AUTH_REQUEST_DENIED = "Authentication request denied";
+    private static final String REGISTRATION_FAILED = "Registration failed, please check your input";
+    private static final String REGISTRATION_SUCCESS = "User registered successfully!";
 
     private final AuthApplicationService authApplicationService;
     private final TokenRevocationService tokenRevocationService;
@@ -60,18 +70,24 @@ public class AuthController {
                     .body(result.user());
         } catch (AuthRateLimitException exception) {
             ResponseEntity.BodyBuilder builder = ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS);
-            if (exception.getRetryAfterSeconds() > 0) {
-                builder.header(HttpHeaders.RETRY_AFTER, String.valueOf(exception.getRetryAfterSeconds()));
+            long retryAfterSeconds = exception.getRetryAfterSeconds();
+            if (retryAfterSeconds > 0) {
+                builder.header(HttpHeaders.RETRY_AFTER, String.valueOf(retryAfterSeconds));
             }
-            return builder.body(Map.of("error", exception.getMessage()));
+            return builder.body(Map.of(
+                    "error", RATE_LIMIT_ERROR,
+                    "retryAfterSeconds", retryAfterSeconds));
         } catch (SecondaryAuthRequiredException exception) {
             return ResponseEntity.status(449).body(Map.of(
-                    "error", exception.getMessage(),
+                    "error", SECONDARY_AUTH_REQUIRED,
                     "requiresSecondaryAuth", true));
         } catch (AuthForbiddenException exception) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", exception.getMessage()));
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", AUTH_REQUEST_DENIED));
         } catch (AuthFailureException exception) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", exception.getMessage()));
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", LOGIN_ERROR));
+        } catch (RuntimeException exception) {
+            logger.warn("Login request failed unexpectedly: {}", SensitiveLogSanitizer.exceptionSummary(exception));
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", LOGIN_ERROR));
         }
     }
 
@@ -93,13 +109,17 @@ public class AuthController {
     public ResponseEntity<?> registerUser(@Valid @RequestBody RegisterRequest signUpRequest, HttpServletRequest request) {
         try {
             authApplicationService.register(signUpRequest, request);
-            return ResponseEntity.ok(Map.of("message", "User registered successfully!"));
+            return ResponseEntity.ok(Map.of("message", REGISTRATION_SUCCESS));
         } catch (AuthForbiddenException exception) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", exception.getMessage()));
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", REGISTRATION_FAILED));
         } catch (DuplicateRegistrationException exception) {
-            return ResponseEntity.badRequest().body(Map.of("message", exception.getMessage()));
+            return ResponseEntity.badRequest().body(Map.of("message", REGISTRATION_FAILED));
         } catch (IllegalArgumentException exception) {
-            return ResponseEntity.badRequest().body(Map.of("message", exception.getMessage()));
+            return ResponseEntity.badRequest().body(Map.of("message", REGISTRATION_FAILED));
+        } catch (RuntimeException exception) {
+            logger.warn("Registration request failed unexpectedly: {}",
+                    SensitiveLogSanitizer.exceptionSummary(exception));
+            return ResponseEntity.badRequest().body(Map.of("message", REGISTRATION_FAILED));
         }
     }
 

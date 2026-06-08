@@ -2,9 +2,11 @@
 import NavBar from './components/NavBar.vue'
 import Footer from './components/Footer.vue'
 import MobileBottomNav from './components/MobileBottomNav.vue'
+import ConfirmHost from './components/ConfirmHost.vue'
 import ToastHost from './components/ToastHost.vue'
 import { defineAsyncComponent, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { AnimatePresence, MotionConfig, motion } from 'motion-v'
 import { showToast } from './composables/useToast'
 import {
@@ -20,6 +22,7 @@ import {
 } from './motion/presets'
 
 const router = useRouter()
+const { t } = useI18n()
 const AiRouteFloatingBall = defineAsyncComponent(() => import('./components/AiRouteFloatingBall.vue'))
 const isNavigating = ref(false)
 let finishTimer: number | undefined
@@ -46,7 +49,7 @@ onMounted(() => {
   })
   removeAfterEach = router.afterEach(finishNavigation)
   removeOnError = router.onError(() => {
-    showToast('页面加载失败，请刷新后重试', 'error')
+    showToast(t('toast.pageLoadFailed'), 'error')
     finishNavigation()
   })
   window.addEventListener('beforeunload', handleBeforeUnload)
@@ -106,6 +109,7 @@ onBeforeUnmount(() => {
       <Footer />
       <AiRouteFloatingBall />
       <MobileBottomNav />
+      <ConfirmHost />
       <ToastHost />
     </div>
   </MotionConfig>

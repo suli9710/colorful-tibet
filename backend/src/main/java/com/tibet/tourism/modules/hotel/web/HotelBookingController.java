@@ -1,14 +1,13 @@
 package com.tibet.tourism.modules.hotel.web;
+import com.tibet.tourism.common.api.PageResponse;
 import com.tibet.tourism.common.security.antibot.BehaviorData;
 import com.tibet.tourism.common.security.antibot.RiskAssessmentService;
 import com.tibet.tourism.common.security.antibot.RiskResult;
 import com.tibet.tourism.common.validation.InputSanitizer;
 import com.tibet.tourism.modules.hotel.application.HotelBookingService;
-import com.tibet.tourism.modules.hotel.domain.Hotel;
 import com.tibet.tourism.modules.hotel.domain.HotelBooking;
 import com.tibet.tourism.modules.hotel.web.dto.HotelBookingRequest;
 import com.tibet.tourism.modules.hotel.web.dto.HotelBookingResponse;
-import com.tibet.tourism.modules.order.domain.Booking;
 import com.tibet.tourism.modules.user.domain.User;
 import com.tibet.tourism.modules.user.infra.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
@@ -42,6 +41,15 @@ public class HotelBookingController {
     private static final Set<String> ALLOWED_BOOKING_SORT_FIELDS = Set.of(
             "id", "status", "checkInDate", "checkOutDate", "totalPrice", "createdAt");
     private static final Sort DEFAULT_BOOKING_SORT = Sort.by(Sort.Direction.DESC, "createdAt").and(Sort.by("id"));
+    private static final String ERROR_NOT_AUTHENTICATED = "User not authenticated";
+    private static final String ERROR_SECURITY_VALIDATION_FAILED = "Security validation failed";
+    private static final String ERROR_ACCESS_DENIED = "Access denied";
+    private static final String ERROR_INVALID_BOOKING_PARAMETERS = "Invalid booking parameters";
+    private static final String ERROR_HOTEL_BOOKING_UNAVAILABLE =
+            "Selected room is unavailable for the requested dates";
+    private static final String ERROR_HOTEL_BOOKING_NOT_FOUND = "Hotel booking not found";
+    private static final String ERROR_INVALID_STATUS = "Invalid status";
+    private static final String ERROR_BOOKING_STATE_CONFLICT = "Booking state cannot be changed";
 
     private final HotelBookingService hotelBookingService;
     private final UserRepository userRepository;
@@ -82,7 +90,7 @@ public class HotelBookingController {
             HttpServletRequest httpRequest) {
         User user = getCurrentUser();
         if (user == null) {
-            return ResponseEntity.status(401).body(Map.of("error", "User not authenticated"));
+            return ResponseEntity.status(401).body(Map.of("error", ERROR_NOT_AUTHENTICATED));
         }
 
         RiskResult risk = riskAssessmentService.assess(
@@ -90,7 +98,7 @@ public class HotelBookingController {
                 httpRequest.getRemoteAddr(), "/api/hotel-bookings");
         if (risk.decision() != RiskResult.Decision.ALLOW) {
             return ResponseEntity.status(403).body(Map.of(
-                    "error", risk.decision() == RiskResult.Decision.BLOCK ? "请求被安全系统拦截" : "请完成安全验证",
+                    "error", ERROR_SECURITY_VALIDATION_FAILED,
                     "code", "ANTIBOT_" + risk.decision().name()));
         }
 
@@ -103,11 +111,11 @@ public class HotelBookingController {
                     "totalPrice", saved.getTotalPrice()
             ));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", "酒店预订参数不合法"));
+            return ResponseEntity.badRequest().body(Map.of("error", ERROR_INVALID_BOOKING_PARAMETERS));
         } catch (IllegalStateException e) {
-            return ResponseEntity.status(409).body(Map.of("error", "所选日期房型不可预订"));
+            return ResponseEntity.status(409).body(Map.of("error", ERROR_HOTEL_BOOKING_UNAVAILABLE));
         } catch (NoSuchElementException e) {
-            return ResponseEntity.status(404).body(Map.of("error", "酒店预订资源不存在"));
+            return ResponseEntity.status(404).body(Map.of("error", ERROR_HOTEL_BOOKING_NOT_FOUND));
         }
     }
 
@@ -116,12 +124,12 @@ public class HotelBookingController {
     public ResponseEntity<?> getMyBookings(@PageableDefault(size = 20) Pageable pageable) {
         User user = getCurrentUser();
         if (user == null) {
-            return ResponseEntity.status(401).body(Map.of("error", "User not authenticated"));
+            return ResponseEntity.status(401).body(Map.of("error", ERROR_NOT_AUTHENTICATED));
         }
         Pageable safePageable = InputSanitizer.sanitizePageable(
                 pageable, ALLOWED_BOOKING_SORT_FIELDS, DEFAULT_BOOKING_SORT, 20, 100);
         Page<HotelBookingResponse> bookings = hotelBookingService.getUserBookings(user, safePageable);
-        return ResponseEntity.ok(bookings);
+        return ResponseEntity.ok(PageResponse.from(bookings));
     }
 
     @GetMapping
@@ -129,15 +137,16 @@ public class HotelBookingController {
     public ResponseEntity<?> getAllBookings(@PageableDefault(size = 20) Pageable pageable) {
         User user = getCurrentUser();
         if (user == null) {
-            return ResponseEntity.status(401).body(Map.of("error", "User not authenticated"));
+            return ResponseEntity.status(401).body(Map.of("error", ERROR_NOT_AUTHENTICATED));
         }
 
         try {
             Pageable safePageable = InputSanitizer.sanitizePageable(
                     pageable, ALLOWED_BOOKING_SORT_FIELDS, DEFAULT_BOOKING_SORT, 20, 100);
-            return ResponseEntity.ok(hotelBookingService.getAllBookings(user, safePageable));
+            Page<HotelBookingResponse> bookings = hotelBookingService.getAllBookings(user, safePageable);
+            return ResponseEntity.ok(PageResponse.from(bookings));
         } catch (SecurityException e) {
-            return ResponseEntity.status(403).body(Map.of("error", "无权操作该资源"));
+            return ResponseEntity.status(403).body(Map.of("error", ERROR_ACCESS_DENIED));
         }
     }
 
@@ -146,15 +155,15 @@ public class HotelBookingController {
     public ResponseEntity<?> revealBookingPii(@PathVariable Long id) {
         User user = getCurrentUser();
         if (user == null) {
-            return ResponseEntity.status(401).body(Map.of("error", "User not authenticated"));
+            return ResponseEntity.status(401).body(Map.of("error", ERROR_NOT_AUTHENTICATED));
         }
 
         try {
             return ResponseEntity.ok(hotelBookingService.revealBookingPii(user, id));
         } catch (SecurityException e) {
-            return ResponseEntity.status(403).body(Map.of("error", "Unauthorized"));
+            return ResponseEntity.status(403).body(Map.of("error", ERROR_ACCESS_DENIED));
         } catch (NoSuchElementException e) {
-            return ResponseEntity.status(404).body(Map.of("error", "Hotel booking not found"));
+            return ResponseEntity.status(404).body(Map.of("error", ERROR_HOTEL_BOOKING_NOT_FOUND));
         }
     }
 
@@ -163,20 +172,20 @@ public class HotelBookingController {
     public ResponseEntity<?> updateStatus(@PathVariable Long id, @RequestBody Map<String, String> payload) {
         User user = getCurrentUser();
         if (user == null) {
-            return ResponseEntity.status(401).body(Map.of("error", "User not authenticated"));
+            return ResponseEntity.status(401).body(Map.of("error", ERROR_NOT_AUTHENTICATED));
         }
 
         try {
             hotelBookingService.updateStatus(user, id, payload.get("status"));
             return ResponseEntity.ok(Map.of("message", "Status updated successfully"));
         } catch (SecurityException e) {
-            return ResponseEntity.status(403).body(Map.of("error", "无权操作该资源"));
+            return ResponseEntity.status(403).body(Map.of("error", ERROR_ACCESS_DENIED));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Invalid status"));
+            return ResponseEntity.badRequest().body(Map.of("error", ERROR_INVALID_STATUS));
         } catch (IllegalStateException e) {
-            return ResponseEntity.status(409).body(Map.of("error", "预订状态不允许这样变更"));
+            return ResponseEntity.status(409).body(Map.of("error", ERROR_BOOKING_STATE_CONFLICT));
         } catch (NoSuchElementException e) {
-            return ResponseEntity.status(404).body(Map.of("error", "酒店预订资源不存在"));
+            return ResponseEntity.status(404).body(Map.of("error", ERROR_HOTEL_BOOKING_NOT_FOUND));
         }
     }
 
@@ -185,18 +194,18 @@ public class HotelBookingController {
     public ResponseEntity<?> cancelBooking(@PathVariable Long id) {
         User user = getCurrentUser();
         if (user == null) {
-            return ResponseEntity.status(401).body(Map.of("error", "User not authenticated"));
+            return ResponseEntity.status(401).body(Map.of("error", ERROR_NOT_AUTHENTICATED));
         }
 
         try {
             hotelBookingService.cancelBooking(user, id);
             return ResponseEntity.ok(Map.of("message", "Booking cancelled successfully"));
         } catch (SecurityException e) {
-            return ResponseEntity.status(403).body(Map.of("error", "无权操作该资源"));
+            return ResponseEntity.status(403).body(Map.of("error", ERROR_ACCESS_DENIED));
         } catch (IllegalStateException e) {
-            return ResponseEntity.status(409).body(Map.of("error", "预订状态不允许这样变更"));
+            return ResponseEntity.status(409).body(Map.of("error", ERROR_BOOKING_STATE_CONFLICT));
         } catch (NoSuchElementException e) {
-            return ResponseEntity.status(404).body(Map.of("error", "酒店预订资源不存在"));
+            return ResponseEntity.status(404).body(Map.of("error", ERROR_HOTEL_BOOKING_NOT_FOUND));
         }
     }
 
@@ -205,18 +214,18 @@ public class HotelBookingController {
     public ResponseEntity<?> deleteBooking(@PathVariable Long id) {
         User user = getCurrentUser();
         if (user == null) {
-            return ResponseEntity.status(401).body(Map.of("error", "User not authenticated"));
+            return ResponseEntity.status(401).body(Map.of("error", ERROR_NOT_AUTHENTICATED));
         }
 
         try {
             hotelBookingService.deleteBooking(user, id);
             return ResponseEntity.noContent().build();
         } catch (SecurityException e) {
-            return ResponseEntity.status(403).body(Map.of("error", "无权操作该资源"));
+            return ResponseEntity.status(403).body(Map.of("error", ERROR_ACCESS_DENIED));
         } catch (IllegalStateException e) {
-            return ResponseEntity.status(409).body(Map.of("error", e.getMessage()));
+            return ResponseEntity.status(409).body(Map.of("error", ERROR_BOOKING_STATE_CONFLICT));
         } catch (NoSuchElementException e) {
-            return ResponseEntity.status(404).body(Map.of("error", "酒店预订资源不存在"));
+            return ResponseEntity.status(404).body(Map.of("error", ERROR_HOTEL_BOOKING_NOT_FOUND));
         }
     }
 

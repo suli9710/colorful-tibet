@@ -75,10 +75,11 @@
 
         <!-- Bead-style carousel dots -->
         <div class="mt-8 flex items-center justify-center gap-2.5 sm:mt-10">
-          <button v-for="(slide, index) in heroSlides" :key="`${slide.image}-${index}`" @click="goToSlide(index)"
+          <button v-for="(slide, index) in heroSlides" :key="`${slide.image}-${index}`" type="button" @click="goToSlide(index)"
                   class="tibet-carousel-dot"
                   :style="{ width: currentSlide === index ? '28px' : '8px', opacity: currentSlide === index ? 1 : 0.68 }"
                   :class="{ active: currentSlide === index }"
+                  :aria-current="currentSlide === index ? 'true' : undefined"
                   :aria-label="t('home.carouselDot', { index: index + 1 })"></button>
         </div>
       </div>
@@ -117,8 +118,9 @@
         @viewportEnter="heatmapMounted = true"
       >
         <HeatMap v-if="heatmapMounted" />
-        <div v-else class="flex h-[420px] items-center justify-center rounded-2xl bg-white/70 sm:h-[600px]">
+        <div v-else class="flex h-[420px] items-center justify-center rounded-2xl bg-white/70 sm:h-[600px]" role="status" :aria-label="t('common.loading')">
           <div class="tibet-spinner"></div>
+          <span class="sr-only">{{ t('common.loading') }}</span>
         </div>
       </motion.div>
     </div>
@@ -145,21 +147,46 @@
           </router-link>
         </motion.div>
 
-        <div v-if="loading" class="flex justify-center py-20">
-          <motion.div
-            class="rounded-full h-12 w-12 border-b-2 border-tibet-gold"
-            :animate="{ rotate: 360 }"
-            :transition="{ duration: 0.9, ease: 'linear', repeat: Infinity }"
-          />
+        <div
+          v-if="recommendationNotice"
+          class="mb-6 rounded-2xl border border-tibet-gold/20 bg-white/70 px-4 py-3 text-sm leading-6 text-tibet-brown/75 shadow-sm backdrop-blur tibetan-font"
+          role="status"
+        >
+          {{ recommendationNotice }}
         </div>
 
-        <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div v-if="loading" role="status" :aria-label="t('home.recommendationsLoading')" class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3 lg:gap-8">
+          <span class="sr-only">{{ t('home.recommendationsLoading') }}</span>
+          <div v-for="i in 3" :key="i" class="overflow-hidden rounded-3xl border border-tibet-gold/20 bg-white/75 shadow-sm" aria-hidden="true">
+            <div class="h-56 animate-pulse bg-tibet-gold/10 sm:h-72"></div>
+            <div class="p-5 sm:p-8">
+              <div class="mb-4 h-6 w-3/4 animate-pulse rounded bg-tibet-gold/10"></div>
+              <div class="mb-2 h-4 animate-pulse rounded bg-tibet-gold/10"></div>
+              <div class="mb-6 h-4 w-5/6 animate-pulse rounded bg-tibet-gold/10"></div>
+              <div class="flex gap-2">
+                <div class="h-6 w-16 animate-pulse rounded-full bg-tibet-gold/10"></div>
+                <div class="h-6 w-16 animate-pulse rounded-full bg-tibet-gold/10"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div v-else-if="recommendedSpots.length === 0" class="rounded-3xl border border-tibet-gold/20 bg-white/75 p-8 text-center shadow-sm">
+          <h3 class="mb-2 text-xl font-bold text-tibet-dark tibetan-font">{{ t('home.noRecommendationsTitle') }}</h3>
+          <p class="mx-auto mb-5 max-w-xl text-sm leading-6 text-tibet-brown/70 tibetan-font">{{ t('home.noRecommendationsMessage') }}</p>
+          <router-link to="/spots" class="inline-flex min-h-11 items-center justify-center rounded-full bg-tibet-dark px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-tibet-dark/90 focus:outline-none focus:ring-2 focus:ring-tibet-gold/60 focus:ring-offset-2 tibetan-font">
+            {{ t('common.viewAll') }}
+          </router-link>
+        </div>
+
+        <div v-else class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3 lg:gap-8">
           <AnimatePresence mode="popLayout">
           <motion.div v-for="(spot, index) in recommendedSpots" :key="spot.id"
                layout
                class="group tibet-card-elevated overflow-hidden gpu-accelerated cursor-pointer focus:outline-none focus:ring-2 focus:ring-tibet-gold/60 focus:ring-offset-4"
                role="link"
                tabindex="0"
+               :aria-label="t('spots.cardAria', { name: spot.name })"
                @click="goToSpot(spot)"
                @keydown.enter.prevent="goToSpot(spot)"
                @keydown.space.prevent="goToSpot(spot)"
@@ -194,25 +221,26 @@
 
               <div class="p-5 sm:p-8">
               <div class="mb-4 flex items-start justify-between gap-3">
-                <h3 class="min-w-0 text-xl font-bold text-tibet-dark transition-colors duration-300 ease-out-expo group-hover:text-tibet-red sm:text-2xl font-display">{{ spot.name }}</h3>
-                <span class="shrink-0 text-base font-semibold text-tibet-red transform transition-transform duration-300 ease-out-expo group-hover:scale-105 sm:text-lg will-change-transform">¥{{ spot.ticketPrice }}</span>
+                <h3 class="min-w-0 break-words text-xl font-bold leading-tight text-tibet-dark transition-colors duration-300 ease-out-expo line-clamp-2 group-hover:text-tibet-red sm:text-2xl font-display">{{ spot.name }}</h3>
+                <span class="max-w-[42%] shrink-0 break-words text-right text-base font-semibold leading-tight text-tibet-red transform transition-transform duration-300 ease-out-expo group-hover:scale-105 sm:text-lg will-change-transform">{{ formatPrice(spot.ticketPrice) }}</span>
               </div>
-              <p v-if="getRecommendationReason(spot.id)" class="text-xs text-tibet-gold mb-3 font-medium tibetan-font">
+              <p v-if="getRecommendationReason(spot.id)" class="mb-3 break-words text-xs font-medium text-tibet-gold tibetan-font">
                 💡 {{ getRecommendationReason(spot.id) }}
               </p>
-              <p class="text-tibet-brown/70 mb-6 line-clamp-2 leading-relaxed tibetan-font">{{ spot.description }}</p>
+              <p class="mb-6 break-words text-tibet-brown/70 line-clamp-2 leading-relaxed tibetan-font">{{ spot.description }}</p>
 
               <div class="flex flex-wrap items-center justify-between gap-3 border-t border-tibet-gold/20 pt-5 sm:pt-6">
-                <div class="flex flex-wrap gap-2">
+                <div class="flex min-w-0 flex-wrap gap-2">
                   <motion.span v-for="(tag, tagIndex) in spot.tags?.slice(0, 2)" :key="tag.id"
-                        class="tibet-tag tibetan-font">
+                        class="tibet-tag max-w-full truncate tibetan-font">
                     {{ tag.tag }}
                   </motion.span>
                 </div>
-                <motion.button @click.stop="goToSpot(spot)"
+                <motion.button type="button" @click.stop="goToSpot(spot)"
+                        :aria-label="t('spots.cardAria', { name: spot.name })"
                         :whileHover="{ x: 3 }"
                         :whilePress="{ scale: 0.96 }"
-                        class="tibet-link text-sm flex items-center group/btn tibetan-font">
+                        class="tibet-link inline-flex min-h-11 items-center text-sm group/btn tibetan-font focus:outline-none focus:ring-2 focus:ring-tibet-gold/60 focus:ring-offset-2">
                   {{ t('common.book') }}
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-1 transform group-hover/btn:translate-x-2 transition-transform duration-300 ease-out-expo will-change-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
@@ -235,6 +263,7 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import api, { endpoints } from '../api'
 import { useAuthStore } from '../stores/auth'
+import { summarizeClientError } from '../utils/errorMonitoring'
 import {
   cardExit,
   cardInitial,
@@ -253,8 +282,45 @@ const router = useRouter()
 const { t, locale } = useI18n()
 const auth = useAuthStore()
 const prefersReducedMotion = useReducedMotion()
-const recommendedSpots = ref<any[]>([])
+
+type SpotCategory = 'NATURAL' | 'CULTURAL'
+
+interface SpotTag {
+  id: string | number
+  tag: string
+}
+
+interface ScenicSpot {
+  id: number | string
+  name: string
+  imageUrl?: string
+  category?: SpotCategory | string
+  ticketPrice?: number | string | null
+  description?: string
+  rating?: number | string | null
+  visitCount?: number | string | null
+  tags?: SpotTag[]
+}
+
+interface HeroSlide {
+  image: string
+  title: string
+  subtitle: string
+  tag: string
+  linkUrl?: string
+}
+
+interface CarouselResponse {
+  imageUrl: string
+  title: string
+  subtitle?: string
+  tag?: string
+  linkUrl?: string
+}
+
+const recommendedSpots = ref<ScenicSpot[]>([])
 const recommendationReasons = ref<Map<number, string>>(new Map())
+const recommendationNotice = ref('')
 const loading = ref(true)
 const heatmapMounted = ref(false)
 const currentSlide = ref(0)
@@ -281,8 +347,8 @@ const createDefaultHeroSlides = () => [
     linkUrl: '/heritage'
   }
 ]
-const heroSlides = ref<Array<{ image: string; title: string; subtitle: string; tag: string; linkUrl?: string }>>(createDefaultHeroSlides())
-const fallbackRecommendedSpots = [
+const heroSlides = ref<HeroSlide[]>(createDefaultHeroSlides())
+const fallbackRecommendedSpots: ScenicSpot[] = [
   {
     id: 1,
     name: '布达拉宫',
@@ -326,7 +392,7 @@ const fetchCarousels = async () => {
   try {
     const response = await api.get(endpoints.carousels.list)
     if (response.data && response.data.length > 0) {
-      heroSlides.value = response.data.map((c: any) => ({
+      heroSlides.value = response.data.map((c: CarouselResponse) => ({
         image: c.imageUrl,
         title: c.title,
         subtitle: c.subtitle || '',
@@ -367,24 +433,36 @@ const stopCarousel = () => {
   }
 }
 
-const applyFallbackRecommendations = () => {
+const applyFallbackRecommendations = (notice = '') => {
   recommendedSpots.value = fallbackRecommendedSpots
   recommendationReasons.value = new Map(
-    fallbackRecommendedSpots.map((spot) => [spot.id, t('home.selectedForYou')])
+    fallbackRecommendedSpots.map((spot) => [Number(spot.id), t('home.selectedForYou')])
   )
+  recommendationNotice.value = notice
 }
 
 // 获取推荐原因（处理类型转换）
-const getRecommendationReason = (spotId: number) => {
+const getRecommendationReason = (spotId: ScenicSpot['id']) => {
   if (!spotId) return null
   // 尝试多种可能的 key 类型
-  const reason = recommendationReasons.value.get(spotId) || 
-                 recommendationReasons.value.get(Number(spotId))
+  const reason = recommendationReasons.value.get(Number(spotId))
   // 如果还是没有，返回默认原因
   return reason || t('home.recommendationReason')
 }
 
-const goToSpot = (spot: any) => {
+const formatNumber = (value: number | string | null | undefined) => {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+const formatPrice = (price: ScenicSpot['ticketPrice']) => {
+  const value = formatNumber(price)
+  if (value == null) return t('common.pendingConfirm')
+  if (value <= 0) return t('common.freeTicket')
+  return t('common.priceCny', { price: value })
+}
+
+const goToSpot = (spot: ScenicSpot) => {
   if (spot?.id == null) {
     console.warn('推荐景点数据缺少 id，无法进入详情页:', spot)
     return
@@ -394,45 +472,48 @@ const goToSpot = (spot: any) => {
 
 const fetchRecommendations = async () => {
   try {
-    const user = auth.user
-    if (user?.id != null) {
-      const recommendationRes = await api.get(`${endpoints.spots.recommendations}?userId=${encodeURIComponent(String(user.id))}`)
+    loading.value = true
+    recommendationNotice.value = ''
+    if (auth.hasValidSession()) {
+      const recommendationRes = await api.get(endpoints.spots.recommendationsMe)
 
       recommendedSpots.value = Array.isArray(recommendationRes.data) ? recommendationRes.data : []
 
       if (!recommendedSpots.value.length) {
-        applyFallbackRecommendations()
+        applyFallbackRecommendations(t('home.noRecommendationsMessage'))
         return
       }
 
       const reasonsMap = new Map<number, string>()
-      recommendedSpots.value.forEach((spot: any) => {
-        if (spot.rating && spot.rating >= 4.0) {
-          reasonsMap.set(spot.id, t('home.highRatingSpot'))
-        } else if (spot.visitCount && spot.visitCount > 15000) {
-          reasonsMap.set(spot.id, t('home.popularSpot'))
+      recommendedSpots.value.forEach((spot) => {
+        const rating = formatNumber(spot.rating)
+        const visitCount = formatNumber(spot.visitCount)
+        if (rating != null && rating >= 4.0) {
+          reasonsMap.set(Number(spot.id), t('home.highRatingSpot'))
+        } else if (visitCount != null && visitCount > 15000) {
+          reasonsMap.set(Number(spot.id), t('home.popularSpot'))
         } else {
-          reasonsMap.set(spot.id, t('home.selectedForYou'))
+          reasonsMap.set(Number(spot.id), t('home.selectedForYou'))
         }
       })
       recommendationReasons.value = reasonsMap
     } else {
       const response = await api.get(endpoints.spots.list)
       const spots = response.data?.content || response.data || []
-      recommendedSpots.value = spots.slice(0, 3)
+      recommendedSpots.value = Array.isArray(spots) ? spots.slice(0, 3) : []
       if (!recommendedSpots.value.length) {
-        applyFallbackRecommendations()
+        applyFallbackRecommendations(t('home.noRecommendationsMessage'))
         return
       }
       const defaultReasons = new Map<number, string>()
-      recommendedSpots.value.forEach((spot: any) => {
-        defaultReasons.set(spot.id, t('home.popularSpot'))
+      recommendedSpots.value.forEach((spot) => {
+        defaultReasons.set(Number(spot.id), t('home.popularSpot'))
       })
       recommendationReasons.value = defaultReasons
     }
   } catch (error) {
-    console.warn('Using fallback recommendations after request failed:', error)
-    applyFallbackRecommendations()
+    console.warn('Using fallback recommendations after request failed:', summarizeClientError(error))
+    applyFallbackRecommendations(t('home.recommendationsFallbackMessage'))
   } finally {
     loading.value = false
   }

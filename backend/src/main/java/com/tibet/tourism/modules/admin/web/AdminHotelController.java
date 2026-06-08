@@ -1,4 +1,5 @@
 package com.tibet.tourism.modules.admin.web;
+import com.tibet.tourism.common.api.PageResponse;
 import com.tibet.tourism.common.validation.InputSanitizer;
 import com.tibet.tourism.modules.admin.web.dto.HotelRequest;
 import com.tibet.tourism.modules.hotel.domain.Hotel;
@@ -12,8 +13,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import jakarta.validation.Valid;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.Map;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
@@ -45,9 +46,9 @@ public class AdminHotelController {
     }
 
     @GetMapping("/hotels")
-    public ResponseEntity<Page<Hotel>> getAllHotels(
+    public ResponseEntity<PageResponse<HotelResponse>> getAllHotels(
             @PageableDefault(size = 50, sort = "id", direction = Sort.Direction.ASC) Pageable pageable) {
-        return ResponseEntity.ok(hotelRepository.findAll(pageable));
+        return ResponseEntity.ok(PageResponse.from(hotelRepository.findAll(pageable).map(HotelResponse::from)));
     }
 
     @PostMapping("/hotels")
@@ -64,7 +65,7 @@ public class AdminHotelController {
             hotel.setRating(request.getRating());
         }
         hotelRepository.save(hotel);
-        return ResponseEntity.ok(hotel);
+        return ResponseEntity.ok(HotelResponse.from(hotel));
     }
 
     @PutMapping("/hotels/{id}")
@@ -83,7 +84,7 @@ public class AdminHotelController {
             hotel.setRating(request.getRating());
         }
         hotelRepository.save(hotel);
-        return ResponseEntity.ok(hotel);
+        return ResponseEntity.ok(HotelResponse.from(hotel));
     }
 
     @DeleteMapping("/hotels/{id}")
@@ -97,7 +98,10 @@ public class AdminHotelController {
 
     @GetMapping("/hotels/{hotelId}/room-types")
     public ResponseEntity<?> getRoomTypes(@PathVariable Long hotelId) {
-        return ResponseEntity.ok(roomTypeRepository.findByHotelIdOrderBySortOrderAsc(hotelId));
+        return ResponseEntity.ok(roomTypeRepository.findByHotelIdOrderBySortOrderAsc(hotelId)
+                .stream()
+                .map(RoomTypeResponse::from)
+                .toList());
     }
 
     @PostMapping("/hotels/{hotelId}/room-types")
@@ -109,7 +113,7 @@ public class AdminHotelController {
         RoomType roomType = new RoomType();
         roomType.setHotel(hotel);
         applyRoomTypeRequest(roomType, request);
-        return ResponseEntity.ok(roomTypeRepository.save(roomType));
+        return ResponseEntity.ok(RoomTypeResponse.from(roomTypeRepository.save(roomType)));
     }
 
     @PutMapping("/room-types/{id}")
@@ -117,7 +121,7 @@ public class AdminHotelController {
         RoomType existing = roomTypeRepository.findById(id).orElse(null);
         if (existing == null) return ResponseEntity.notFound().build();
         applyRoomTypeRequest(existing, request);
-        return ResponseEntity.ok(roomTypeRepository.save(existing));
+        return ResponseEntity.ok(RoomTypeResponse.from(roomTypeRepository.save(existing)));
     }
 
     @DeleteMapping("/room-types/{id}")
@@ -134,5 +138,51 @@ public class AdminHotelController {
         roomType.setImageUrl(safeImageUrl(request.imageUrl(), "房型图片"));
         roomType.setAmenities(InputSanitizer.optionalPlainText(request.amenities(), 500, "房型设施"));
         roomType.setSortOrder(request.sortOrder() == null ? 0 : request.sortOrder());
+    }
+
+    public record HotelResponse(
+            Long id,
+            String name,
+            String location,
+            String phone,
+            String priceRange,
+            BigDecimal rating,
+            String imageUrl,
+            String facilities,
+            LocalDateTime createdAt
+    ) {
+        private static HotelResponse from(Hotel hotel) {
+            return new HotelResponse(
+                    hotel.getId(),
+                    hotel.getName(),
+                    hotel.getLocation(),
+                    hotel.getPhone(),
+                    hotel.getPriceRange(),
+                    hotel.getRating(),
+                    hotel.getImageUrl(),
+                    hotel.getFacilities(),
+                    hotel.getCreatedAt());
+        }
+    }
+
+    public record RoomTypeResponse(
+            Long id,
+            String name,
+            BigDecimal price,
+            Integer capacity,
+            String imageUrl,
+            String amenities,
+            Integer sortOrder
+    ) {
+        private static RoomTypeResponse from(RoomType roomType) {
+            return new RoomTypeResponse(
+                    roomType.getId(),
+                    roomType.getName(),
+                    roomType.getPrice(),
+                    roomType.getCapacity(),
+                    roomType.getImageUrl(),
+                    roomType.getAmenities(),
+                    roomType.getSortOrder());
+        }
     }
 }

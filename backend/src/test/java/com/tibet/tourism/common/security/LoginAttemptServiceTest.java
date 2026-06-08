@@ -1,6 +1,7 @@
 package com.tibet.tourism.common.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -213,7 +214,10 @@ class LoginAttemptServiceTest {
         StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
         ValueOperations<String, String> operations = mock(ValueOperations.class);
         when(redisTemplate.opsForValue()).thenReturn(operations);
-        when(operations.get("brute-force:stringuser")).thenReturn("5:" + System.currentTimeMillis());
+        when(operations.get(argThat((String key) -> key != null
+                && key.startsWith("brute-force:acct:")
+                && !key.contains("stringuser"))))
+                .thenReturn("5:" + System.currentTimeMillis());
 
         service = serviceWithRedis(redisTemplate);
 
@@ -233,12 +237,35 @@ class LoginAttemptServiceTest {
         StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
         ValueOperations<String, String> operations = mock(ValueOperations.class);
         when(redisTemplate.opsForValue()).thenReturn(operations);
-        when(operations.get("brute-force:redisdown")).thenThrow(new RuntimeException("redis down"));
+        when(operations.get(argThat((String key) -> key != null
+                && key.startsWith("brute-force:acct:")
+                && !key.contains("redisdown"))))
+                .thenThrow(new RuntimeException("redis down"));
 
         service = serviceWithRedis(redisTemplate);
 
         assertThat(service.recordFailure("redisdown", "203.0.113.90").allowed()).isTrue();
         assertThat(service.failureCount("redisdown")).isEqualTo(1);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void redisKeysDoNotContainRawUsernameOrEmail() {
+        StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
+        ValueOperations<String, String> operations = mock(ValueOperations.class);
+        when(redisTemplate.opsForValue()).thenReturn(operations);
+
+        service = serviceWithRedis(redisTemplate);
+
+        service.recordFailure("Traveler.Email@example.com", "203.0.113.91");
+
+        org.mockito.ArgumentCaptor<String> keyCaptor = org.mockito.ArgumentCaptor.forClass(String.class);
+        org.mockito.Mockito.verify(operations, org.mockito.Mockito.atLeastOnce())
+                .set(keyCaptor.capture(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.any());
+        assertThat(keyCaptor.getAllValues())
+                .allSatisfy(key -> assertThat(key)
+                        .startsWith("brute-force:")
+                        .doesNotContain("Traveler", "traveler", "Email", "email", "example.com", "@"));
     }
 
     private void configure(LoginAttemptService target, boolean redisEnabled) {

@@ -31,6 +31,13 @@ import org.springframework.web.bind.annotation.*;
 @PreAuthorize("isAuthenticated()")
 public class BookingController {
 
+    private static final String ERROR_NOT_AUTHENTICATED = "User not authenticated";
+    private static final String ERROR_SECURITY_VALIDATION_FAILED = "Security validation failed";
+    private static final String ERROR_SCENIC_SPOT_NOT_FOUND = "Scenic spot not found";
+    private static final String ERROR_BOOKING_NOT_FOUND = "Booking not found";
+    private static final String ERROR_DELETE_REQUIRES_CANCELLED = "Only cancelled bookings can be deleted";
+    private static final String ERROR_DELETE_FAILED = "Failed to delete booking";
+
     @Autowired
     BookingRepository bookingRepository;
 
@@ -56,7 +63,7 @@ public class BookingController {
             HttpServletRequest request) {
         User user = getCurrentUser();
         if (user == null) {
-            return ResponseEntity.status(401).body("User not authenticated");
+            return ResponseEntity.status(401).body(ERROR_NOT_AUTHENTICATED);
         }
 
         RiskResult risk = riskAssessmentService.assess(
@@ -64,13 +71,13 @@ public class BookingController {
                 request.getRemoteAddr(), "/api/bookings");
         if (risk.decision() != RiskResult.Decision.ALLOW) {
             return ResponseEntity.status(403).body(Map.of(
-                    "error", risk.decision() == RiskResult.Decision.BLOCK ? "请求被安全系统拦截" : "请完成安全验证",
+                    "error", ERROR_SECURITY_VALIDATION_FAILED,
                     "code", "ANTIBOT_" + risk.decision().name()));
         }
 
         ScenicSpot spot = scenicSpotRepository.findById(payload.getSpotId()).orElse(null);
         if (spot == null) {
-            return ResponseEntity.status(404).body(Map.of("error", "Spot not found"));
+            return ResponseEntity.status(404).body(Map.of("error", ERROR_SCENIC_SPOT_NOT_FOUND));
         }
 
         Booking booking = new Booking();
@@ -120,7 +127,7 @@ public class BookingController {
     public ResponseEntity<?> getMyBookings() {
         User user = getCurrentUser();
         if (user == null) {
-            return ResponseEntity.status(401).body("User not authenticated");
+            return ResponseEntity.status(401).body(ERROR_NOT_AUTHENTICATED);
         }
 
         List<BookingResponse> bookings = bookingRepository.findByUserId(user.getId()).stream()
@@ -134,16 +141,12 @@ public class BookingController {
     public ResponseEntity<?> cancelBooking(@PathVariable Long id) {
         User user = getCurrentUser();
         if (user == null) {
-            return ResponseEntity.status(401).body("User not authenticated");
+            return ResponseEntity.status(401).body(ERROR_NOT_AUTHENTICATED);
         }
 
-        Booking booking = bookingRepository.findById(id).orElse(null);
-        if (booking == null) {
-            return ResponseEntity.status(404).body(Map.of("error", "Booking not found"));
-        }
-
-        if (!booking.getUser().getId().equals(user.getId())) {
-            return ResponseEntity.status(404).body(Map.of("error", "Booking not found"));
+        Booking booking = bookingRepository.findByIdAndUserId(id, user.getId()).orElse(null);
+        if (booking == null || !isOwner(booking, user)) {
+            return ResponseEntity.status(404).body(Map.of("error", ERROR_BOOKING_NOT_FOUND));
         }
 
         if (booking.getStatus() == Booking.Status.CANCELLED) {
@@ -161,32 +164,34 @@ public class BookingController {
     public ResponseEntity<?> deleteBooking(@PathVariable Long id) {
         User user = getCurrentUser();
         if (user == null) {
-            return ResponseEntity.status(401).body("User not authenticated");
+            return ResponseEntity.status(401).body(ERROR_NOT_AUTHENTICATED);
         }
 
-        Booking booking = bookingRepository.findById(id).orElse(null);
-        if (booking == null) {
-            return ResponseEntity.status(404).body(Map.of("error", "Booking not found"));
-        }
-
-        if (!booking.getUser().getId().equals(user.getId())) {
-            return ResponseEntity.status(404).body(Map.of("error", "Booking not found"));
+        Booking booking = bookingRepository.findByIdAndUserId(id, user.getId()).orElse(null);
+        if (booking == null || !isOwner(booking, user)) {
+            return ResponseEntity.status(404).body(Map.of("error", ERROR_BOOKING_NOT_FOUND));
         }
 
         if (booking.getStatus() != Booking.Status.CANCELLED) {
-            return ResponseEntity.status(409).body(Map.of("error", "Only cancelled bookings can be deleted"));
+            return ResponseEntity.status(409).body(Map.of("error", ERROR_DELETE_REQUIRES_CANCELLED));
         }
 
         try {
             int deleted = bookingRepository.deleteByIdAndUserIdAndStatus(id, user.getId(), Booking.Status.CANCELLED);
             if (deleted == 0) {
-                return ResponseEntity.status(409).body(Map.of("error", "Booking could not be deleted"));
+                return ResponseEntity.status(404).body(Map.of("error", ERROR_BOOKING_NOT_FOUND));
             }
         } catch (Exception e) {
-            return ResponseEntity.internalServerError().body(Map.of("error", "Failed to delete booking"));
+            return ResponseEntity.internalServerError().body(Map.of("error", ERROR_DELETE_FAILED));
         }
 
         return ResponseEntity.ok(Map.of("message", "Booking deleted successfully!"));
+    }
+
+    private boolean isOwner(Booking booking, User user) {
+        return booking.getUser() != null
+                && user.getId() != null
+                && user.getId().equals(booking.getUser().getId());
     }
 
     private User getCurrentUser() {

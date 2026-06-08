@@ -54,9 +54,37 @@ class CurrentUserApplicationServiceTest {
         user.setUsername("login-name");
         user.setPassword("hashed-password");
         user.setNickname("Public Nickname");
+        user.setAvatar("/avatars/public.png");
         user.setPhone("13800138000");
         user.setIpAddress("203.0.113.99");
         user.setAllowedLoginFingerprintHash("fingerprint-hash");
+        user.setRole(User.Role.ADMIN);
+        user.setMustChangePassword(true);
+    }
+
+    @Test
+    void getProfileReturnsSessionProfileWithoutInternalIdentifiers() {
+        when(userRepository.findById(7L)).thenReturn(Optional.of(user));
+
+        Map<String, Object> profile = service.getProfile(7L);
+
+        assertThat(profile)
+                .doesNotContainKeys("id", "username")
+                .containsEntry("nickname", "Public Nickname")
+                .containsEntry("avatar", "/avatars/public.png")
+                .containsEntry("avatarUrl", "/avatars/public.png")
+                .containsEntry("role", User.Role.ADMIN)
+                .containsEntry("mustChangePassword", true);
+    }
+
+    @Test
+    void getProfileSuppressesNicknameWhenItMatchesLoginName() {
+        user.setNickname(" login-name ");
+        when(userRepository.findById(7L)).thenReturn(Optional.of(user));
+
+        Map<String, Object> profile = service.getProfile(7L);
+
+        assertThat(profile).doesNotContainKeys("id", "username", "nickname");
     }
 
     @Test

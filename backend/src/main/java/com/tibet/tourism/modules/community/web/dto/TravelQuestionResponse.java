@@ -17,12 +17,16 @@ public record TravelQuestionResponse(
         LocalDateTime updatedAt
 ) {
     public static TravelQuestionResponse fromEntity(TravelQuestion question) {
+        return fromEntity(question, null);
+    }
+
+    public static TravelQuestionResponse fromEntity(TravelQuestion question, Long currentUserId) {
         if (question == null) {
             return null;
         }
         return new TravelQuestionResponse(
                 question.getId(),
-                PublicUserResponse.fromEntity(question.getAuthor()),
+                PublicUserResponse.fromEntity(question.getAuthor(), currentUserId),
                 question.getTitle(),
                 question.getContent(),
                 question.getTags(),

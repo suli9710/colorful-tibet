@@ -2,6 +2,7 @@ package com.tibet.tourism.common.logging;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tibet.tourism.common.security.PiiMasker;
+import com.tibet.tourism.common.security.SensitiveLogSanitizer;
 import com.tibet.tourism.common.security.TrustedProxyIpResolver;
 import java.time.Duration;
 import java.util.HashMap;
@@ -109,7 +110,8 @@ public class IpLocationService {
                 return cityInfo.length() > 0 ? cityInfo.toString() : "未知";
             }
         } catch (Exception e) {
-            logger.error("解析IP地址 {} 的城市信息时出错: {}", PiiMasker.maskIp(ipAddress), e.getMessage());
+            logger.error("解析IP地址 {} 的城市信息时出错: {}",
+                    PiiMasker.maskIp(ipAddress), SensitiveLogSanitizer.exceptionSummary(e));
         }
 
         return "未知";

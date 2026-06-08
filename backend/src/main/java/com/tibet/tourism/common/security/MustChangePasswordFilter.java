@@ -47,8 +47,8 @@ public class MustChangePasswordFilter extends OncePerRequestFilter {
             return;
         }
 
-        logger.warn("Blocked request from user requiring password change: username={}, path={}",
-                username,
+        logger.warn("Blocked request from user requiring password change: user={}, path={}",
+                "user#" + PiiMasker.shortHash(username),
                 request.getServletPath());
         response.setStatus(HttpServletResponse.SC_FORBIDDEN);
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);

@@ -8,7 +8,7 @@ COPY . .
 # 构建时传入的环境变量
 ARG VITE_API_BASE_URL=/api
 ARG VITE_RECAPTCHA_ENABLED=false
-ARG VITE_RECAPTCHA_MODE=v2
+ARG VITE_RECAPTCHA_MODE=v3
 ARG VITE_RECAPTCHA_SITE_KEY=
 ARG VITE_AMAP_KEY=
 ARG VITE_AMAP_SECURITY_CODE=
@@ -39,6 +39,9 @@ ENV NGINX_HTTP_ONLY=false
 
 # Expose unprivileged ports; compose maps public 80/443 to these.
 EXPOSE 8080 8443
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD wget -qO- http://127.0.0.1:8080/health >/dev/null || exit 1
 
 USER 101:101
 

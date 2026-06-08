@@ -2,6 +2,7 @@ package com.tibet.tourism.common.security.antibot;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.OptionalDouble;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
@@ -11,6 +12,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
 class RecaptchaServiceTest {
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     @Test
     void v2SuccessWithoutScoreCountsAsVerified() {
@@ -56,6 +58,25 @@ class RecaptchaServiceTest {
         OptionalDouble result = service.verify("bad-token", "203.0.113.10");
 
         assertThat(result).isEmpty();
+    }
+
+    @Test
+    void verificationSummaryOmitsRawProviderFields() throws Exception {
+        String providerResponse = """
+                {
+                  "success": false,
+                  "hostname": "private.example",
+                  "action": "checkout-with-sensitive-context",
+                  "error-codes": ["invalid-input-response", "unexpected code with spaces"]
+                }
+                """;
+
+        String summary = RecaptchaService.summarizeVerificationResponse(OBJECT_MAPPER.readTree(providerResponse));
+
+        assertThat(summary).contains("success=false", "score=none", "invalid-input-response", "invalid-code");
+        assertThat(summary).doesNotContain("private.example");
+        assertThat(summary).doesNotContain("checkout-with-sensitive-context");
+        assertThat(summary).doesNotContain("unexpected code with spaces");
     }
 
     private RecaptchaService serviceWithResponse(String body) {

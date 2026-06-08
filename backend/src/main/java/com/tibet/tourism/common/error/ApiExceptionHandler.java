@@ -1,4 +1,6 @@
 package com.tibet.tourism.common.error;
+
+import com.tibet.tourism.common.security.SensitiveLogSanitizer;
 import jakarta.validation.ConstraintViolationException;
 import java.util.Locale;
 import java.util.Map;
@@ -10,107 +12,113 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.validation.FieldError;
-import org.springframework.web.bind.annotation.ExceptionHandler;
-import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
-import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
 
     private static final Logger logger = LoggerFactory.getLogger(ApiExceptionHandler.class);
+    private static final String AUTHENTICATION_REQUIRED_MESSAGE = "Authentication required";
+    private static final String ACCESS_DENIED_MESSAGE = "Access denied";
+    private static final String RESOURCE_NOT_FOUND_MESSAGE = "Resource not found";
+    private static final String INVALID_REQUEST_MESSAGE = "Invalid request";
+    private static final String RESOURCE_ACCESS_DENIED_MESSAGE = "\u65e0\u6743\u8bbf\u95ee\u8be5\u8d44\u6e90";
+    private static final String UNSUPPORTED_MEDIA_TYPE_MESSAGE =
+            "\u4e0d\u652f\u6301\u7684\u8bf7\u6c42\u5185\u5bb9\u7c7b\u578b";
+    private static final String CONFLICT_MESSAGE =
+            "\u5f53\u524d\u72b6\u6001\u4e0d\u5141\u8bb8\u8be5\u64cd\u4f5c";
+    private static final String UPLOAD_TOO_LARGE_MESSAGE =
+            "\u4e0a\u4f20\u6587\u4ef6\u8fc7\u5927";
+    private static final String OPTIMISTIC_LOCK_MESSAGE =
+            "\u6570\u636e\u5df2\u88ab\u5176\u4ed6\u64cd\u4f5c\u4fee\u6539\uff0c\u8bf7\u5237\u65b0\u540e\u91cd\u8bd5";
+    private static final String INTERNAL_ERROR_MESSAGE =
+            "\u670d\u52a1\u5668\u5904\u7406\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5";
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, String>> handleValidation(MethodArgumentNotValidException exception) {
-        String message = exception.getBindingResult().getFieldErrors().stream()
-                .findFirst()
-                .map(FieldError::getDefaultMessage)
-                .orElse("请求参数不合法");
-        return ResponseEntity.badRequest().body(Map.of("error", message));
+        return ResponseEntity.badRequest().body(Map.of("error", INVALID_REQUEST_MESSAGE));
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
     public ResponseEntity<Map<String, String>> handleConstraintViolation(ConstraintViolationException exception) {
-        String message = exception.getConstraintViolations().stream()
-                .findFirst()
-                .map(violation -> violation.getMessage())
-                .orElse("请求参数不合法");
-        return ResponseEntity.badRequest().body(Map.of("error", message));
+        return ResponseEntity.badRequest().body(Map.of("error", INVALID_REQUEST_MESSAGE));
     }
 
     @ExceptionHandler(MissingServletRequestParameterException.class)
     public ResponseEntity<Map<String, String>> handleMissingParameter(MissingServletRequestParameterException exception) {
-        return ResponseEntity.badRequest().body(Map.of("error", "缺少必要参数: " + exception.getParameterName()));
+        return ResponseEntity.badRequest().body(Map.of("error", INVALID_REQUEST_MESSAGE));
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<Map<String, String>> handleUnreadableMessage(HttpMessageNotReadableException exception) {
-        return ResponseEntity.badRequest().body(Map.of("error", "请求体格式不正确"));
+        return ResponseEntity.badRequest().body(Map.of("error", INVALID_REQUEST_MESSAGE));
     }
 
     @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
     public ResponseEntity<Map<String, String>> handleUnsupportedMediaType(HttpMediaTypeNotSupportedException exception) {
         return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
-                .body(Map.of("error", "不支持的请求内容类型"));
+                .body(Map.of("error", UNSUPPORTED_MEDIA_TYPE_MESSAGE));
     }
 
     @ExceptionHandler(AuthenticationRequiredException.class)
     public ResponseEntity<Map<String, String>> handleAuthenticationRequired(AuthenticationRequiredException exception) {
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", exception.getMessage()));
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(Map.of("error", AUTHENTICATION_REQUIRED_MESSAGE));
     }
 
     @ExceptionHandler(UnauthorizedActionException.class)
     public ResponseEntity<Map<String, String>> handleUnauthorizedAction(UnauthorizedActionException exception) {
-        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", exception.getMessage()));
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", ACCESS_DENIED_MESSAGE));
     }
 
     @ExceptionHandler({ResourceNotFoundException.class, NoSuchElementException.class})
     public ResponseEntity<Map<String, String>> handleNotFound(RuntimeException exception) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", exception.getMessage()));
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", RESOURCE_NOT_FOUND_MESSAGE));
     }
 
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<Map<String, String>> handleBusiness(BusinessException exception) {
-        return ResponseEntity.badRequest().body(Map.of("error", exception.getMessage()));
+        return ResponseEntity.badRequest().body(Map.of("error", INVALID_REQUEST_MESSAGE));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, String>> handleIllegalArgument(IllegalArgumentException exception) {
-        logger.warn("Rejected invalid API argument: {}", rootCauseMessage(exception));
-        return ResponseEntity.badRequest().body(Map.of("error", "请求参数不合法"));
+        logger.warn("Rejected invalid API argument: {}", SensitiveLogSanitizer.exceptionSummary(exception));
+        return ResponseEntity.badRequest().body(Map.of("error", INVALID_REQUEST_MESSAGE));
     }
 
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<Map<String, String>> handleAccessDenied() {
-        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "无权访问该资源"));
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", RESOURCE_ACCESS_DENIED_MESSAGE));
     }
 
     @ExceptionHandler(SecurityException.class)
     public ResponseEntity<Map<String, String>> handleSecurity(SecurityException exception) {
-        String message = exception.getMessage() == null ? "无权访问该资源" : exception.getMessage();
-        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", message));
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", RESOURCE_ACCESS_DENIED_MESSAGE));
     }
 
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<Map<String, String>> handleIllegalState(IllegalStateException exception) {
-        logger.warn("Rejected invalid API state: {}", rootCauseMessage(exception));
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", "当前状态不允许该操作"));
+        logger.warn("Rejected invalid API state: {}", SensitiveLogSanitizer.exceptionSummary(exception));
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", CONFLICT_MESSAGE));
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<Map<String, String>> handleMaxUploadSize() {
-        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(Map.of("error", "上传文件过大"));
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(Map.of("error", UPLOAD_TOO_LARGE_MESSAGE));
     }
 
     @ExceptionHandler(OptimisticLockingFailureException.class)
     public ResponseEntity<Map<String, String>> handleOptimisticLock(OptimisticLockingFailureException ex) {
-        logger.warn("Optimistic lock conflict: {}", ex.getMessage());
+        logger.warn("Optimistic lock conflict: {}", SensitiveLogSanitizer.exceptionSummary(ex));
         return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(Map.of("error", "数据已被其他操作修改，请刷新后重试"));
+                .body(Map.of("error", OPTIMISTIC_LOCK_MESSAGE));
     }
 
     @ExceptionHandler(AsyncRequestNotUsableException.class)
@@ -124,8 +132,8 @@ public class ApiExceptionHandler {
             logClientDisconnect(exception);
             return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
         }
-        logger.error("Unhandled API exception", exception);
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "服务器处理失败，请稍后重试"));
+        logger.error("Unhandled API exception: {}", SensitiveLogSanitizer.exceptionSummary(exception));
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", INTERNAL_ERROR_MESSAGE));
     }
 
     static boolean isClientDisconnect(Throwable throwable) {
@@ -153,17 +161,8 @@ public class ApiExceptionHandler {
 
     private void logClientDisconnect(Throwable throwable) {
         if (logger.isDebugEnabled()) {
-            logger.debug("Client disconnected before API response completed: {}", rootCauseMessage(throwable));
+            logger.debug("Client disconnected before API response completed: {}",
+                    SensitiveLogSanitizer.exceptionSummary(throwable));
         }
-    }
-
-    private static String rootCauseMessage(Throwable throwable) {
-        Throwable current = throwable;
-        Throwable root = throwable;
-        while (current != null) {
-            root = current;
-            current = current.getCause();
-        }
-        return root == null ? "" : root.getMessage();
     }
 }

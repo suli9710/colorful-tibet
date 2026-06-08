@@ -60,7 +60,8 @@ public class TokenRevocationService {
                         ttlMillis,
                         TimeUnit.MILLISECONDS);
             } catch (Exception exception) {
-                logger.debug("Redis unavailable for JWT revocation save: {}", exception.getMessage());
+                logger.debug("Redis unavailable for JWT revocation save: {}",
+                        SensitiveLogSanitizer.exceptionSummary(exception));
             }
         }
     }
@@ -93,7 +94,7 @@ public class TokenRevocationService {
                 }
             } catch (Exception exception) {
                 logger.debug("Redis unavailable for JWT revocation check; using in-memory state: {}",
-                        exception.getMessage());
+                        SensitiveLogSanitizer.exceptionSummary(exception));
             }
         }
 

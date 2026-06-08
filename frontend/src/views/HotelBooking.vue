@@ -44,7 +44,12 @@
         :animate="{ opacity: 1, y: 0 }"
         :transition="{ duration: 0.38, ease: motionEase }"
       >
-        <div class="lg:col-span-2 space-y-6">
+        <form
+          class="lg:col-span-2 space-y-6"
+          novalidate
+          :aria-describedby="bookingFormDescribedBy"
+          @submit.prevent="submitBooking"
+        >
           <motion.div
             class="bg-white rounded-3xl p-5 border border-tibet-gold/20 shadow-sm sm:p-7"
             :initial="cardInitial"
@@ -54,17 +59,43 @@
             <h2 class="text-xl font-bold text-gray-900 mb-6">{{ t('hotel.checkIn') }} / {{ t('hotel.checkOut') }}</h2>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">{{ t('hotel.checkIn') }}</label>
-                <input v-model="form.checkInDate" type="date" class="w-full px-4 py-3 rounded-2xl border border-tibet-gold/25 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all" />
+                <label for="hotel-booking-check-in" class="block text-sm font-medium text-gray-700 mb-2">{{ t('hotel.checkIn') }}</label>
+                <input
+                  id="hotel-booking-check-in"
+                  v-model="form.checkInDate"
+                  type="date"
+                  autocomplete="off"
+                  class="w-full px-4 py-3 rounded-2xl border border-tibet-gold/25 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all"
+                  :aria-describedby="dateHelpId"
+                  :aria-invalid="dateInvalid"
+                  required
+                />
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">{{ t('hotel.checkOut') }}</label>
-                <input v-model="form.checkOutDate" type="date" class="w-full px-4 py-3 rounded-2xl border border-tibet-gold/25 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all" />
+                <label for="hotel-booking-check-out" class="block text-sm font-medium text-gray-700 mb-2">{{ t('hotel.checkOut') }}</label>
+                <input
+                  id="hotel-booking-check-out"
+                  v-model="form.checkOutDate"
+                  type="date"
+                  autocomplete="off"
+                  class="w-full px-4 py-3 rounded-2xl border border-tibet-gold/25 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all"
+                  :aria-describedby="dateHelpId"
+                  :aria-invalid="dateInvalid"
+                  required
+                />
               </div>
             </div>
+            <p :id="dateHelpId" class="mt-3 text-xs leading-relaxed text-gray-500">
+              离店日期需要晚于入住日期，系统仅提交咨询意向，不在站内收款。
+            </p>
             <div class="mt-4">
-              <label class="block text-sm font-medium text-gray-700 mb-2">{{ t('hotel.guests') }}</label>
-              <select v-model="form.guests" class="w-full px-4 py-3 rounded-2xl border border-tibet-gold/25 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all">
+              <label for="hotel-booking-guests" class="block text-sm font-medium text-gray-700 mb-2">{{ t('hotel.guests') }}</label>
+              <select
+                id="hotel-booking-guests"
+                v-model="form.guests"
+                class="w-full px-4 py-3 rounded-2xl border border-tibet-gold/25 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all"
+                :aria-describedby="dateHelpId"
+              >
                 <option v-for="n in 6" :key="n" :value="n">{{ n }}{{ t('hotel.guests') }}</option>
               </select>
             </div>
@@ -79,17 +110,49 @@
             <h2 class="text-xl font-bold text-gray-900 mb-6">{{ t('hotel.booker') }}</h2>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">{{ t('contact.name') }}</label>
-                <input v-model="form.guestName" type="text" :placeholder="t('contact.namePlaceholder')" class="w-full px-4 py-3 rounded-2xl border border-tibet-gold/25 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all" />
+                <label for="hotel-booking-guest-name" class="block text-sm font-medium text-gray-700 mb-2">{{ t('contact.name') }}</label>
+                <input
+                  id="hotel-booking-guest-name"
+                  v-model="form.guestName"
+                  type="text"
+                  autocomplete="name"
+                  :placeholder="t('contact.namePlaceholder')"
+                  class="w-full px-4 py-3 rounded-2xl border border-tibet-gold/25 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all"
+                  :aria-describedby="contactHelpId"
+                  :aria-invalid="guestNameInvalid"
+                  required
+                />
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">{{ t('hotel.phone') }}</label>
-                <input v-model="form.phone" type="tel" :placeholder="t('hotel.phonePlaceholder')" class="w-full px-4 py-3 rounded-2xl border border-tibet-gold/25 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all" />
+                <label for="hotel-booking-phone" class="block text-sm font-medium text-gray-700 mb-2">{{ t('hotel.phone') }}</label>
+                <input
+                  id="hotel-booking-phone"
+                  v-model="form.phone"
+                  type="tel"
+                  inputmode="tel"
+                  autocomplete="tel"
+                  :placeholder="t('hotel.phonePlaceholder')"
+                  class="w-full px-4 py-3 rounded-2xl border border-tibet-gold/25 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all"
+                  :aria-describedby="contactHelpId"
+                  :aria-invalid="phoneInvalid"
+                  required
+                />
               </div>
             </div>
+            <p :id="contactHelpId" class="mt-3 text-xs leading-relaxed text-gray-500">
+              联系方式仅用于酒店咨询确认，请填写可联系到您的姓名和电话。
+            </p>
             <div class="mt-4">
-              <label class="block text-sm font-medium text-gray-700 mb-2">{{ t('hotel.noteLabel') }}</label>
-              <textarea v-model="form.note" rows="3" :placeholder="t('hotel.notePlaceholder')" class="w-full px-4 py-3 rounded-2xl border border-tibet-gold/25 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all resize-none"></textarea>
+              <label for="hotel-booking-note" class="block text-sm font-medium text-gray-700 mb-2">{{ t('hotel.noteLabel') }}</label>
+              <textarea
+                id="hotel-booking-note"
+                v-model="form.note"
+                rows="3"
+                autocomplete="off"
+                :placeholder="t('hotel.notePlaceholder')"
+                class="w-full px-4 py-3 rounded-2xl border border-tibet-gold/25 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all resize-none"
+                :aria-describedby="contactHelpId"
+              ></textarea>
             </div>
           </motion.div>
 
@@ -97,7 +160,11 @@
             <motion.div
               v-if="submitError"
               key="hotel-booking-error"
+              :id="bookingErrorId"
               class="bg-red-50 border border-red-200 rounded-2xl p-4 text-red-700 text-sm"
+              role="alert"
+              aria-live="assertive"
+              aria-atomic="true"
               :initial="{ opacity: 0, y: -10, scale: 0.98 }"
               :animate="{ opacity: 1, y: 0, scale: 1 }"
               :exit="{ opacity: 0, y: -8, scale: 0.98 }"
@@ -108,9 +175,11 @@
           </AnimatePresence>
 
           <motion.button
-            @click="submitBooking"
+            type="submit"
             :disabled="submitting"
-            class="hidden w-full py-4 rounded-full bg-tibet-red text-tibet-yellow font-bold text-lg hover:bg-tibet-red/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed md:block"
+            :aria-busy="submitting"
+            :aria-describedby="bookingFormDescribedBy"
+            class="hidden min-h-12 w-full py-4 rounded-full bg-tibet-red text-tibet-yellow font-bold text-lg hover:bg-tibet-red/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed md:block"
             :initial="cardInitial"
             :animate="cardInView"
             :transition="cardTransition(2, 0.16)"
@@ -140,7 +209,7 @@
               </motion.span>
             </AnimatePresence>
           </motion.button>
-        </div>
+        </form>
 
         <div>
           <motion.div
@@ -221,8 +290,10 @@ import { getHotelById, getRoomById, hotels } from '../data/hotels'
 import { applyHotelImageFallback, resolveHotelCoverImage } from '../data/hotelImages'
 import { getCanonicalRegion, localizeApiRoom, localizeHotel } from '../data/hotelTranslations'
 import api, { endpoints } from '../api'
+import { clearHotelOrderClientStorage } from '../api/cache'
 import MobileStickyActionBar from '../components/MobileStickyActionBar.vue'
 import { useBehaviorTracker } from '../composables/useBehaviorTracker'
+import { safeClientErrorMessage } from '../utils/errorMonitoring'
 import {
   cardInitial,
   cardInView,
@@ -340,19 +411,43 @@ const totalPrice = computed(() => {
 
 const submitting = ref(false)
 const submitError = ref('')
+const submitAttempted = ref(false)
+const bookingErrorId = 'hotel-booking-error-message'
+const dateHelpId = 'hotel-booking-date-help'
+const contactHelpId = 'hotel-booking-contact-help'
+const bookingValidationMessages = {
+  dateRequired: '请选择入住和离店日期',
+  dateRangeInvalid: '离店日期需要晚于入住日期',
+  guestNameRequired: '请填写预订人姓名',
+  phoneRequired: '请填写联系电话',
+  securityVerificationFailed: '安全校验未通过，请稍后重试'
+}
+const dateInvalid = computed(() => submitAttempted.value && (!form.value.checkInDate || !form.value.checkOutDate || nights.value <= 0))
+const guestNameInvalid = computed(() => submitAttempted.value && !form.value.guestName.trim())
+const phoneInvalid = computed(() => submitAttempted.value && !form.value.phone.trim())
+const bookingFormDescribedBy = computed(() =>
+  [dateHelpId, contactHelpId, submitError.value ? bookingErrorId : ''].filter(Boolean).join(' ')
+)
+
+const clearHotelOrderCache = clearHotelOrderClientStorage
 
 const submitBooking = async () => {
+  submitAttempted.value = true
   submitError.value = ''
   if (!form.value.checkInDate || !form.value.checkOutDate) {
-    submitError.value = t('hotel.checkInRequired')
+    submitError.value = bookingValidationMessages.dateRequired
+    return
+  }
+  if (nights.value <= 0) {
+    submitError.value = bookingValidationMessages.dateRangeInvalid
     return
   }
   if (!form.value.guestName.trim()) {
-    submitError.value = t('hotel.guestNameRequired')
+    submitError.value = bookingValidationMessages.guestNameRequired
     return
   }
   if (!form.value.phone.trim()) {
-    submitError.value = t('hotel.phoneRequired')
+    submitError.value = bookingValidationMessages.phoneRequired
     return
   }
   submitting.value = true
@@ -377,24 +472,25 @@ const submitBooking = async () => {
       }
     })
   } catch (error: any) {
+    clearHotelOrderCache()
     if (error.response) {
       if (String(error.response?.data?.code || '').startsWith('ANTIBOT_')) {
-        submitError.value = t('hotel.securityVerificationFailed')
+        submitError.value = bookingValidationMessages.securityVerificationFailed
         return
       }
-      submitError.value = error.response?.data?.message || error.response?.data?.error || t('hotel.bookingFailed')
+      submitError.value = safeClientErrorMessage(error, t('hotel.bookingFailed'))
       return
     }
 
-    localStorage.removeItem('hotel-orders')
-    submitError.value = t('hotel.bookingFailed')
+    submitError.value = safeClientErrorMessage(error, t('hotel.bookingFailed'))
     return
   } finally {
     submitting.value = false
     resetBehavior()
   }
 
-  localStorage.removeItem('hotel-orders')
+  clearHotelOrderCache()
+  submitAttempted.value = false
   window.dispatchEvent(new CustomEvent('hotel-orders-updated'))
   window.dispatchEvent(new CustomEvent('bookings-updated'))
   router.push('/orders')

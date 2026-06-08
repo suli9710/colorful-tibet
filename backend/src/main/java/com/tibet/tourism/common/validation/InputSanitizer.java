@@ -75,7 +75,7 @@ public final class InputSanitizer {
         if (!StringUtils.hasText(normalized)) {
             throw new IllegalArgumentException(fieldName + "不能为空");
         }
-        return escapeAndValidateLength(normalized, maxLength, fieldName);
+        return validateLength(normalized, maxLength, fieldName);
     }
 
     public static String optionalPlainText(String value, int maxLength, String fieldName) {
@@ -83,7 +83,7 @@ public final class InputSanitizer {
         if (!StringUtils.hasText(normalized)) {
             return null;
         }
-        return escapeAndValidateLength(normalized, maxLength, fieldName);
+        return validateLength(normalized, maxLength, fieldName);
     }
 
     public static String requiredTextBlock(String value, int maxLength, String fieldName) {
@@ -91,7 +91,7 @@ public final class InputSanitizer {
         if (!StringUtils.hasText(normalized)) {
             throw new IllegalArgumentException(fieldName + "不能为空");
         }
-        return escapeAndValidateLength(normalized, maxLength, fieldName);
+        return validateLength(normalized, maxLength, fieldName);
     }
 
     public static String optionalTextBlock(String value, int maxLength, String fieldName) {
@@ -99,7 +99,7 @@ public final class InputSanitizer {
         if (!StringUtils.hasText(normalized)) {
             return null;
         }
-        return escapeAndValidateLength(normalized, maxLength, fieldName);
+        return validateLength(normalized, maxLength, fieldName);
     }
 
     public static String optionalAllowedValue(String value, Set<String> allowedValues, String fieldName) {
@@ -305,15 +305,11 @@ public final class InputSanitizer {
         }
     }
 
-    private static String escapeAndValidateLength(String value, int maxLength, String fieldName) {
+    private static String validateLength(String value, int maxLength, String fieldName) {
         if (value.length() > maxLength) {
             throw new IllegalArgumentException(fieldName + "长度不能超过" + maxLength + "个字符");
         }
-        String escaped = HtmlUtils.htmlEscape(value);
-        if (escaped.length() > maxLength) {
-            throw new IllegalArgumentException(fieldName + "包含过多特殊字符");
-        }
-        return escaped;
+        return value;
     }
 
     private static String normalizeSingleLine(String value) {

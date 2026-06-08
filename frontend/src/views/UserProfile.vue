@@ -7,6 +7,10 @@ import api, { endpoints } from '@/api'
 import { useAuthStore } from '@/stores/auth'
 import { applyHotelImageFallback, resolveHotelBookingImage } from '@/data/hotelImages'
 import MotionModal from '@/components/motion/MotionModal.vue'
+import { showConfirm } from '@/composables/useConfirm'
+import { showToast } from '@/composables/useToast'
+import { readBrowserStorage } from '@/utils/browserStorage'
+import { safeClientErrorMessage, summarizeClientError } from '@/utils/errorMonitoring'
 import {
   cardExit,
   cardInitial,
@@ -23,7 +27,6 @@ const { t } = useI18n()
 const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
-const user = ref<any>(null)
 const userInfo = ref<any>(null)
 const stats = ref<any>(null)
 const myRoutes = ref<any[]>([])
@@ -40,14 +43,51 @@ const passwordForm = ref({
   newPassword: '',
   confirmPassword: ''
 })
+const passwordFormError = ref('')
+const profilePasswordErrorId = 'profile-password-error'
+const passwordFieldInvalid = computed(() => passwordFormError.value ? 'true' : undefined)
+const describePasswordField = (helpId: string) => computed(() => [
+  helpId,
+  passwordFormError.value ? profilePasswordErrorId : ''
+].filter(Boolean).join(' '))
+const currentPasswordDescription = describePasswordField('profile-current-password-help')
+const newPasswordDescription = describePasswordField('profile-new-password-help')
+const confirmNewPasswordDescription = describePasswordField('profile-confirm-new-password-help')
 const changingPassword = ref(false)
 const showNicknameModal = ref(false)
 const nicknameForm = ref({
   nickname: ''
 })
+const nicknameFormError = ref('')
+const profileNicknameErrorId = 'profile-nickname-error'
+const nicknameFieldInvalid = computed(() => nicknameFormError.value ? 'true' : undefined)
+const nicknameDescription = computed(() => [
+  'profile-nickname-help',
+  nicknameFormError.value ? profileNicknameErrorId : ''
+].filter(Boolean).join(' '))
 const updatingNickname = ref(false)
 const uploadingAvatar = ref(false)
 const avatarFileInput = ref<HTMLInputElement | null>(null)
+
+const normalizeProfileText = (value: unknown) => typeof value === 'string' ? value.trim() : ''
+const profileRole = computed(() =>
+  normalizeProfileText(userInfo.value?.role) ||
+  normalizeProfileText(auth.user?.role)
+)
+const profileRoleLabel = computed(() => profileRole.value === 'ADMIN' ? t('profile.admin') : t('profile.member'))
+const profileDisplayName = computed(() =>
+  normalizeProfileText(userInfo.value?.nickname) ||
+  normalizeProfileText(auth.user?.nickname) ||
+  profileRoleLabel.value
+)
+const profileAvatarUrl = computed(() =>
+  normalizeProfileText(userInfo.value?.avatar) ||
+  normalizeProfileText(userInfo.value?.avatarUrl) ||
+  normalizeProfileText(auth.user?.avatar) ||
+  normalizeProfileText(auth.user?.avatarUrl) ||
+  undefined
+)
+const profileAvatarInitial = computed(() => profileDisplayName.value.charAt(0).toUpperCase())
 
 const profileTabs = computed<Array<{ id: ProfileTabId; label: string; count: number }>>(() => [
   { id: 'routes', label: t('profile.myRoutesTab'), count: myRoutes.value.length },
@@ -61,8 +101,6 @@ onMounted(async () => {
     await router.push('/login')
     return
   }
-
-  user.value = auth.user ? { ...auth.user } : null
 
   try {
     await fetchUserInfo()
@@ -78,10 +116,10 @@ onMounted(async () => {
     await loadProfileDetails()
   } catch (e: any) {
     // 如果API调用失败（特别是401），响应拦截器会处理跳转
-    console.error('Failed to load user profile:', e)
+    console.error('Failed to load user profile:', summarizeClientError(e))
     if (e.response?.status !== 401) {
       // 如果不是401错误，显示错误信息
-      alert(t('profile.loadFailed'))
+      showToast(t('profile.loadFailed'), 'error')
     }
   } finally {
     loading.value = false
@@ -103,7 +141,7 @@ const fetchUserInfo = async () => {
     const response = await api.get('/auth/me')
     userInfo.value = response.data
   } catch (e: any) {
-    console.error('Failed to fetch user info:', e)
+    console.error('Failed to fetch user info:', summarizeClientError(e))
     // 如果是401错误，说明token无效，让响应拦截器处理跳转
     if (e.response?.status === 401) {
       throw e // 重新抛出，让响应拦截器处理
@@ -116,7 +154,7 @@ const fetchStats = async () => {
     const response = await api.get('/auth/me/stats')
     stats.value = response.data
   } catch (e: any) {
-    console.error('Failed to fetch stats:', e)
+    console.error('Failed to fetch stats:', summarizeClientError(e))
     // 如果是401错误，说明token无效，让响应拦截器处理跳转
     if (e.response?.status === 401) {
       throw e // 重新抛出，让响应拦截器处理
@@ -129,7 +167,7 @@ const fetchMyRoutes = async () => {
     const response = await api.get('/routes/my-routes')
     myRoutes.value = response.data || []
   } catch (e: any) {
-    console.error('Failed to fetch my routes:', e)
+    console.error('Failed to fetch my routes:', summarizeClientError(e))
     // 如果是401错误，说明token无效，让响应拦截器处理跳转
     if (e.response?.status === 401) {
       throw e // 重新抛出，让响应拦截器处理
@@ -143,7 +181,7 @@ const fetchBookings = async () => {
     const response = await api.get(endpoints.bookings.my)
     bookings.value = response.data || []
   } catch (e) {
-    console.error('Failed to fetch bookings:', e)
+    console.error('Failed to fetch bookings:', summarizeClientError(e))
     bookings.value = []
   }
 }
@@ -153,38 +191,38 @@ const fetchHotelBookings = async () => {
     const response = await api.get(endpoints.hotelBookings.my)
     hotelBookings.value = response.data?.content || response.data || []
   } catch (e) {
-    console.error('Failed to fetch hotel bookings:', e)
+    console.error('Failed to fetch hotel bookings:', summarizeClientError(e))
     hotelBookings.value = []
   }
 }
 
 const getApiErrorMessage = (error: any, fallback: string) => {
-  const data = error?.response?.data
-  if (typeof data === 'string') return data
-  return data?.error || data?.message || fallback
+  return safeClientErrorMessage(error, fallback)
 }
 
+const confirmDangerousAction = (message: string) => showConfirm({ message, tone: 'danger' })
+
 const cancelHotelBooking = async (id: number) => {
-  if (!confirm(t('profile.confirmCancelHotelBooking'))) return
+  if (!(await confirmDangerousAction(t('profile.confirmCancelHotelBooking')))) return
 
   try {
     await api.delete(endpoints.hotelBookings.cancel(id))
     fetchHotelBookings()
   } catch (e) {
-    console.error(e)
-    alert(t('profile.cancelHotelBookingFailed'))
+    console.error('Failed to cancel hotel booking:', summarizeClientError(e))
+    showToast(t('profile.cancelHotelBookingFailed'), 'error')
   }
 }
 
 const deleteHotelBooking = async (id: number) => {
-  if (!confirm(t('profile.confirmDeleteBooking'))) return
+  if (!(await confirmDangerousAction(t('profile.confirmDeleteBooking')))) return
 
   try {
     await api.delete(endpoints.hotelBookings.delete(id))
     hotelBookings.value = hotelBookings.value.filter(booking => booking.id !== id)
   } catch (e: any) {
-    console.error(e)
-    alert(getApiErrorMessage(e, t('profile.deleteBookingFailed')))
+    console.error('Failed to delete hotel booking:', summarizeClientError(e))
+    showToast(getApiErrorMessage(e, t('profile.deleteBookingFailed')), 'error')
   }
 }
 
@@ -194,7 +232,7 @@ const fetchMyComments = async () => {
     spotComments.value = response.data.spotComments || []
     routeComments.value = response.data.routeComments || []
   } catch (e: any) {
-    console.error('Failed to fetch my comments:', e)
+    console.error('Failed to fetch my comments:', summarizeClientError(e))
     if (e.response?.status === 401) {
       throw e
     }
@@ -204,44 +242,44 @@ const fetchMyComments = async () => {
 }
 
 const cancelBooking = async (id: number) => {
-  if (!confirm(t('profile.confirmCancelBooking'))) return
+  if (!(await confirmDangerousAction(t('profile.confirmCancelBooking')))) return
 
   try {
     await api.post(endpoints.bookings.cancel(id))
     fetchBookings()
   } catch (e: any) {
-    console.error(e)
-    alert(getApiErrorMessage(e, t('profile.cancelFailed')))
+    console.error('Failed to cancel booking:', summarizeClientError(e))
+    showToast(getApiErrorMessage(e, t('profile.cancelFailed')), 'error')
   }
 }
 
 const deleteBooking = async (id: number) => {
-  if (!confirm(t('profile.confirmDeleteBooking'))) return
+  if (!(await confirmDangerousAction(t('profile.confirmDeleteBooking')))) return
 
   try {
     await api.delete(endpoints.bookings.delete(id))
     fetchBookings()
   } catch (e: any) {
-    console.error(e)
-    alert(getApiErrorMessage(e, t('profile.deleteBookingFailed')))
+    console.error('Failed to delete booking:', summarizeClientError(e))
+    showToast(getApiErrorMessage(e, t('profile.deleteBookingFailed')), 'error')
   }
 }
 
 const deleteRoute = async (id: number) => {
-  if (!confirm(t('profile.confirmDeleteRoute'))) return
+  if (!(await confirmDangerousAction(t('profile.confirmDeleteRoute')))) return
   
   try {
     await api.delete(`/routes/shared/${id}`)
-    alert(t('profile.deleteSuccess'))
+    showToast(t('profile.deleteSuccess'), 'success')
     fetchMyRoutes()
   } catch (e) {
-    console.error(e)
-    alert(t('profile.deleteFailed'))
+    console.error('Failed to delete route:', summarizeClientError(e))
+    showToast(t('profile.deleteFailed'), 'error')
   }
 }
 
 const deleteSpotComment = async (id: number) => {
-  if (!confirm(t('profile.confirmDeleteComment'))) return
+  if (!(await confirmDangerousAction(t('profile.confirmDeleteComment')))) return
 
   try {
     await api.delete(endpoints.comments.delete(id))
@@ -250,17 +288,17 @@ const deleteSpotComment = async (id: number) => {
       stats.value.commentCount--
     }
   } catch (e) {
-    console.error(e)
-    alert(t('profile.deleteFailed'))
+    console.error('Failed to delete spot comment:', summarizeClientError(e))
+    showToast(t('profile.deleteFailed'), 'error')
   }
 }
 
 const deleteRouteComment = async (comment: any) => {
-  if (!confirm(t('profile.confirmDeleteComment'))) return
+  if (!(await confirmDangerousAction(t('profile.confirmDeleteComment')))) return
   const routeId = comment.route?.id
 
   if (!routeId) {
-    alert(t('profile.deleteFailed'))
+    showToast(t('profile.deleteFailed'), 'error')
     return
   }
 
@@ -271,24 +309,37 @@ const deleteRouteComment = async (comment: any) => {
       stats.value.commentCount--
     }
   } catch (e) {
-    console.error(e)
-    alert(t('profile.deleteFailed'))
+    console.error('Failed to delete route comment:', summarizeClientError(e))
+    showToast(t('profile.deleteFailed'), 'error')
   }
 }
 
+const clearPasswordFormError = () => {
+  passwordFormError.value = ''
+}
+
+const showPasswordFormError = (message: string, tone: 'warning' | 'error') => {
+  passwordFormError.value = message
+  showToast(message, tone)
+}
+
 const changePassword = async () => {
+  if (changingPassword.value) return
+
+  clearPasswordFormError()
+
   if (!passwordForm.value.oldPassword || !passwordForm.value.newPassword) {
-    alert(t('profile.fillAllFields'))
+    showPasswordFormError(t('profile.fillAllFields'), 'warning')
     return
   }
   
   if (passwordForm.value.newPassword !== passwordForm.value.confirmPassword) {
-    alert(t('profile.passwordMismatch'))
+    showPasswordFormError(t('profile.passwordMismatch'), 'warning')
     return
   }
   
   if (passwordForm.value.newPassword.length < 6) {
-    alert(t('profile.passwordMinLength'))
+    showPasswordFormError(t('profile.passwordMinLength'), 'warning')
     return
   }
   
@@ -298,7 +349,7 @@ const changePassword = async () => {
       oldPassword: passwordForm.value.oldPassword,
       newPassword: passwordForm.value.newPassword
     })
-    alert(t('profile.passwordChangeSuccess'))
+    showToast(t('profile.passwordChangeSuccess'), 'success')
     showPasswordModal.value = false
     auth.updateUser({ mustChangePassword: false })
     if (userInfo.value) {
@@ -314,66 +365,103 @@ const changePassword = async () => {
     }
     await loadProfileDetails()
   } catch (e: any) {
-    console.error('Failed to change password:', e)
-    const errorMsg = e.response?.data?.error || t('profile.passwordChangeFailed')
-    alert(errorMsg)
+    console.error('Failed to change password:', summarizeClientError(e))
+    const errorMsg = safeClientErrorMessage(e, t('profile.passwordChangeFailed'))
+    showPasswordFormError(errorMsg, 'error')
   } finally {
     changingPassword.value = false
   }
 }
 
 const formatDate = (dateStr: string) => {
-  const locale = localStorage.getItem('locale') || 'zh'
+  const locale = readBrowserStorage('localStorage', 'locale', 'zh')
   return new Date(dateStr).toLocaleDateString(locale === 'bo' ? 'bo-CN' : 'zh-CN')
 }
 
+const openPasswordModal = () => {
+  clearPasswordFormError()
+  showPasswordModal.value = true
+}
+
+const closePasswordModal = () => {
+  if (changingPassword.value) return
+  showPasswordModal.value = false
+  clearPasswordFormError()
+}
+
+const clearNicknameFormError = () => {
+  nicknameFormError.value = ''
+}
+
+const showNicknameFormError = (message: string, tone: 'warning' | 'error') => {
+  nicknameFormError.value = message
+  showToast(message, tone)
+}
+
 const openNicknameModal = () => {
-  nicknameForm.value.nickname = userInfo.value?.nickname || ''
+  clearNicknameFormError()
+  nicknameForm.value.nickname =
+    normalizeProfileText(userInfo.value?.nickname) ||
+    normalizeProfileText(auth.user?.nickname)
   showNicknameModal.value = true
 }
 
+const closeNicknameModal = () => {
+  if (updatingNickname.value) return
+  showNicknameModal.value = false
+  clearNicknameFormError()
+}
+
 const updateNickname = async () => {
-  if (!nicknameForm.value.nickname.trim()) {
-    alert(t('profile.nicknameRequired'))
+  if (updatingNickname.value) return
+
+  clearNicknameFormError()
+  const nickname = nicknameForm.value.nickname.trim()
+  if (!nickname) {
+    showNicknameFormError(t('profile.nicknameRequired'), 'warning')
     return
   }
   
   updatingNickname.value = true
   try {
-    const response = await api.put('/auth/me/nickname', {
-      nickname: nicknameForm.value.nickname.trim()
+    await api.put('/auth/me/nickname', {
+      nickname
     })
-    alert(t('profile.nicknameUpdateSuccess'))
+    showToast(t('profile.nicknameUpdateSuccess'), 'success')
     showNicknameModal.value = false
     await fetchUserInfo()
-    auth.updateUser({ nickname: nicknameForm.value.nickname.trim() })
+    auth.updateUser({ nickname })
   } catch (e: any) {
-    console.error('Failed to update nickname:', e)
-    const errorMsg = e.response?.data?.error || t('profile.nicknameUpdateFailed')
-    alert(errorMsg)
+    console.error('Failed to update nickname:', summarizeClientError(e))
+    const errorMsg = safeClientErrorMessage(e, t('profile.nicknameUpdateFailed'))
+    showNicknameFormError(errorMsg, 'error')
   } finally {
     updatingNickname.value = false
   }
 }
 
 const handleAvatarClick = () => {
+  if (uploadingAvatar.value) return
   avatarFileInput.value?.click()
 }
 
 const handleAvatarUpload = async (event: Event) => {
+  if (uploadingAvatar.value) return
   const target = event.target as HTMLInputElement
   const file = target.files?.[0]
   if (!file) return
   
   // 验证文件类型
   if (!file.type.startsWith('image/')) {
-    alert(t('profile.selectImageFile'))
+    showToast(t('profile.selectImageFile'), 'warning')
+    target.value = ''
     return
   }
   
   // 验证文件大小（5MB）
   if (file.size > 5 * 1024 * 1024) {
-    alert(t('profile.imageTooLarge'))
+    showToast(t('profile.imageTooLarge'), 'warning')
+    target.value = ''
     return
   }
   
@@ -384,13 +472,13 @@ const handleAvatarUpload = async (event: Event) => {
     
     const response = await api.post('/auth/me/upload-avatar', formData)
     
-    alert(t('profile.avatarUploadSuccess'))
+    showToast(t('profile.avatarUploadSuccess'), 'success')
     await fetchUserInfo()
     auth.updateUser({ avatar: response.data.avatarUrl })
   } catch (e: any) {
-    console.error('Failed to upload avatar:', e)
-    const errorMsg = e.response?.data?.error || t('profile.avatarUploadFailed')
-    alert(errorMsg)
+    console.error('Failed to upload avatar:', summarizeClientError(e))
+    const errorMsg = safeClientErrorMessage(e, t('profile.avatarUploadFailed'))
+    showToast(errorMsg, 'error')
   } finally {
     uploadingAvatar.value = false
     // 清空input
@@ -400,12 +488,7 @@ const handleAvatarUpload = async (event: Event) => {
   }
 }
 
-const getAvatarUrl = () => {
-  if (userInfo.value?.avatar) {
-    return userInfo.value.avatar
-  }
-  return null
-}
+const getAvatarUrl = (): string | undefined => profileAvatarUrl.value || undefined
 </script>
 
 <template>
@@ -425,12 +508,17 @@ const getAvatarUrl = () => {
       >
         <div class="flex flex-col md:flex-row items-center md:items-start gap-6">
           <div class="relative group">
-            <motion.div
+            <motion.button
+              type="button"
               @click="handleAvatarClick"
-              class="w-20 h-20 rounded-full flex items-center justify-center text-2xl text-white font-bold shadow-lg cursor-pointer overflow-hidden transition-all hover:ring-4 hover:ring-tibet-gold/60/50 sm:h-24 sm:w-24 sm:text-3xl"
+              class="w-20 h-20 rounded-full flex items-center justify-center text-2xl text-white font-bold shadow-lg cursor-pointer overflow-hidden transition-all hover:ring-4 hover:ring-tibet-gold/60/50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-tibet-gold/70 disabled:cursor-wait disabled:opacity-75 sm:h-24 sm:w-24 sm:text-3xl"
               :whileHover="{ scale: 1.04, rotate: -1 }"
               :whileTap="{ scale: 0.96 }"
               :class="getAvatarUrl() ? '' : 'bg-gradient-to-br from-blue-500 to-purple-600'"
+              :disabled="uploadingAvatar"
+              :aria-busy="uploadingAvatar"
+              :aria-label="`${t('common.edit')} ${t('profile.avatar')}`"
+              :title="`${t('common.edit')} ${t('profile.avatar')}`"
             >
               <img 
                 v-if="getAvatarUrl()" 
@@ -439,10 +527,10 @@ const getAvatarUrl = () => {
                 class="w-full h-full object-cover"
               >
               <span v-else>
-                {{ (userInfo?.nickname || userInfo?.username || user?.username || 'U').charAt(0).toUpperCase() }}
+                {{ profileAvatarInitial }}
               </span>
-            </motion.div>
-            <div class="absolute inset-0 bg-black/0 group-hover:bg-black/20 rounded-full flex items-center justify-center transition-all cursor-pointer" @click="handleAvatarClick">
+            </motion.button>
+            <div class="pointer-events-none absolute inset-0 bg-black/0 group-hover:bg-black/20 rounded-full flex items-center justify-center transition-all" aria-hidden="true">
               <svg v-if="!uploadingAvatar" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -450,9 +538,11 @@ const getAvatarUrl = () => {
               <div v-else class="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
             </div>
             <input 
+              id="avatar-upload"
               ref="avatarFileInput"
               type="file" 
               accept="image/*" 
+              :aria-label="t('profile.avatar')"
               @change="handleAvatarUpload"
               class="hidden"
             >
@@ -460,22 +550,24 @@ const getAvatarUrl = () => {
           <div class="flex-1 text-center md:text-left">
             <div class="flex items-center justify-center md:justify-start gap-2 mb-2">
               <h1 class="min-w-0 break-words text-2xl font-bold text-tibet-dark sm:text-3xl">
-                {{ userInfo?.nickname || userInfo?.username || user?.username }}
+                {{ profileDisplayName }}
               </h1>
               <motion.button
+                type="button"
                 @click="openNicknameModal"
                 class="text-tibet-brown/70 hover:text-tibet-gold transition-colors"
                 :whileHover="{ scale: 1.12, rotate: -4 }"
                 :whileTap="{ scale: 0.9 }"
+                :aria-label="t('profile.editNickname')"
                 :title="t('profile.editNickname')"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                 </svg>
               </motion.button>
             </div>
             <p class="text-tibet-brown/70 mb-4">
-              {{ userInfo?.role === 'ADMIN' ? t('profile.admin') : t('profile.member') }} · 
+              {{ profileRoleLabel }} ·
               {{ t('profile.registeredAt') }} {{ userInfo?.createdAt ? formatDate(userInfo.createdAt) : '' }}
             </p>
             <div class="flex flex-wrap gap-2 justify-center md:justify-start mb-4 sm:gap-4">
@@ -523,8 +615,9 @@ const getAvatarUrl = () => {
               </motion.div>
             </div>
             <motion.button
-              @click="showPasswordModal = true"
-              class="px-4 py-2 bg-tibet-gold hover:bg-tibet-gold/80 text-white rounded-xl transition-colors text-sm font-medium"
+              type="button"
+              @click="openPasswordModal"
+              class="min-w-0 whitespace-normal break-words rounded-xl bg-tibet-gold px-4 py-2 text-center text-sm font-medium leading-snug text-white transition-colors hover:bg-tibet-gold/80"
               :whileHover="{ y: -2, scale: 1.02 }"
               :whileTap="{ scale: 0.96 }"
             >
@@ -540,38 +633,61 @@ const getAvatarUrl = () => {
         modal-key="nickname-modal"
         panel-class="glass rounded-3xl p-5 sm:p-8 max-w-md mx-4 border border-white/50"
         backdrop-class="bg-black/50"
-        @close="showNicknameModal = false"
+        labelled-by="nickname-modal-title"
+        @close="closeNicknameModal"
       >
-          <h2 class="text-2xl font-bold text-tibet-dark mb-6">{{ t('profile.editNickname') }}</h2>
-          <form @submit.prevent="updateNickname" class="space-y-4">
+          <h2 id="nickname-modal-title" class="text-2xl font-bold text-tibet-dark mb-6">{{ t('profile.editNickname') }}</h2>
+          <form
+            @submit.prevent="updateNickname"
+            class="space-y-4"
+            :aria-busy="updatingNickname"
+            :aria-describedby="nicknameFormError ? profileNicknameErrorId : undefined"
+          >
             <div>
-              <label class="block text-sm font-medium text-tibet-dark/80 mb-2">{{ t('profile.nickname') }}</label>
+              <label for="profile-nickname" class="block text-sm font-medium text-tibet-dark/80 mb-2">{{ t('profile.nickname') }}</label>
               <input 
+                id="profile-nickname"
                 v-model="nicknameForm.nickname" 
+                name="nickname"
                 type="text" 
                 required
                 maxlength="20"
-                class="w-full px-4 py-2 rounded-xl bg-white/50 border border-tibet-gold/25 focus:border-tibet-gold focus:ring-2 focus:ring-blue-100 outline-none"
+                autocomplete="nickname"
+                :disabled="updatingNickname"
+                :aria-describedby="nicknameDescription"
+                :aria-invalid="nicknameFieldInvalid"
+                class="w-full rounded-xl border border-tibet-gold/25 bg-white/50 px-4 py-2 outline-none focus:border-tibet-gold focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-70"
                 :placeholder="t('profile.nicknamePlaceholder')"
+                @input="clearNicknameFormError"
               />
-              <p class="mt-1 text-xs text-gray-500">{{ nicknameForm.nickname.length }}/20</p>
+              <p id="profile-nickname-help" class="mt-1 text-xs text-gray-500">{{ nicknameForm.nickname.length }}/20</p>
             </div>
-            <div class="flex gap-4 pt-4">
+            <div
+              v-if="nicknameFormError"
+              :id="profileNicknameErrorId"
+              role="alert"
+              aria-live="assertive"
+              class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+            >
+              {{ nicknameFormError }}
+            </div>
+            <div class="flex flex-col gap-3 pt-4 sm:flex-row">
               <motion.button
                 type="button"
-                @click="showNicknameModal = false"
-                class="flex-1 px-4 py-2 rounded-xl border border-tibet-gold/25 hover:bg-gray-50 text-gray-700 font-medium transition-colors"
-                :whileHover="{ y: -1, scale: 1.02 }"
-                :whileTap="{ scale: 0.96 }"
+                :disabled="updatingNickname"
+                @click="closeNicknameModal"
+                class="min-w-0 flex-1 whitespace-normal break-words rounded-xl border border-tibet-gold/25 px-4 py-2 text-center font-medium leading-snug text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                :whileHover="updatingNickname ? {} : { y: -1, scale: 1.02 }"
+                :whileTap="updatingNickname ? {} : { scale: 0.96 }"
               >
                 {{ t('profile.cancel') }}
               </motion.button>
               <motion.button
                 type="submit"
                 :disabled="updatingNickname"
-                class="flex-1 px-4 py-2 rounded-xl bg-tibet-gold hover:bg-tibet-gold/80 text-white font-medium transition-colors disabled:opacity-50"
-                :whileHover="{ y: -1, scale: 1.02 }"
-                :whileTap="{ scale: 0.96 }"
+                class="min-w-0 flex-1 whitespace-normal break-words rounded-xl bg-tibet-gold px-4 py-2 text-center font-medium leading-snug text-white transition-colors hover:bg-tibet-gold/80 disabled:cursor-not-allowed disabled:opacity-50"
+                :whileHover="updatingNickname ? {} : { y: -1, scale: 1.02 }"
+                :whileTap="updatingNickname ? {} : { scale: 0.96 }"
               >
                 {{ updatingNickname ? t('profile.updating') : t('profile.confirmUpdate') }}
               </motion.button>
@@ -585,56 +701,98 @@ const getAvatarUrl = () => {
         modal-key="password-modal"
         panel-class="glass rounded-3xl p-5 sm:p-8 max-w-md mx-4 border border-white/50"
         backdrop-class="bg-black/50"
-        @close="showPasswordModal = false"
+        labelled-by="password-modal-title"
+        @close="closePasswordModal"
       >
-          <h2 class="text-2xl font-bold text-tibet-dark mb-6">{{ t('profile.changePassword') }}</h2>
-          <form @submit.prevent="changePassword" class="space-y-4">
+          <h2 id="password-modal-title" class="text-2xl font-bold text-tibet-dark mb-6">{{ t('profile.changePassword') }}</h2>
+          <form
+            @submit.prevent="changePassword"
+            class="space-y-4"
+            :aria-busy="changingPassword"
+            :aria-describedby="passwordFormError ? profilePasswordErrorId : undefined"
+          >
             <div>
-              <label class="block text-sm font-medium text-tibet-dark/80 mb-2">{{ t('profile.currentPassword') }}</label>
+              <label for="profile-current-password" class="block text-sm font-medium text-tibet-dark/80 mb-2">{{ t('profile.currentPassword') }}</label>
               <input 
+                id="profile-current-password"
                 v-model="passwordForm.oldPassword" 
+                name="current-password"
                 type="password" 
                 required
-                class="w-full px-4 py-2 rounded-xl bg-white/50 border border-tibet-gold/25 focus:border-tibet-gold focus:ring-2 focus:ring-blue-100 outline-none"
+                autocomplete="current-password"
+                :disabled="changingPassword"
+                :aria-describedby="currentPasswordDescription"
+                :aria-invalid="passwordFieldInvalid"
+                class="w-full rounded-xl border border-tibet-gold/25 bg-white/50 px-4 py-2 outline-none focus:border-tibet-gold focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-70"
                 :placeholder="t('profile.currentPasswordPlaceholder')"
+                @input="clearPasswordFormError"
               />
+              <p id="profile-current-password-help" class="sr-only">{{ t('profile.currentPassword') }}</p>
             </div>
             <div>
-              <label class="block text-sm font-medium text-tibet-dark/80 mb-2">{{ t('profile.newPassword') }}</label>
+              <label for="profile-new-password" class="block text-sm font-medium text-tibet-dark/80 mb-2">{{ t('profile.newPassword') }}</label>
               <input 
+                id="profile-new-password"
                 v-model="passwordForm.newPassword" 
+                name="new-password"
                 type="password" 
                 required
-                class="w-full px-4 py-2 rounded-xl bg-white/50 border border-tibet-gold/25 focus:border-tibet-gold focus:ring-2 focus:ring-blue-100 outline-none"
+                autocomplete="new-password"
+                minlength="6"
+                :disabled="changingPassword"
+                :aria-describedby="newPasswordDescription"
+                :aria-invalid="passwordFieldInvalid"
+                class="w-full rounded-xl border border-tibet-gold/25 bg-white/50 px-4 py-2 outline-none focus:border-tibet-gold focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-70"
                 :placeholder="t('profile.newPasswordPlaceholder')"
+                @input="clearPasswordFormError"
               />
+              <p id="profile-new-password-help" class="sr-only">{{ t('profile.newPassword') }}</p>
             </div>
             <div>
-              <label class="block text-sm font-medium text-tibet-dark/80 mb-2">{{ t('profile.confirmNewPassword') }}</label>
+              <label for="profile-confirm-new-password" class="block text-sm font-medium text-tibet-dark/80 mb-2">{{ t('profile.confirmNewPassword') }}</label>
               <input 
+                id="profile-confirm-new-password"
                 v-model="passwordForm.confirmPassword" 
+                name="confirm-new-password"
                 type="password" 
                 required
-                class="w-full px-4 py-2 rounded-xl bg-white/50 border border-tibet-gold/25 focus:border-tibet-gold focus:ring-2 focus:ring-blue-100 outline-none"
+                autocomplete="new-password"
+                minlength="6"
+                :disabled="changingPassword"
+                :aria-describedby="confirmNewPasswordDescription"
+                :aria-invalid="passwordFieldInvalid"
+                class="w-full rounded-xl border border-tibet-gold/25 bg-white/50 px-4 py-2 outline-none focus:border-tibet-gold focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-70"
                 :placeholder="t('profile.confirmNewPasswordPlaceholder')"
+                @input="clearPasswordFormError"
               />
+              <p id="profile-confirm-new-password-help" class="sr-only">{{ t('profile.confirmNewPassword') }}</p>
             </div>
-            <div class="flex gap-4 pt-4">
+            <div
+              v-if="passwordFormError"
+              :id="profilePasswordErrorId"
+              role="alert"
+              aria-live="assertive"
+              class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+            >
+              {{ passwordFormError }}
+            </div>
+            <div class="flex flex-col gap-3 pt-4 sm:flex-row">
               <motion.button
                 type="button"
-                @click="showPasswordModal = false"
-                class="flex-1 px-4 py-2 rounded-xl border border-tibet-gold/25 hover:bg-gray-50 text-gray-700 font-medium transition-colors"
-                :whileHover="{ y: -1, scale: 1.02 }"
-                :whileTap="{ scale: 0.96 }"
+                :disabled="changingPassword"
+                @click="closePasswordModal"
+                class="min-w-0 flex-1 whitespace-normal break-words rounded-xl border border-tibet-gold/25 px-4 py-2 text-center font-medium leading-snug text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                :whileHover="changingPassword ? {} : { y: -1, scale: 1.02 }"
+                :whileTap="changingPassword ? {} : { scale: 0.96 }"
               >
                 {{ t('profile.cancel') }}
               </motion.button>
               <motion.button
                 type="submit"
                 :disabled="changingPassword"
-                class="flex-1 px-4 py-2 rounded-xl bg-tibet-gold hover:bg-tibet-gold/80 text-white font-medium transition-colors disabled:opacity-50"
-                :whileHover="{ y: -1, scale: 1.02 }"
-                :whileTap="{ scale: 0.96 }"
+                class="min-w-0 flex-1 whitespace-normal break-words rounded-xl bg-tibet-gold px-4 py-2 text-center font-medium leading-snug text-white transition-colors hover:bg-tibet-gold/80 disabled:cursor-not-allowed disabled:opacity-50"
+                :whileHover="changingPassword ? {} : { y: -1, scale: 1.02 }"
+                :whileTap="changingPassword ? {} : { scale: 0.96 }"
               >
                 {{ changingPassword ? t('profile.changing') : t('profile.confirmChange') }}
               </motion.button>
@@ -650,10 +808,13 @@ const getAvatarUrl = () => {
         :transition="cardTransition(1, 0.08)"
       >
         <LayoutGroup>
-        <div class="-mx-4 flex gap-2 overflow-x-auto border-b border-tibet-gold/25 px-4 pb-1 mb-5 sm:mx-0 sm:gap-4 sm:px-0 sm:pb-0 sm:mb-6">
+        <div class="-mx-4 flex gap-2 overflow-x-auto border-b border-tibet-gold/25 px-4 pb-1 mb-5 sm:mx-0 sm:gap-4 sm:px-0 sm:pb-0 sm:mb-6" role="tablist">
           <motion.button
             v-for="tab in profileTabs"
             :key="tab.id"
+            type="button"
+            role="tab"
+            :aria-selected="activeTab === tab.id"
             @click="activeTab = tab.id"
             class="relative shrink-0 px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors sm:px-6 sm:text-base"
             :class="activeTab === tab.id ? 'text-tibet-gold' : 'text-tibet-brown/70 hover:text-tibet-dark/80'"
@@ -723,13 +884,15 @@ const getAvatarUrl = () => {
                   {{ route.title }}
                 </h3>
                 <motion.button
+                  type="button"
                   @click="deleteRoute(route.id)"
                   class="ml-2 text-red-500 hover:text-red-700 transition-colors"
                   :whileHover="{ scale: 1.12, rotate: -4 }"
                   :whileTap="{ scale: 0.9 }"
+                  :aria-label="`${t('profile.delete')} ${route.title}`"
                   :title="t('profile.delete')"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                   </svg>
                 </motion.button>

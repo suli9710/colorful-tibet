@@ -32,7 +32,7 @@
               </div>
               <h1 class="break-words text-xl font-bold text-gray-900 mb-3 sm:text-2xl">{{ question.title }}</h1>
               <div class="flex flex-wrap items-center gap-2 text-sm text-gray-400 sm:gap-3">
-                <span>{{ question.author?.username || t('questionDetail.anonymousUser') }}</span>
+                <span>{{ publicUserName(question.author) }}</span>
                 <span>·</span>
                 <span>{{ formatDate(question.createdAt) }}</span>
                 <span>·</span>
@@ -44,12 +44,22 @@
 
           <!-- Question Actions -->
           <div class="flex flex-wrap items-center gap-3 mt-6 pt-6 border-t border-tibet-gold/20 sm:gap-4">
-            <button @click="toggleLike" class="flex items-center gap-2 px-4 py-2 rounded-xl transition-all text-sm font-medium"
+            <button type="button"
+                    @click="toggleLike"
+                    :disabled="liking"
+                    :aria-label="questionLikeAccessibleName"
+                    :aria-pressed="isLiked"
+                    :aria-busy="liking"
+                    class="flex items-center gap-2 px-4 py-2 rounded-xl transition-all text-sm font-medium disabled:cursor-wait disabled:opacity-70"
                     :class="isLiked ? 'bg-red-50 text-red-600' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'">
-              <span>{{ isLiked ? '❤️' : '🤍' }}</span>
+              <Heart class="h-4 w-4" :fill="isLiked ? 'currentColor' : 'none'" aria-hidden="true" />
               <span>{{ question.likeCount }}</span>
             </button>
-            <button v-if="isAuthor" @click="deleteQuestion" class="ml-auto px-4 py-2 rounded-xl bg-gray-50 text-gray-400 hover:bg-red-50 hover:text-red-500 transition-colors text-sm">
+            <button v-if="isAuthor"
+                    @click="deleteQuestion"
+                    :disabled="deletingQuestion"
+                    :aria-busy="deletingQuestion"
+                    class="ml-auto px-4 py-2 rounded-xl bg-gray-50 text-gray-400 hover:bg-red-50 hover:text-red-500 transition-colors text-sm disabled:cursor-wait disabled:opacity-70">
               {{ t('questionDetail.deleteQuestion') }}
             </button>
           </div>
@@ -71,7 +81,7 @@
                  :class="answer.isAccepted ? 'border-2 border-emerald-300 bg-emerald-50/40' : 'border border-white/20'">
               <div class="flex flex-col gap-2 mb-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                 <div class="flex flex-wrap items-center gap-2">
-                  <span class="font-semibold text-gray-900 text-sm">{{ answer.user?.username || t('questionDetail.anonymousUser') }}</span>
+                  <span class="font-semibold text-gray-900 text-sm">{{ publicUserName(answer.user) }}</span>
                   <span v-if="answer.isAccepted" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-600 text-xs font-medium">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                     {{ t('community.accepted') }}
@@ -87,7 +97,9 @@
                 </span>
                 <button v-if="isQuestionAuthor && !answer.isAccepted && !question.isResolved"
                         @click="acceptAnswer(answer.id)"
-                        class="ml-auto px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 text-xs font-medium transition-colors">
+                        :disabled="acceptingAnswerId !== null"
+                        :aria-busy="acceptingAnswerId === answer.id"
+                        class="ml-auto px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 text-xs font-medium transition-colors disabled:cursor-wait disabled:opacity-70">
                   {{ t('community.acceptAnswer') }}
                 </button>
               </div>
@@ -100,10 +112,13 @@
           <h3 class="text-lg font-bold text-gray-900 mb-4">{{ t('community.writeAnswer') }}</h3>
           <textarea v-model="newAnswer" rows="4"
                     :placeholder="t('community.yourAnswer')"
+                    :aria-label="t('community.yourAnswer')"
                     class="w-full px-4 py-3 rounded-xl bg-white/50 border border-tibet-gold/25 focus:border-tibet-red focus:ring-4 focus:ring-red-50 outline-none transition-all text-sm resize-none mb-4"></textarea>
           <div class="flex justify-end">
-            <button @click="submitAnswer" :disabled="!newAnswer.trim() || answering"
-                    class="px-6 py-2.5 bg-gradient-to-r from-tibet-red to-rose-600 text-white rounded-xl shadow-lg shadow-red-500/20 hover:shadow-xl hover:shadow-red-500/30 transition-all disabled:opacity-50 text-sm font-medium">
+            <button @click="submitAnswer"
+                    :disabled="isSubmitAnswerDisabled"
+                    :aria-busy="answering"
+                    class="px-6 py-2.5 bg-gradient-to-r from-tibet-red to-rose-600 text-white rounded-xl shadow-lg shadow-red-500/20 hover:shadow-xl hover:shadow-red-500/30 transition-all disabled:cursor-wait disabled:opacity-50 text-sm font-medium">
               {{ answering ? t('community.submittingAnswer') : t('community.submitAnswer') }}
             </button>
           </div>
@@ -124,6 +139,11 @@ import { revealInitial, revealInView, revealTransition } from '../motion/presets
 import api from '../api'
 import { useAuthStore } from '../stores/auth'
 import { useAuthGuard } from '../composables/useAuthGuard'
+import { showConfirm } from '../composables/useConfirm'
+import { showToast } from '../composables/useToast'
+import { readBrowserStorage } from '../utils/browserStorage'
+import { summarizeClientError } from '../utils/errorMonitoring'
+import { Heart } from 'lucide-vue-next'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -137,16 +157,24 @@ const loading = ref(true)
 const answering = ref(false)
 const newAnswer = ref('')
 const isLiked = ref(false)
+const liking = ref(false)
+const acceptingAnswerId = ref<number | null>(null)
+const deletingQuestion = ref(false)
 
-const currentUserId = computed(() => {
-  const id = auth.user?.id
-  if (id == null) return null
-  const numericId = Number(id)
-  return Number.isFinite(numericId) ? numericId : null
+const isAuthor = computed(() => Boolean(question.value?.author?.owner))
+const isQuestionAuthor = isAuthor
+const isSubmitAnswerDisabled = computed(() => !newAnswer.value.trim() || answering.value)
+const questionLikeAccessibleName = computed(() => {
+  const action = isLiked.value ? '取消点赞问题' : '点赞问题'
+  const state = isLiked.value ? '当前已点赞' : '当前未点赞'
+  const count = question.value?.likeCount ?? 0
+
+  return `${action}，${state}，${count} 次点赞`
 })
 
-const isAuthor = computed(() => currentUserId.value && question.value?.author?.id === currentUserId.value)
-const isQuestionAuthor = computed(() => currentUserId.value && question.value?.author?.id === currentUserId.value)
+const normalizePublicUserName = (value: unknown) => typeof value === 'string' ? value.trim() : ''
+const publicUserName = (user: any) =>
+  normalizePublicUserName(user?.nickname) || t('questionDetail.anonymousUser')
 
 interface TagOption { value: string; color: string }
 
@@ -178,14 +206,14 @@ const loadQuestion = async () => {
     answers.value = aRes.data || []
 
     // Check like status
-    if (currentUserId.value) {
+    if (auth.hasValidSession()) {
       try {
         const likeRes = await api.get(`/community/questions/${id}/like-status`)
         isLiked.value = likeRes.data.liked
       } catch { /* ignore */ }
     }
   } catch (error) {
-    console.error('Failed to load question:', error)
+    console.error('Failed to load question:', summarizeClientError(error))
     question.value = null
   } finally {
     loading.value = false
@@ -193,12 +221,13 @@ const loadQuestion = async () => {
 }
 
 const submitAnswer = async () => {
-  if (!newAnswer.value.trim() || answering.value) return
-  if (!(await requireAuth())) return
-
+  const content = newAnswer.value.trim()
+  if (!content || answering.value || !question.value) return
   answering.value = true
   try {
-    await api.post(`/community/questions/${question.value.id}/answers`, { content: newAnswer.value })
+    if (!(await requireAuth())) return
+
+    await api.post(`/community/questions/${question.value.id}/answers`, { content })
     newAnswer.value = ''
     const aRes = await api.get(`/community/questions/${question.value.id}/answers`)
     answers.value = aRes.data || []
@@ -209,7 +238,7 @@ const submitAnswer = async () => {
     if (error.response?.status === 401) {
       if (!(await requireAuth())) return
     } else {
-      alert(t('questionDetail.answerFailed'))
+      showToast(t('questionDetail.answerFailed'), 'error')
     }
   } finally {
     answering.value = false
@@ -217,8 +246,11 @@ const submitAnswer = async () => {
 }
 
 const toggleLike = async () => {
-  if (!(await requireAuth())) return
+  if (liking.value || !question.value) return
+  liking.value = true
   try {
+    if (!(await requireAuth())) return
+
     if (isLiked.value) {
       await api.delete(`/community/questions/${question.value.id}/like`)
       isLiked.value = false
@@ -232,31 +264,52 @@ const toggleLike = async () => {
     if (error.response?.status === 401) {
       if (!(await requireAuth())) return
     }
+  } finally {
+    liking.value = false
   }
 }
 
 const acceptAnswer = async (answerId: number) => {
+  if (acceptingAnswerId.value !== null || !question.value) return
+  acceptingAnswerId.value = answerId
   try {
+    if (!(await requireAuth())) return
+
     await api.post(`/community/questions/${question.value.id}/answers/${answerId}/accept`)
     question.value.isResolved = true
-    loadQuestion()
+    await loadQuestion()
   } catch (error: any) {
-    alert(t('questionDetail.acceptFailed'))
+    showToast(t('questionDetail.acceptFailed'), 'error')
+  } finally {
+    acceptingAnswerId.value = null
   }
 }
 
 const deleteQuestion = async () => {
-  if (!confirm(t('questionDetail.confirmDelete'))) return
+  if (deletingQuestion.value || !question.value) return
+  deletingQuestion.value = true
   try {
+    if (!(await requireAuth())) return
+
+    const confirmed = await showConfirm({
+      message: t('questionDetail.confirmDelete'),
+      confirmLabel: t('common.delete'),
+      cancelLabel: t('common.cancel'),
+      tone: 'danger'
+    })
+    if (!confirmed) return
+
     await api.delete(`/community/questions/${question.value.id}`)
     router.push('/community')
   } catch (error: any) {
-    alert(t('questionDetail.deleteFailed'))
+    showToast(t('questionDetail.deleteFailed'), 'error')
+  } finally {
+    deletingQuestion.value = false
   }
 }
 
 const formatDate = (dateStr: string) => {
-  const locale = localStorage.getItem('locale') || 'zh'
+  const locale = readBrowserStorage('localStorage', 'locale', 'zh')
   return new Date(dateStr).toLocaleDateString(locale === 'bo' ? 'bo-CN' : 'zh-CN')
 }
 

@@ -1,11 +1,16 @@
 package com.tibet.tourism.modules.community.web;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.containsString;
 
 import com.tibet.tourism.common.security.JwtAuthSupport;
 import com.tibet.tourism.common.security.JwtUtils;
@@ -21,6 +26,7 @@ import com.tibet.tourism.modules.user.domain.User;
 import com.tibet.tourism.modules.user.infra.UserRepository;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -28,6 +34,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(controllers = {SharedRouteController.class, TravelQAController.class})
@@ -69,7 +76,8 @@ class CommunityPublicDtoTest {
 
         mockMvc.perform(get("/api/routes/shared"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content[0].author.id").value(7))
+                .andExpect(jsonPath("$.content[0].author.id").doesNotExist())
+                .andExpect(jsonPath("$.content[0].author.owner").value(false))
                 .andExpect(jsonPath("$.content[0].author.username").doesNotExist())
                 .andExpect(jsonPath("$.content[0].author.phone").doesNotExist())
                 .andExpect(jsonPath("$.content[0].author.ipAddress").doesNotExist())
@@ -80,10 +88,12 @@ class CommunityPublicDtoTest {
     void sharedRouteDetailReturnsPublicAuthorOnly() throws Exception {
         SharedRoute route = sharedRoute();
         when(routeService.getRoute(100L)).thenReturn(route);
+        when(jwtAuthSupport.resolveOptionalCurrentUser(any())).thenReturn(Optional.of(publicUser()));
 
         mockMvc.perform(get("/api/routes/shared/100"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.author.id").value(7))
+                .andExpect(jsonPath("$.author.id").doesNotExist())
+                .andExpect(jsonPath("$.author.owner").value(true))
                 .andExpect(jsonPath("$.author.nickname").value("Public Nickname"))
                 .andExpect(jsonPath("$.author.avatar").value("/avatars/u7.png"))
                 .andExpect(jsonPath("$.author.username").doesNotExist())
@@ -105,7 +115,8 @@ class CommunityPublicDtoTest {
 
         mockMvc.perform(get("/api/routes/shared/100/comments"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].user.id").value(7))
+                .andExpect(jsonPath("$[0].user.id").doesNotExist())
+                .andExpect(jsonPath("$[0].user.owner").value(false))
                 .andExpect(jsonPath("$[0].route").doesNotExist())
                 .andExpect(jsonPath("$[0].user.username").doesNotExist())
                 .andExpect(jsonPath("$[0].user.phone").doesNotExist())
@@ -124,7 +135,8 @@ class CommunityPublicDtoTest {
 
         mockMvc.perform(get("/api/community/questions"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content[0].author.id").value(7))
+                .andExpect(jsonPath("$.content[0].author.id").doesNotExist())
+                .andExpect(jsonPath("$.content[0].author.owner").value(false))
                 .andExpect(jsonPath("$.content[0].isResolved").value(false))
                 .andExpect(jsonPath("$.content[0].author.username").doesNotExist())
                 .andExpect(jsonPath("$.content[0].author.phone").doesNotExist())
@@ -136,10 +148,12 @@ class CommunityPublicDtoTest {
     void questionDetailReturnsPublicAuthorOnly() throws Exception {
         TravelQuestion question = question();
         when(qaService.getQuestion(200L)).thenReturn(question);
+        when(jwtAuthSupport.resolveOptionalCurrentUser(any())).thenReturn(Optional.of(publicUser()));
 
         mockMvc.perform(get("/api/community/questions/200"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.author.id").value(7))
+                .andExpect(jsonPath("$.author.id").doesNotExist())
+                .andExpect(jsonPath("$.author.owner").value(true))
                 .andExpect(jsonPath("$.author.nickname").value("Public Nickname"))
                 .andExpect(jsonPath("$.isResolved").value(false))
                 .andExpect(jsonPath("$.author.username").doesNotExist())
@@ -162,13 +176,58 @@ class CommunityPublicDtoTest {
 
         mockMvc.perform(get("/api/community/questions/200/answers"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].user.id").value(7))
+                .andExpect(jsonPath("$[0].user.id").doesNotExist())
+                .andExpect(jsonPath("$[0].user.owner").value(false))
                 .andExpect(jsonPath("$[0].isAccepted").value(true))
                 .andExpect(jsonPath("$[0].question").doesNotExist())
                 .andExpect(jsonPath("$[0].user.username").doesNotExist())
                 .andExpect(jsonPath("$[0].user.phone").doesNotExist())
                 .andExpect(jsonPath("$[0].user.ipAddress").doesNotExist())
                 .andExpect(jsonPath("$[0].user.allowedLoginFingerprintHash").doesNotExist());
+    }
+
+    @Test
+    void questionMutationErrorsDoNotExposeRawExceptionMessages() throws Exception {
+        when(jwtAuthSupport.resolveCurrentUserId(any())).thenReturn(7L);
+        when(qaService.askQuestion(
+                anyLong(),
+                nullable(String.class),
+                nullable(String.class),
+                nullable(String.class)))
+                .thenThrow(new IllegalArgumentException("SQL constraint user_secret_token=abc123"));
+
+        mockMvc.perform(post("/api/community/questions")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"title":"Altitude","content":"How to prepare?","tags":"safety"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Invalid request"))
+                .andExpect(content().string(not(containsString("SQL constraint"))))
+                .andExpect(content().string(not(containsString("user_secret_token"))));
+    }
+
+    @Test
+    void sharedRouteMutationErrorsDoNotExposeRawExceptionMessages() throws Exception {
+        when(jwtAuthSupport.resolveCurrentUserId(any())).thenReturn(7L);
+        when(routeService.shareRoute(
+                anyLong(),
+                nullable(String.class),
+                nullable(String.class),
+                nullable(Integer.class),
+                nullable(String.class),
+                nullable(String.class)))
+                .thenThrow(new IllegalArgumentException("storage path C:/private/uploads/secret.html"));
+
+        mockMvc.perform(post("/api/routes/share")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"title":"Route","content":"Route content","days":3,"budget":"mid","preference":"culture"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Invalid request"))
+                .andExpect(content().string(not(containsString("C:/private"))))
+                .andExpect(content().string(not(containsString("secret.html"))));
     }
 
     private static User publicUser() {

@@ -1,9 +1,11 @@
 package com.tibet.tourism.modules.user.web;
 import com.tibet.tourism.common.api.ApiErrorResponder;
 import com.tibet.tourism.common.security.JwtAuthSupport;
+import com.tibet.tourism.common.security.SensitiveLogSanitizer;
 import com.tibet.tourism.modules.user.application.CurrentUserApplicationService;
-import com.tibet.tourism.modules.user.domain.User;
 import com.tibet.tourism.modules.user.web.dto.ChangePasswordRequest;
+import com.tibet.tourism.modules.user.web.dto.UpdateAvatarRequest;
+import com.tibet.tourism.modules.user.web.dto.UpdateNicknameRequest;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.Map;
@@ -89,15 +91,15 @@ public class CurrentUserController {
         } catch (IllegalArgumentException exception) {
             return ResponseEntity.badRequest().body(Map.of("error", "Invalid upload file"));
         } catch (Exception exception) {
-            logger.warn("Avatar upload failed: {}", exception.getMessage());
+            logger.warn("Avatar upload failed: {}", SensitiveLogSanitizer.exceptionSummary(exception));
             return ResponseEntity.badRequest().body(Map.of("error", "Avatar upload failed"));
         }
     }
 
     @PutMapping("/me/nickname")
-    public ResponseEntity<?> updateNickname(@RequestBody Map<String, String> payload, HttpServletRequest request) {
+    public ResponseEntity<?> updateNickname(@Valid @RequestBody UpdateNicknameRequest payload, HttpServletRequest request) {
         try {
-            String nickname = currentUserApplicationService.updateNickname(currentUserId(request), payload.get("nickname"));
+            String nickname = currentUserApplicationService.updateNickname(currentUserId(request), payload.nickname());
             return ResponseEntity.ok(Map.of("message", "Nickname updated successfully", "nickname", nickname));
         } catch (DataIntegrityViolationException exception) {
             return ResponseEntity.badRequest().body(Map.of("error", "Nickname update failed"));
@@ -107,9 +109,9 @@ public class CurrentUserController {
     }
 
     @PutMapping("/me/avatar")
-    public ResponseEntity<?> updateAvatar(@RequestBody Map<String, String> payload, HttpServletRequest request) {
+    public ResponseEntity<?> updateAvatar(@Valid @RequestBody UpdateAvatarRequest payload, HttpServletRequest request) {
         try {
-            String avatarUrl = currentUserApplicationService.updateAvatar(currentUserId(request), payload.get("avatarUrl"));
+            String avatarUrl = currentUserApplicationService.updateAvatar(currentUserId(request), payload.avatarUrl());
             return ResponseEntity.ok(Map.of("message", "Avatar updated successfully", "avatarUrl", avatarUrl));
         } catch (Exception exception) {
             return apiErrorResponder.authenticatedRequest(exception);

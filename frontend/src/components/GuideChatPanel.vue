@@ -1,18 +1,22 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { AnimatePresence, motion } from 'motion-v'
 import { softSpring } from '../motion/presets'
 import { useRouteGenerationStore } from '../stores/routeGeneration'
 import {
   type ChatMessage,
   type GuideChatHistoryItem,
+  MAX_GUIDE_CHAT_MESSAGE_CHARS,
+  createNetworkFallbackGuideMessage,
   createPendingGuideMessage,
   createUserMessage,
-  getLocalGuideReply,
   getGreeting,
+  normalizeGuideChatInput,
   quickReplies,
-  requestGuideChat
+  requestGuideChat,
+  summarizeGuideChatError
 } from '../services/guideChat'
 
 const props = defineProps<{
@@ -24,20 +28,41 @@ const emit = defineEmits<{
 }>()
 
 const router = useRouter()
+const { t } = useI18n()
 const generationStore = useRouteGenerationStore()
 
 const messages = ref<ChatMessage[]>([])
 const inputText = ref('')
 const messagesContainer = ref<HTMLElement | null>(null)
+const inputField = ref<HTMLTextAreaElement | null>(null)
 const isSending = ref(false)
 const cooldownRemaining = ref(0)
 
 const SEND_COOLDOWN_SECONDS = 6
 const MAX_UI_COOLDOWN_SECONDS = 300
+const inputLimit = MAX_GUIDE_CHAT_MESSAGE_CHARS
+const panelTitleId = 'guide-chat-title'
+const privacyNoteId = 'guide-chat-privacy-note'
+const cooldownId = 'guide-chat-cooldown'
+const inputLimitId = 'guide-chat-input-limit'
+const messagesLogId = 'guide-chat-messages'
 let cooldownTimer: number | undefined
 
-const canSend = computed(() => Boolean(inputText.value.trim()) && !isSending.value && cooldownRemaining.value <= 0)
+const normalizedInput = computed(() => normalizeGuideChatInput(inputText.value))
+const inputLength = computed(() => Array.from(inputText.value).length)
+const inputNearLimit = computed(() => inputLength.value >= inputLimit - 30)
+const canSend = computed(() => Boolean(normalizedInput.value) && !isSending.value && cooldownRemaining.value <= 0)
 const interactionLocked = computed(() => isSending.value || cooldownRemaining.value > 0)
+const sendButtonLabel = computed(() => {
+  if (isSending.value) return t('common.submitting')
+  if (cooldownRemaining.value > 0) return t('guideChat.cooldown', { seconds: cooldownRemaining.value })
+  return t('guideChat.send')
+})
+const inputDescribedBy = computed(() => [
+  privacyNoteId,
+  cooldownRemaining.value > 0 ? cooldownId : '',
+  inputNearLimit.value ? inputLimitId : ''
+].filter(Boolean).join(' '))
 
 function scrollToBottom() {
   nextTick(() => {
@@ -56,7 +81,8 @@ function clearCooldownTimer() {
 }
 
 function startCooldown(seconds = SEND_COOLDOWN_SECONDS) {
-  const nextSeconds = Math.max(SEND_COOLDOWN_SECONDS, Math.min(Math.ceil(seconds), MAX_UI_COOLDOWN_SECONDS))
+  const safeSeconds = Number.isFinite(seconds) ? seconds : SEND_COOLDOWN_SECONDS
+  const nextSeconds = Math.max(SEND_COOLDOWN_SECONDS, Math.min(Math.ceil(safeSeconds), MAX_UI_COOLDOWN_SECONDS))
   cooldownRemaining.value = nextSeconds
   clearCooldownTimer()
   cooldownTimer = window.setInterval(() => {
@@ -70,10 +96,14 @@ function startCooldown(seconds = SEND_COOLDOWN_SECONDS) {
 onBeforeUnmount(clearCooldownTimer)
 
 watch(() => props.visible, (v) => {
-  if (v && messages.value.length === 0) {
+  if (!v) return
+
+  if (messages.value.length === 0) {
     messages.value = [getGreeting()]
     scrollToBottom()
   }
+
+  nextTick(() => inputField.value?.focus())
 })
 
 function replaceMessage(id: number, nextMessage: ChatMessage) {
@@ -89,12 +119,13 @@ function buildHistory(): GuideChatHistoryItem[] {
     .slice(-8)
     .map(msg => ({
       role: msg.role,
-      content: msg.text.slice(0, 500)
+      content: normalizeGuideChatInput(msg.text)
     }))
+    .filter(item => item.content)
 }
 
 async function sendMessage(text: string) {
-  const trimmed = text.trim()
+  const trimmed = normalizeGuideChatInput(text)
   if (!trimmed || isSending.value || cooldownRemaining.value > 0) return
 
   const history = buildHistory()
@@ -110,8 +141,10 @@ async function sendMessage(text: string) {
     replaceMessage(pendingMessage.id, guideMessage)
     startCooldown(guideMessage.limited ? guideMessage.retryAfterSeconds : SEND_COOLDOWN_SECONDS)
   } catch (error) {
-    console.warn('AI guide chat failed, using local fallback:', error)
-    replaceMessage(pendingMessage.id, getLocalGuideReply(trimmed))
+    if (import.meta.env.DEV) {
+      console.warn('AI guide chat failed, using local fallback:', summarizeGuideChatError(error))
+    }
+    replaceMessage(pendingMessage.id, createNetworkFallbackGuideMessage(trimmed))
     startCooldown(SEND_COOLDOWN_SECONDS)
   } finally {
     isSending.value = false
@@ -121,6 +154,21 @@ async function sendMessage(text: string) {
 
 function handleQuickReply(reply: (typeof quickReplies)[number]) {
   sendMessage(reply.text)
+}
+
+function handleInput(event: Event) {
+  const target = event.target as HTMLTextAreaElement
+  const chars = Array.from(target.value)
+  const nextValue = chars.length > inputLimit ? chars.slice(0, inputLimit).join('') : target.value
+  inputText.value = nextValue
+  if (target.value !== nextValue) {
+    target.value = nextValue
+  }
+}
+
+function retryNetworkFallback(msg: ChatMessage) {
+  if (!msg.networkFallback || !msg.retryText || interactionLocked.value) return
+  sendMessage(msg.retryText)
 }
 
 function handleAction(msg: ChatMessage) {
@@ -135,6 +183,8 @@ function handleAction(msg: ChatMessage) {
 }
 
 function handleKeydown(e: KeyboardEvent) {
+  if (e.isComposing) return
+
   if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault()
     sendMessage(inputText.value)
@@ -152,6 +202,8 @@ function handleKeydown(e: KeyboardEvent) {
       :animate="{ opacity: 1, y: 0, scale: 1 }"
       :exit="{ opacity: 0, y: 12, scale: 0.95 }"
       :transition="softSpring"
+      role="dialog"
+      :aria-labelledby="panelTitleId"
     >
       <!-- Header -->
       <div class="chat-header">
@@ -180,15 +232,17 @@ function handleKeydown(e: KeyboardEvent) {
             </svg>
           </div>
           <div>
-            <p class="text-sm font-bold text-gray-800 leading-tight">西藏小导游</p>
+            <p :id="panelTitleId" class="text-sm font-bold text-gray-800 leading-tight">{{ t('guideChat.title') }}</p>
             <p class="text-[10px] text-gray-400 flex items-center gap-1">
               <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-              在线
+              {{ t('guideChat.online') }}
             </p>
           </div>
         </div>
         <button
+          type="button"
           @click="emit('close')"
+          :aria-label="t('guideChat.closePanel')"
           class="flex items-center justify-center w-7 h-7 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
         >
           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -198,7 +252,15 @@ function handleKeydown(e: KeyboardEvent) {
       </div>
 
       <!-- Messages -->
-      <div ref="messagesContainer" class="chat-messages">
+      <div
+        :id="messagesLogId"
+        ref="messagesContainer"
+        class="chat-messages"
+        role="log"
+        aria-live="polite"
+        aria-relevant="additions text"
+        :aria-busy="isSending"
+      >
         <template v-for="msg in messages" :key="msg.id">
           <!-- Guide message -->
           <div v-if="msg.role === 'guide'" class="flex gap-2 mb-4">
@@ -221,11 +283,29 @@ function handleKeydown(e: KeyboardEvent) {
                   <span></span>
                   <span></span>
                 </span>
-                <span>{{ msg.text }}</span>
+                <span v-if="msg.pending" class="sr-only" role="status" aria-live="polite">{{ msg.text }}</span>
+                <span :aria-hidden="msg.pending ? 'true' : undefined">{{ msg.text }}</span>
+                <div v-if="!msg.pending && (msg.limited || msg.fallback || msg.networkFallback || msg.challengeRequired)" class="chat-message-flags">
+                  <span v-if="msg.limited && !msg.challengeRequired" class="chat-message-flag">{{ t('guideChat.rateLimited') }}</span>
+                  <span v-if="msg.fallback || msg.networkFallback" class="chat-message-flag">{{ t('guideChat.localFallback') }}</span>
+                  <span v-if="msg.challengeRequired" class="chat-message-flag">{{ t('guideChat.securityCheck') }}</span>
+                </div>
               </div>
+              <button
+                v-if="msg.networkFallback && msg.retryText && !msg.pending"
+                type="button"
+                @click="retryNetworkFallback(msg)"
+                :disabled="interactionLocked"
+                :aria-label="t('guideChat.retryCloud')"
+                class="chat-retry-btn"
+                :class="{ 'opacity-50 cursor-not-allowed': interactionLocked }"
+              >
+                {{ t('guideChat.retryCloud') }}
+              </button>
               <!-- Action button -->
               <motion.button
                 v-if="msg.action && !msg.pending"
+                type="button"
                 @click="handleAction(msg)"
                 class="mt-2 inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-tibet-red to-rose-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-md shadow-tibet-red/20"
                 :whileHover="{ scale: 1.04 }"
@@ -234,7 +314,7 @@ function handleKeydown(e: KeyboardEvent) {
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
-                {{ msg.actionLabel || '立即前往' }}
+                {{ msg.actionLabel || t('guideChat.goNow') }}
               </motion.button>
             </div>
           </div>
@@ -253,8 +333,10 @@ function handleKeydown(e: KeyboardEvent) {
         <button
           v-for="reply in quickReplies"
           :key="reply.label"
+          type="button"
           @click="handleQuickReply(reply)"
           :disabled="interactionLocked"
+          :aria-label="reply.label"
           class="quick-reply-chip"
           :class="{ 'opacity-50 cursor-not-allowed': interactionLocked }"
         >
@@ -265,17 +347,27 @@ function handleKeydown(e: KeyboardEvent) {
       <!-- Input area -->
       <div class="chat-input-shell">
         <div class="chat-input-area">
-          <input
+          <textarea
+            ref="inputField"
             v-model="inputText"
+            @input="handleInput"
             @keydown="handleKeydown"
-            type="text"
             :disabled="isSending"
-            placeholder="只聊西藏路线、景点、高原适应..."
+            :maxlength="inputLimit"
+            :aria-label="t('guideChat.placeholder')"
+            :aria-describedby="inputDescribedBy"
+            rows="1"
+            enterkeyhint="send"
+            inputmode="text"
+            :placeholder="t('guideChat.placeholder')"
             class="chat-input"
-          />
+          ></textarea>
           <button
+            type="button"
             @click="sendMessage(inputText)"
             :disabled="!canSend"
+            :aria-label="sendButtonLabel"
+            :aria-controls="messagesLogId"
             class="chat-send-btn"
             :class="{ 'opacity-30 cursor-not-allowed': !canSend }"
           >
@@ -284,8 +376,14 @@ function handleKeydown(e: KeyboardEvent) {
             </svg>
           </button>
         </div>
-        <p v-if="cooldownRemaining > 0" class="chat-cooldown">
-          请等 {{ cooldownRemaining }} 秒后继续问我西藏行程
+        <p :id="privacyNoteId" class="chat-privacy-note">
+          {{ t('guideChat.privacyNote') }}
+        </p>
+        <p v-if="inputNearLimit" :id="inputLimitId" role="status" aria-live="polite" class="chat-input-limit">
+          {{ inputLength }}/{{ inputLimit }}
+        </p>
+        <p v-if="cooldownRemaining > 0" :id="cooldownId" role="status" aria-live="polite" class="chat-cooldown">
+          {{ t('guideChat.cooldown', { seconds: cooldownRemaining }) }}
         </p>
       </div>
     </motion.div>
@@ -406,6 +504,41 @@ function handleKeydown(e: KeyboardEvent) {
   color: #6B7280;
 }
 
+.chat-message-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.chat-message-flag {
+  border-radius: 999px;
+  border: 1px solid #FCD34D;
+  background: #FFFBEB;
+  color: #92400E;
+  padding: 2px 7px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.chat-retry-btn {
+  margin-top: 6px;
+  border-radius: 999px;
+  border: 1px solid #BFDBFE;
+  background: #EFF6FF;
+  color: #1D4ED8;
+  padding: 5px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.chat-retry-btn:hover:not(:disabled) {
+  border-color: #60A5FA;
+  background: #DBEAFE;
+}
+
 .typing-dots {
   display: inline-flex;
   align-items: center;
@@ -498,16 +631,38 @@ function handleKeydown(e: KeyboardEvent) {
   color: #92400E;
 }
 
+.chat-privacy-note,
+.chat-input-limit {
+  padding: 0 18px;
+  font-size: 10.5px;
+  line-height: 1.45;
+}
+
+.chat-privacy-note {
+  color: #6B7280;
+}
+
+.chat-input-limit {
+  padding-top: 2px;
+  color: #B45309;
+  text-align: right;
+}
+
 .chat-input {
   flex: 1;
+  min-height: 36px;
+  max-height: 86px;
   padding: 8px 14px;
   border: 1px solid #E5E7EB;
-  border-radius: 999px;
+  border-radius: 18px;
   font-size: 13px;
+  line-height: 1.45;
   outline: none;
+  resize: none;
   transition: border-color 0.2s ease;
   color: #374151;
   background: #F9FAFB;
+  overflow-y: auto;
 }
 
 .chat-input:focus {

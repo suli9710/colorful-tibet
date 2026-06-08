@@ -141,8 +141,10 @@
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import ContactModal from './ContactModal.vue'
+import { useToast } from '../composables/useToast'
 
 const { t } = useI18n()
+const { showToast } = useToast()
 const showContactModal = ref(false)
 
 const quickLinks = computed(() => [
@@ -170,9 +172,9 @@ const weiboShareUrl = computed(() => {
 
 const shareToWeChat = () => {
   if (/MicroMessenger/i.test(navigator.userAgent)) {
-    alert(t('heatmap.wechatShare'))
+    showToast(t('heatmap.wechatShare'), 'info')
   } else {
-    alert(t('heatmap.pcShare'))
+    showToast(t('heatmap.pcShare'), 'info')
   }
 }
 </script>

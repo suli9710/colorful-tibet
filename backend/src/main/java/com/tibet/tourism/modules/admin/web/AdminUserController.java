@@ -1,5 +1,6 @@
 package com.tibet.tourism.modules.admin.web;
 
+import com.tibet.tourism.common.api.PageResponse;
 import com.tibet.tourism.common.security.LoginAttemptService;
 import com.tibet.tourism.modules.admin.application.AdminUserService;
 import com.tibet.tourism.modules.upload.application.FileStorageService;
@@ -8,7 +9,6 @@ import com.tibet.tourism.modules.user.infra.UserRepository;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Optional;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
@@ -46,11 +46,14 @@ public class AdminUserController {
     }
 
     @GetMapping("/users")
-    public ResponseEntity<Page<AdminUserSummary>> getAllUsers(
-            @PageableDefault(size = 50, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
-        Page<AdminUserSummary> users = userRepository.findAll(pageable)
-                .map(user -> AdminUserSummary.from(user, loginAttemptService));
-        return ResponseEntity.ok(users);
+    public ResponseEntity<PageResponse<AdminUserSummary>> getAllUsers(
+            @PageableDefault(size = 50, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable,
+            Authentication authentication) {
+        return ResponseEntity.ok(PageResponse.from(userRepository.findAll(pageable)
+                .map(user -> AdminUserSummary.from(
+                        user,
+                        loginAttemptService,
+                        adminUserService.actionPolicyFor(user, authentication)))));
     }
 
     public record AdminUserSummary(
@@ -61,9 +64,15 @@ public class AdminUserController {
             LocalDateTime createdAt,
             boolean locked,
             long lockRemainingSeconds,
-            int failureCount
+            int failureCount,
+            boolean protectedAccount,
+            boolean deletable,
+            boolean roleMutable
     ) {
-        static AdminUserSummary from(User user, LoginAttemptService service) {
+        static AdminUserSummary from(
+                User user,
+                LoginAttemptService service,
+                AdminUserService.UserActionPolicy actionPolicy) {
             long remaining = service.remainingLockSeconds(user.getUsername());
             return new AdminUserSummary(
                     user.getId(),
@@ -73,7 +82,10 @@ public class AdminUserController {
                     user.getCreatedAt(),
                     remaining > 0,
                     remaining,
-                    service.failureCount(user.getUsername()));
+                    service.failureCount(user.getUsername()),
+                    actionPolicy.protectedAccount(),
+                    actionPolicy.deletable(),
+                    actionPolicy.roleMutable());
         }
     }
 

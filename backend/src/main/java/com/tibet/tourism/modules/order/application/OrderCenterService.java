@@ -1,4 +1,5 @@
 package com.tibet.tourism.modules.order.application;
+import com.tibet.tourism.common.error.AuthenticationRequiredException;
 import com.tibet.tourism.common.security.PiiMasker;
 import com.tibet.tourism.common.validation.InputSanitizer;
 import com.tibet.tourism.modules.hotel.domain.Hotel;
@@ -84,6 +85,7 @@ public class OrderCenterService {
 
     private final PlatformOrderRepository orderRepository;
     private final PaymentTransactionRepository paymentTransactionRepository;
+    private final PaymentCallbackAuditService paymentCallbackAuditService;
     private final CancellationPolicyRepository cancellationPolicyRepository;
     private final InventoryLockRepository inventoryLockRepository;
     private final ScenicSpotRepository scenicSpotRepository;
@@ -105,6 +107,7 @@ public class OrderCenterService {
 
     public OrderCenterService(PlatformOrderRepository orderRepository,
                               PaymentTransactionRepository paymentTransactionRepository,
+                              PaymentCallbackAuditService paymentCallbackAuditService,
                               CancellationPolicyRepository cancellationPolicyRepository,
                               InventoryLockRepository inventoryLockRepository,
                               ScenicSpotRepository scenicSpotRepository,
@@ -113,6 +116,7 @@ public class OrderCenterService {
                               HotelBookingRepository hotelBookingRepository) {
         this.orderRepository = orderRepository;
         this.paymentTransactionRepository = paymentTransactionRepository;
+        this.paymentCallbackAuditService = paymentCallbackAuditService;
         this.cancellationPolicyRepository = cancellationPolicyRepository;
         this.inventoryLockRepository = inventoryLockRepository;
         this.scenicSpotRepository = scenicSpotRepository;
@@ -152,8 +156,16 @@ public class OrderCenterService {
         }
     }
 
+    private User requireAuthenticatedUser(User user) {
+        if (user == null || user.getId() == null) {
+            throw new AuthenticationRequiredException("Authentication required");
+        }
+        return user;
+    }
+
     @Transactional
     public OrderResponse createOrder(User user, CreateOrderRequest request, String headerIdempotencyKey) {
+        user = requireAuthenticatedUser(user);
         String idempotencyKey = normalizeIdempotencyKey(
                 StringUtils.hasText(headerIdempotencyKey) ? headerIdempotencyKey : request.getIdempotencyKey());
         if (StringUtils.hasText(idempotencyKey)) {
@@ -169,7 +181,7 @@ public class OrderCenterService {
         order.setIdempotencyKey(idempotencyKey);
         order.setCustomerName(InputSanitizer.optionalPlainText(request.getCustomerName(), 64, "customer name"));
         order.setCustomerPhone(InputSanitizer.optionalPlainText(request.getCustomerPhone(), 32, "customer phone"));
-        order.setCustomerNote(InputSanitizer.optionalTextBlock(request.getCustomerNote(), 500, "澶囨敞"));
+        order.setCustomerNote(InputSanitizer.optionalTextBlock(request.getCustomerNote(), 500, "\u5907\u6ce8"));
         order.setLockedUntil(LocalDateTime.now().plusMinutes(LOCK_MINUTES));
         order.setExpiresAt(order.getLockedUntil());
 
@@ -195,6 +207,7 @@ public class OrderCenterService {
 
     @Transactional
     public List<OrderResponse> getMyOrders(User user) {
+        user = requireAuthenticatedUser(user);
         return orderRepository.findByUserIdOrderByCreatedAtDesc(user.getId()).stream()
                 .map(this::expireIfNeeded)
                 .map(this::toResponse)
@@ -203,6 +216,7 @@ public class OrderCenterService {
 
     @Transactional
     public OrderResponse getOrder(User user, Long id) {
+        user = requireAuthenticatedUser(user);
         PlatformOrder order = orderRepository.findByIdAndUserIdForUpdate(id, user.getId())
                 .orElseThrow(() -> new NoSuchElementException("Order not found"));
         return toResponse(expireIfNeeded(order));
@@ -210,6 +224,7 @@ public class OrderCenterService {
 
     @Transactional
     public OrderResponse cancelOrder(User user, Long id, CancelOrderRequest request) {
+        user = requireAuthenticatedUser(user);
         PlatformOrder order = orderRepository.findByIdAndUserIdForUpdate(id, user.getId())
                 .orElseThrow(() -> new NoSuchElementException("Order not found"));
         expireIfNeeded(order);
@@ -218,7 +233,7 @@ public class OrderCenterService {
         }
         if (order.getStatus() == PlatformOrder.Status.PENDING_PAYMENT) {
             transition(order, user, PlatformOrder.Status.CANCELLED,
-                    InputSanitizer.optionalTextBlock(request == null ? null : request.getReason(), 500, "鍙栨秷鍘熷洜"));
+                    InputSanitizer.optionalTextBlock(request == null ? null : request.getReason(), 500, "\u53d6\u6d88\u539f\u56e0"));
             releaseLocks(order, InventoryLock.Status.RELEASED);
             order.setCancelledAt(LocalDateTime.now());
             order.getItems().forEach(item -> item.setStatus(OrderItem.Status.CANCELLED));
@@ -237,6 +252,7 @@ public class OrderCenterService {
 
     @Transactional
     public RefundResponse requestRefund(User user, Long id, RefundRequest request) {
+        user = requireAuthenticatedUser(user);
         PlatformOrder order = orderRepository.findByIdAndUserIdForUpdate(id, user.getId())
                 .orElseThrow(() -> new NoSuchElementException("Order not found"));
         expireIfNeeded(order);
@@ -257,6 +273,7 @@ public class OrderCenterService {
 
     @Transactional
     public InvoiceResponse requestInvoice(User user, Long id, InvoiceRequest request) {
+        user = requireAuthenticatedUser(user);
         PlatformOrder order = orderRepository.findByIdAndUserId(id, user.getId())
                 .orElseThrow(() -> new NoSuchElementException("Order not found"));
         if (order.getPaymentStatus() == PlatformOrder.PaymentStatus.UNPAID) {
@@ -264,8 +281,8 @@ public class OrderCenterService {
         }
         Invoice invoice = new Invoice();
         invoice.setInvoiceNo(nextBusinessNo("INV"));
-        invoice.setInvoiceTitle(InputSanitizer.requiredPlainText(request.getInvoiceTitle(), 160, "鍙戠エ鎶ご"));
-        invoice.setTaxNo(InputSanitizer.optionalPlainText(request.getTaxNo(), 64, "绋庡彿"));
+        invoice.setInvoiceTitle(InputSanitizer.requiredPlainText(request.getInvoiceTitle(), 160, "\u53d1\u7968\u62ac\u5934"));
+        invoice.setTaxNo(InputSanitizer.optionalPlainText(request.getTaxNo(), 64, "\u7a0e\u53f7"));
         invoice.setAmount(order.getPayableAmount());
         invoice.setStatus(Invoice.Status.REQUESTED);
         order.addInvoice(invoice);
@@ -275,6 +292,7 @@ public class OrderCenterService {
 
     @Transactional
     public void deleteClosedOrder(User user, Long id) {
+        user = requireAuthenticatedUser(user);
         PlatformOrder order = orderRepository.findByIdAndUserIdForUpdate(id, user.getId())
                 .orElseThrow(() -> new NoSuchElementException("Order not found"));
         expireIfNeeded(order);
@@ -291,9 +309,7 @@ public class OrderCenterService {
         if (!mockCallbackEnabled) {
             throw new IllegalStateException("Mock payment callback is disabled");
         }
-        if (actor == null || actor.getId() == null) {
-            throw new SecurityException("Authenticated user is required for mock payment callback");
-        }
+        actor = requireAuthenticatedUser(actor);
         if (!"MOCK".equalsIgnoreCase(request.provider())) {
             throw new IllegalArgumentException("Mock payment callback only accepts MOCK provider");
         }
@@ -315,17 +331,6 @@ public class OrderCenterService {
 
     private OrderResponse handlePaymentCallback(PlatformOrder order, PaymentCallbackRequest request) {
         String transactionNo = InputSanitizer.requiredPlainText(request.transactionNo(), 64, "transactionNo");
-        Optional<PaymentTransaction> duplicate = paymentTransactionRepository.findByTransactionNo(transactionNo);
-        if (duplicate.isPresent()) {
-            PaymentTransaction existing = duplicate.get();
-            PlatformOrder existingOrder = existing.getOrder();
-            if (existingOrder == null || !order.getOrderNo().equals(existingOrder.getOrderNo())) {
-                throw new IllegalArgumentException("Payment transaction number already belongs to another order");
-            }
-            ensureSamePaymentCallback(existing, request);
-            return toResponse(expireIfNeeded(existingOrder));
-        }
-
         boolean signatureValid = verifyCallbackSignature(request);
         PaymentTransaction transaction = new PaymentTransaction();
         transaction.setTransactionNo(transactionNo);
@@ -336,16 +341,45 @@ public class OrderCenterService {
 
         if (!signatureValid) {
             transaction.setStatus(PaymentTransaction.Status.FAILED);
-            order.addPaymentTransaction(transaction);
-            order.addAuditLog(audit(null, "PAYMENT_CALLBACK_REJECTED", order.getStatus().name(), order.getStatus().name(), "鏀粯鍥炶皟绛惧悕鏃犳晥"));
+            recordRejectedPaymentCallback(order, transaction);
             throw new SecurityException("Invalid payment signature");
+        }
+
+        Optional<PaymentTransaction> duplicate = paymentTransactionRepository.findByTransactionNo(transactionNo);
+        if (duplicate.isPresent()) {
+            PaymentTransaction existing = duplicate.get();
+            PlatformOrder existingOrder = existing.getOrder();
+            if (existingOrder == null || !order.getOrderNo().equals(existingOrder.getOrderNo())) {
+                transaction.setStatus(PaymentTransaction.Status.FAILED);
+                recordRejectedPaymentCallback(
+                        order,
+                        transaction,
+                        "PAYMENT_CALLBACK_DUPLICATE_REJECTED",
+                        "Payment callback rejected: transaction belongs to another order");
+                throw new IllegalArgumentException("Payment transaction number already belongs to another order");
+            }
+            try {
+                ensureSamePaymentCallback(existing, request);
+            } catch (IllegalArgumentException exception) {
+                transaction.setStatus(PaymentTransaction.Status.FAILED);
+                recordRejectedPaymentCallback(
+                        order,
+                        transaction,
+                        "PAYMENT_CALLBACK_DUPLICATE_REJECTED",
+                        "Payment callback rejected: duplicate transaction payload mismatch");
+                throw exception;
+            }
+            return toResponse(expireIfNeeded(existingOrder));
         }
 
         expireIfNeeded(order);
         if (!sameAmount(order.getPayableAmount(), request.amount())) {
             transaction.setStatus(PaymentTransaction.Status.FAILED);
-            order.addPaymentTransaction(transaction);
-            order.addAuditLog(audit(null, "PAYMENT_AMOUNT_MISMATCH", order.getStatus().name(), order.getStatus().name(), "Payment amount mismatch"));
+            recordRejectedPaymentCallback(
+                    order,
+                    transaction,
+                    "PAYMENT_AMOUNT_MISMATCH",
+                    "Payment callback rejected: amount mismatch");
             throw new IllegalArgumentException("Payment amount mismatch");
         }
 
@@ -368,15 +402,45 @@ public class OrderCenterService {
             if (order.getStatus() == PlatformOrder.Status.PENDING_PAYMENT) {
                 order.setPaymentStatus(PlatformOrder.PaymentStatus.FAILED);
             }
-            order.addAuditLog(audit(null, "PAYMENT_FAILED", order.getStatus().name(), order.getStatus().name(), "鏀粯澶辫触鍥炶皟"));
+            order.addAuditLog(audit(null, "PAYMENT_FAILED", order.getStatus().name(), order.getStatus().name(), "\u652f\u4ed8\u5931\u8d25\u56de\u8c03"));
         }
         return toResponse(order);
+    }
+
+    private void recordRejectedPaymentCallback(PlatformOrder order, PaymentTransaction transaction) {
+        recordRejectedPaymentCallback(
+                order,
+                transaction,
+                "PAYMENT_CALLBACK_REJECTED",
+                "Payment callback rejected: invalid signature");
+    }
+
+    private void recordRejectedPaymentCallback(PlatformOrder order,
+                                               PaymentTransaction transaction,
+                                               String action,
+                                               String note) {
+        try {
+            paymentCallbackAuditService.recordRejectedCallback(
+                    order,
+                    transaction,
+                    action,
+                    note);
+        } catch (DataIntegrityViolationException exception) {
+            logger.warn("Rejected payment callback audit already exists for action={} transaction={}",
+                    action, paymentIdentifierLabel("txn", transaction.getTransactionNo()));
+        } catch (RuntimeException exception) {
+            logger.warn("Rejected payment callback audit failed for action={} transaction={}, reason={}",
+                    action,
+                    paymentIdentifierLabel("txn", transaction.getTransactionNo()),
+                    exception.getClass().getSimpleName());
+        }
     }
 
     @Transactional
     public PlatformOrder createFromLegacySpotBooking(Booking booking) {
         String idempotencyKey = "LEGACY_SPOT_" + booking.getId();
-        Optional<PlatformOrder> existing = orderRepository.findByUserIdAndIdempotencyKey(booking.getUser().getId(), idempotencyKey);
+        Optional<PlatformOrder> existing = findExistingLegacyOrder(
+                booking.getUser(), idempotencyKey, "LEGACY_SPOT_BOOKING", booking.getId());
         if (existing.isPresent()) {
             return existing.get();
         }
@@ -417,7 +481,8 @@ public class OrderCenterService {
     @Transactional
     public PlatformOrder createFromLegacyHotelBooking(HotelBooking booking) {
         String idempotencyKey = "LEGACY_HOTEL_" + booking.getId();
-        Optional<PlatformOrder> existing = orderRepository.findByUserIdAndIdempotencyKey(booking.getUser().getId(), idempotencyKey);
+        Optional<PlatformOrder> existing = findExistingLegacyOrder(
+                booking.getUser(), idempotencyKey, "LEGACY_HOTEL_BOOKING", booking.getId());
         if (existing.isPresent()) {
             PlatformOrder order = existing.get();
             if (booking.getStatus() == HotelBooking.Status.CONFIRMED && canConfirmPayment(order)) {
@@ -435,7 +500,7 @@ public class OrderCenterService {
         order.setCustomerName(booking.getGuestName());
         order.setCustomerPhone(booking.getPhone());
         order.setCustomerNote(booking.getNote());
-        order.setProductSummary(booking.getHotel().getName() + " 路 " + booking.getRoomName());
+        order.setProductSummary(booking.getHotel().getName() + " - " + booking.getRoomName());
         order.setTotalAmount(defaultMoney(booking.getTotalPrice()));
         order.setPayableAmount(order.getTotalAmount());
 
@@ -464,6 +529,19 @@ public class OrderCenterService {
             releaseLocks(saved, InventoryLock.Status.CONFIRMED);
         }
         return saved;
+    }
+
+    private Optional<PlatformOrder> findExistingLegacyOrder(
+            User user, String idempotencyKey, String sourceType, Long sourceReferenceId) {
+        Optional<PlatformOrder> existingBySource =
+                orderRepository.findBySourceTypeAndSourceReferenceId(sourceType, sourceReferenceId);
+        if (existingBySource.isPresent()) {
+            return existingBySource;
+        }
+        if (user == null || user.getId() == null) {
+            return Optional.empty();
+        }
+        return orderRepository.findByUserIdAndIdempotencyKey(user.getId(), idempotencyKey);
     }
 
     @Transactional
@@ -497,7 +575,13 @@ public class OrderCenterService {
     }
 
     public boolean verifyCallbackSignature(PaymentCallbackRequest request) {
-        if (request == null || !StringUtils.hasText(request.signature())) {
+        if (request == null
+                || !StringUtils.hasText(request.signature())
+                || !StringUtils.hasText(callbackSecret)
+                || !StringUtils.hasText(request.orderNo())
+                || !StringUtils.hasText(request.transactionNo())
+                || !StringUtils.hasText(request.status())
+                || request.amount() == null) {
             return false;
         }
         String payload = request.orderNo() + "|" + request.transactionNo() + "|" + request.amount().setScale(2, RoundingMode.HALF_UP) + "|" + request.status();
@@ -523,7 +607,7 @@ public class OrderCenterService {
         return switch (productType) {
             case SCENIC_SPOT -> scenicSpotOrderItem(request, sortOrder);
             case HOTEL_ROOM -> hotelRoomOrderItem(request, sortOrder);
-            default -> throw new IllegalArgumentException("当前商品类型暂未接入统一下单");
+            default -> throw new IllegalArgumentException("Product type is not supported by unified ordering");
         };
     }
 
@@ -546,14 +630,14 @@ public class OrderCenterService {
 
     private OrderItem hotelRoomOrderItem(CreateOrderItemRequest request, int sortOrder) {
         if (request.getSkuId() == null) {
-            throw new IllegalArgumentException("酒店房型不能为空");
+            throw new IllegalArgumentException("Room type is required");
         }
         Hotel hotel = hotelRepository.findById(request.getProductId())
                 .orElseThrow(() -> new NoSuchElementException("Hotel not found"));
         RoomType roomType = roomTypeRepository.findByIdForUpdate(request.getSkuId())
                 .orElseThrow(() -> new NoSuchElementException("Room type not found"));
         if (roomType.getHotel() == null || !hotel.getId().equals(roomType.getHotel().getId())) {
-            throw new IllegalArgumentException("房型不属于该酒店");
+            throw new IllegalArgumentException("Room type does not belong to this hotel");
         }
         LocalDate checkIn = request.getServiceStartDate();
         LocalDate checkOut = request.getServiceEndDate();
@@ -948,7 +1032,7 @@ public class OrderCenterService {
         order.setConfirmedAt(LocalDateTime.now());
         order.setSourceType(sourceType);
         order.setSourceReferenceId(sourceReferenceId);
-        order.addAuditLog(audit(user, "LEGACY_MIRROR_CREATED", null, order.getStatus().name(), "旧预订写入统一订单中心"));
+        order.addAuditLog(audit(user, "LEGACY_MIRROR_CREATED", null, order.getStatus().name(), "\u65e7\u9884\u8ba2\u5199\u5165\u7edf\u4e00\u8ba2\u5355\u4e2d\u5fc3"));
         return order;
     }
 
@@ -1028,7 +1112,7 @@ public class OrderCenterService {
 
     private String buildSummary(List<OrderItem> items) {
         if (items.isEmpty()) {
-            return "鏃呰璁㈠崟";
+            return "\u65c5\u884c\u8ba2\u5355";
         }
         if (items.size() == 1) {
             return items.get(0).getProductName();
@@ -1042,8 +1126,14 @@ public class OrderCenterService {
     }
 
     private String callbackPayloadSummary(PaymentCallbackRequest request) {
-        return "orderNo=" + request.orderNo() + ",transactionNo=" + request.transactionNo()
-                + ",amount=" + request.amount() + ",status=" + request.status();
+        return "orderNoHash=" + paymentIdentifierLabel("order", request.orderNo())
+                + ",transactionNoHash=" + paymentIdentifierLabel("txn", request.transactionNo())
+                + ",amount=" + request.amount()
+                + ",status=" + request.status();
+    }
+
+    private String paymentIdentifierLabel(String prefix, String value) {
+        return prefix + "#" + PiiMasker.shortHash(value);
     }
 
     private String normalizeIdempotencyKey(String value) {
@@ -1091,7 +1181,7 @@ public class OrderCenterService {
                 order.getTotalAmount(),
                 order.getDiscountAmount(),
                 order.getPayableAmount(),
-                order.getCustomerName(),
+                PiiMasker.maskName(order.getCustomerName()),
                 PiiMasker.maskPhone(order.getCustomerPhone()),
                 order.getCustomerNote(),
                 order.getSourceType(),

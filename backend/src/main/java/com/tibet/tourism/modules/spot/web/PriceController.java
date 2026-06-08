@@ -1,5 +1,6 @@
 package com.tibet.tourism.modules.spot.web;
 import com.tibet.tourism.common.error.ResourceNotFoundException;
+import com.tibet.tourism.common.security.SensitiveLogSanitizer;
 import com.tibet.tourism.modules.spot.application.PriceFetchService;
 import com.tibet.tourism.modules.spot.application.PriceBatchUpdateJobService;
 import com.tibet.tourism.modules.spot.application.PriceUpdateService;
@@ -22,6 +23,8 @@ import org.springframework.web.bind.annotation.*;
 public class PriceController {
 
     private static final Logger logger = LoggerFactory.getLogger(PriceController.class);
+    private static final String PRICE_NOT_FOUND_ERROR = "Price resource not found";
+    private static final String PRICE_OPERATION_ERROR = "Price operation could not be processed";
 
     @Autowired
     private PriceFetchService priceFetchService;
@@ -60,11 +63,13 @@ public class PriceController {
                 "currentPrice", spot.getTicketPrice()
             ));
         } catch (ResourceNotFoundException e) {
-            logger.warn("Price fetch requested for missing spot: spotId={}", spotId);
-            return ResponseEntity.status(404).body(Map.of("error", e.getMessage()));
+            logger.warn("Price fetch requested for missing spot: spotId={}, detail={}",
+                    spotId, SensitiveLogSanitizer.exceptionSummary(e));
+            return ResponseEntity.status(404).body(Map.of("error", PRICE_NOT_FOUND_ERROR));
         } catch (Exception e) {
-            logger.error("Price fetch failed for spotId={}", spotId, e);
-            return ResponseEntity.badRequest().body(Map.of("error", "价格查询失败，请稍后重试"));
+            logger.error("Price fetch failed: spotId={}, detail={}",
+                    spotId, SensitiveLogSanitizer.exceptionSummary(e));
+            return ResponseEntity.badRequest().body(Map.of("error", PRICE_OPERATION_ERROR));
         }
     }
 
@@ -80,11 +85,13 @@ public class PriceController {
             PriceUpdateService.PriceUpdateResult result = priceUpdateService.updateSpotPrice(spotId, force);
             return ResponseEntity.ok(result);
         } catch (ResourceNotFoundException e) {
-            logger.warn("Price update requested for missing spot: spotId={}", spotId);
-            return ResponseEntity.status(404).body(Map.of("error", e.getMessage()));
+            logger.warn("Price update requested for missing spot: spotId={}, detail={}",
+                    spotId, SensitiveLogSanitizer.exceptionSummary(e));
+            return ResponseEntity.status(404).body(Map.of("error", PRICE_NOT_FOUND_ERROR));
         } catch (Exception e) {
-            logger.error("Price update failed for spotId={}, force={}", spotId, force, e);
-            return ResponseEntity.badRequest().body(Map.of("error", "价格查询失败，请稍后重试"));
+            logger.error("Price update failed: spotId={}, force={}, detail={}",
+                    spotId, force, SensitiveLogSanitizer.exceptionSummary(e));
+            return ResponseEntity.badRequest().body(Map.of("error", PRICE_OPERATION_ERROR));
         }
     }
 
@@ -99,8 +106,9 @@ public class PriceController {
             PriceUpdateService.BatchUpdateResult result = priceUpdateService.batchUpdatePrices(force);
             return ResponseEntity.ok(result);
         } catch (Exception e) {
-            logger.error("Batch price update failed, force={}", force, e);
-            return ResponseEntity.badRequest().body(Map.of("error", "价格查询失败，请稍后重试"));
+            logger.error("Batch price update failed: force={}, detail={}",
+                    force, SensitiveLogSanitizer.exceptionSummary(e));
+            return ResponseEntity.badRequest().body(Map.of("error", PRICE_OPERATION_ERROR));
         }
     }
 
@@ -111,8 +119,9 @@ public class PriceController {
         try {
             return ResponseEntity.ok(priceBatchUpdateJobService.startJob(force));
         } catch (Exception e) {
-            logger.error("Batch price update job start failed, force={}", force, e);
-            return ResponseEntity.badRequest().body(Map.of("error", "价格查询失败，请稍后重试"));
+            logger.error("Batch price update job start failed: force={}, detail={}",
+                    force, SensitiveLogSanitizer.exceptionSummary(e));
+            return ResponseEntity.badRequest().body(Map.of("error", PRICE_OPERATION_ERROR));
         }
     }
 

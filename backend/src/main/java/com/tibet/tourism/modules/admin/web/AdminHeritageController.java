@@ -1,4 +1,5 @@
 package com.tibet.tourism.modules.admin.web;
+import com.tibet.tourism.common.api.PageResponse;
 import com.tibet.tourism.common.validation.InputSanitizer;
 import com.tibet.tourism.modules.admin.web.dto.HeritageEventRequest;
 import com.tibet.tourism.modules.admin.web.dto.HeritageInheritorRequest;
@@ -12,9 +13,10 @@ import com.tibet.tourism.modules.content.infra.HeritageInheritorRepository;
 import com.tibet.tourism.modules.content.infra.HeritageItemRepository;
 import com.tibet.tourism.modules.content.infra.HeritageLikeRepository;
 import jakarta.validation.Valid;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
@@ -48,9 +50,9 @@ public class AdminHeritageController {
 
     // ---- Heritage Items CRUD ----
     @GetMapping
-    public ResponseEntity<Page<HeritageItem>> getAllItems(
+    public ResponseEntity<PageResponse<HeritageItemResponse>> getAllItems(
             @PageableDefault(size = 50, sort = "id", direction = Sort.Direction.ASC) Pageable pageable) {
-        return ResponseEntity.ok(itemRepository.findAll(pageable));
+        return ResponseEntity.ok(PageResponse.from(itemRepository.findAll(pageable).map(HeritageItemResponse::from)));
     }
 
     @PostMapping
@@ -58,7 +60,7 @@ public class AdminHeritageController {
         HeritageItem item = new HeritageItem();
         applyItemFields(item, request);
         itemRepository.save(item);
-        return ResponseEntity.ok(item);
+        return ResponseEntity.ok(HeritageItemResponse.from(item));
     }
 
     @PutMapping("/{id}")
@@ -67,7 +69,7 @@ public class AdminHeritageController {
         if (item == null) return ResponseEntity.notFound().build();
         applyItemFields(item, request);
         itemRepository.save(item);
-        return ResponseEntity.ok(item);
+        return ResponseEntity.ok(HeritageItemResponse.from(item));
     }
 
     @DeleteMapping("/{id}")
@@ -84,8 +86,11 @@ public class AdminHeritageController {
 
     // ---- Inheritors CRUD ----
     @GetMapping("/{itemId}/inheritors")
-    public ResponseEntity<List<HeritageInheritor>> getInheritors(@PathVariable Long itemId) {
-        return ResponseEntity.ok(inheritorRepository.findByHeritageItemId(itemId));
+    public ResponseEntity<List<HeritageInheritorResponse>> getInheritors(@PathVariable Long itemId) {
+        return ResponseEntity.ok(inheritorRepository.findByHeritageItemId(itemId)
+                .stream()
+                .map(HeritageInheritorResponse::from)
+                .toList());
     }
 
     @PostMapping("/{itemId}/inheritors")
@@ -97,7 +102,7 @@ public class AdminHeritageController {
         inheritor.setHeritageItem(item);
         applyInheritorFields(inheritor, request);
         inheritorRepository.save(inheritor);
-        return ResponseEntity.ok(inheritor);
+        return ResponseEntity.ok(HeritageInheritorResponse.from(inheritor));
     }
 
     @PutMapping("/inheritors/{id}")
@@ -106,7 +111,7 @@ public class AdminHeritageController {
         if (inheritor == null) return ResponseEntity.notFound().build();
         applyInheritorFields(inheritor, request);
         inheritorRepository.save(inheritor);
-        return ResponseEntity.ok(inheritor);
+        return ResponseEntity.ok(HeritageInheritorResponse.from(inheritor));
     }
 
     @DeleteMapping("/inheritors/{id}")
@@ -118,8 +123,11 @@ public class AdminHeritageController {
 
     // ---- Events CRUD ----
     @GetMapping("/{itemId}/events")
-    public ResponseEntity<List<HeritageEvent>> getEvents(@PathVariable Long itemId) {
-        return ResponseEntity.ok(eventRepository.findByHeritageItemId(itemId));
+    public ResponseEntity<List<HeritageEventResponse>> getEvents(@PathVariable Long itemId) {
+        return ResponseEntity.ok(eventRepository.findByHeritageItemId(itemId)
+                .stream()
+                .map(HeritageEventResponse::from)
+                .toList());
     }
 
     @PostMapping("/{itemId}/events")
@@ -131,7 +139,7 @@ public class AdminHeritageController {
         event.setHeritageItem(item);
         applyEventFields(event, request);
         eventRepository.save(event);
-        return ResponseEntity.ok(event);
+        return ResponseEntity.ok(HeritageEventResponse.from(event));
     }
 
     @PutMapping("/events/{id}")
@@ -140,7 +148,7 @@ public class AdminHeritageController {
         if (event == null) return ResponseEntity.notFound().build();
         applyEventFields(event, request);
         eventRepository.save(event);
-        return ResponseEntity.ok(event);
+        return ResponseEntity.ok(HeritageEventResponse.from(event));
     }
 
     @DeleteMapping("/events/{id}")
@@ -148,6 +156,109 @@ public class AdminHeritageController {
         if (!eventRepository.existsById(id)) return ResponseEntity.notFound().build();
         eventRepository.deleteById(id);
         return ResponseEntity.ok(Map.of("message", "删除成功"));
+    }
+
+    public record HeritageItemResponse(
+            Long id,
+            String name,
+            String nameTibetan,
+            String description,
+            String descriptionTibetan,
+            String category,
+            String imageUrl,
+            String videoUrl,
+            String originStory,
+            String significance,
+            String baikeUrl,
+            String region,
+            String protectionLevel,
+            Integer viewCount,
+            Integer likeCount,
+            Integer commentCount,
+            LocalDateTime createdAt
+    ) {
+        private static HeritageItemResponse from(HeritageItem item) {
+            return new HeritageItemResponse(
+                    item.getId(),
+                    item.getName(),
+                    item.getNameTibetan(),
+                    item.getDescription(),
+                    item.getDescriptionTibetan(),
+                    item.getCategory(),
+                    item.getImageUrl(),
+                    item.getVideoUrl(),
+                    item.getOriginStory(),
+                    item.getSignificance(),
+                    item.getBaikeUrl(),
+                    item.getRegion(),
+                    item.getProtectionLevel(),
+                    item.getViewCount(),
+                    item.getLikeCount(),
+                    item.getCommentCount(),
+                    item.getCreatedAt());
+        }
+    }
+
+    public record HeritageInheritorResponse(
+            Long id,
+            String name,
+            String nameTibetan,
+            String avatarUrl,
+            String level,
+            String bio,
+            String bioTibetan,
+            String story,
+            String region,
+            Long heritageItemId,
+            LocalDateTime createdAt
+    ) {
+        private static HeritageInheritorResponse from(HeritageInheritor inheritor) {
+            HeritageItem item = inheritor.getHeritageItem();
+            return new HeritageInheritorResponse(
+                    inheritor.getId(),
+                    inheritor.getName(),
+                    inheritor.getNameTibetan(),
+                    inheritor.getAvatarUrl(),
+                    inheritor.getLevel(),
+                    inheritor.getBio(),
+                    inheritor.getBioTibetan(),
+                    inheritor.getStory(),
+                    inheritor.getRegion(),
+                    item == null ? null : item.getId(),
+                    inheritor.getCreatedAt());
+        }
+    }
+
+    public record HeritageEventResponse(
+            Long id,
+            String title,
+            String titleTibetan,
+            String description,
+            String descriptionTibetan,
+            LocalDate eventDate,
+            LocalDate endDate,
+            String location,
+            String imageUrl,
+            String contactInfo,
+            Long heritageItemId,
+            LocalDateTime createdAt
+    ) {
+        private static HeritageEventResponse from(HeritageEvent event) {
+            HeritageItem item = event.getHeritageItem();
+            return new HeritageEventResponse(
+                    event.getId(),
+                    event.getTitle(),
+                    event.getTitleTibetan(),
+                    event.getDescription(),
+                    event.getDescriptionTibetan(),
+                    event.getEventDate(),
+                    event.getEndDate(),
+                    event.getLocation(),
+                    event.getImageUrl(),
+                    event.getContactInfo(),
+                    item == null ? null : item.getId(),
+                    event.getCreatedAt());
+        }
     }
 
     // ---- Private helpers ----

@@ -83,8 +83,8 @@ public class AiRouteGenerationJobService {
                 jobs.put(cachedJob.jobId, cachedJob);
                 return cachedJob.snapshot();
             }
-            log.warn("Ignoring invalid cached AI route content: userId={}, days={}, budget={}, preference={}",
-                    userId, days, budget, preference);
+            log.warn("Ignoring invalid cached AI route content: user={}, days={}, budgetProvided={}, preferenceProvided={}",
+                    AiLogPrivacy.userRef(userId), days, AiLogPrivacy.hasText(budget), AiLogPrivacy.hasText(preference));
         }
 
         String activeJobId = activeJobByCacheKey.get(cacheKey);
@@ -195,8 +195,8 @@ public class AiRouteGenerationJobService {
             job.complete(content);
             notifySubscribers(job);
         } catch (Exception e) {
-            log.warn("AI route job failed: jobId={}, userId={}, days={}",
-                    job.jobId, job.userId, job.days, e);
+            log.warn("AI route job failed: jobId={}, user={}, days={}, reason={}",
+                    job.jobId, AiLogPrivacy.userRef(job.userId), job.days, AiLogPrivacy.exceptionSummary(e));
             job.fail("AI route generation failed");
             recordFailedRoute(job, currentUser, "AI route generation failed");
             notifySubscribers(job);
@@ -266,8 +266,8 @@ public class AiRouteGenerationJobService {
             aiRouteRecordService.updateRunningContent(job.userId, job.jobId, content);
             job.markContentPersisted();
         } catch (Exception e) {
-            log.debug("Failed to persist running AI route record: jobId={}, message={}",
-                    job.jobId, e.getMessage());
+            log.debug("Failed to persist running AI route record: jobId={}, reason={}",
+                    job.jobId, AiLogPrivacy.exceptionSummary(e));
         }
     }
 
@@ -278,8 +278,8 @@ public class AiRouteGenerationJobService {
             job.setRouteRecordId(record.getId());
             job.markContentPersisted();
         } catch (Exception e) {
-            log.warn("Failed to persist completed AI route record: jobId={}, userId={}, message={}",
-                    job.jobId, job.userId, e.getMessage());
+            log.warn("Failed to persist completed AI route record: jobId={}, user={}, reason={}",
+                    job.jobId, AiLogPrivacy.userRef(job.userId), AiLogPrivacy.exceptionSummary(e));
         }
     }
 
@@ -288,8 +288,8 @@ public class AiRouteGenerationJobService {
             aiRouteRecordService.recordFailedRoute(
                     currentUser, job.jobId, job.days, job.budget, job.preference, job.locale, message);
         } catch (Exception e) {
-            log.debug("Failed to persist failed AI route record: jobId={}, message={}",
-                    job.jobId, e.getMessage());
+            log.debug("Failed to persist failed AI route record: jobId={}, reason={}",
+                    job.jobId, AiLogPrivacy.exceptionSummary(e));
         }
     }
 
@@ -337,7 +337,7 @@ public class AiRouteGenerationJobService {
             }
             emitter.send(SseEmitter.event().data(objectMapper.writeValueAsString(event)));
         } catch (IOException e) {
-            log.debug("Failed to send AI route job SSE event type={}: {}", type, e.getMessage());
+            log.debug("Failed to send AI route job SSE event type={}: {}", type, AiLogPrivacy.exceptionSummary(e));
         }
     }
 

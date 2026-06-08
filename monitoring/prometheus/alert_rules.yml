@@ -36,3 +36,31 @@ groups:
         annotations:
           summary: High backend p95 latency
           description: Backend p95 HTTP latency is above 2 seconds for 5 minutes.
+
+      - alert: HighHttp4xxRate
+        expr: |
+          (
+            sum(rate(http_server_requests_seconds_count{job="colorful-tibet-backend",status=~"4.."}[5m]))
+            /
+            clamp_min(sum(rate(http_server_requests_seconds_count{job="colorful-tibet-backend"}[5m])), 1)
+          ) > 0.20
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: High backend 4xx error rate
+          description: More than 20 percent of backend HTTP requests are returning 4xx over 10 minutes.
+
+      - alert: HighJvmHeapUsage
+        expr: |
+          (
+            sum(jvm_memory_used_bytes{job="colorful-tibet-backend",area="heap"})
+            /
+            clamp_min(sum(jvm_memory_max_bytes{job="colorful-tibet-backend",area="heap"}), 1)
+          ) > 0.85
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: High backend JVM heap usage
+          description: Backend JVM heap usage is above 85 percent for 10 minutes.

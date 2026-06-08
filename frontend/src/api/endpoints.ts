@@ -47,6 +47,7 @@ export const endpoints = {
     detail: (id: number) => `/spots/${id}`,
     search: '/spots/search',
     recommendations: '/spots/recommendations',
+    recommendationsMe: '/spots/recommendations/me',
     recommendationsDebug: '/spots/recommendations/debug'
   },
   news: {

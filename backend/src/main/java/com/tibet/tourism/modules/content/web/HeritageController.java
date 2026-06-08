@@ -1,4 +1,5 @@
 package com.tibet.tourism.modules.content.web;
+import com.tibet.tourism.common.api.PageResponse;
 import com.tibet.tourism.common.error.ResourceNotFoundException;
 import com.tibet.tourism.common.security.JwtAuthSupport;
 import com.tibet.tourism.common.validation.InputSanitizer;
@@ -63,31 +64,35 @@ public class HeritageController {
     private JwtAuthSupport jwtAuthSupport;
 
     @GetMapping
-    public Page<HeritageItemDTO> getAllItems(
+    public PageResponse<HeritageItemDTO> getAllItems(
             @RequestParam(required = false, defaultValue = "zh") String locale,
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String keyword,
             @PageableDefault(size = 20) Pageable pageable) {
         Pageable safePageable = InputSanitizer.sanitizePageable(
                 pageable, ALLOWED_HERITAGE_ITEM_SORT_FIELDS, DEFAULT_HERITAGE_ITEM_SORT, 20, 100);
+        Page<HeritageItemDTO> items;
         if (keyword != null && !keyword.isBlank()) {
             if (category != null && !category.isEmpty()) {
-                return heritageService.searchItemsByCategory(category, keyword, safePageable)
+                items = heritageService.searchItemsByCategory(category, keyword, safePageable)
                         .map(item -> HeritageItemDTO.fromEntity(item, locale));
+                return PageResponse.from(items);
             }
-            return heritageService.searchItems(keyword, safePageable)
+            items = heritageService.searchItems(keyword, safePageable)
                     .map(item -> HeritageItemDTO.fromEntity(item, locale));
+            return PageResponse.from(items);
         }
         if (category != null && !category.isEmpty()) {
-            return heritageService.getItemsByCategory(category, safePageable)
+            items = heritageService.getItemsByCategory(category, safePageable)
                     .map(item -> HeritageItemDTO.fromEntity(item, locale));
+            return PageResponse.from(items);
         }
-        return heritageService.getAllItems(safePageable)
+        items = heritageService.getAllItems(safePageable)
                 .map(item -> HeritageItemDTO.fromEntity(item, locale));
+        return PageResponse.from(items);
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<HeritageItemDTO> getItemById(
             @PathVariable Long id,
             @RequestParam(required = false, defaultValue = "zh") String locale) {
@@ -143,14 +148,18 @@ public class HeritageController {
 
     // ---- 评论 ----
     @GetMapping("/{id}/comments")
-    @PreAuthorize("isAuthenticated()")
-    public Page<HeritageCommentDTO> getComments(
+    public PageResponse<HeritageCommentDTO> getComments(
             @PathVariable Long id,
-            @PageableDefault(size = 20) Pageable pageable) {
+            @PageableDefault(size = 20) Pageable pageable,
+            HttpServletRequest request) {
         Pageable safePageable = InputSanitizer.sanitizePageable(
                 pageable, ALLOWED_HERITAGE_COMMENT_SORT_FIELDS, DEFAULT_HERITAGE_COMMENT_SORT, 20, 100);
-        return heritageCommentRepository.findByHeritageItemIdOrderByCreatedAtDesc(id, safePageable)
-                .map(HeritageCommentDTO::fromEntity);
+        Long currentUserId = jwtAuthSupport.resolveOptionalCurrentUser(request)
+                .map(User::getId)
+                .orElse(null);
+        Page<HeritageCommentDTO> comments = heritageCommentRepository.findByHeritageItemIdOrderByCreatedAtDesc(id, safePageable)
+                .map(comment -> HeritageCommentDTO.fromEntity(comment, currentUserId));
+        return PageResponse.from(comments);
     }
 
     @PostMapping("/{id}/comments")
@@ -176,7 +185,7 @@ public class HeritageController {
 
         heritageItemRepository.incrementCommentCount(id);
 
-        return ResponseEntity.ok(HeritageCommentDTO.fromEntity(comment));
+        return ResponseEntity.ok(HeritageCommentDTO.fromEntity(comment, user.getId()));
     }
 
     @DeleteMapping("/{heritageId}/comments/{commentId}")
@@ -208,7 +217,6 @@ public class HeritageController {
 
     // ---- 传承人 ----
     @GetMapping("/{id}/inheritors")
-    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<HeritageInheritorDTO>> getInheritors(
             @PathVariable Long id,
             @RequestParam(required = false, defaultValue = "zh") String locale) {
@@ -221,7 +229,6 @@ public class HeritageController {
 
     // ---- 活动 ----
     @GetMapping("/{id}/events")
-    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<HeritageEventDTO>> getEvents(
             @PathVariable Long id,
             @RequestParam(required = false, defaultValue = "zh") String locale) {
@@ -233,12 +240,13 @@ public class HeritageController {
     }
 
     @GetMapping("/events/upcoming")
-    public Page<HeritageEventDTO> getUpcomingEvents(
+    public PageResponse<HeritageEventDTO> getUpcomingEvents(
             @RequestParam(required = false, defaultValue = "zh") String locale,
             @PageableDefault(size = 10) Pageable pageable) {
         Pageable safePageable = InputSanitizer.sanitizePageable(
                 pageable, ALLOWED_HERITAGE_EVENT_SORT_FIELDS, DEFAULT_HERITAGE_EVENT_SORT, 10, 100);
-        return heritageService.getUpcomingEvents(safePageable)
+        Page<HeritageEventDTO> events = heritageService.getUpcomingEvents(safePageable)
                 .map(e -> HeritageEventDTO.fromEntity(e, locale));
+        return PageResponse.from(events);
     }
 }

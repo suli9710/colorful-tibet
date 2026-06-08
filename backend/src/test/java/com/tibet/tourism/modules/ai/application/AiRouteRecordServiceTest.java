@@ -1,6 +1,7 @@
 package com.tibet.tourism.modules.ai.application;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -56,20 +57,83 @@ class AiRouteRecordServiceTest {
         assertEquals(55L, record.getId());
         assertEquals(user, record.getUser());
         assertEquals(AiRouteRecord.Status.COMPLETED, record.getStatus());
+        assertNull(record.getJobId());
         assertEquals("Lhasa route", record.getTitle());
         verify(routeRecordRepository).findFirstByUserIdAndJobIdOrderByUpdatedAtDesc(7L, "job-1");
+    }
+
+    @Test
+    void failedRouteClearsStoredJobIdAfterUsingJobLookup() {
+        User user = user(7L);
+        AiRouteRecord record = record(44L, user, "# Partial route");
+        record.setStatus(AiRouteRecord.Status.RUNNING);
+        record.setJobId("job-2");
+
+        when(userRepository.getReferenceById(7L)).thenReturn(user);
+        when(routeRecordRepository.findFirstByUserIdAndJobIdOrderByUpdatedAtDesc(7L, "job-2"))
+                .thenReturn(Optional.of(record));
+        when(routeRecordRepository.save(record)).thenReturn(record);
+
+        service.recordFailedRoute(user, "job-2", 4, "comfort", "natural", "zh", "failed");
+
+        assertEquals(AiRouteRecord.Status.FAILED, record.getStatus());
+        assertNull(record.getJobId());
+        verify(routeRecordRepository).findFirstByUserIdAndJobIdOrderByUpdatedAtDesc(7L, "job-2");
+    }
+
+    @Test
+    void latestRunningRecordExposesJobIdForSseReconnect() {
+        User user = user(7L);
+        AiRouteRecord record = record(32L, user, "# Partial route");
+        record.setStatus(AiRouteRecord.Status.RUNNING);
+        record.setJobId("job-running");
+        when(routeRecordRepository.findFirstByUserOrderByUpdatedAtDesc(user)).thenReturn(Optional.of(record));
+
+        Optional<AiRouteRecordResponse> response = service.latestFor(user);
+
+        assertTrue(response.isPresent());
+        assertEquals("job-running", response.get().jobId());
+    }
+
+    @Test
+    void latestCompletedRecordDoesNotExposeJobId() {
+        User user = user(7L);
+        AiRouteRecord record = record(33L, user, "# Done route");
+        record.setJobId("legacy-completed-job");
+        when(routeRecordRepository.findFirstByUserOrderByUpdatedAtDesc(user)).thenReturn(Optional.of(record));
+
+        Optional<AiRouteRecordResponse> response = service.latestFor(user);
+
+        assertTrue(response.isPresent());
+        assertNull(response.get().jobId());
+    }
+
+    @Test
+    void latestFailedRecordDoesNotExposeJobId() {
+        User user = user(7L);
+        AiRouteRecord record = record(34L, user, "# Failed route");
+        record.setStatus(AiRouteRecord.Status.FAILED);
+        record.setJobId("legacy-failed-job");
+        when(routeRecordRepository.findFirstByUserOrderByUpdatedAtDesc(user)).thenReturn(Optional.of(record));
+
+        Optional<AiRouteRecordResponse> response = service.latestFor(user);
+
+        assertTrue(response.isPresent());
+        assertNull(response.get().jobId());
     }
 
     @Test
     void saveForUserUsesOwnedLookupAndMarksPrivateSaved() {
         User user = user(7L);
         AiRouteRecord record = record(31L, user, "# Saved route");
+        record.setJobId("legacy-saved-job");
         when(routeRecordRepository.findByIdAndUser(31L, user)).thenReturn(Optional.of(record));
         when(routeRecordRepository.save(record)).thenReturn(record);
 
         AiRouteRecordResponse response = service.saveForUser(31L, user);
 
         assertEquals(31L, response.id());
+        assertNull(response.jobId());
         assertTrue(response.manuallySaved());
         verify(routeRecordRepository).findByIdAndUser(31L, user);
     }
@@ -94,13 +158,16 @@ class AiRouteRecordServiceTest {
     @Test
     void savedListIsScopedToCurrentUser() {
         User user = user(7L);
+        AiRouteRecord record = record(1L, user, "# One");
+        record.setJobId("legacy-saved-job");
         when(routeRecordRepository.findByUserAndManuallySavedTrueOrderByUpdatedAtDesc(user))
-                .thenReturn(List.of(record(1L, user, "# One")));
+                .thenReturn(List.of(record));
 
         List<AiRouteRecordResponse> saved = service.savedFor(user);
 
         assertEquals(1, saved.size());
         assertEquals(1L, saved.get(0).id());
+        assertNull(saved.get(0).jobId());
         verify(routeRecordRepository).findByUserAndManuallySavedTrueOrderByUpdatedAtDesc(user);
     }
 

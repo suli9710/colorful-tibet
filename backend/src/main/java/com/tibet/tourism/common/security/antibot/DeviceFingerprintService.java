@@ -1,4 +1,5 @@
 package com.tibet.tourism.common.security.antibot;
+import com.tibet.tourism.common.security.SensitiveLogSanitizer;
 import java.nio.charset.StandardCharsets;
 import java.util.HexFormat;
 import java.util.concurrent.TimeUnit;
@@ -79,7 +80,7 @@ public class DeviceFingerprintService {
             }
             return risk;
         } catch (Exception e) {
-            log.warn("Fingerprint assessment failed: {}", e.getMessage());
+            log.warn("Fingerprint assessment failed: {}", SensitiveLogSanitizer.exceptionSummary(e));
             return 0;
         }
     }

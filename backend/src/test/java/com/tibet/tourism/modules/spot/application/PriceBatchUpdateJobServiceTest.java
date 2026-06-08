@@ -2,6 +2,7 @@ package com.tibet.tourism.modules.spot.application;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
@@ -14,11 +15,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.test.util.ReflectionTestUtils;
 
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class PriceBatchUpdateJobServiceTest {
 
     @Mock
@@ -69,6 +72,36 @@ class PriceBatchUpdateJobServiceTest {
 
         assertEquals("COMPLETED", snapshot.status());
         assertThrows(IllegalArgumentException.class, () -> service.getJob(snapshot.jobId()));
+    }
+
+    @Test
+    void spotFailureLogUsesSummaryInsteadOfRawExceptionMessage(CapturedOutput output) {
+        String rawMessage = "supplier payload phone=13800138000 token=price-secret";
+        when(scenicSpotRepository.findAllWithoutTags(any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(spot(99L, "Sensitive Spot Name", null))));
+        when(priceUpdateService.updateSpotPrice(99L, true))
+                .thenThrow(new IllegalStateException(rawMessage));
+
+        PriceBatchUpdateJobService.PriceBatchUpdateJobSnapshot snapshot = service.startJob(true);
+
+        assertEquals("COMPLETED", snapshot.status());
+        assertEquals(1, snapshot.failed());
+        assertThat(output).contains("type=IllegalStateException", "messageHash=")
+                .doesNotContain(rawMessage, "13800138000", "price-secret", "Sensitive Spot Name");
+    }
+
+    @Test
+    void jobFailureExposesGenericSnapshotErrorAndSummaryLog(CapturedOutput output) {
+        String rawMessage = "repository shard password=raw-secret";
+        when(scenicSpotRepository.findAllWithoutTags(any(Pageable.class)))
+                .thenThrow(new IllegalStateException(rawMessage));
+
+        PriceBatchUpdateJobService.PriceBatchUpdateJobSnapshot snapshot = service.startJob(true);
+
+        assertEquals("FAILED", snapshot.status());
+        assertEquals("Price batch update failed", snapshot.errorMessage());
+        assertThat(output).contains("type=IllegalStateException", "messageHash=")
+                .doesNotContain(rawMessage, "raw-secret");
     }
 
     private ScenicSpot spot(Long id, String name, BigDecimal price) {

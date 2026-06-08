@@ -1,0 +1,120 @@
+// @vitest-environment jsdom
+import { describe, expect, it } from 'vitest'
+import { renderMarkdownToSafeHtml, sanitizeHtml } from './sanitize'
+
+describe('HTML sanitization', () => {
+  it('removes scripts, event handlers, and unsafe URLs from HTML', () => {
+    const clean = sanitizeHtml(`
+      <p onclick="alert(1)">Hello</p>
+      <script>alert(2)</script>
+      <a href="javascript:alert(3)" onmouseover="alert(4)">bad link</a>
+      <a href="//evil.example/phish">protocol relative</a>
+      <img src="javascript:alert(5)" onerror="alert(6)" alt="bad image">
+    `)
+
+    expect(clean.toLowerCase()).not.toContain('<script')
+    expect(clean).not.toContain('onclick')
+    expect(clean).not.toContain('onmouseover')
+    expect(clean).not.toContain('onerror')
+    expect(clean.toLowerCase()).not.toContain('javascript:')
+    expect(clean).not.toContain('//evil.example')
+    expect(clean).toContain('<p>Hello</p>')
+  })
+
+  it('preserves product-supported Markdown structure', () => {
+    const clean = renderMarkdownToSafeHtml(`
+# Title
+
+A [safe link](https://example.com/route) with **bold text** and \`inline code\`.
+
+| Day | Plan |
+| --- | --- |
+| 1 | Lhasa |
+
+\`\`\`text
+Day 1: Lhasa
+\`\`\`
+
+![Potala](/images/potala.jpg)
+`)
+
+    expect(clean).toContain('<h1>Title</h1>')
+    expect(clean).toContain('<a href="https://example.com/route" target="_blank" rel="noopener noreferrer">safe link</a>')
+    expect(clean).toContain('<strong>bold text</strong>')
+    expect(clean).toContain('<code>inline code</code>')
+    expect(clean).toContain('<table>')
+    expect(clean).toContain('<pre><code>Day 1: Lhasa')
+    expect(clean).toMatch(/<img[^>]+src="\/images\/potala\.jpg"[^>]*>/)
+    expect(clean).toMatch(/<img[^>]+alt="Potala"[^>]*>/)
+  })
+
+  it('sanitizes raw HTML and javascript links embedded in Markdown', () => {
+    const clean = renderMarkdownToSafeHtml(`
+[bad](javascript:alert(1))
+
+<img src="/images/route.jpg" onerror="alert(2)" alt="route">
+<iframe src="https://example.com/embed"></iframe>
+`)
+
+    expect(clean.toLowerCase()).not.toContain('javascript:')
+    expect(clean).not.toContain('onerror')
+    expect(clean.toLowerCase()).not.toContain('<iframe')
+    expect(clean).toMatch(/<img[^>]+src="\/images\/route\.jpg"[^>]*>/)
+  })
+
+  it('normalizes blank-target links and auto-hardens absolute http links', () => {
+    const clean = sanitizeHtml(`
+      <a href="https://example.com" target=" _BLANK " rel="opener">external</a>
+      <a href="https://docs.example/route">auto external</a>
+      <a href="/local" target="sidebar" rel="opener">local</a>
+      <a target="_blank" rel="opener">missing href</a>
+      <p target="_blank" rel="bookmark">not a link</p>
+    `)
+
+    expect(clean.match(/target="_blank"/g)?.length).toBe(2)
+    expect(clean.match(/rel="noopener noreferrer"/g)?.length).toBe(2)
+    expect(clean).toContain('<a href="https://docs.example/route" target="_blank" rel="noopener noreferrer">auto external</a>')
+    expect(clean).not.toContain('rel="opener"')
+    expect(clean).not.toContain('target="sidebar"')
+    expect(clean).not.toContain('<p target=')
+    expect(clean).not.toContain('<p rel=')
+  })
+
+  it('keeps image sources to fetchable web or relative URLs', () => {
+    const clean = sanitizeHtml(`
+      <img src="https://images.example/potala.jpg" alt="remote">
+      <img src="../images/potala.jpg" alt="relative">
+      <img src="mailto:security@example.com" alt="mail">
+      <img src="tel:+123456789" alt="phone">
+      <img src="#preview" alt="fragment">
+      <img src="?preview=1" alt="query">
+    `)
+
+    expect(clean).toMatch(/<img[^>]+src="https:\/\/images\.example\/potala\.jpg"[^>]*>/)
+    expect(clean).toMatch(/<img[^>]+src="\.\.\/images\/potala\.jpg"[^>]*>/)
+    expect(clean).not.toContain('src="mailto:')
+    expect(clean).not.toContain('src="tel:')
+    expect(clean).not.toContain('src="#preview"')
+    expect(clean).not.toContain('src="?preview=1"')
+  })
+
+  it('forbids dangerous rich embed tags and encoded unsafe protocols', () => {
+    const clean = sanitizeHtml(`
+      <object data="https://example.com/app.swf"></object>
+      <embed src="https://example.com/app.swf">
+      <iframe srcdoc="<script>alert(1)</script>"></iframe>
+      <a href="java&#x0D;script:alert(1)">encoded bad link</a>
+      <a href="data:text/html,<script>alert(2)</script>">data bad link</a>
+      <img src="data:image/svg+xml,<svg onload=alert(3)>" alt="data image">
+    `)
+
+    expect(clean.toLowerCase()).not.toContain('<object')
+    expect(clean.toLowerCase()).not.toContain('<embed')
+    expect(clean.toLowerCase()).not.toContain('<iframe')
+    expect(clean.toLowerCase()).not.toContain('javascript:')
+    expect(clean.toLowerCase()).not.toContain('data:text/html')
+    expect(clean.toLowerCase()).not.toContain('data:image/svg')
+    expect(clean).toContain('encoded bad link')
+    expect(clean).toContain('data bad link')
+  })
+})

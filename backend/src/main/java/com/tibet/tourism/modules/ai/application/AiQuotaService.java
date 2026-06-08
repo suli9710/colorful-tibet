@@ -75,7 +75,7 @@ public class AiQuotaService {
                 mirrorFallbackQuota(dateKey, userId, used);
                 return decision;
             } catch (Exception e) {
-                log.warn("Redis quota consume failed, using in-memory fallback: {}", e.getMessage());
+                log.warn("Redis quota consume failed, using in-memory fallback: {}", AiLogPrivacy.exceptionSummary(e));
                 return tryConsumeFallbackQuota(dateKey, userId);
             }
         }
@@ -95,7 +95,7 @@ public class AiQuotaService {
                 int count = parseInt(val);
                 return count >= dailyLimit;
             } catch (Exception e) {
-                log.warn("Redis quota check failed, using in-memory fallback: {}", e.getMessage());
+                log.warn("Redis quota check failed, using in-memory fallback: {}", AiLogPrivacy.exceptionSummary(e));
                 return isFallbackQuotaExceeded(dateKey, userId);
             }
         }
@@ -119,7 +119,7 @@ public class AiQuotaService {
                 String val = redisTemplate.opsForValue().get(key);
                 used = parseInt(val);
             } catch (Exception e) {
-                log.warn("Redis quota remaining check failed, using in-memory fallback: {}", e.getMessage());
+                log.warn("Redis quota remaining check failed, using in-memory fallback: {}", AiLogPrivacy.exceptionSummary(e));
                 used = getFallbackQuotaCount(dateKey, userId);
             }
         } else {
@@ -134,7 +134,7 @@ public class AiQuotaService {
                 String val = redisTemplate.opsForValue().get(CACHE_KEY_PREFIX + cacheKey);
                 return val == null ? null : val.toString();
             } catch (Exception e) {
-                log.warn("Redis cache read failed: {}", e.getMessage());
+                log.warn("Redis cache read failed: {}", AiLogPrivacy.exceptionSummary(e));
             }
         }
         CacheEntry entry = fallbackCache.get(cacheKey);
@@ -152,7 +152,7 @@ public class AiQuotaService {
                         CACHE_KEY_PREFIX + cacheKey, content, Duration.ofSeconds(cacheTtlSeconds));
                 return;
             } catch (Exception e) {
-                log.warn("Redis cache write failed: {}", e.getMessage());
+                log.warn("Redis cache write failed: {}", AiLogPrivacy.exceptionSummary(e));
             }
         }
         fallbackCache.put(cacheKey, new CacheEntry(content, System.currentTimeMillis() + cacheTtlSeconds * 1000L));

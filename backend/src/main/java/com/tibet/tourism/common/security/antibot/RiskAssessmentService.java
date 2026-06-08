@@ -1,9 +1,9 @@
 package com.tibet.tourism.common.security.antibot;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tibet.tourism.common.security.PiiMasker;
+import com.tibet.tourism.common.security.SensitiveLogSanitizer;
 import com.tibet.tourism.common.security.antibot.domain.BehaviorLog;
 import com.tibet.tourism.common.security.antibot.infra.BehaviorLogRepository;
-import com.tibet.tourism.modules.user.domain.User;
 import java.util.Base64;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
@@ -68,7 +68,7 @@ public class RiskAssessmentService {
             recaptchaScore = score == null ? OptionalDouble.empty() : score;
             metrics = behaviorFuture.join();
         } catch (Exception e) {
-            log.warn("Antibot assessment partially failed: {}", e.getMessage());
+            log.warn("Antibot assessment partially failed: {}", SensitiveLogSanitizer.exceptionSummary(e));
             recaptchaScore = OptionalDouble.empty();
             metrics = new BehaviorAnalysisService.BehaviorMetrics(0, 0, 0, 0, 0, 0);
         }
@@ -115,8 +115,9 @@ public class RiskAssessmentService {
 
         String userLabel = safeUserLabel(userId);
         String fingerprintLabel = safeFingerprintLabel(fingerprint);
+        String endpointLabel = safeEndpointLabel(endpoint);
         log.info("Antibot assessment: endpoint={} user={} fp={} score={} decision={}",
-                endpoint, userLabel, fingerprintLabel,
+                endpointLabel, userLabel, fingerprintLabel,
                 String.format("%.1f", finalScore), decision);
 
         final OptionalDouble captchaScore = recaptchaScore;
@@ -137,25 +138,42 @@ public class RiskAssessmentService {
             byte[] json = Base64.getDecoder().decode(header);
             return MAPPER.readValue(json, BehaviorData.class);
         } catch (Exception e) {
-            log.debug("Failed to decode behavior data: {}", e.getMessage());
+            log.debug("Failed to decode behavior data: {}", SensitiveLogSanitizer.exceptionSummary(e));
             return null;
         }
     }
 
     private String safeFingerprintLabel(String fingerprint) {
-        String label = fingerprintService.fingerprintLabel(fingerprint);
-        if (StringUtils.hasText(label)) {
-            return label;
+        try {
+            String label = fingerprintService.fingerprintLabel(fingerprint);
+            if (StringUtils.hasText(label)) {
+                return label;
+            }
+        } catch (Exception e) {
+            log.debug("Failed to create fingerprint log label: {}",
+                    SensitiveLogSanitizer.exceptionSummary(e));
         }
         return "fp#" + PiiMasker.shortHash(fingerprint);
     }
 
     private String safeUserLabel(Long userId) {
-        String label = fingerprintService.userLabel(userId);
-        if (StringUtils.hasText(label)) {
-            return label;
+        try {
+            String label = fingerprintService.userLabel(userId);
+            if (StringUtils.hasText(label)) {
+                return label;
+            }
+        } catch (Exception e) {
+            log.debug("Failed to create user log label: {}",
+                    SensitiveLogSanitizer.exceptionSummary(e));
         }
         return "user#" + PiiMasker.shortHash(userId == null ? null : userId.toString());
+    }
+
+    private String safeEndpointLabel(String endpoint) {
+        if (!StringUtils.hasText(endpoint)) {
+            return "endpoint#empty";
+        }
+        return "endpoint#" + PiiMasker.shortHash(endpoint);
     }
 
     private void persistLog(Long userId, String endpoint, String fingerprint,
@@ -177,7 +195,7 @@ public class RiskAssessmentService {
             logEntry.setDecision(decision.name());
             behaviorLogRepository.save(logEntry);
         } catch (Exception e) {
-            log.warn("Failed to persist behavior log: {}", e.getMessage());
+            log.warn("Failed to persist behavior log: {}", SensitiveLogSanitizer.exceptionSummary(e));
         }
     }
 }
