@@ -4,14 +4,35 @@ import routeCommunitySource from './RouteCommunity.vue?raw'
 describe('community list UX and accessibility guardrails', () => {
   it('keeps the route/community switch exposed as real tabs', () => {
     expect(routeCommunitySource).toContain('role="tablist"')
+    expect(routeCommunitySource).toContain('@keydown="handleTabKeydown"')
     expect(routeCommunitySource.match(/role="tab"/g)?.length).toBe(2)
     expect(routeCommunitySource).toContain(':aria-selected="activeTab === \'routes\'"')
     expect(routeCommunitySource).toContain(':aria-selected="activeTab === \'qa\'"')
+    expect(routeCommunitySource).toContain(':tabindex="activeTab === \'routes\' ? 0 : -1"')
+    expect(routeCommunitySource).toContain(':tabindex="activeTab === \'qa\' ? 0 : -1"')
     expect(routeCommunitySource).toContain('aria-controls="community-panel-routes"')
     expect(routeCommunitySource).toContain('aria-controls="community-panel-qa"')
     expect(routeCommunitySource.match(/role="tabpanel"/g)?.length).toBe(2)
     expect(routeCommunitySource).toContain('aria-labelledby="community-tab-routes"')
     expect(routeCommunitySource).toContain('aria-labelledby="community-tab-qa"')
+    expect(routeCommunitySource).toContain(':hidden="activeTab !== \'routes\'"')
+    expect(routeCommunitySource).toContain(':hidden="activeTab !== \'qa\'"')
+    expect(routeCommunitySource).not.toMatch(/<section\s+v-if="activeTab === 'routes'"/)
+    expect(routeCommunitySource).not.toMatch(/<section\s+v-if="activeTab === 'qa'"/)
+    expect(routeCommunitySource).toContain("case 'ArrowRight':")
+    expect(routeCommunitySource).toContain("case 'ArrowLeft':")
+    expect(routeCommunitySource).toContain("case 'Home':")
+    expect(routeCommunitySource).toContain("case 'End':")
+    expect(routeCommunitySource).toContain('document.getElementById(communityTabIds[tab])?.focus()')
+  })
+
+  it('keeps the ask-question dialog and required fields named from visible labels', () => {
+    expect(routeCommunitySource).toContain('labelled-by="ask-question-modal-title"')
+    expect(routeCommunitySource).toContain('id="ask-question-modal-title"')
+    expect(routeCommunitySource).toContain('for="ask-question-title"')
+    expect(routeCommunitySource).toContain('id="ask-question-title"')
+    expect(routeCommunitySource).toContain('for="ask-question-content"')
+    expect(routeCommunitySource).toContain('id="ask-question-content"')
   })
 
   it('keeps filters, paging, and creation actions labelled or titled', () => {

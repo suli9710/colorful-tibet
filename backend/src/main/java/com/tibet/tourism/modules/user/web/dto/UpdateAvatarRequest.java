@@ -13,10 +13,10 @@ public record UpdateAvatarRequest(
 ) {
 
     @JsonIgnore
-    @AssertTrue(message = "Avatar URL must be HTTPS or a local image asset")
+    @AssertTrue(message = "Avatar URL is invalid")
     public boolean isAvatarUrlAllowed() {
         try {
-            InputSanitizer.optionalPublicImageUrl(avatarUrl, "avatarUrl");
+            InputSanitizer.optionalLocalAvatarResourcePath(avatarUrl, "avatarUrl");
             return true;
         } catch (IllegalArgumentException exception) {
             return false;
