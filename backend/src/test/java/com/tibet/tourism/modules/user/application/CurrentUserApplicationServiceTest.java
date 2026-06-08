@@ -1,6 +1,10 @@
 package com.tibet.tourism.modules.user.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.tibet.tourism.modules.community.domain.Comment;
@@ -112,5 +116,25 @@ class CurrentUserApplicationServiceTest {
         assertThat((List<?>) comments.get("routeComments")).hasOnlyElementsOfType(RouteCommentResponse.class);
         assertThat(comments.get("spotComments").toString()).doesNotContain("hashed-password", "13800138000", "203.0.113.99");
         assertThat(comments.get("routeComments").toString()).doesNotContain("hashed-password", "13800138000", "203.0.113.99");
+    }
+
+    @Test
+    void updateAvatarStoresOnlyLocalAvatarResourcePath() {
+        when(userRepository.findById(7L)).thenReturn(Optional.of(user));
+
+        String avatarUrl = service.updateAvatar(7L, "  /uploads/avatars/user.png  ");
+
+        assertThat(avatarUrl).isEqualTo("/uploads/avatars/user.png");
+        assertThat(user.getAvatar()).isEqualTo("/uploads/avatars/user.png");
+        verify(userRepository).save(user);
+    }
+
+    @Test
+    void updateAvatarRejectsExternalAvatarUrlBeforeLoadingUser() {
+        assertThatThrownBy(() -> service.updateAvatar(7L, "https://cdn.example.com/avatar.png?signature=secret"))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        verify(userRepository, never()).findById(7L);
+        verify(userRepository, never()).save(any(User.class));
     }
 }
