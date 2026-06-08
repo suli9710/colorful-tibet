@@ -110,7 +110,7 @@ call :test_wsl_distro
 exit /b !ERRORLEVEL!
 
 :test_wsl_distro
-wsl.exe -d "%WSL_DISTRO%" -- bash -lc "printf WSL_READY" >nul 2>nul
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$d='%WSL_DISTRO%'; & wsl.exe -d $d -- bash -lc 'printf WSL_READY' *> $null; if ($LASTEXITCODE -ne 0) { exit 1 }; exit 0"
 if not "!ERRORLEVEL!"=="0" (
     echo Error: WSL distribution "%WSL_DISTRO%" could not be started.
     exit /b 1

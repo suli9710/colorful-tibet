@@ -13,7 +13,23 @@ const auth = useAuthStore()
 const isOpen = ref(false)
 const isScrolled = ref(false)
 const menuButton = ref<HTMLButtonElement | null>(null)
+const mobileMenuPanel = ref<HTMLElement | null>(null)
 let ticking = false
+
+interface NavItem {
+  path: string
+  label: string
+  matchPaths?: string[]
+}
+
+const focusableMenuSelector = [
+  'a[href]',
+  'button:not(:disabled)',
+  'input:not(:disabled)',
+  'select:not(:disabled)',
+  'textarea:not(:disabled)',
+  '[tabindex]:not([tabindex="-1"])'
+].join(',')
 
 const updateScrolledState = () => {
   isScrolled.value = window.scrollY > 80
@@ -39,11 +55,53 @@ const toggleMobileMenu = () => {
   isOpen.value = !isOpen.value
 }
 
+const syncBodyScrollLock = (locked: boolean) => {
+  document.body.classList.toggle('nav-menu-open', locked)
+}
+
+const getMobileMenuFocusable = () => {
+  return Array.from(mobileMenuPanel.value?.querySelectorAll<HTMLElement>(focusableMenuSelector) ?? [])
+    .filter(element => !element.hasAttribute('disabled') && element.tabIndex !== -1)
+}
+
+const focusFirstMobileMenuItem = () => {
+  void nextTick(() => {
+    getMobileMenuFocusable()[0]?.focus()
+  })
+}
+
+const handleMobileMenuTab = (event: KeyboardEvent) => {
+  const focusable = getMobileMenuFocusable()
+  const first = focusable[0]
+  const last = focusable[focusable.length - 1]
+
+  if (!first || !last) {
+    event.preventDefault()
+    mobileMenuPanel.value?.focus()
+    return
+  }
+
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault()
+    last.focus()
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault()
+    first.focus()
+  }
+}
+
 const handleGlobalKeydown = (event: KeyboardEvent) => {
   if (event.key !== 'Escape' || !isOpen.value) return
   event.preventDefault()
   closeMobileMenu(true)
 }
+
+watch(isOpen, open => {
+  syncBodyScrollLock(open)
+  if (open) {
+    focusFirstMobileMenuItem()
+  }
+})
 
 watch(() => route.fullPath, () => {
   closeMobileMenu()
@@ -58,6 +116,7 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('scroll', handleScroll)
   window.removeEventListener('keydown', handleGlobalKeydown)
+  syncBodyScrollLock(false)
 })
 
 const currentLocale = computed(() => locale.value)
@@ -68,19 +127,26 @@ const currentUserLabel = computed(() => {
   return auth.user?.role === 'ADMIN' ? t('profile.admin') : t('profile.member')
 })
 const currentUserInitial = computed(() => currentUserLabel.value.charAt(0).toUpperCase())
-const navItems = computed(() => [
-  { path: '/', label: t('common.home') },
-  { path: '/spots', label: t('common.spots') },
-  { path: '/route-planner', label: t('common.routePlanner') },
-  { path: '/community', label: t('common.community') },
-  { path: '/hotels', label: t('common.hotels') },
-  { path: '/heritage', label: t('common.heritage') },
-  { path: '/news', label: t('common.news') },
+const navItems = computed<NavItem[]>(() => [
+  { path: '/', label: t('common.home'), matchPaths: ['/'] },
+  { path: '/spots', label: t('common.spots'), matchPaths: ['/spots'] },
+  { path: '/route-planner', label: t('common.routePlanner'), matchPaths: ['/route-planner', '/route'] },
+  { path: '/community', label: t('common.community'), matchPaths: ['/community', '/create-route'] },
+  { path: '/hotels', label: t('common.hotels'), matchPaths: ['/hotels', '/hotel-booking'] },
+  { path: '/heritage', label: t('common.heritage'), matchPaths: ['/heritage'] },
+  { path: '/news', label: t('common.news'), matchPaths: ['/news'] },
   ...(auth.user ? [
-    { path: '/orders', label: t('common.orders') },
-    { path: '/profile', label: t('common.profile') }
+    { path: '/orders', label: t('common.orders'), matchPaths: ['/orders', '/hotel-orders'] },
+    { path: '/profile', label: t('common.profile'), matchPaths: ['/profile', '/favorites'] }
   ] : []),
 ])
+
+const isPathActive = (paths: string[]) => paths.some(path => (
+  route.path === path || (path !== '/' && route.path.startsWith(`${path}/`))
+))
+
+const isNavItemActive = (item: NavItem) => isPathActive(item.matchPaths ?? [item.path])
+const isAdminActive = computed(() => isPathActive(['/admin']))
 
 const switchLanguage = (lang: string) => {
   locale.value = lang
@@ -118,15 +184,16 @@ const logout = async () => {
         </div>
 
         <div class="hidden md:flex items-center space-x-1">
-          <router-link v-for="item in navItems" :key="item.path" :to="item.path" custom v-slot="{ href, navigate, isActive }">
+          <router-link v-for="item in navItems" :key="item.path" :to="item.path" custom v-slot="{ href, navigate }">
             <a
               :href="href"
               class="relative px-4 py-2 rounded-full text-sm font-medium text-tibet-brown/80 hover:text-tibet-dark transition-all duration-300 ease-out-expo group will-change-transform hover:-translate-y-0.5 hover:scale-[1.03] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tibet-gold/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white/80"
-              :aria-current="isActive ? 'page' : undefined"
+              :class="isNavItemActive(item) ? 'text-tibet-red' : ''"
+              :aria-current="isNavItemActive(item) ? 'page' : undefined"
               @click="navigate"
             >
               <span
-                v-if="isActive"
+                v-if="isNavItemActive(item)"
                 class="absolute inset-0 rounded-full bg-white/75 shadow-sm border border-tibet-gold/20"
               />
               <span class="absolute inset-0 bg-gradient-to-r from-tibet-gold/10 to-tibet-red/10 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 ease-out-expo"></span>
@@ -134,15 +201,16 @@ const logout = async () => {
             </a>
           </router-link>
 
-          <router-link v-if="auth.user && auth.user.role === 'ADMIN'" to="/admin" custom v-slot="{ href, navigate, isActive }">
+          <router-link v-if="auth.user && auth.user.role === 'ADMIN'" to="/admin" custom v-slot="{ href, navigate }">
             <a
               :href="href"
               class="relative px-4 py-2 rounded-full text-sm font-medium text-tibet-brown/80 hover:text-tibet-dark transition-all duration-200 hover:-translate-y-0.5 hover:scale-[1.03] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tibet-gold/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white/80"
-              :aria-current="isActive ? 'page' : undefined"
+              :class="isAdminActive ? 'text-tibet-red' : ''"
+              :aria-current="isAdminActive ? 'page' : undefined"
               @click="navigate"
             >
               <span
-                v-if="isActive"
+                v-if="isAdminActive"
                 class="absolute inset-0 rounded-full bg-white/75 shadow-sm border border-tibet-gold/20"
               />
               <span class="relative z-10">{{ t('common.admin') }}</span>
@@ -222,12 +290,24 @@ const logout = async () => {
     </nav>
   </div>
 
+  <button
+      v-if="isOpen"
+      type="button"
+      class="fixed inset-0 z-30 cursor-default bg-tibet-dark/10 backdrop-blur-[1px] md:hidden"
+      aria-hidden="true"
+      tabindex="-1"
+      @click="closeMobileMenu()"
+    ></button>
+
   <nav
       v-if="isOpen"
+      ref="mobileMenuPanel"
       id="mobile-primary-menu"
       key="mobile-nav"
       class="mobile-menu-panel fixed z-40 origin-top overflow-y-auto overscroll-contain rounded-3xl border border-white/20 shadow-2xl md:hidden glass animate-fade-in"
+      tabindex="-1"
       :aria-label="t('mobileNav.ariaLabel')"
+      @keydown.tab="handleMobileMenuTab"
     >
       <div class="px-3 pt-2 pb-5 space-y-1 sm:px-4 sm:pb-6">
         <div
@@ -239,12 +319,12 @@ const logout = async () => {
           <router-link
             :to="item.path"
             custom
-            v-slot="{ href, navigate, isActive }">
+            v-slot="{ href, navigate }">
             <a
               :href="href"
               class="block rounded-xl px-4 py-3 text-base font-medium text-tibet-brown/80 hover:text-tibet-dark hover:bg-white/60 transition-all duration-300 ease-out-expo active:scale-98 sm:hover:translate-x-2 group will-change-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tibet-gold/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white/80"
-              :class="isActive ? 'bg-white/75 text-tibet-red shadow-sm' : ''"
-              :aria-current="isActive ? 'page' : undefined"
+              :class="isNavItemActive(item) ? 'bg-white/75 text-tibet-red shadow-sm' : ''"
+              :aria-current="isNavItemActive(item) ? 'page' : undefined"
               @click="(event) => { navigate(event); closeMobileMenu() }"
             >
               <span class="flex items-center">
@@ -257,12 +337,12 @@ const logout = async () => {
           </router-link>
         </div>
 
-        <router-link v-if="auth.user && auth.user.role === 'ADMIN'" to="/admin" custom v-slot="{ href, navigate, isActive }">
+        <router-link v-if="auth.user && auth.user.role === 'ADMIN'" to="/admin" custom v-slot="{ href, navigate }">
           <a
             :href="href"
             class="block px-4 py-3 rounded-xl text-base font-medium text-tibet-brown/80 hover:text-tibet-dark hover:bg-white/50 transition-all active:scale-98 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tibet-gold/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white/80"
-            :class="isActive ? 'bg-white/75 text-tibet-red shadow-sm' : ''"
-            :aria-current="isActive ? 'page' : undefined"
+            :class="isAdminActive ? 'bg-white/75 text-tibet-red shadow-sm' : ''"
+            :aria-current="isAdminActive ? 'page' : undefined"
             @click="(event) => { navigate(event); closeMobileMenu() }"
           >
             {{ t('common.admin') }}

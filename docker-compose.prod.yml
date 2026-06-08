@@ -46,7 +46,7 @@ services:
       - TRUST_PROXY_HEADERS=${TRUST_PROXY_HEADERS:-true}
       - TRUSTED_PROXY_CIDRS=${TRUSTED_PROXY_CIDRS:-172.16.0.0/12,10.0.0.0/8,127.0.0.1/32}
       - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS}
-      - SUPER_ADMIN_USERNAME=${SUPER_ADMIN_USERNAME}
+      - SUPER_ADMIN_USERNAME=${SUPER_ADMIN_USERNAME:?SUPER_ADMIN_USERNAME is required in production}
       - SUPER_ADMIN_TOTP_SECRET=${SUPER_ADMIN_TOTP_SECRET:?SUPER_ADMIN_TOTP_SECRET is required in production}
       # MySQL 数据库配置（如果使用 MySQL）
       - DB_USERNAME=${DB_USERNAME:-tibet_user}
@@ -127,8 +127,18 @@ services:
   redis:
     image: redis:7-alpine
     container_name: colorful-tibet-redis
-    command: >
-      sh -c 'exec redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"'
+    entrypoint:
+      - /bin/sh
+      - -ec
+    command:
+      - |
+        umask 077
+        REDIS_PASSWORD_ESCAPED=$$(printf '%s' "$${REDIS_PASSWORD}" | sed 's/[\\"]/\\&/g')
+        cat > /tmp/redis.conf <<EOF
+        appendonly yes
+        requirepass "$${REDIS_PASSWORD_ESCAPED}"
+        EOF
+        exec redis-server /tmp/redis.conf
     environment:
       - REDIS_PASSWORD=${REDIS_PASSWORD:?REDIS_PASSWORD is required in production}
     volumes:
@@ -137,7 +147,7 @@ services:
     networks:
       - tibet-network
     healthcheck:
-      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping"]
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$${REDIS_PASSWORD}\" redis-cli ping | grep -q PONG"]
       interval: 10s
       timeout: 3s
       retries: 5
@@ -161,7 +171,13 @@ services:
     networks:
       - tibet-network
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$${MYSQL_ROOT_PASSWORD}\" --silent"]
+      test:
+        - CMD-SHELL
+        - |
+          umask 077
+          trap 'rm -f /tmp/mysql-health.cnf' EXIT
+          printf '[client]\nuser=root\npassword=%s\nhost=127.0.0.1\n' "$${MYSQL_ROOT_PASSWORD}" > /tmp/mysql-health.cnf
+          mysqladmin --defaults-extra-file=/tmp/mysql-health.cnf ping --silent
       interval: 10s
       timeout: 5s
       retries: 10

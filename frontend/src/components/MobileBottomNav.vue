@@ -10,7 +10,7 @@ const { t } = useI18n()
 const auth = useAuthStore()
 
 const hiddenRouteNames = new Set(['privacy', 'terms'])
-const hiddenPathPrefixes = ['/login', '/register', '/admin', '/privacy', '/terms']
+const hiddenPathPrefixes = ['/login', '/register', '/admin', '/privacy', '/terms', '/hotel-booking']
 
 const isVisible = computed(() => {
   const routeName = typeof route.name === 'string' ? route.name : ''
@@ -93,11 +93,11 @@ const tabs = computed(() => [
             >
               <span
                 v-if="tab.active"
-                class="absolute inset-x-1 top-1 bottom-1 rounded-2xl bg-tibet-red/8"
+                class="absolute inset-x-1 top-1 bottom-1 rounded-2xl bg-tibet-red/8 shadow-inner shadow-tibet-red/5"
                 aria-hidden="true"
               ></span>
               <component :is="tab.icon" class="relative h-5 w-5 shrink-0" :stroke-width="tab.active ? 2.6 : 2.1" aria-hidden="true" />
-              <span class="relative w-full truncate leading-[1.1]">{{ tab.label }}</span>
+              <span class="mobile-bottom-nav__label relative block w-full truncate text-center leading-[1.1]">{{ tab.label }}</span>
             </a>
           </router-link>
         </div>
@@ -122,6 +122,10 @@ const tabs = computed(() => [
 .mobile-bottom-nav__tab {
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
+}
+
+.mobile-bottom-nav__label {
+  min-height: 1.1em;
 }
 
 @media (max-width: 360px) {

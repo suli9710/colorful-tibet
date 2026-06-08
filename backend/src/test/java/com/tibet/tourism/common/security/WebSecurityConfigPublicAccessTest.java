@@ -4,19 +4,24 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.mockito.Mockito.when;
+import static org.hamcrest.Matchers.containsString;
 
 import com.tibet.tourism.modules.user.infra.UserRepository;
 import jakarta.servlet.http.Cookie;
 import java.util.Map;
 import java.util.stream.Stream;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.test.web.servlet.MockMvc;
@@ -98,6 +103,23 @@ class WebSecurityConfigPublicAccessTest {
 
         mockMvc.perform(request.cookie(new Cookie(CookieAuthConstants.AUTH_COOKIE_NAME, "valid-token")))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void adminEndpointForNonAdminReturnsGenericJsonForbidden() throws Exception {
+        when(jwtUtils.validateJwtToken("valid-token")).thenReturn(true);
+        when(jwtUtils.getUserNameFromJwtToken("valid-token")).thenReturn("traveler");
+        when(userSessionVersionService.tokenMatchesCurrentSession("valid-token")).thenReturn(true);
+        when(userDetailsService.loadUserByUsername("traveler")).thenReturn(
+                User.withUsername("traveler").password("unused").roles("USER").build());
+
+        mockMvc.perform(get("/api/admin/users")
+                        .cookie(new Cookie(CookieAuthConstants.AUTH_COOKIE_NAME, "valid-token")))
+                .andExpect(status().isForbidden())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, containsString("no-store")))
+                .andExpect(header().string("X-Content-Type-Options", "nosniff"))
+                .andExpect(jsonPath("$.error").value("Forbidden"))
+                .andExpect(jsonPath("$.message").value("Access denied"));
     }
 
     private static Stream<MockHttpServletRequestBuilder> publicReadRequests() {

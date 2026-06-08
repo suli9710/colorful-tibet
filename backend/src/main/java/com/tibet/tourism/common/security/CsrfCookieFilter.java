@@ -12,7 +12,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.annotation.Order;
 import org.springframework.core.Ordered;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -130,10 +129,10 @@ public class CsrfCookieFilter extends OncePerRequestFilter {
 
     private void reject(HttpServletResponse response, String reason) throws IOException {
         logger.warn("Rejected state-changing request: {}", reason);
-        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        response.setCharacterEncoding("UTF-8");
-        response.getWriter().write("{\"error\":\"Invalid CSRF token\"}");
+        SecurityErrorResponseWriter.writeJson(
+                response,
+                HttpServletResponse.SC_FORBIDDEN,
+                "Invalid CSRF token");
     }
 
     private String readCookie(HttpServletRequest request, String name) {

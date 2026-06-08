@@ -19,6 +19,12 @@
     background-attachment: scroll;
   }
 
+  body.nav-menu-open {
+    overflow: hidden;
+    overscroll-behavior: contain;
+    touch-action: none;
+  }
+
   h1, h2, h3, h4, .font-display {
     font-family: 'Noto Serif SC', 'Noto Sans SC', serif;
     letter-spacing: 0;
@@ -115,6 +121,41 @@
     -webkit-backdrop-filter: blur(8px) saturate(135%);
     border: 1px solid rgba(255, 255, 255, 0.2);
     box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+  }
+
+  .skip-link {
+    position: fixed;
+    top: calc(0.75rem + env(safe-area-inset-top));
+    left: max(1rem, env(safe-area-inset-left));
+    z-index: 200;
+    min-height: 44px;
+    transform: translateY(calc(-100% - 1.25rem));
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    border: 1px solid rgba(197, 150, 75, 0.45);
+    background: rgba(255, 255, 255, 0.96);
+    color: #6B1D2A;
+    box-shadow: 0 14px 36px rgba(26, 21, 32, 0.16);
+    font-size: 0.875rem;
+    font-weight: 700;
+    padding: 0.625rem 1rem;
+    transition: transform 180ms ease, box-shadow 180ms ease;
+  }
+
+  .skip-link:focus,
+  .skip-link:focus-visible {
+    transform: translateY(0);
+    outline: none;
+    box-shadow: 0 14px 36px rgba(26, 21, 32, 0.18), 0 0 0 3px rgba(242, 201, 76, 0.38);
+  }
+
+  .app-main {
+    scroll-margin-top: 6rem;
+  }
+
+  .app-main:focus {
+    outline: none;
   }
 
   /* 用于卡片/组件背景 — 更不透明，保证可读性 */

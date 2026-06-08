@@ -13,7 +13,13 @@ services:
       - mysql_data:/var/lib/mysql
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$${MYSQL_ROOT_PASSWORD}\" --silent"]
+      test:
+        - CMD-SHELL
+        - |
+          umask 077
+          trap 'rm -f /tmp/mysql-health.cnf' EXIT
+          printf '[client]\nuser=root\npassword=%s\nhost=127.0.0.1\n' "$${MYSQL_ROOT_PASSWORD}" > /tmp/mysql-health.cnf
+          mysqladmin --defaults-extra-file=/tmp/mysql-health.cnf ping --silent
       interval: 10s
       timeout: 5s
       retries: 10

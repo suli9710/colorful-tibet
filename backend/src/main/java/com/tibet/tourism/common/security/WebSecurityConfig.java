@@ -58,6 +58,8 @@ public class WebSecurityConfig {
     @Value("${app.security.public-metrics-enabled:false}")
     private boolean publicMetricsEnabled;
 
+    private final SecurityAccessDeniedHandler accessDeniedHandler = new SecurityAccessDeniedHandler();
+
     @Bean
     public AuthTokenFilter authenticationJwtTokenFilter() {
         return new AuthTokenFilter(jwtUtils, userDetailsService, tokenRevocationService, userSessionVersionService);
@@ -92,7 +94,9 @@ public class WebSecurityConfig {
             MustChangePasswordFilter mustChangePasswordFilter) throws Exception {
         http.cors(Customizer.withDefaults())
             .csrf(csrf -> csrf.disable())
-            .exceptionHandling(exception -> exception.authenticationEntryPoint(unauthorizedHandler))
+            .exceptionHandling(exception -> exception
+                    .authenticationEntryPoint(unauthorizedHandler)
+                    .accessDeniedHandler(accessDeniedHandler))
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> {
                 if (publicDocsEnabled) {

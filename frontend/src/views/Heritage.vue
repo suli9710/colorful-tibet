@@ -48,8 +48,25 @@
         </form>
       </div>
 
+      <div
+        v-if="heritageErrorMessage"
+        class="mx-auto mb-8 max-w-3xl rounded-2xl border border-tibet-red/20 bg-white/85 px-5 py-4 text-center shadow-sm"
+        role="alert"
+        aria-live="assertive"
+      >
+        <p class="text-sm leading-6 text-tibet-brown/75">{{ heritageErrorMessage }}</p>
+        <button
+          type="button"
+          class="mt-3 inline-flex min-h-10 items-center justify-center rounded-full bg-tibet-dark px-5 py-2 text-sm font-semibold text-white transition hover:bg-tibet-dark/90 focus:outline-none focus:ring-2 focus:ring-tibet-gold/60 focus:ring-offset-2"
+          :disabled="searchLoading"
+          @click="refreshHeritageModule"
+        >
+          {{ searchLoading ? t('common.loading') : t('spots.reload') }}
+        </button>
+      </div>
+
       <motion.section
-        v-if="!loading"
+        v-if="!loading && (!heritageErrorMessage || heritageItems.length)"
         class="mb-8 grid grid-cols-1 gap-4 sm:mb-10 sm:gap-6 xl:grid-cols-[minmax(0,1fr)_360px]"
         :initial="{ opacity: 0, y: 20 }"
         :animate="{ opacity: 1, y: 0 }"
@@ -167,10 +184,13 @@
                     :alt="item.name"
                     class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                     loading="lazy"
-                    @error="applyHeritageImageFallback"
+                    @error="markHeritageImageFailed(item)"
                   />
                   <div v-else class="flex h-full w-full items-center justify-center bg-gradient-to-br from-stone-100 to-amber-50 text-stone-400">
-                    <BookOpen class="h-8 w-8" />
+                    <div class="text-center">
+                      <BookOpen class="mx-auto h-8 w-8" />
+                      <p class="mt-2 text-xs text-stone-500">{{ item.name }}</p>
+                    </div>
                   </div>
                   <div class="absolute left-3 top-3 max-w-[75%] rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur">
                     <span class="line-clamp-1">{{ item.category || '非遗项目' }}</span>
@@ -486,12 +506,16 @@
             >
               <div class="h-36 -mx-4 -mt-4 mb-4 overflow-hidden rounded-t-2xl bg-stone-100 sm:-mx-5 sm:-mt-5">
                 <img
+                  v-if="resolveHeritageImage(item)"
                   :src="resolveHeritageImage(item)"
                   :alt="item.name"
                   class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                   loading="lazy"
-                  @error="applyHeritageImageFallback"
+                  @error="markHeritageImageFailed(item)"
                 />
+                <div v-else class="flex h-full w-full items-center justify-center bg-gradient-to-br from-stone-100 to-amber-50 text-stone-400">
+                  <BookOpen class="h-8 w-8" />
+                </div>
               </div>
               <div class="mb-3">
                 <span class="inline-block px-3 py-1 rounded-full text-xs font-medium bg-tibet-red/10 text-tibet-red border border-tibet-red/15">
@@ -548,14 +572,18 @@
           <!-- 顶部大图 -->
           <div class="relative h-44 sm:h-56 md:h-72 bg-stone-100">
             <motion.img
+              v-if="resolveHeritageImage(selectedItem)"
               :src="resolveHeritageImage(selectedItem)"
               :alt="selectedItem.name"
               class="w-full h-full object-cover"
               :initial="{ opacity: 0, scale: 1.06 }"
               :animate="{ opacity: 1, scale: 1 }"
               :transition="{ duration: 0.5, ease: motionEase }"
-              @error="applyHeritageImageFallback"
+              @error="markHeritageImageFailed(selectedItem)"
             />
+            <div v-else class="flex h-full w-full items-center justify-center bg-gradient-to-br from-stone-100 to-amber-50 text-stone-400">
+              <BookOpen class="h-10 w-10" />
+            </div>
             <motion.button
               type="button"
               class="absolute top-3 right-3 bg-black/50 text-white p-2 rounded-full hover:bg-black/70 transition sm:top-4 sm:right-4"
@@ -1018,7 +1046,10 @@
         <motion.div
           v-if="loading"
           key="heritage-loading"
-          class="flex justify-center items-center h-64"
+          class="flex h-64 flex-col items-center justify-center gap-3 text-sm text-tibet-brown/60"
+          role="status"
+          aria-live="polite"
+          :aria-label="t('heritage.loadingLabel', '正在加载非遗内容')"
           :initial="{ opacity: 0 }"
           :animate="{ opacity: 1 }"
           :exit="{ opacity: 0 }"
@@ -1029,6 +1060,7 @@
             :animate="{ rotate: 360 }"
             :transition="{ duration: 1, repeat: Infinity, ease: 'linear' }"
           ></motion.div>
+          <span>{{ t('heritage.loadingLabel', '正在加载非遗内容') }}</span>
         </motion.div>
       </AnimatePresence>
 

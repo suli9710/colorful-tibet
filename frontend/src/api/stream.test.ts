@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { generateRouteStream, streamRouteGenerationJob } from './stream'
+import { generateRouteStream, startRouteGenerationJob, streamRouteGenerationJob } from './stream'
 
 const encoder = new TextEncoder()
 
@@ -151,6 +151,46 @@ describe('route generation streams', () => {
     stubFetch(new Response('slow down', { status: 429 }))
 
     await expect(streamRouteGenerationJob('job-1', {})).rejects.toThrow('temporarily rate limited')
+  })
+
+  it('uses endpoint registry paths for route stream and job requests', async () => {
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(streamResponse([
+        'data: {"type":"done","content":"ok"}\n\n'
+      ]))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        jobId: 'job-1',
+        status: 'RUNNING',
+        content: '',
+        days: 3,
+        budget: 'comfort',
+        preference: 'natural',
+        cached: false,
+        createdAt: '2026-06-08T00:00:00Z',
+        updatedAt: '2026-06-08T00:00:00Z'
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      }))
+      .mockResolvedValueOnce(streamResponse([
+        'data: {"type":"done","content":"ok"}\n\n'
+      ])))
+
+    await generateRouteStream(
+      { days: 3, budget: 'comfort', preference: 'natural' },
+      {}
+    )
+
+    await startRouteGenerationJob(
+      { days: 3, budget: 'comfort', preference: 'natural' }
+    )
+
+    await streamRouteGenerationJob('job/1', {})
+
+    const fetchMock = fetch as unknown as ReturnType<typeof vi.fn>
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/routes/generate/stream')
+    expect(fetchMock.mock.calls[1][0]).toBe('/api/routes/generate/jobs')
+    expect(fetchMock.mock.calls[2][0]).toBe('/api/routes/generate/jobs/job%2F1/stream')
   })
 
   it('does not attach legacy localStorage tokens to stream requests', async () => {
