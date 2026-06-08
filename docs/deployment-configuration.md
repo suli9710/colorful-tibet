@@ -1,4 +1,4 @@
-# 部署配置治理说明
+﻿# 部署配置治理说明
 
 本文补充 `docs/DEPLOYMENT.md` 的本地部署步骤，重点说明 local/prod Compose 边界、环境变量来源、metrics 公开性，以及 CI 与分支保护要求。本文只描述治理规则，不改变运行行为。
 
@@ -10,6 +10,8 @@
 | 生产部署 | `docker-compose.prod.yml` | `docker compose -f docker-compose.prod.yml up -d --build` | HTTPS 前端、生产 profile、监控组件 | 前端发布 `80/443`；backend、Prometheus、Alertmanager、Grafana、Zipkin 默认只绑定 `127.0.0.1`；MySQL 和 Redis 不发布宿主机端口 |
 
 本地 Compose 默认 `SPRING_PROFILES_ACTIVE=local`，允许 HTTP、本地种子内容和较宽松的调试开关。生产 Compose 固定 `SPRING_PROFILES_ACTIVE=prod`，要求真实域名、证书、强密钥、Redis 密码、Scrapling API key、reCAPTCHA 和生产地图配置。
+
+后端启动安全校验除 `SPRING_PROFILES_ACTIVE=prod` 外，也会把 `APP_ENV=production`、`ENVIRONMENT=production`、`RAILWAY_ENVIRONMENT=production` 以及 `K_SERVICE`、`RENDER_SERVICE_ID`、`FLY_APP_NAME`、`WEBSITE_HOSTNAME`、`KUBERNETES_SERVICE_HOST` 等云或 K8s 信号视为生产意图，并强制 cookie-secure、强密钥、禁用 mock callback 和 Scrapling API key 检查。
 
 不要用 `docker-compose.yml` 承载公网生产流量；也不要把从 `.env.example` 复制出的本地 `.env` 直接用于生产。生产发布前必须用 `docker compose -f docker-compose.prod.yml config` 检查最终展开结果，确认没有 `change-me`、`replace-with-*` 或本地 profile 值残留。
 
@@ -36,13 +38,15 @@ Docker Compose 展开变量时，宿主机环境变量和 `--env-file`/`.env` �
 | Redis | 本地 Redis 不要求密码 | `REDIS_PASSWORD` 必填 |
 | 强密钥 | 关键密钥必须非空，可用本地随机值 | `JWT_SECRET`、`CSRF_SIGNING_SECRET`、`PII_KEYS`、`ADMIN_ENCRYPTION_KEY` 等必须为强随机生产值 |
 | 文档公开 | `PUBLIC_DOCS_ENABLED` 默认 false，可本地打开 | 默认 false，生产公开前必须有明确审批 |
-| Metrics 公开 | 应显式评估 `PUBLIC_METRICS_ENABLED` | 当前生产 Compose 默认 true 以便 Prometheus 抓取；公网部署必须配合网络隔离或改为 false |
+| Metrics 公开 | 应显式评估 `PUBLIC_METRICS_ENABLED` | 生产 Compose 默认 true，以便内置 Prometheus 无认证采集；只有后端 metrics 处在受信 Prometheus 网络内时才保持 true |
 | 前端公开配置 | 可留空或使用开发 key | `VITE_AMAP_KEY`、`VITE_AMAP_SECURITY_CODE`、`VITE_RECAPTCHA_SITE_KEY` 必须使用生产配置 |
 | 反向代理 | 本地 HTTP 和 `localhost` | `NGINX_SERVER_NAME`、`NGINX_CERT_DOMAIN`、证书挂载必须真实可用 |
 
 ## Metrics 公开性
 
-后端 Prometheus 指标路径是 `/actuator/prometheus`。应用配置默认 `PUBLIC_METRICS_ENABLED=false`，此时该路径要求管理员权限；当前 `docker-compose.prod.yml` 将其默认展开为 true，目的是让同一 Compose 网络里的 Prometheus 无需管理员 token 即可抓取。
+后端 Prometheus 指标路径是 `/actuator/prometheus`。应用配置默认 `PUBLIC_METRICS_ENABLED=false`，此时该路径要求管理员权限；生产 Compose 的内置 Prometheus 不携带登录态或长期 ADMIN JWT，因此 `docker-compose.prod.yml` 默认将 `PUBLIC_METRICS_ENABLED` 展开为 true，让同一受控 Compose 网络内的 Prometheus 能够采集指标。
+
+如果生产环境不是使用仓库内置 Prometheus，或者 backend 会被公网、第三方容器、非受信内网直接访问，应显式设置 `PUBLIC_METRICS_ENABLED=false`，并改用认证代理、防火墙 allowlist、独立内部 metrics path，或其他受控采集方案。
 
 这里的“公开”指任何能连到 backend 的网络主体都可无认证读取 metrics，不等同于一定暴露到公网。生产安全边界必须同时满足：
 

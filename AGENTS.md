@@ -1,8 +1,8 @@
 # Project Instructions
 
 ## Tech Stack
-- Backend: Spring Boot 3.2, Java 17, Spring Security JWT, Spring Data JPA, Redis cache, MySQL.
-- Frontend: Vue 3, Vite 5, TypeScript, Pinia, Vue Router, vue-i18n, Tailwind CSS.
+- Backend: Spring Boot 3.5.12, Java 17, Spring Security JWT, Spring Data JPA, Redis cache, MySQL.
+- Frontend: Vue 3, Vite 8, TypeScript, Pinia, Vue Router, vue-i18n, Tailwind CSS.
 - Deployment: Docker Compose with separate backend, frontend, and Redis services.
 
 ## Build & Run
@@ -33,5 +33,5 @@
 - Do not revert unrelated working-tree changes; this repository often has broad in-progress edits.
 
 ## Verification
-- Run `npm run typecheck`, `npm run build`, and `mvn -q test` before handing off production-facing changes.
+- Run `npm run check` and `mvn -q test` before handing off production-facing changes.
 - For Docker/deployment edits, also inspect `backend/Dockerfile`, `frontend/Dockerfile`, `docker-compose.yml`, and `docker-compose.prod.yml` together.

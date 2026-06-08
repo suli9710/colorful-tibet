@@ -82,6 +82,80 @@ class CsrfCookieFilterTest {
     }
 
     @Test
+    void publicGuideChatRejectsCrossSiteOriginWithoutAuthCookie() throws Exception {
+        MockHttpServletRequest request = apiRequest("POST", "/api/guide/chat");
+        request.addHeader("Origin", "https://evil.example");
+
+        MockHttpServletResponse response = doFilter(request);
+
+        assertEquals(403, response.getStatus());
+    }
+
+    @Test
+    void publicGuideChatRejectsCrossSiteFetchMetadataWithoutAuthCookie() throws Exception {
+        MockHttpServletRequest request = apiRequest("POST", "/api/guide/chat");
+        request.addHeader("Sec-Fetch-Site", "cross-site");
+
+        MockHttpServletResponse response = doFilter(request);
+
+        assertEquals(403, response.getStatus());
+    }
+
+    @Test
+    void publicGuideChatAcceptsAnonymousServerCallWithoutBrowserMetadata() throws Exception {
+        MockHttpServletRequest request = apiRequest("POST", "/api/guide/chat");
+
+        MockHttpServletResponse response = doFilter(request);
+
+        assertEquals(200, response.getStatus());
+    }
+
+    @Test
+    void publicGuideChatWithAuthCookieRequiresCsrfToken() throws Exception {
+        MockHttpServletRequest request = apiRequest("POST", "/api/guide/chat");
+        request.setCookies(new Cookie(CookieAuthConstants.AUTH_COOKIE_NAME, SESSION_TOKEN));
+        request.addHeader("Origin", "http://localhost:5173");
+        request.addHeader("Sec-Fetch-Site", "same-site");
+
+        MockHttpServletResponse response = doFilter(request);
+
+        assertEquals(403, response.getStatus());
+    }
+
+    @Test
+    void publicGuideChatWithAuthCookieAcceptsSignedDoubleSubmitToken() throws Exception {
+        String csrfToken = csrfTokenService.generateToken(SESSION_TOKEN);
+        MockHttpServletRequest request = apiRequest("POST", "/api/guide/chat");
+        request.setCookies(
+                new Cookie(CookieAuthConstants.AUTH_COOKIE_NAME, SESSION_TOKEN),
+                new Cookie(CookieAuthConstants.CSRF_COOKIE_NAME, csrfToken));
+        request.addHeader(CookieAuthConstants.CSRF_HEADER_NAME, csrfToken);
+        request.addHeader("Origin", "http://localhost:5173");
+        request.addHeader("Sec-Fetch-Site", "same-site");
+
+        MockHttpServletResponse response = doFilter(request);
+
+        assertEquals(200, response.getStatus());
+    }
+
+    @Test
+    void wildcardAllowedOriginDoesNotAuthorizeCsrfOrigin() throws Exception {
+        CsrfCookieFilter filter = new CsrfCookieFilter(csrfTokenService, "https://*.example.com,https://app.example.com");
+        String csrfToken = csrfTokenService.generateToken(SESSION_TOKEN);
+        MockHttpServletRequest request = apiRequest("POST", "/api/auth/me/change-password");
+        request.setCookies(
+                new Cookie(CookieAuthConstants.AUTH_COOKIE_NAME, SESSION_TOKEN),
+                new Cookie(CookieAuthConstants.CSRF_COOKIE_NAME, csrfToken));
+        request.addHeader(CookieAuthConstants.CSRF_HEADER_NAME, csrfToken);
+        request.addHeader("Origin", "https://foo.example.com");
+
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        filter.doFilter(request, response, new MockFilterChain());
+
+        assertEquals(403, response.getStatus());
+    }
+
+    @Test
     void registerRequestWithStaleAuthCookieBypassesCsrfCheck() throws Exception {
         MockHttpServletRequest request = apiRequest("POST", "/api/auth/register");
         request.setCookies(new Cookie(CookieAuthConstants.AUTH_COOKIE_NAME, SESSION_TOKEN));

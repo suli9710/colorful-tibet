@@ -47,6 +47,9 @@ public final class ApiSecurityPaths {
             "/api/auth/register",
             "/api/guide/chat");
 
+    private static final Set<String> OPTIONAL_AUTH_PUBLIC_POST_PATHS = Set.of(
+            "/api/guide/chat");
+
     private static final String[] ADMIN_API_PATHS = {
             "/api/admin/**",
             "/api/spots/admin/**"
@@ -65,9 +68,24 @@ public final class ApiSecurityPaths {
 
     public static boolean isPublicRequest(String method, String path) {
         if (READ_METHODS.contains(method)) {
+            if (isPrivateUploadPath(path)) {
+                return false;
+            }
             return matchesAny(path, PUBLIC_READ_PATHS);
         }
+        return isPublicPostRequest(method, path);
+    }
+
+    public static boolean isPublicPostRequest(String method, String path) {
         return "POST".equals(method) && PUBLIC_POST_PATHS.contains(path);
+    }
+
+    public static boolean requiresCsrfWhenAuthenticatedPublicPost(String method, String path) {
+        return "POST".equals(method) && OPTIONAL_AUTH_PUBLIC_POST_PATHS.contains(path);
+    }
+
+    private static boolean isPrivateUploadPath(String path) {
+        return path != null && ("/uploads/private".equals(path) || path.startsWith("/uploads/private/"));
     }
 
     private static String servletPath(HttpServletRequest request) {

@@ -3,6 +3,9 @@ import vue from '@vitejs/plugin-vue'
 import VueI18nPlugin from '@intlify/unplugin-vue-i18n/vite'
 import fs from 'fs'
 import path from 'path'
+import { resolveDevProxyTarget } from './src/utils/devProxyTarget'
+
+const devProxyTarget = resolveDevProxyTarget(process.env.VITE_API_BASE_URL, process.env.VITE_DEV_PROXY_TARGET)
 
 // https://vitejs.dev/config/
 export default defineConfig(({ command }) => ({
@@ -27,13 +30,13 @@ export default defineConfig(({ command }) => ({
     host: true,
     proxy: {
       '/api': {
-        target: 'http://localhost:8080',
+        target: devProxyTarget,
         changeOrigin: true,
         cookieDomainRewrite: '',
         // 不重写路径，保留 /api 前缀，因为后端路径包含 /api
       },
       '/images': {
-        target: 'http://localhost:8080',
+        target: devProxyTarget,
         changeOrigin: true,
         bypass: (req) => {
           const pathname = req.url?.split('?')[0]
@@ -46,7 +49,7 @@ export default defineConfig(({ command }) => ({
         },
       },
       '/uploads': {
-        target: 'http://localhost:8080',
+        target: devProxyTarget,
         changeOrigin: true,
       }
     }

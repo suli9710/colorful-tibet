@@ -397,7 +397,7 @@ import { AnimatePresence, LayoutGroup, motion } from 'motion-v'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import MotionModal from '../components/motion/MotionModal.vue'
-import api from '../api'
+import api, { endpoints } from '../api'
 import { useAuthGuard } from '../composables/useAuthGuard'
 import { showToast } from '../composables/useToast'
 import { readBrowserStorage } from '../utils/browserStorage'
@@ -509,7 +509,7 @@ const loadRoutes = async () => {
     if (routeFilters.days) { const d = parseInt(routeFilters.days); if (!isNaN(d)) params.days = d }
     if (routeFilters.budget) params.budget = routeFilters.budget
     if (routeFilters.preference) params.preference = routeFilters.preference
-    const response = await api.get('/routes/shared', { params })
+    const response = await api.get(endpoints.routes.shared, { params })
     routes.value = response.data.content || []
     routeTotalPages.value = response.data.totalPages || 0
   } catch (error) {
@@ -570,7 +570,7 @@ const loadQuestions = async () => {
   try {
     const params: any = { page: qaPage.value, size: 10, sort: qaFilters.sort }
     if (qaFilters.tag) params.tag = qaFilters.tag
-    const response = await api.get('/community/questions', { params })
+    const response = await api.get(endpoints.community.questions, { params })
     questions.value = response.data.content || []
     qaTotalPages.value = response.data.totalPages || 0
   } catch (error) {
@@ -585,7 +585,7 @@ const submitQuestion = async () => {
   if (!newQuestion.title.trim() || !newQuestion.content.trim()) return
   qaSubmitting.value = true
   try {
-    await api.post('/community/questions', {
+    await api.post(endpoints.community.questions, {
       title: newQuestion.title,
       content: newQuestion.content,
       tags: newQuestion.tags.join(',')

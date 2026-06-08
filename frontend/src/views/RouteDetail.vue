@@ -134,7 +134,7 @@ const { t } = useI18n()
 const currentRoute = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
-const routeId = currentRoute.params.id
+const routeId = Number(currentRoute.params.id)
 
 const loading = ref(true)
 const routeData = ref<any>(null)
@@ -157,9 +157,9 @@ const loadRouteDetail = async () => {
   loading.value = true
   try {
     const [routeRes, commentsRes, likeRes] = await Promise.all([
-      api.get(`/routes/shared/${routeId}`),
-      api.get(`/routes/shared/${routeId}/comments`),
-      api.get(`/routes/shared/${routeId}/like-status`).catch(() => ({ data: { liked: false } }))
+      api.get(endpoints.routes.sharedDetail(routeId)),
+      api.get(endpoints.routes.sharedComments(routeId)),
+      api.get(endpoints.routes.sharedLikeStatus(routeId)).catch(() => ({ data: { liked: false } }))
     ])
     
     routeData.value = routeRes.data
@@ -184,11 +184,11 @@ const toggleLike = async () => {
     }
 
     if (isLiked.value) {
-      await api.delete(`/routes/shared/${routeId}/like`)
+      await api.delete(endpoints.routes.sharedLike(routeId))
       routeData.value.likeCount--
       isLiked.value = false
     } else {
-      await api.post(`/routes/shared/${routeId}/like`)
+      await api.post(endpoints.routes.sharedLike(routeId))
       routeData.value.likeCount++
       isLiked.value = true
     }
@@ -215,7 +215,7 @@ const submitComment = async () => {
       return
     }
 
-    const response = await api.post(`/routes/shared/${routeId}/comments`, {
+    const response = await api.post(endpoints.routes.sharedComments(routeId), {
       content
     })
     
@@ -258,7 +258,7 @@ const deleteComment = async (comment: any) => {
   if (!confirmed) return
 
   try {
-    await api.delete(endpoints.routes.deleteSharedComment(Number(routeId), comment.id))
+    await api.delete(endpoints.routes.deleteSharedComment(routeId, comment.id))
     comments.value = comments.value.filter(item => item.id !== comment.id)
     if (routeData.value?.commentCount > 0) {
       routeData.value.commentCount--

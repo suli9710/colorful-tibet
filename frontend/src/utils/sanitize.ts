@@ -3,8 +3,10 @@ import { marked } from 'marked'
 
 const SAFE_BLANK_LINK_REL = 'noopener noreferrer'
 const SAFE_LINK_HREF_REGEXP = /^(?:(?:https?|mailto|tel):|\/(?!\/)|#|\?|\.{1,2}\/|[^\s:/\\?#]+(?:[/?#]|$))/i
-const SAFE_IMAGE_SRC_REGEXP = /^(?:(?:https?):|\/(?!\/)|\.{1,2}\/|[^\s:/\\?#]+(?:[/?#]|$))/i
+const SAFE_LOCAL_IMAGE_SRC_REGEXP = /^(?:\/(?![\\/])|\.{1,2}\/|[^\s:/\\?#]+(?:[/?#]|$))/i
+const SAFE_DATA_IMAGE_SRC_REGEXP = /^data:image\/(?:png|jpe?g|gif|webp|avif);base64,[a-z0-9+/]+={0,2}$/i
 const ABSOLUTE_HTTP_URL_REGEXP = /^https?:\/\//i
+const MAX_SAFE_DATA_IMAGE_SRC_LENGTH = 256 * 1024
 
 const SANITIZE_CONFIG: Config = {
   ALLOWED_TAGS: [
@@ -42,6 +44,23 @@ const SANITIZE_CONFIG: Config = {
   RETURN_TRUSTED_TYPE: false,
 }
 
+function isSameOriginHttpImageSource(source: string): boolean {
+  if (typeof window === 'undefined' || !window.location.origin) return false
+
+  try {
+    const url = new URL(source)
+    return (url.protocol === 'http:' || url.protocol === 'https:') && url.origin === window.location.origin
+  } catch {
+    return false
+  }
+}
+
+function isSafeImageSource(source: string): boolean {
+  if (SAFE_LOCAL_IMAGE_SRC_REGEXP.test(source)) return true
+  if (source.length <= MAX_SAFE_DATA_IMAGE_SRC_LENGTH && SAFE_DATA_IMAGE_SRC_REGEXP.test(source)) return true
+  return ABSOLUTE_HTTP_URL_REGEXP.test(source) && isSameOriginHttpImageSource(source)
+}
+
 if (typeof DOMPurify.addHook === 'function') {
   DOMPurify.addHook('afterSanitizeAttributes', node => {
     const element = node as Element
@@ -72,9 +91,11 @@ if (typeof DOMPurify.addHook === 'function') {
 
     if (tagName === 'img') {
       const source = element.getAttribute('src')?.trim()
-      if (!source || !SAFE_IMAGE_SRC_REGEXP.test(source)) {
-        element.removeAttribute('src')
+      if (!source || !isSafeImageSource(source)) {
+        element.remove()
+        return
       }
+      element.setAttribute('src', source)
     }
 
     element.removeAttribute('rel')

@@ -1,3 +1,5 @@
+import { applyThirdPartyScriptSecurity } from './scriptSecurity'
+
 let loadPromise: Promise<void> | null = null
 let loadedScriptKey = ''
 const ENABLED_VALUES = new Set(['1', 'true', 'yes', 'on'])
@@ -72,6 +74,7 @@ function loadScript(mode: RecaptchaMode, siteKey: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const existingScript = document.querySelector<HTMLScriptElement>('script[src*="recaptcha/api.js"]')
     if (existingScript) {
+      applyThirdPartyScriptSecurity(existingScript, 'recaptcha')
       waitForReady(mode).then(resolve, reject)
       return
     }
@@ -81,6 +84,7 @@ function loadScript(mode: RecaptchaMode, siteKey: string): Promise<void> {
     script.src = `https://www.recaptcha.net/recaptcha/api.js?render=${renderParam}`
     script.async = true
     script.defer = true
+    applyThirdPartyScriptSecurity(script, 'recaptcha')
     script.onload = () => waitForReady(mode).then(resolve, reject)
     script.onerror = () => reject(new Error('Failed to load reCAPTCHA'))
     document.head.appendChild(script)

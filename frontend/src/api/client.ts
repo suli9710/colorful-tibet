@@ -47,10 +47,6 @@ export function handleUnauthorizedResponse(error: any) {
     console.error(`[401] ${summarizeClientError(error)}`)
   }
 
-  if (requestUrl.includes('/admin')) {
-    return
-  }
-
   const isBookingCreate = method === 'post' && requestUrl.includes('/bookings')
   const isAiRouteGenerate = method === 'post' && requestUrl.includes('/routes/generate')
   const isRouteShare = method === 'post' && requestUrl.includes('/routes/share')

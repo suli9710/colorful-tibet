@@ -93,6 +93,13 @@ public class GuideChatUsageService {
             return Decision.challenge("captcha", Math.max(1, safeWindowSeconds));
         }
 
+        int currentWindow = parseCount(redisTemplate.opsForValue().get(windowKey));
+        Long ttlSeconds = redisTemplate.getExpire(windowKey, TimeUnit.SECONDS);
+        int retryAfter = ttlSeconds == null || ttlSeconds <= 0 ? safeWindowSeconds : Math.toIntExact(ttlSeconds);
+        if (currentWindow >= safeWindowLimit) {
+            return Decision.blocked("window", 0, retryAfter);
+        }
+
         Long dailyCount = redisTemplate.opsForValue().increment(dailyKey);
         if (dailyCount != null && dailyCount == 1L) {
             redisTemplate.expire(dailyKey, Duration.ofSeconds(secondsUntilTomorrow() + 3600));
@@ -108,12 +115,12 @@ public class GuideChatUsageService {
         }
 
         if (dailyCount > safeDailyLimit) {
+            compensateDailyIncrement(dailyKey);
             return Decision.blocked("daily", 0, secondsUntilTomorrow());
         }
 
-        Long ttlSeconds = redisTemplate.getExpire(windowKey, TimeUnit.SECONDS);
-        int retryAfter = ttlSeconds == null || ttlSeconds <= 0 ? safeWindowSeconds : Math.toIntExact(ttlSeconds);
         if (windowCount > safeWindowLimit) {
+            compensateDailyIncrement(dailyKey);
             return Decision.blocked("window", 0, retryAfter);
         }
 
@@ -121,6 +128,15 @@ public class GuideChatUsageService {
                 Math.max(0, safeDailyLimit - Math.toIntExact(dailyCount)),
                 Math.max(0, safeWindowLimit - Math.toIntExact(windowCount)));
         return Decision.allowed(remaining, retryAfter);
+    }
+
+    private void compensateDailyIncrement(String dailyKey) {
+        try {
+            redisTemplate.opsForValue().decrement(dailyKey);
+        } catch (Exception e) {
+            log.warn("Failed to compensate guide chat daily quota increment: {}",
+                    AiLogPrivacy.exceptionSummary(e));
+        }
     }
 
     private Decision tryAcquireInMemory(String identity, String dateKey, boolean authenticated, boolean recaptchaVerified) {

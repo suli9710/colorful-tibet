@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -15,8 +16,11 @@ import com.tibet.tourism.modules.ai.infra.AiRouteRecordRepository;
 import com.tibet.tourism.modules.ai.web.dto.AiRouteRecordResponse;
 import com.tibet.tourism.modules.user.domain.User;
 import com.tibet.tourism.modules.user.infra.UserRepository;
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -120,6 +124,39 @@ class AiRouteRecordServiceTest {
 
         assertTrue(response.isPresent());
         assertNull(response.get().jobId());
+    }
+
+    @Test
+    void staleRunningCleanupMarksRecordsFailedAndClearsJobIds() {
+        User user = user(7L);
+        AiRouteRecord titledRecord = record(41L, user, "# Old route\n\npartial");
+        titledRecord.setStatus(AiRouteRecord.Status.RUNNING);
+        titledRecord.setJobId("job-old");
+        titledRecord.setUpdatedAt(LocalDateTime.now().minusHours(3));
+        AiRouteRecord emptyRecord = record(42L, user, "");
+        emptyRecord.setStatus(AiRouteRecord.Status.RUNNING);
+        emptyRecord.setJobId("job-empty");
+        emptyRecord.setUpdatedAt(LocalDateTime.now().minusHours(4));
+
+        when(routeRecordRepository.findByStatusAndUpdatedAtBeforeOrderByUpdatedAtAsc(
+                eq(AiRouteRecord.Status.RUNNING), any(LocalDateTime.class)))
+                .thenReturn(List.of(titledRecord, emptyRecord));
+
+        int recovered = service.failStaleRunningRecords(Duration.ofHours(2));
+
+        assertEquals(2, recovered);
+        assertEquals(AiRouteRecord.Status.FAILED, titledRecord.getStatus());
+        assertNull(titledRecord.getJobId());
+        assertEquals("Old route", titledRecord.getTitle());
+        assertTrue(titledRecord.getErrorMessage().contains("recovery window"));
+        assertEquals(AiRouteRecord.Status.FAILED, emptyRecord.getStatus());
+        assertNull(emptyRecord.getJobId());
+        assertEquals(AiRouteRecord.defaultTitle(emptyRecord.getDays()), emptyRecord.getTitle());
+        ArgumentCaptor<LocalDateTime> cutoff = ArgumentCaptor.forClass(LocalDateTime.class);
+        verify(routeRecordRepository).findByStatusAndUpdatedAtBeforeOrderByUpdatedAtAsc(
+                eq(AiRouteRecord.Status.RUNNING), cutoff.capture());
+        assertTrue(cutoff.getValue().isBefore(LocalDateTime.now().minusMinutes(119)));
+        verify(routeRecordRepository).saveAll(List.of(titledRecord, emptyRecord));
     }
 
     @Test

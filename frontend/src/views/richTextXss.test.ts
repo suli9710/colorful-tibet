@@ -16,6 +16,8 @@ const fixtures = vi.hoisted(() => ({
 <iframe src="https://evil.example/embed"></iframe>
 <object data="https://evil.example/app.swf"></object>
 <img src="/images/safe.jpg" onerror="alert('image')" alt="safe image">
+<img src="https://tracker.example/pixel.png" alt="remote tracker">
+<img src="/uploads/routes/day-1.jpg" alt="local upload image">
 <a href="javascript:alert('bad')" onclick="alert('click')">bad link</a>
 
 [encoded bad](java&#x0d;script:alert('bad'))
@@ -58,6 +60,10 @@ vi.mock('../api', () => ({
   },
   endpoints: {
     routes: {
+      sharedDetail: (id: number) => `/routes/shared/${id}`,
+      sharedLike: (id: number) => `/routes/shared/${id}/like`,
+      sharedLikeStatus: (id: number) => `/routes/shared/${id}/like-status`,
+      sharedComments: (id: number) => `/routes/shared/${id}/comments`,
       deleteSharedComment: (routeId: number, commentId: number) => `/routes/shared/${routeId}/comments/${commentId}`
     }
   }
@@ -214,6 +220,18 @@ const expectSafeExternalLink = (root: ParentNode) => {
   expect(safeLink?.getAttribute('rel')).toBe('noopener noreferrer')
 }
 
+const expectNoRemoteTrackerImages = (root: ParentNode) => {
+  expect(root.querySelector('img[src*="tracker.example"]')).toBeNull()
+  expect((root as Element).innerHTML).not.toContain('tracker.example')
+}
+
+const expectLocalUploadImage = (root: ParentNode) => {
+  const localImage = root.querySelector('img[src="/uploads/routes/day-1.jpg"]')
+
+  expect(localImage).not.toBeNull()
+  expect(localImage?.getAttribute('alt')).toBe('local upload image')
+}
+
 describe('rich text XSS safeguards', () => {
   beforeEach(() => {
     routeMocks.apiGet.mockImplementation((url: string) => {
@@ -258,6 +276,10 @@ describe('rich text XSS safeguards', () => {
     assertNoExecutableDom(termsRoot.querySelector('.legal-markdown') ?? termsRoot)
     expectSafeExternalLink(privacyRoot)
     expectSafeExternalLink(termsRoot)
+    expectNoRemoteTrackerImages(privacyRoot)
+    expectNoRemoteTrackerImages(termsRoot)
+    expectLocalUploadImage(privacyRoot)
+    expectLocalUploadImage(termsRoot)
   })
 
   it('renders shared route detail Markdown through the shared sanitizer before v-html reaches the DOM', async () => {
@@ -270,6 +292,8 @@ describe('rich text XSS safeguards', () => {
     expect(markdownRoot).not.toBeNull()
     assertNoExecutableDom(markdownRoot ?? root)
     expectSafeExternalLink(markdownRoot ?? root)
+    expectNoRemoteTrackerImages(markdownRoot ?? root)
+    expectLocalUploadImage(markdownRoot ?? root)
   })
 
   it('keeps route planner worker HTML sanitized before assigning it to v-html content', () => {
@@ -280,6 +304,7 @@ describe('rich text XSS safeguards', () => {
     const workerHtml = `
       <p onclick="alert(1)">Generated route</p>
       <iframe src="https://evil.example/embed"></iframe>
+      <img src="https://tracker.example/pixel.png" alt="remote tracker">
       <img src="javascript:alert(2)" onerror="alert(3)">
       <a href="javascript:alert(4)">bad worker link</a>
       <a href="https://safe.example/docs">safe external</a>
@@ -288,6 +313,7 @@ describe('rich text XSS safeguards', () => {
 
     assertNoExecutableDom(root)
     expectSafeExternalLink(root)
+    expectNoRemoteTrackerImages(root)
   })
 
   it('keeps sanitizer output safe when inserted into a DOM node directly', () => {
@@ -295,5 +321,7 @@ describe('rich text XSS safeguards', () => {
 
     assertNoExecutableDom(root)
     expectSafeExternalLink(root)
+    expectNoRemoteTrackerImages(root)
+    expectLocalUploadImage(root)
   })
 })

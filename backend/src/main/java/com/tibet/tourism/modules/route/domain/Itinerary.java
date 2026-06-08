@@ -1,6 +1,7 @@
 package com.tibet.tourism.modules.route.domain;
 import com.tibet.tourism.modules.user.domain.User;
 import jakarta.persistence.*;
+import org.hibernate.annotations.BatchSize;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -24,6 +25,7 @@ public class Itinerary {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "parent_itinerary_id")
+    @BatchSize(size = 50)
     private Itinerary parentItinerary;
 
     @Column(nullable = false, length = 160)
@@ -54,6 +56,7 @@ public class Itinerary {
 
     @OneToMany(mappedBy = "itinerary", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("dayNumber ASC")
+    @BatchSize(size = 50)
     private List<ItineraryDay> itineraryDays = new ArrayList<>();
 
     @Column(name = "created_at")

@@ -67,7 +67,17 @@
 
         <!-- Hotel Orders Management -->
         <div class="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden">
-          <div class="flex flex-col gap-3 border-b border-stone-100 bg-gradient-to-r from-stone-50 to-white px-4 py-4 transition-colors hover:bg-stone-100/50 sm:flex-row sm:items-center sm:justify-between sm:px-6 cursor-pointer" @click="showAllHotelOrders = !showAllHotelOrders">
+          <div
+            class="flex flex-col gap-3 border-b border-stone-100 bg-gradient-to-r from-stone-50 to-white px-4 py-4 transition-colors hover:bg-stone-100/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 sm:flex-row sm:items-center sm:justify-between sm:px-6 cursor-pointer"
+            role="button"
+            tabindex="0"
+            :aria-expanded="showAllHotelOrders"
+            aria-controls="admin-hotel-orders-content"
+            :aria-label="t('admin.hotelOrders')"
+            @click="toggleAllHotelOrders"
+            @keydown.enter="activateKeyboardPanel($event, toggleAllHotelOrders)"
+            @keydown.space="activateKeyboardPanel($event, toggleAllHotelOrders)"
+          >
             <div class="flex min-w-0 items-center gap-3">
               <div class="w-9 h-9 rounded-lg bg-amber-100 flex items-center justify-center">
                 <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
@@ -89,7 +99,7 @@
             <p>{{ t('admin.loadingHotelOrders') }}</p>
           </div>
 
-          <div v-else-if="showAllHotelOrders" class="overflow-x-auto">
+          <div v-else-if="showAllHotelOrders" id="admin-hotel-orders-content" class="overflow-x-auto">
             <table class="min-w-full divide-y divide-stone-200">
               <thead class="bg-stone-50">
                 <tr>
@@ -159,7 +169,17 @@
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-8">
           <!-- Recent Bookings -->
           <div class="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden">
-            <div class="flex flex-col gap-3 border-b border-stone-100 bg-gradient-to-r from-stone-50 to-white px-4 py-4 transition-colors hover:bg-stone-100/50 sm:flex-row sm:items-center sm:justify-between sm:px-6 cursor-pointer" @click="showRecentOrders = !showRecentOrders">
+            <div
+              class="flex flex-col gap-3 border-b border-stone-100 bg-gradient-to-r from-stone-50 to-white px-4 py-4 transition-colors hover:bg-stone-100/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 sm:flex-row sm:items-center sm:justify-between sm:px-6 cursor-pointer"
+              role="button"
+              tabindex="0"
+              :aria-expanded="showRecentOrders"
+              aria-controls="admin-recent-orders-content"
+              :aria-label="t('admin.latestOrders')"
+              @click="toggleRecentOrders"
+              @keydown.enter="activateKeyboardPanel($event, toggleRecentOrders)"
+              @keydown.space="activateKeyboardPanel($event, toggleRecentOrders)"
+            >
               <div class="flex items-center gap-3">
                 <div class="w-9 h-9 rounded-lg bg-blue-100 flex items-center justify-center">
                   <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
@@ -170,7 +190,7 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
               </svg>
             </div>
-            <div v-if="showRecentOrders" class="divide-y divide-stone-100">
+            <div v-if="showRecentOrders" id="admin-recent-orders-content" class="divide-y divide-stone-100">
               <template v-if="recentOrders.length > 0">
                 <div v-for="order in recentOrders" :key="order.id" class="px-6 py-4 flex items-center justify-between hover:bg-stone-50 transition-colors">
                   <div>
@@ -193,7 +213,17 @@
 
           <!-- Popular Spots -->
           <div class="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden">
-            <div class="flex flex-col gap-3 border-b border-stone-100 bg-gradient-to-r from-stone-50 to-white px-4 py-4 transition-colors hover:bg-stone-100/50 sm:flex-row sm:items-center sm:justify-between sm:px-6 cursor-pointer" @click="showPopularSpots = !showPopularSpots">
+            <div
+              class="flex flex-col gap-3 border-b border-stone-100 bg-gradient-to-r from-stone-50 to-white px-4 py-4 transition-colors hover:bg-stone-100/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 sm:flex-row sm:items-center sm:justify-between sm:px-6 cursor-pointer"
+              role="button"
+              tabindex="0"
+              :aria-expanded="showPopularSpots"
+              aria-controls="admin-popular-spots-content"
+              :aria-label="t('admin.popularSpots')"
+              @click="togglePopularSpots"
+              @keydown.enter="activateKeyboardPanel($event, togglePopularSpots)"
+              @keydown.space="activateKeyboardPanel($event, togglePopularSpots)"
+            >
               <div class="flex items-center gap-3">
                 <div class="w-9 h-9 rounded-lg bg-rose-100 flex items-center justify-center">
                   <svg class="w-5 h-5 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>
@@ -204,7 +234,7 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
               </svg>
             </div>
-            <div v-if="showPopularSpots" class="divide-y divide-stone-100">
+            <div v-if="showPopularSpots" id="admin-popular-spots-content" class="divide-y divide-stone-100">
               <div v-for="(spot, index) in sortedPopularSpots" :key="spot.id" class="px-6 py-4 flex items-center hover:bg-stone-50 transition-colors">
                 <span class="text-lg font-bold text-stone-300 w-8">{{ index + 1 }}</span>
                 <img :src="spot.imageUrl" class="w-10 h-10 rounded-lg object-cover mr-4" alt="">
@@ -232,7 +262,17 @@
         
         <!-- Spots Management Section -->
         <div class="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden mt-8">
-          <div class="flex flex-col gap-3 border-b border-stone-100 bg-gradient-to-r from-stone-50 to-white px-4 py-4 transition-colors hover:bg-stone-100/50 sm:flex-row sm:items-center sm:justify-between sm:px-6 cursor-pointer" @click="showSpots = !showSpots">
+          <div
+            class="flex flex-col gap-3 border-b border-stone-100 bg-gradient-to-r from-stone-50 to-white px-4 py-4 transition-colors hover:bg-stone-100/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 sm:flex-row sm:items-center sm:justify-between sm:px-6 cursor-pointer"
+            role="button"
+            tabindex="0"
+            :aria-expanded="showSpots"
+            aria-controls="admin-spots-content"
+            :aria-label="t('admin.spotManagement')"
+            @click="toggleSpotsPanel"
+            @keydown.enter="activateKeyboardPanel($event, toggleSpotsPanel)"
+            @keydown.space="activateKeyboardPanel($event, toggleSpotsPanel)"
+          >
             <div class="flex items-center gap-3">
               <div class="w-9 h-9 rounded-lg bg-emerald-100 flex items-center justify-center">
                 <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
@@ -277,7 +317,7 @@
             </div>
           </div>
 
-          <template v-if="showSpots">
+          <div v-if="showSpots" id="admin-spots-content">
             <!-- Loading State -->
             <div v-if="loadingSpots" class="p-12 text-center">
               <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-500 mx-auto mb-4"></div>
@@ -303,8 +343,13 @@
             <!-- Spots Card Grid -->
             <div v-else class="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               <div v-for="spot in displayedSpots" :key="spot.id"
-                   class="group bg-white rounded-xl border border-stone-200 overflow-hidden hover:shadow-lg hover:border-emerald-300 transition-all duration-200 cursor-pointer"
-                   @click="openEditModal(spot)">
+                   class="group bg-white rounded-xl border border-stone-200 overflow-hidden hover:shadow-lg hover:border-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 transition-all duration-200 cursor-pointer"
+                   role="button"
+                   tabindex="0"
+                   :aria-label="`${t('common.edit')} ${spot.name || ''}`.trim()"
+                   @click="openEditModal(spot)"
+                   @keydown.enter="activateKeyboardPanel($event, () => openEditModal(spot))"
+                   @keydown.space="activateKeyboardPanel($event, () => openEditModal(spot))">
                 <!-- Thumbnail -->
                 <div class="relative h-40 overflow-hidden bg-stone-100">
                   <img v-if="spot.imageUrl" :src="spot.imageUrl" :alt="spot.name"
@@ -353,7 +398,7 @@
                 </div>
               </div>
             </div>
-          </template>
+          </div>
           <div v-else class="px-6 py-4 text-center text-stone-500 text-sm">
             {{ t('admin.expandSpots', { count: spots.length }) }}
           </div>
@@ -361,7 +406,17 @@
 
         <!-- User Management Section -->
         <div class="bg-white rounded-lg shadow overflow-hidden mt-8">
-          <div class="flex flex-col gap-3 border-b border-stone-100 bg-gradient-to-r from-stone-50 to-white px-4 py-4 transition-colors hover:bg-stone-100/50 sm:flex-row sm:items-center sm:justify-between sm:px-6 cursor-pointer" @click="showUsers = !showUsers">
+          <div
+            class="flex flex-col gap-3 border-b border-stone-100 bg-gradient-to-r from-stone-50 to-white px-4 py-4 transition-colors hover:bg-stone-100/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 sm:flex-row sm:items-center sm:justify-between sm:px-6 cursor-pointer"
+            role="button"
+            tabindex="0"
+            :aria-expanded="showUsers"
+            aria-controls="admin-users-content"
+            :aria-label="t('admin.userManagement')"
+            @click="toggleUsersPanel"
+            @keydown.enter="activateKeyboardPanel($event, toggleUsersPanel)"
+            @keydown.space="activateKeyboardPanel($event, toggleUsersPanel)"
+          >
             <div class="flex items-center gap-3">
               <div class="w-9 h-9 rounded-lg bg-violet-100 flex items-center justify-center">
                 <svg class="w-5 h-5 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"/></svg>
@@ -373,7 +428,7 @@
               <svg class="w-5 h-5 text-stone-400 transition-transform duration-200" :class="{ 'rotate-180': showUsers }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
             </div>
           </div>
-          <div v-if="showUsers">
+          <div v-if="showUsers" id="admin-users-content">
             <div class="divide-y divide-stone-100 md:hidden">
               <div v-for="u in users" :key="u.id" class="space-y-3 px-4 py-4" :class="{ 'bg-red-50/50': u.locked }">
                 <div class="flex items-start justify-between gap-3">
@@ -470,7 +525,17 @@
         <AdminCommunityPanel />
         <AdminHeritagePanel />
         <div class="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden mt-8">
-          <div class="flex flex-col gap-3 border-b border-stone-100 bg-gradient-to-r from-stone-50 to-white px-4 py-4 transition-colors hover:bg-stone-100/50 sm:flex-row sm:items-center sm:justify-between sm:px-6 cursor-pointer" @click="showAllNews = !showAllNews">
+          <div
+            class="flex flex-col gap-3 border-b border-stone-100 bg-gradient-to-r from-stone-50 to-white px-4 py-4 transition-colors hover:bg-stone-100/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 sm:flex-row sm:items-center sm:justify-between sm:px-6 cursor-pointer"
+            role="button"
+            tabindex="0"
+            :aria-expanded="showAllNews"
+            aria-controls="admin-news-content"
+            :aria-label="t('admin.newsManagement')"
+            @click="toggleNewsPanel"
+            @keydown.enter="activateKeyboardPanel($event, toggleNewsPanel)"
+            @keydown.space="activateKeyboardPanel($event, toggleNewsPanel)"
+          >
             <div class="flex items-center gap-3">
               <div class="w-9 h-9 rounded-lg bg-cyan-100 flex items-center justify-center">
                 <svg class="w-5 h-5 text-cyan-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"/></svg>
@@ -495,7 +560,7 @@
           </div>
           
           <!-- News List (Collapsible) -->
-          <div v-else-if="showAllNews" class="divide-y divide-stone-200">
+          <div v-else-if="showAllNews" id="admin-news-content" class="divide-y divide-stone-200">
             <div v-for="news in newsList" :key="news.id" class="px-4 py-4 transition-colors hover:bg-stone-50 sm:px-6">
               <div class="flex flex-col gap-4 sm:flex-row sm:items-start">
                 <div class="h-40 w-full flex-shrink-0 overflow-hidden rounded-lg bg-gray-200 sm:h-24 sm:w-24">
@@ -540,7 +605,17 @@
 
         <!-- Carousel Management Section -->
         <div class="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden mt-8">
-          <div class="flex flex-col gap-3 border-b border-stone-100 bg-gradient-to-r from-stone-50 to-white px-4 py-4 transition-colors hover:bg-stone-100/50 sm:flex-row sm:items-center sm:justify-between sm:px-6 cursor-pointer" @click="showCarousels = !showCarousels">
+          <div
+            class="flex flex-col gap-3 border-b border-stone-100 bg-gradient-to-r from-stone-50 to-white px-4 py-4 transition-colors hover:bg-stone-100/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 sm:flex-row sm:items-center sm:justify-between sm:px-6 cursor-pointer"
+            role="button"
+            tabindex="0"
+            :aria-expanded="showCarousels"
+            aria-controls="admin-carousels-content"
+            :aria-label="t('admin.carouselManagement')"
+            @click="toggleCarouselsPanel"
+            @keydown.enter="activateKeyboardPanel($event, toggleCarouselsPanel)"
+            @keydown.space="activateKeyboardPanel($event, toggleCarouselsPanel)"
+          >
             <div class="flex items-center gap-3">
               <div class="w-9 h-9 rounded-lg bg-pink-100 flex items-center justify-center">
                 <svg class="w-5 h-5 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
@@ -552,7 +627,7 @@
               <svg class="w-5 h-5 text-stone-400 transition-transform duration-200" :class="{ 'rotate-180': showCarousels }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
             </div>
           </div>
-          <div v-if="showCarousels" class="p-6">
+          <div v-if="showCarousels" id="admin-carousels-content" class="p-6">
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <div v-for="c in carousels" :key="c.id" class="border rounded-lg overflow-hidden">
                 <img :src="c.imageUrl" class="w-full h-32 object-cover">
@@ -574,7 +649,17 @@
 
         <!-- Route Management Section -->
         <div class="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden mt-8">
-          <div class="flex flex-col gap-3 border-b border-stone-100 bg-gradient-to-r from-stone-50 to-white px-4 py-4 transition-colors hover:bg-stone-100/50 sm:flex-row sm:items-center sm:justify-between sm:px-6 cursor-pointer" @click="showRoutes = !showRoutes">
+          <div
+            class="flex flex-col gap-3 border-b border-stone-100 bg-gradient-to-r from-stone-50 to-white px-4 py-4 transition-colors hover:bg-stone-100/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 sm:flex-row sm:items-center sm:justify-between sm:px-6 cursor-pointer"
+            role="button"
+            tabindex="0"
+            :aria-expanded="showRoutes"
+            aria-controls="admin-routes-content"
+            :aria-label="t('admin.routeManagement')"
+            @click="toggleRoutesPanel"
+            @keydown.enter="activateKeyboardPanel($event, toggleRoutesPanel)"
+            @keydown.space="activateKeyboardPanel($event, toggleRoutesPanel)"
+          >
             <div class="flex items-center gap-3">
               <div class="w-9 h-9 rounded-lg bg-teal-100 flex items-center justify-center">
                 <svg class="w-5 h-5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
@@ -587,7 +672,7 @@
               <svg class="w-5 h-5 text-stone-400 transition-transform duration-200" :class="{ 'rotate-180': showRoutes }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
             </div>
           </div>
-          <div v-if="showRoutes" class="overflow-x-auto">
+          <div v-if="showRoutes" id="admin-routes-content" class="overflow-x-auto">
             <table class="min-w-full divide-y divide-stone-200">
               <thead class="bg-stone-50">
                 <tr>
@@ -641,7 +726,17 @@
 
         <!-- Hotel Management Section -->
         <div class="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden mt-8">
-          <div class="flex flex-col gap-3 border-b border-stone-100 bg-gradient-to-r from-stone-50 to-white px-4 py-4 transition-colors hover:bg-stone-100/50 sm:flex-row sm:items-center sm:justify-between sm:px-6 cursor-pointer" @click="showHotels = !showHotels">
+          <div
+            class="flex flex-col gap-3 border-b border-stone-100 bg-gradient-to-r from-stone-50 to-white px-4 py-4 transition-colors hover:bg-stone-100/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 sm:flex-row sm:items-center sm:justify-between sm:px-6 cursor-pointer"
+            role="button"
+            tabindex="0"
+            :aria-expanded="showHotels"
+            aria-controls="admin-hotels-content"
+            :aria-label="t('admin.hotelManagement')"
+            @click="toggleHotelsPanel"
+            @keydown.enter="activateKeyboardPanel($event, toggleHotelsPanel)"
+            @keydown.space="activateKeyboardPanel($event, toggleHotelsPanel)"
+          >
             <div class="flex items-center gap-3">
               <div class="w-9 h-9 rounded-lg bg-indigo-100 flex items-center justify-center">
                 <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
@@ -656,12 +751,22 @@
           </div>
 
           <!-- Card Grid -->
-          <div v-if="showHotels" class="p-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div v-if="showHotels" id="admin-hotels-content" class="p-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div v-for="h in adminHotels" :key="h.id"
                  class="bg-white rounded-xl border border-stone-200 overflow-hidden hover:shadow-md transition-all duration-200"
                  :class="{ 'ring-2 ring-indigo-200 shadow-md': expandedHotelId === h.id }">
               <!-- Card Header (always visible) -->
-              <div class="flex gap-4 p-4 cursor-pointer" @click="toggleHotelExpand(h)">
+              <div
+                class="flex gap-4 p-4 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
+                role="button"
+                tabindex="0"
+                :aria-expanded="expandedHotelId === h.id"
+                :aria-controls="`admin-hotel-${h.id}-rooms`"
+                :aria-label="`${t('admin.roomManagement')} ${h.name || ''}`.trim()"
+                @click="toggleHotelExpand(h)"
+                @keydown.enter="activateKeyboardPanel($event, () => toggleHotelExpand(h))"
+                @keydown.space="activateKeyboardPanel($event, () => toggleHotelExpand(h))"
+              >
                 <!-- Thumbnail -->
                 <div class="w-24 h-24 shrink-0 rounded-lg overflow-hidden bg-stone-100">
                   <img v-if="h.imageUrl && !failedHotelImages[h.id]" :src="h.imageUrl" :alt="h.name"
@@ -701,7 +806,7 @@
               </div>
 
               <!-- Expanded Room Type Management -->
-              <div v-if="expandedHotelId === h.id" class="border-t border-stone-100 bg-stone-50/50 px-4 py-3 animate-slide-up">
+              <div v-if="expandedHotelId === h.id" :id="`admin-hotel-${h.id}-rooms`" class="border-t border-stone-100 bg-stone-50/50 px-4 py-3 animate-slide-up">
                 <div class="flex items-center justify-between mb-3">
                   <span class="text-xs font-semibold text-stone-500 uppercase tracking-wide">{{ t('admin.roomManagement') }}</span>
                   <span class="text-xs text-stone-400">{{ t('admin.roomTypesCount', { count: expandedRoomTypes.length }) }}</span>
@@ -1047,6 +1152,11 @@ const AdminAnalyticsPanel = defineAsyncComponent(() => import('../components/Adm
 
 const confirmDanger = (message: string) => showConfirm({ message, tone: 'danger' })
 const apiErrorMessage = (error: unknown, fallback: string) => safeClientErrorMessage(error, fallback)
+const activateKeyboardPanel = (event: KeyboardEvent, action: () => void | Promise<void>) => {
+  if (event.target !== event.currentTarget) return
+  event.preventDefault()
+  void action()
+}
 
 const stats = ref<Stats>({
   userCount: 0,
@@ -1308,6 +1418,16 @@ const newsForm = ref({
   viewCount: 0
 })
 const updatingNews = ref(false)
+
+const toggleAllHotelOrders = () => { showAllHotelOrders.value = !showAllHotelOrders.value }
+const toggleRecentOrders = () => { showRecentOrders.value = !showRecentOrders.value }
+const togglePopularSpots = () => { showPopularSpots.value = !showPopularSpots.value }
+const toggleSpotsPanel = () => { showSpots.value = !showSpots.value }
+const toggleUsersPanel = () => { showUsers.value = !showUsers.value }
+const toggleNewsPanel = () => { showAllNews.value = !showAllNews.value }
+const toggleCarouselsPanel = () => { showCarousels.value = !showCarousels.value }
+const toggleRoutesPanel = () => { showRoutes.value = !showRoutes.value }
+const toggleHotelsPanel = () => { showHotels.value = !showHotels.value }
 
 // Computed property to control displayed spots
 const displayedSpots = computed(() => {

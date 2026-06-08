@@ -2258,7 +2258,7 @@ const shareRoute = async () => {
   }
 
   try {
-    await api.post('/routes/share', {
+    await api.post(endpoints.routes.share, {
       title: t('routePlanner.routeTitle', { days: form.value.days, preference: getPreferenceText(form.value.preference) }),
       content: result.value,
       days: form.value.days,

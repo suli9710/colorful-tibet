@@ -138,7 +138,7 @@ const loadProfileDetails = async () => {
 
 const fetchUserInfo = async () => {
   try {
-    const response = await api.get('/auth/me')
+    const response = await api.get(endpoints.auth.me)
     userInfo.value = response.data
   } catch (e: any) {
     console.error('Failed to fetch user info:', summarizeClientError(e))
@@ -151,7 +151,7 @@ const fetchUserInfo = async () => {
 
 const fetchStats = async () => {
   try {
-    const response = await api.get('/auth/me/stats')
+    const response = await api.get(endpoints.auth.meStats)
     stats.value = response.data
   } catch (e: any) {
     console.error('Failed to fetch stats:', summarizeClientError(e))
@@ -164,7 +164,7 @@ const fetchStats = async () => {
 
 const fetchMyRoutes = async () => {
   try {
-    const response = await api.get('/routes/my-routes')
+    const response = await api.get(endpoints.routes.myRoutes)
     myRoutes.value = response.data || []
   } catch (e: any) {
     console.error('Failed to fetch my routes:', summarizeClientError(e))
@@ -228,7 +228,7 @@ const deleteHotelBooking = async (id: number) => {
 
 const fetchMyComments = async () => {
   try {
-    const response = await api.get('/auth/me/comments')
+    const response = await api.get(endpoints.auth.meComments)
     spotComments.value = response.data.spotComments || []
     routeComments.value = response.data.routeComments || []
   } catch (e: any) {
@@ -269,7 +269,7 @@ const deleteRoute = async (id: number) => {
   if (!(await confirmDangerousAction(t('profile.confirmDeleteRoute')))) return
   
   try {
-    await api.delete(`/routes/shared/${id}`)
+    await api.delete(endpoints.routes.sharedDetail(id))
     showToast(t('profile.deleteSuccess'), 'success')
     fetchMyRoutes()
   } catch (e) {
@@ -345,7 +345,7 @@ const changePassword = async () => {
   
   changingPassword.value = true
   try {
-    await api.post('/auth/me/change-password', {
+    await api.post(endpoints.auth.changePassword, {
       oldPassword: passwordForm.value.oldPassword,
       newPassword: passwordForm.value.newPassword
     })
@@ -424,7 +424,7 @@ const updateNickname = async () => {
   
   updatingNickname.value = true
   try {
-    await api.put('/auth/me/nickname', {
+    await api.put(endpoints.auth.updateNickname, {
       nickname
     })
     showToast(t('profile.nicknameUpdateSuccess'), 'success')
@@ -470,7 +470,7 @@ const handleAvatarUpload = async (event: Event) => {
     const formData = new FormData()
     formData.append('file', file)
     
-    const response = await api.post('/auth/me/upload-avatar', formData)
+    const response = await api.post(endpoints.auth.uploadAvatar, formData)
     
     showToast(t('profile.avatarUploadSuccess'), 'success')
     await fetchUserInfo()

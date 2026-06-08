@@ -164,7 +164,7 @@ import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { motion, useReducedMotion } from 'motion-v'
-import api from '../api'
+import api, { endpoints } from '../api'
 import { useToast } from '../composables/useToast'
 import { safeClientErrorMessage, summarizeClientError } from '../utils/errorMonitoring'
 import {
@@ -245,7 +245,7 @@ const handleRegister = async () => {
         throw new RecaptchaError()
       }
     }
-    await api.post('/auth/register', form.value, {
+    await api.post(endpoints.auth.register, form.value, {
       headers: recaptchaToken ? { 'X-Recaptcha-Token': recaptchaToken } : {}
     })
     showToast(t('register.registerSuccess'), 'success')

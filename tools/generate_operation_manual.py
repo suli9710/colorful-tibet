@@ -356,7 +356,7 @@ def add_cover(doc):
     for label, value in [
         ("\u9879\u76ee\u540d\u79f0", "\u4e03\u5f69\u897f\u85cf Colorful Tibet"),
         ("\u7cfb\u7edf\u7c7b\u578b", "\u897f\u85cf\u65c5\u6e38\u4fe1\u606f\u3001\u8def\u7ebf\u89c4\u5212\u3001\u9152\u5e97\u9884\u8ba2\u4e0e\u5185\u5bb9\u7ba1\u7406 Web \u7cfb\u7edf"),
-        ("\u6280\u672f\u67b6\u6784", "Spring Boot 3.2 + Vue 3 + MySQL + Redis + Docker Compose"),
+        ("\u6280\u672f\u67b6\u6784", "Spring Boot 3.5.12 + Vue 3 + MySQL + Redis + Docker Compose"),
         ("\u9002\u7528\u5bf9\u8c61", "\u6e38\u5ba2\u3001\u6ce8\u518c\u7528\u6237\u3001\u7ba1\u7406\u5458\u3001\u90e8\u7f72\u4e0e\u8fd0\u7ef4\u4eba\u5458"),
         ("\u7f16\u5199\u65e5\u671f", TODAY),
         ("\u6587\u6863\u7248\u672c", "V1.0"),

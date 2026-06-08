@@ -2,40 +2,17 @@ package com.tibet.tourism.common.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.tibet.tourism.common.api.TestController;
-import com.tibet.tourism.modules.admin.web.AdminCarouselController;
-import com.tibet.tourism.modules.admin.web.AdminCommunityController;
-import com.tibet.tourism.modules.admin.web.AdminHotelController;
-import com.tibet.tourism.modules.admin.web.AdminNewsController;
-import com.tibet.tourism.modules.admin.web.AdminRouteController;
-import com.tibet.tourism.modules.admin.web.AdminScenicSpotController;
-import com.tibet.tourism.modules.admin.web.AdminSecurityPostureController;
-import com.tibet.tourism.modules.admin.web.AdminStatsController;
-import com.tibet.tourism.modules.admin.web.AdminUserController;
-import com.tibet.tourism.modules.ai.web.AiRouteController;
-import com.tibet.tourism.modules.auth.web.AuthController;
-import com.tibet.tourism.modules.community.web.CommentController;
-import com.tibet.tourism.modules.community.web.FavoriteController;
-import com.tibet.tourism.modules.community.web.SharedRouteController;
-import com.tibet.tourism.modules.community.web.TravelQAController;
-import com.tibet.tourism.modules.content.web.CarouselController;
-import com.tibet.tourism.modules.content.web.HeritageController;
-import com.tibet.tourism.modules.content.web.NewsController;
-import com.tibet.tourism.modules.content.web.TibetanDictionaryController;
-import com.tibet.tourism.modules.hotel.web.HotelBookingController;
-import com.tibet.tourism.modules.order.web.BookingController;
-import com.tibet.tourism.modules.order.web.OrderCenterController;
-import com.tibet.tourism.modules.route.web.ItineraryController;
-import com.tibet.tourism.modules.route.web.TibetSpecialtyController;
-import com.tibet.tourism.modules.spot.web.PriceController;
-import com.tibet.tourism.modules.spot.web.ScenicSpotController;
-import com.tibet.tourism.modules.user.web.CurrentUserController;
+import com.tibet.tourism.modules.admin.web.AdminHeritageController;
+import com.tibet.tourism.modules.ai.web.AiGuideChatController;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Stream;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
+import org.springframework.core.type.filter.AnnotationTypeFilter;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -43,38 +20,11 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 class ControllerAuthorizationMatrixTest {
 
-    private static final List<Class<?>> CONTROLLERS = List.of(
-            TestController.class,
-            AuthController.class,
-            CurrentUserController.class,
-            AiRouteController.class,
-            OrderCenterController.class,
-            BookingController.class,
-            AdminCarouselController.class,
-            AdminCommunityController.class,
-            AdminHotelController.class,
-            AdminNewsController.class,
-            AdminRouteController.class,
-            AdminScenicSpotController.class,
-            AdminSecurityPostureController.class,
-            AdminStatsController.class,
-            AdminUserController.class,
-            TibetSpecialtyController.class,
-            ItineraryController.class,
-            TibetanDictionaryController.class,
-            NewsController.class,
-            HeritageController.class,
-            CarouselController.class,
-            HotelBookingController.class,
-            ScenicSpotController.class,
-            PriceController.class,
-            CommentController.class,
-            TravelQAController.class,
-            SharedRouteController.class,
-            FavoriteController.class);
+    private static final List<Class<?>> CONTROLLERS = discoverRestControllers();
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("mappedEndpoints")
@@ -93,9 +43,34 @@ class ControllerAuthorizationMatrixTest {
     }
 
     static Stream<Endpoint> mappedEndpoints() {
+        assertThat(CONTROLLERS)
+                .as("controller discovery must find the application @RestController classes")
+                .contains(AiGuideChatController.class, AdminHeritageController.class);
         return CONTROLLERS.stream()
                 .flatMap(controller -> Arrays.stream(controller.getDeclaredMethods())
                         .flatMap(method -> endpointsFor(controller, method)));
+    }
+
+    private static List<Class<?>> discoverRestControllers() {
+        ClassPathScanningCandidateComponentProvider scanner =
+                new ClassPathScanningCandidateComponentProvider(false);
+        scanner.addIncludeFilter(new AnnotationTypeFilter(RestController.class));
+        List<Class<?>> controllers = new ArrayList<>();
+        scanner.findCandidateComponents("com.tibet.tourism.modules").forEach(beanDefinition -> {
+            Class<?> controller = loadControllerClass(beanDefinition.getBeanClassName());
+            if (!controller.isSynthetic()) {
+                controllers.add(controller);
+            }
+        });
+        return List.copyOf(controllers);
+    }
+
+    private static Class<?> loadControllerClass(String className) {
+        try {
+            return Class.forName(className);
+        } catch (ClassNotFoundException e) {
+            throw new IllegalStateException("Unable to load controller " + className, e);
+        }
     }
 
     private static Stream<Endpoint> endpointsFor(Class<?> controller, Method method) {

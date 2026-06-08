@@ -37,7 +37,9 @@ services:
       - PAYMENT_CALLBACK_SECRET=${PAYMENT_CALLBACK_SECRET:-}
       - REQUIRE_STRONG_SECRETS=${REQUIRE_STRONG_SECRETS:-true}
       - PUBLIC_DOCS_ENABLED=${PUBLIC_DOCS_ENABLED:-false}
-      - PUBLIC_METRICS_ENABLED=${PUBLIC_METRICS_ENABLED:-false}
+      # Prometheus in this production compose stack scrapes without credentials.
+      # Keep backend/monitoring on trusted networks; set false only with a protected scrape path.
+      - PUBLIC_METRICS_ENABLED=${PUBLIC_METRICS_ENABLED:-true}
       - SEED_CONTENT_ENABLED=${SEED_CONTENT_ENABLED:-false}
       - COOKIE_SECURE=${COOKIE_SECURE:-true}
       - SERVER_FORWARD_HEADERS_STRATEGY=${SERVER_FORWARD_HEADERS_STRATEGY:-framework}

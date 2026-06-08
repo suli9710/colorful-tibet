@@ -1,8 +1,15 @@
 <template>
   <section class="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden mt-8">
     <div
-      class="flex flex-col gap-3 border-b border-stone-100 bg-gradient-to-r from-stone-50 to-white px-4 py-4 transition-colors hover:bg-stone-100/50 sm:flex-row sm:items-center sm:justify-between sm:px-6 cursor-pointer"
-      @click="showPanel = !showPanel"
+      class="flex flex-col gap-3 border-b border-stone-100 bg-gradient-to-r from-stone-50 to-white px-4 py-4 transition-colors hover:bg-stone-100/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 sm:flex-row sm:items-center sm:justify-between sm:px-6 cursor-pointer"
+      role="button"
+      tabindex="0"
+      :aria-expanded="showPanel"
+      aria-controls="admin-community-panel-content"
+      :aria-label="t('admin.communityManagement')"
+      @click="togglePanel"
+      @keydown.enter="togglePanelFromKeyboard"
+      @keydown.space="togglePanelFromKeyboard"
     >
       <div class="flex min-w-0 items-center gap-3">
         <div class="w-9 h-9 rounded-lg bg-rose-100 flex items-center justify-center">
@@ -26,7 +33,7 @@
       </div>
     </div>
 
-    <div v-if="showPanel" class="space-y-5 p-4 sm:p-6">
+    <div v-if="showPanel" id="admin-community-panel-content" class="space-y-5 p-4 sm:p-6">
       <div class="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">
         <button
           v-for="tab in communityTabs"
@@ -374,6 +381,75 @@ interface CommunityTabConfig {
   icon: Component
 }
 
+interface CommunityAuthor {
+  nickname?: string | null
+  username?: string | null
+}
+
+interface AdminCommunityBaseItem {
+  id: number
+  title?: string | null
+  content?: string | null
+  createdAt?: string | null
+  days?: number | null
+  budget?: string | null
+  preference?: string | null
+  tags?: string | null
+  rating?: number | null
+  isResolved?: boolean | null
+  isAccepted?: boolean | null
+}
+
+interface AdminCommunityRoute extends AdminCommunityBaseItem {
+  title?: string | null
+  author?: CommunityAuthor | null
+  days?: number | null
+  budget?: string | null
+  preference?: string | null
+  viewCount?: number | null
+  likeCount?: number | null
+  commentCount?: number | null
+}
+
+interface AdminCommunityQuestion extends AdminCommunityBaseItem {
+  title?: string | null
+  tags?: string | null
+  author?: CommunityAuthor | null
+  isResolved?: boolean | null
+  answerCount?: number | null
+  likeCount?: number | null
+}
+
+interface AdminCommunityComment extends AdminCommunityBaseItem {
+  routeTitle?: string | null
+  routeId?: number | null
+  user?: CommunityAuthor | null
+}
+
+interface AdminCommunitySpotComment extends AdminCommunityBaseItem {
+  spotName?: string | null
+  spotId?: number | null
+  user?: CommunityAuthor | null
+  rating?: number | null
+  likeCount?: number | null
+}
+
+interface AdminCommunityAnswer extends AdminCommunityBaseItem {
+  questionTitle?: string | null
+  questionId?: number | null
+  user?: CommunityAuthor | null
+  isAccepted?: boolean | null
+}
+
+type CommunityItem =
+  | AdminCommunityRoute
+  | AdminCommunityQuestion
+  | AdminCommunityComment
+  | AdminCommunitySpotComment
+  | AdminCommunityAnswer
+
+type CommunityListResponse<T> = T[] | { content?: T[] | null } | null | undefined
+
 const { t, locale } = useI18n()
 const { showConfirm } = useConfirm()
 const { showToast } = useToast()
@@ -384,15 +460,15 @@ const loadingCommunity = ref(false)
 const savingCommunity = ref(false)
 const communityError = ref('')
 
-const communityRoutes = ref<any[]>([])
-const communityQuestions = ref<any[]>([])
-const communityComments = ref<any[]>([])
-const communitySpotComments = ref<any[]>([])
-const communityAnswers = ref<any[]>([])
+const communityRoutes = ref<AdminCommunityRoute[]>([])
+const communityQuestions = ref<AdminCommunityQuestion[]>([])
+const communityComments = ref<AdminCommunityComment[]>([])
+const communitySpotComments = ref<AdminCommunitySpotComment[]>([])
+const communityAnswers = ref<AdminCommunityAnswer[]>([])
 
 const showCommunityModal = ref(false)
 const editingType = ref<CommunityType>('route')
-const editingItem = ref<any>(null)
+const editingItem = ref<CommunityItem | null>(null)
 const communityForm = ref({
   title: '',
   content: '',
@@ -432,7 +508,17 @@ const preferenceOptions = computed(() => [
   { value: '休闲度假', label: t('routePlanner.preferenceOptions.relaxation') }
 ])
 
-const toArray = (value: any) => {
+const togglePanel = () => {
+  showPanel.value = !showPanel.value
+}
+
+const togglePanelFromKeyboard = (event: KeyboardEvent) => {
+  if (event.target !== event.currentTarget) return
+  event.preventDefault()
+  togglePanel()
+}
+
+const toArray = <T>(value: CommunityListResponse<T>): T[] => {
   if (Array.isArray(value)) return value
   if (Array.isArray(value?.content)) return value.content
   return []
@@ -440,53 +526,63 @@ const toArray = (value: any) => {
 
 const pageParams = { page: 0, size: 100 }
 
+const fetchCommunityList = async <T>(url: string) => {
+  const response = await api.get<CommunityListResponse<T>>(url, { params: pageParams })
+  return toArray<T>(response.data)
+}
+
 const fetchCommunityContent = async () => {
   loadingCommunity.value = true
   communityError.value = ''
-  const requests = [
-    { key: 'routes', load: () => api.get(endpoints.adminCommunity.routes, { params: pageParams }), assign: (items: any[]) => { communityRoutes.value = items } },
-    { key: 'questions', load: () => api.get(endpoints.adminCommunity.questions, { params: pageParams }), assign: (items: any[]) => { communityQuestions.value = items } },
-    { key: 'comments', load: () => api.get(endpoints.adminCommunity.comments, { params: pageParams }), assign: (items: any[]) => { communityComments.value = items } },
-    { key: 'spotComments', load: () => api.get(endpoints.adminCommunity.spotComments, { params: pageParams }), assign: (items: any[]) => { communitySpotComments.value = items } },
-    { key: 'answers', load: () => api.get(endpoints.adminCommunity.answers, { params: pageParams }), assign: (items: any[]) => { communityAnswers.value = items } }
-  ]
-
-  const results = await Promise.allSettled(requests.map(request => request.load()))
+  const results = await Promise.allSettled([
+    fetchCommunityList<AdminCommunityRoute>(endpoints.adminCommunity.routes),
+    fetchCommunityList<AdminCommunityQuestion>(endpoints.adminCommunity.questions),
+    fetchCommunityList<AdminCommunityComment>(endpoints.adminCommunity.comments),
+    fetchCommunityList<AdminCommunitySpotComment>(endpoints.adminCommunity.spotComments),
+    fetchCommunityList<AdminCommunityAnswer>(endpoints.adminCommunity.answers)
+  ])
+  const resultEntries = [
+    { key: 'routes', result: results[0] },
+    { key: 'questions', result: results[1] },
+    { key: 'comments', result: results[2] },
+    { key: 'spotComments', result: results[3] },
+    { key: 'answers', result: results[4] }
+  ] as const
   const failed = results
-    .map((result, index) => ({ result, request: requests[index] }))
+    .map((result, index) => ({ result, request: resultEntries[index] }))
     .filter(({ result }) => result.status === 'rejected')
 
-  results.forEach((result, index) => {
-    if (result.status === 'fulfilled') {
-      requests[index].assign(toArray(result.value.data))
-    }
-  })
+  if (results[0].status === 'fulfilled') communityRoutes.value = results[0].value
+  if (results[1].status === 'fulfilled') communityQuestions.value = results[1].value
+  if (results[2].status === 'fulfilled') communityComments.value = results[2].value
+  if (results[3].status === 'fulfilled') communitySpotComments.value = results[3].value
+  if (results[4].status === 'fulfilled') communityAnswers.value = results[4].value
 
   if (failed.length > 0) {
     console.error('Failed to load some community content:', failed.map(({ result, request }) => ({
       key: request.key,
       error: result.status === 'rejected' ? summarizeClientError(result.reason) : 'unknown'
     })))
-    if (failed.length === requests.length) {
-      const firstError: any = failed[0].result.status === 'rejected' ? failed[0].result.reason : null
+    if (failed.length === resultEntries.length) {
+      const firstError: unknown = failed[0].result.status === 'rejected' ? failed[0].result.reason : null
       communityError.value = safeClientErrorMessage(firstError, t('admin.loadCommunityFailed'))
     }
   }
   loadingCommunity.value = false
 }
 
-const authorName = (author: any) => {
+const authorName = (author?: CommunityAuthor | null) => {
   if (!author) return '-'
   return author.nickname || author.username || '-'
 }
 
-const contentPreview = (content: string) => {
+const contentPreview = (content?: string | null) => {
   if (!content) return '-'
   const normalized = content.replace(/\s+/g, ' ').trim()
   return normalized.length > 90 ? `${normalized.slice(0, 90)}...` : normalized
 }
 
-const formatDateTime = (dateStr: string) => {
+const formatDateTime = (dateStr?: string | null) => {
   if (!dateStr) return '-'
   return new Date(dateStr).toLocaleString(activeDateLocale.value, {
     year: 'numeric',
@@ -508,7 +604,7 @@ const typeLabel = (type: CommunityType) => {
   return labels[type]
 }
 
-const openEditItem = (type: CommunityType, item: any) => {
+const openEditItem = (type: CommunityType, item: CommunityItem) => {
   editingType.value = type
   editingItem.value = item
   communityForm.value = {
@@ -569,7 +665,7 @@ const saveCommunityItem = async () => {
     await fetchCommunityContent()
     closeCommunityModal()
     showToast(t('admin.saveSuccess'), 'success')
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to save community item:', summarizeClientError(error))
     showToast(safeClientErrorMessage(error, t('admin.saveFailed')), 'error')
   } finally {
@@ -598,7 +694,7 @@ const deleteCommunityItem = async (type: CommunityType, id: number) => {
     }
     await fetchCommunityContent()
     showToast(t('admin.deleteSuccess'), 'success')
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to delete community item:', summarizeClientError(error))
     showToast(safeClientErrorMessage(error, t('admin.deleteFailed')), 'error')
   }
