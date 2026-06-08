@@ -34,6 +34,30 @@ class InputSanitizerTest {
     }
 
     @Test
+    void localAvatarResourcePathRejectsExternalAndTrackedUrls() {
+        assertThat(InputSanitizer.optionalLocalAvatarResourcePath("/uploads/avatars/user.png", "avatarUrl"))
+                .isEqualTo("/uploads/avatars/user.png");
+        assertThat(InputSanitizer.optionalLocalAvatarResourcePath("/images/users/default-avatar.webp", "avatarUrl"))
+                .isEqualTo("/images/users/default-avatar.webp");
+
+        assertThatThrownBy(() -> InputSanitizer.optionalLocalAvatarResourcePath(
+                "https://cdn.example.com/avatar.png", "avatarUrl"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> InputSanitizer.optionalLocalAvatarResourcePath(
+                "https://cdn.example.com/avatar.png?utm_source=profile&signature=secret", "avatarUrl"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> InputSanitizer.optionalLocalAvatarResourcePath(
+                "/uploads/avatars/user.png?signature=secret", "avatarUrl"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> InputSanitizer.optionalLocalAvatarResourcePath(
+                "javascript:alert(1)", "avatarUrl"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> InputSanitizer.optionalLocalAvatarResourcePath(
+                "data:image/svg+xml,<svg></svg>", "avatarUrl"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void publicImageUrlOnlyAllowsHttpsOrLocalAssets() {
         assertThat(InputSanitizer.optionalPublicImageUrl("https://cdn.example.com/avatar.png", "头像地址"))
                 .isEqualTo("https://cdn.example.com/avatar.png");

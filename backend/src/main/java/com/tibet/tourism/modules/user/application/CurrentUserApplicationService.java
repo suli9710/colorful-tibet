@@ -124,7 +124,7 @@ public class CurrentUserApplicationService {
 
     @Transactional
     public String updateAvatar(Long userId, String rawAvatarUrl) {
-        String avatarUrl = InputSanitizer.optionalPublicImageUrl(rawAvatarUrl, "avatarUrl");
+        String avatarUrl = InputSanitizer.optionalLocalAvatarResourcePath(rawAvatarUrl, "avatarUrl");
         User user = getUser(userId);
         user.setAvatar(avatarUrl);
         userRepository.save(user);

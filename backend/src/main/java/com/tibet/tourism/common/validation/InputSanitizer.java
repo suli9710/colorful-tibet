@@ -169,6 +169,10 @@ public final class InputSanitizer {
         return normalized;
     }
 
+    public static String optionalLocalAvatarResourcePath(String value, String fieldName) {
+        return optionalLocalAssetPath(value, fieldName);
+    }
+
     public static String optionalPublicImageUrl(String value, String fieldName) {
         String normalized = normalizeSingleLine(value);
         if (!StringUtils.hasText(normalized)) {
