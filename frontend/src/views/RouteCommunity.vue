@@ -18,14 +18,24 @@
         <LayoutGroup>
         <motion.div
           class="tibet-panel inline-flex min-w-max gap-1 rounded-2xl p-1.5"
+          role="tablist"
+          :aria-label="t('community.title')"
+          @keydown="handleTabKeydown"
           :initial="revealInitial"
           :whileInView="revealInView"
           :inViewOptions="inViewOnce"
           :transition="revealTransition"
         >
           <motion.button
-            @click="activeTab = 'routes'"
-            class="px-6 py-2.5 rounded-xl font-semibold text-sm transition-colors duration-300 flex items-center gap-2 relative overflow-hidden"
+            type="button"
+            role="tab"
+            id="community-tab-routes"
+            aria-controls="community-panel-routes"
+            :aria-selected="activeTab === 'routes'"
+            :tabindex="activeTab === 'routes' ? 0 : -1"
+            :title="t('community.sharedRoutes')"
+            @click="selectTab('routes')"
+            class="min-h-11 px-6 py-2.5 rounded-xl font-semibold text-sm transition-colors duration-300 flex items-center gap-2 relative overflow-hidden whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-tibet-gold focus-visible:ring-offset-2"
             :class="activeTab === 'routes' ? 'text-tibet-yellow' : 'text-tibet-brown/70 hover:text-tibet-dark/80'"
             :whileHover="{ y: -2, scale: 1.03 }"
             :whilePress="{ scale: 0.95 }"
@@ -42,8 +52,15 @@
             <span class="relative z-10">{{ t('community.sharedRoutes') }}</span>
           </motion.button>
           <motion.button
-            @click="activeTab = 'qa'"
-            class="px-6 py-2.5 rounded-xl font-semibold text-sm transition-colors duration-300 flex items-center gap-2 relative overflow-hidden"
+            type="button"
+            role="tab"
+            id="community-tab-qa"
+            aria-controls="community-panel-qa"
+            :aria-selected="activeTab === 'qa'"
+            :tabindex="activeTab === 'qa' ? 0 : -1"
+            :title="t('community.travelQA')"
+            @click="selectTab('qa')"
+            class="min-h-11 px-6 py-2.5 rounded-xl font-semibold text-sm transition-colors duration-300 flex items-center gap-2 relative overflow-hidden whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-tibet-gold focus-visible:ring-offset-2"
             :class="activeTab === 'qa' ? 'text-tibet-yellow' : 'text-tibet-brown/70 hover:text-tibet-dark/80'"
             :whileHover="{ y: -2, scale: 1.03 }"
             :whilePress="{ scale: 0.95 }"
@@ -64,7 +81,12 @@
       </div>
 
       <!-- ==================== ROUTE SHARING TAB ==================== -->
-      <template v-if="activeTab === 'routes'">
+      <section
+        id="community-panel-routes"
+        role="tabpanel"
+        aria-labelledby="community-tab-routes"
+        :hidden="activeTab !== 'routes'"
+      >
         <motion.div
           class="tibet-panel mb-8 flex flex-col gap-4 rounded-2xl p-4 sm:p-6 lg:flex-row lg:items-center lg:justify-between"
           :initial="revealInitial"
@@ -72,24 +94,24 @@
           :inViewOptions="inViewOnce"
           :transition="revealTransition"
         >
-          <div class="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">
-            <select v-model="routeFilters.days" @change="loadRoutes" class="shrink-0 px-4 py-2 rounded-xl bg-white/50 border border-tibet-gold/25 focus:border-tibet-gold outline-none text-sm">
+          <div class="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0" role="group" :aria-label="t('community.sharedRoutes')">
+            <select v-model="routeFilters.days" @change="loadRoutes" :aria-label="t('community.allDays')" :title="t('community.allDays')" class="min-h-11 min-w-36 shrink-0 px-4 py-2 rounded-xl bg-white/50 border border-tibet-gold/25 focus:border-tibet-gold outline-none text-sm">
               <option value="">{{ t('community.allDays') }}</option>
               <option value="3">3{{ t('community.days') }}</option>
               <option value="5">5{{ t('community.days') }}</option>
               <option value="7">7{{ t('community.days') }}</option>
               <option value="10">10{{ t('community.days') }}+</option>
             </select>
-            <select v-model="routeFilters.budget" @change="loadRoutes" class="shrink-0 px-4 py-2 rounded-xl bg-white/50 border border-tibet-gold/25 focus:border-tibet-gold outline-none text-sm">
+            <select v-model="routeFilters.budget" @change="loadRoutes" :aria-label="t('community.allBudget')" :title="t('community.allBudget')" class="min-h-11 min-w-36 shrink-0 px-4 py-2 rounded-xl bg-white/50 border border-tibet-gold/25 focus:border-tibet-gold outline-none text-sm">
               <option value="">{{ t('community.allBudget') }}</option>
               <option v-for="opt in budgetOptions" :key="opt.key" :value="opt.key">{{ opt.label }}</option>
             </select>
-            <select v-model="routeFilters.preference" @change="loadRoutes" class="shrink-0 px-4 py-2 rounded-xl bg-white/50 border border-tibet-gold/25 focus:border-tibet-gold outline-none text-sm">
+            <select v-model="routeFilters.preference" @change="loadRoutes" :aria-label="t('community.allPreference')" :title="t('community.allPreference')" class="min-h-11 min-w-36 shrink-0 px-4 py-2 rounded-xl bg-white/50 border border-tibet-gold/25 focus:border-tibet-gold outline-none text-sm">
               <option value="">{{ t('community.allPreference') }}</option>
               <option v-for="opt in preferenceOptions" :key="opt.key" :value="opt.key">{{ opt.label }}</option>
             </select>
           </div>
-          <button @click="router.push('/create-route')" class="px-4 py-2.5 bg-tibet-red text-tibet-yellow rounded-xl hover:bg-tibet-red/90 transition-all duration-300 transform hover:scale-105 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-tibet-red/20 active:scale-95 font-medium text-sm">
+          <button type="button" @click="router.push('/create-route')" :aria-label="t('community.createMyRoute')" :title="t('community.createMyRoute')" class="min-h-11 min-w-0 px-4 py-2.5 bg-tibet-red text-tibet-yellow rounded-xl hover:bg-tibet-red/90 transition-all duration-300 transform hover:scale-105 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-tibet-red/20 active:scale-95 font-medium text-sm whitespace-normal break-words">
             {{ t('community.createMyRoute') }}
           </button>
         </motion.div>
@@ -108,7 +130,11 @@
                v-for="(route, index) in routes"
                :key="route.id"
                layout
-               class="tibet-card-elevated rounded-2xl p-6 cursor-pointer group hover:border-tibet-gold/30"
+               role="button"
+               tabindex="0"
+               :aria-label="getRouteCardLabel(route)"
+               :title="route.title"
+               class="tibet-card-elevated rounded-2xl p-6 cursor-pointer group hover:border-tibet-gold/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-tibet-gold focus-visible:ring-offset-2"
                :initial="cardInitial"
                :whileInView="cardInView"
                :exit="cardExit"
@@ -116,27 +142,31 @@
                :transition="cardTransition(index)"
                :whileHover="{ y: -5, scale: 1.012 }"
                :whilePress="{ scale: 0.996 }"
-               @click="viewRoute(route.id)">
-            <div class="flex justify-between items-start mb-4">
-              <h3 class="text-xl font-bold text-gray-900 group-hover:text-tibet-gold transition-colors duration-300 line-clamp-2 flex-1">
+               @click="viewRoute(route.id)"
+               @keydown.enter.prevent="viewRoute(route.id)"
+               @keydown.space.prevent="viewRoute(route.id)">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-4">
+              <h3 class="text-xl font-bold text-gray-900 group-hover:text-tibet-gold transition-colors duration-300 line-clamp-2 min-w-0 flex-1 break-words">
                 {{ route.title }}
               </h3>
-              <span
-                v-if="route.sourceType === 'OFFICIAL'"
-                class="text-xs px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-full whitespace-nowrap font-semibold ml-2"
-              >
-                {{ t('community.officialRoute') }}
-              </span>
-              <span class="text-xs px-2.5 py-1 bg-blue-50 text-blue-600 rounded-full whitespace-nowrap font-semibold transform group-hover:scale-110 transition-transform duration-300 ml-2">
-                {{ route.days }}{{ t('community.days') }}
-              </span>
+              <div class="flex flex-wrap gap-2 sm:justify-end">
+                <span
+                  v-if="route.sourceType === 'OFFICIAL'"
+                  class="text-xs px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-full whitespace-nowrap font-semibold"
+                >
+                  {{ t('community.officialRoute') }}
+                </span>
+                <span class="text-xs px-2.5 py-1 bg-blue-50 text-blue-600 rounded-full whitespace-nowrap font-semibold transform group-hover:scale-110 transition-transform duration-300">
+                  {{ route.days }}{{ t('community.days') }}
+                </span>
+              </div>
             </div>
-            <div class="flex gap-2 mb-4 text-sm text-gray-600">
-              <span class="px-3 py-1.5 bg-gray-100 rounded-lg">{{ getBudgetLabel(route.budget) }}</span>
-              <span class="px-3 py-1.5 bg-gray-100 rounded-lg">{{ getPreferenceLabel(route.preference) }}</span>
+            <div class="flex flex-wrap gap-2 mb-4 text-sm text-gray-600">
+              <span class="max-w-full px-3 py-1.5 bg-gray-100 rounded-lg break-words">{{ getBudgetLabel(route.budget) }}</span>
+              <span class="max-w-full px-3 py-1.5 bg-gray-100 rounded-lg break-words">{{ getPreferenceLabel(route.preference) }}</span>
             </div>
-            <div class="flex justify-between items-center text-sm text-gray-500 pt-4 border-t border-tibet-gold/20">
-              <div class="flex items-center gap-4">
+            <div class="flex flex-col gap-3 text-sm text-gray-500 pt-4 border-t border-tibet-gold/20 sm:flex-row sm:items-center sm:justify-between">
+              <div class="flex min-w-0 flex-wrap items-center gap-3">
                 <span class="flex items-center gap-1.5">
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                   {{ route.viewCount }}
@@ -150,27 +180,34 @@
                   {{ route.commentCount }}
                 </span>
               </div>
-              <span class="text-xs">{{ formatDate(route.createdAt) }}</span>
+              <span class="text-xs whitespace-nowrap">{{ formatDate(route.createdAt) }}</span>
             </div>
           </motion.div>
           </AnimatePresence>
         </div>
 
-        <div v-if="routeTotalPages > 1" class="flex justify-center mt-8 gap-2">
-          <button @click="changeRoutePage(routePage - 1)" :disabled="routePage === 0"
-                  class="px-4 py-2 rounded-lg bg-white border border-tibet-gold/25 disabled:opacity-50 hover:bg-gray-50 text-sm">
+        <div v-if="routeTotalPages > 1" class="flex flex-wrap justify-center mt-8 gap-2" role="navigation" :aria-label="t('community.sharedRoutes')">
+          <button type="button" @click="changeRoutePage(routePage - 1)" :disabled="routePage === 0"
+                  :aria-label="routePreviousPageLabel" :title="routePreviousPageLabel"
+                  class="min-h-11 min-w-0 px-4 py-2 rounded-lg bg-white border border-tibet-gold/25 disabled:opacity-50 hover:bg-gray-50 text-sm whitespace-normal break-words">
             {{ t('community.previousPage') }}
           </button>
-          <span class="px-4 py-2 text-sm">{{ routePage + 1 }} / {{ routeTotalPages }}</span>
-          <button @click="changeRoutePage(routePage + 1)" :disabled="routePage >= routeTotalPages - 1"
-                  class="px-4 py-2 rounded-lg bg-white border border-tibet-gold/25 disabled:opacity-50 hover:bg-gray-50 text-sm">
+          <span class="px-4 py-2 text-sm" role="status" aria-live="polite">{{ routePage + 1 }} / {{ routeTotalPages }}</span>
+          <button type="button" @click="changeRoutePage(routePage + 1)" :disabled="routePage >= routeTotalPages - 1"
+                  :aria-label="routeNextPageLabel" :title="routeNextPageLabel"
+                  class="min-h-11 min-w-0 px-4 py-2 rounded-lg bg-white border border-tibet-gold/25 disabled:opacity-50 hover:bg-gray-50 text-sm whitespace-normal break-words">
             {{ t('community.nextPage') }}
           </button>
         </div>
-      </template>
+      </section>
 
       <!-- ==================== Q&A TAB ==================== -->
-      <template v-if="activeTab === 'qa'">
+      <section
+        id="community-panel-qa"
+        role="tabpanel"
+        aria-labelledby="community-tab-qa"
+        :hidden="activeTab !== 'qa'"
+      >
         <motion.div
           class="tibet-panel mb-8 flex flex-col gap-4 rounded-2xl p-4 sm:p-6 lg:flex-row lg:items-center lg:justify-between"
           :initial="revealInitial"
@@ -180,28 +217,36 @@
         >
           <div class="min-w-0 space-y-3">
             <!-- Tag filter -->
-            <div class="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">
+            <div class="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0" role="group" :aria-label="t('community.allTags')">
               <button
+                type="button"
                 @click="qaFilters.tag = ''; loadQuestions()"
-                class="shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+                :aria-pressed="!qaFilters.tag"
+                :aria-label="t('community.allTags')"
+                :title="t('community.allTags')"
+                class="min-h-9 shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap"
                 :class="!qaFilters.tag ? 'bg-tibet-gold text-white shadow-sm' : 'bg-white/60 text-gray-500 hover:bg-white hover:text-gray-700 border border-tibet-gold/20'"
               >{{ t('common.all') }}</button>
               <button
                 v-for="tag in tagOptions" :key="tag.value"
+                type="button"
                 @click="qaFilters.tag = qaFilters.tag === tag.value ? '' : tag.value; loadQuestions()"
-                class="shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border"
+                :aria-pressed="qaFilters.tag === tag.value"
+                :aria-label="tag.value"
+                :title="tag.value"
+                class="min-h-9 max-w-full shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border whitespace-normal break-words"
                 :class="qaFilters.tag === tag.value ? 'text-white shadow-sm border-transparent' : 'bg-white/60 text-gray-500 hover:bg-white hover:text-gray-700 border-tibet-gold/20'"
                 :style="qaFilters.tag === tag.value ? { backgroundColor: tag.color, borderColor: tag.color } : {}"
               >{{ tag.value }}</button>
             </div>
             <!-- Sort -->
-            <select v-model="qaFilters.sort" @change="loadQuestions" class="px-3 py-2 rounded-xl bg-white/60 border border-tibet-gold/25 focus:border-tibet-gold outline-none text-xs">
+            <select v-model="qaFilters.sort" @change="loadQuestions" :aria-label="qaSortControlLabel" :title="qaSortControlLabel" class="min-h-11 min-w-36 px-3 py-2 rounded-xl bg-white/60 border border-tibet-gold/25 focus:border-tibet-gold outline-none text-xs">
               <option value="latest">{{ t('community.sortLatest') }}</option>
               <option value="hot">{{ t('community.sortHot') }}</option>
               <option value="unsolved">{{ t('community.sortUnanswered') }}</option>
             </select>
           </div>
-          <button @click="showAskModal = true" class="px-4 py-2.5 bg-tibet-red text-tibet-yellow rounded-xl hover:bg-tibet-red/90 transition-all duration-300 transform hover:scale-105 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-red-500/30 active:scale-95 font-medium text-sm">
+          <button type="button" @click="showAskModal = true" :aria-label="t('community.askQuestion')" :title="t('community.askQuestion')" class="min-h-11 min-w-0 px-4 py-2.5 bg-tibet-red text-tibet-yellow rounded-xl hover:bg-tibet-red/90 transition-all duration-300 transform hover:scale-105 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-red-500/30 active:scale-95 font-medium text-sm whitespace-normal break-words">
             {{ t('community.askQuestion') }}
           </button>
         </motion.div>
@@ -220,7 +265,11 @@
                v-for="(q, index) in questions"
                :key="q.id"
                layout
-               class="tibet-card-elevated rounded-2xl p-6 cursor-pointer group"
+               role="button"
+               tabindex="0"
+               :aria-label="getQuestionCardLabel(q)"
+               :title="q.title"
+               class="tibet-card-elevated rounded-2xl p-6 cursor-pointer group focus:outline-none focus-visible:ring-2 focus-visible:ring-tibet-gold focus-visible:ring-offset-2"
                :initial="cardInitial"
                :whileInView="cardInView"
                :exit="cardExit"
@@ -228,28 +277,30 @@
                :transition="cardTransition(index)"
                :whileHover="{ y: -3, scale: 1.006 }"
                :whilePress="{ scale: 0.996 }"
-               @click="viewQuestion(q.id)">
+               @click="viewQuestion(q.id)"
+               @keydown.enter.prevent="viewQuestion(q.id)"
+               @keydown.space.prevent="viewQuestion(q.id)">
             <div class="flex items-start justify-between gap-4">
               <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-2 mb-2">
-                  <span v-if="q.isResolved" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-600 text-xs font-medium">
+                <div class="flex flex-wrap items-center gap-2 mb-2">
+                  <span v-if="q.isResolved" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-600 text-xs font-medium whitespace-nowrap">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                     {{ t('community.solved') }}
                   </span>
-                  <span v-else class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 text-amber-600 text-xs font-medium">
+                  <span v-else class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 text-amber-600 text-xs font-medium whitespace-nowrap">
                     {{ t('community.unsolved') }}
                   </span>
-                  <div v-if="q.tags" class="flex gap-1">
-                    <span v-for="tag in parseTags(q.tags)" :key="tag" class="px-2 py-0.5 rounded-md text-xs font-medium text-white" :style="{ backgroundColor: getTagColor(tag) }">{{ tag }}</span>
+                  <div v-if="q.tags" class="flex min-w-0 flex-wrap gap-1">
+                    <span v-for="tag in parseTags(q.tags)" :key="tag" class="max-w-full px-2 py-0.5 rounded-md text-xs font-medium text-white break-words" :style="{ backgroundColor: getTagColor(tag) }">{{ tag }}</span>
                   </div>
                 </div>
-                <h3 class="text-lg font-bold text-gray-900 group-hover:text-tibet-red transition-colors duration-300 line-clamp-1 mb-1">
+                <h3 class="text-lg font-bold text-gray-900 group-hover:text-tibet-red transition-colors duration-300 line-clamp-2 min-w-0 break-words mb-1">
                   {{ q.title }}
                 </h3>
-                <p class="text-sm text-gray-500 line-clamp-2">{{ q.content }}</p>
+                <p class="text-sm text-gray-500 line-clamp-2 break-words">{{ q.content }}</p>
               </div>
             </div>
-            <div class="flex items-center gap-4 mt-4 pt-4 border-t border-tibet-gold/20 text-xs text-gray-400">
+            <div class="flex flex-wrap items-center gap-x-4 gap-y-2 mt-4 pt-4 border-t border-tibet-gold/20 text-xs text-gray-400">
               <span class="flex items-center gap-1">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                 {{ q.viewCount }} {{ t('community.viewCount') }}
@@ -262,49 +313,52 @@
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg>
                 {{ q.likeCount }}
               </span>
-              <span class="ml-auto">{{ formatDate(q.createdAt) }}</span>
+              <span class="whitespace-nowrap sm:ml-auto">{{ formatDate(q.createdAt) }}</span>
             </div>
           </motion.div>
           </AnimatePresence>
         </div>
 
-        <div v-if="qaTotalPages > 1" class="flex justify-center mt-8 gap-2">
-          <button @click="changeQaPage(qaPage - 1)" :disabled="qaPage === 0"
-                  class="px-4 py-2 rounded-lg bg-white border border-tibet-gold/25 disabled:opacity-50 hover:bg-gray-50 text-sm">
+        <div v-if="qaTotalPages > 1" class="flex flex-wrap justify-center mt-8 gap-2" role="navigation" :aria-label="t('community.travelQA')">
+          <button type="button" @click="changeQaPage(qaPage - 1)" :disabled="qaPage === 0"
+                  :aria-label="qaPreviousPageLabel" :title="qaPreviousPageLabel"
+                  class="min-h-11 min-w-0 px-4 py-2 rounded-lg bg-white border border-tibet-gold/25 disabled:opacity-50 hover:bg-gray-50 text-sm whitespace-normal break-words">
             {{ t('community.previousPage') }}
           </button>
-          <span class="px-4 py-2 text-sm">{{ qaPage + 1 }} / {{ qaTotalPages }}</span>
-          <button @click="changeQaPage(qaPage + 1)" :disabled="qaPage >= qaTotalPages - 1"
-                  class="px-4 py-2 rounded-lg bg-white border border-tibet-gold/25 disabled:opacity-50 hover:bg-gray-50 text-sm">
+          <span class="px-4 py-2 text-sm" role="status" aria-live="polite">{{ qaPage + 1 }} / {{ qaTotalPages }}</span>
+          <button type="button" @click="changeQaPage(qaPage + 1)" :disabled="qaPage >= qaTotalPages - 1"
+                  :aria-label="qaNextPageLabel" :title="qaNextPageLabel"
+                  class="min-h-11 min-w-0 px-4 py-2 rounded-lg bg-white border border-tibet-gold/25 disabled:opacity-50 hover:bg-gray-50 text-sm whitespace-normal break-words">
             {{ t('community.nextPage') }}
           </button>
         </div>
-      </template>
+      </section>
 
       <!-- ==================== ASK QUESTION MODAL ==================== -->
       <MotionModal
         :show="showAskModal"
         modal-key="ask-question-modal"
+        labelled-by="ask-question-modal-title"
         backdrop-class="bg-black/40 backdrop-blur-sm"
         panel-class="max-w-lg rounded-3xl bg-white p-8 overflow-auto max-h-[90vh]"
         @close="showAskModal = false"
       >
               <div class="flex items-center justify-between mb-6">
-                <h2 class="text-xl font-bold text-gray-900">{{ t('community.askQuestion') }}</h2>
-                <button @click="showAskModal = false" class="p-2 rounded-xl hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors">
+                <h2 id="ask-question-modal-title" class="text-xl font-bold text-gray-900">{{ t('community.askQuestion') }}</h2>
+                <button type="button" @click="showAskModal = false" :aria-label="t('toast.close')" :title="t('toast.close')" class="p-2 rounded-xl hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors">
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
               </div>
               <form @submit.prevent="submitQuestion" class="space-y-4">
                 <div>
-                  <label class="block text-sm font-semibold text-gray-700 mb-1.5">{{ t('community.questionTitle') }}</label>
-                  <input v-model="newQuestion.title" type="text" required
+                  <label for="ask-question-title" class="block text-sm font-semibold text-gray-700 mb-1.5">{{ t('community.questionTitle') }}</label>
+                  <input id="ask-question-title" v-model="newQuestion.title" type="text" required
                          :placeholder="t('community.questionTitlePlaceholder')"
                          class="w-full px-4 py-3 rounded-xl border border-tibet-gold/25 bg-gray-50 focus:border-tibet-red focus:ring-4 focus:ring-red-50 outline-none transition-all text-sm" />
                 </div>
                 <div>
-                  <label class="block text-sm font-semibold text-gray-700 mb-1.5">{{ t('community.questionContent') }}</label>
-                  <textarea v-model="newQuestion.content" rows="4" required
+                  <label for="ask-question-content" class="block text-sm font-semibold text-gray-700 mb-1.5">{{ t('community.questionContent') }}</label>
+                  <textarea id="ask-question-content" v-model="newQuestion.content" rows="4" required
                             :placeholder="t('community.questionContentPlaceholder')"
                             class="w-full px-4 py-3 rounded-xl border border-tibet-gold/25 bg-gray-50 focus:border-tibet-red focus:ring-4 focus:ring-red-50 outline-none transition-all text-sm resize-none"></textarea>
                 </div>
@@ -332,13 +386,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, onActivated, computed } from 'vue'
+import { ref, reactive, onMounted, onActivated, computed, nextTick } from 'vue'
 import { AnimatePresence, LayoutGroup, motion } from 'motion-v'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import MotionModal from '../components/motion/MotionModal.vue'
 import api from '../api'
 import { useAuthGuard } from '../composables/useAuthGuard'
+import { showToast } from '../composables/useToast'
+import { readBrowserStorage } from '../utils/browserStorage'
+import { summarizeClientError } from '../utils/errorMonitoring'
 import {
   cardExit,
   cardInitial,
@@ -355,7 +412,46 @@ const { t } = useI18n()
 const router = useRouter()
 const { requireAuth } = useAuthGuard()
 
-const activeTab = ref<'routes' | 'qa'>('routes')
+type CommunityTab = 'routes' | 'qa'
+
+const activeTab = ref<CommunityTab>('routes')
+const selectTab = (tab: CommunityTab) => { activeTab.value = tab }
+const communityTabs: CommunityTab[] = ['routes', 'qa']
+const communityTabIds: Record<CommunityTab, string> = {
+  routes: 'community-tab-routes',
+  qa: 'community-tab-qa'
+}
+
+const focusTab = (tab: CommunityTab) => {
+  selectTab(tab)
+  void nextTick(() => {
+    document.getElementById(communityTabIds[tab])?.focus()
+  })
+}
+
+const handleTabKeydown = (event: KeyboardEvent) => {
+  let nextIndex = communityTabs.indexOf(activeTab.value)
+
+  switch (event.key) {
+    case 'ArrowRight':
+      nextIndex = (nextIndex + 1) % communityTabs.length
+      break
+    case 'ArrowLeft':
+      nextIndex = (nextIndex - 1 + communityTabs.length) % communityTabs.length
+      break
+    case 'Home':
+      nextIndex = 0
+      break
+    case 'End':
+      nextIndex = communityTabs.length - 1
+      break
+    default:
+      return
+  }
+
+  event.preventDefault()
+  focusTab(communityTabs[nextIndex])
+}
 
 // ========== Route sharing state ==========
 const routeLoading = ref(true)
@@ -397,6 +493,8 @@ const preferenceOptions = computed(() => [
 ])
 
 const routeFilters = reactive({ days: '', budget: '', preference: '' })
+const routePreviousPageLabel = computed(() => `${t('community.sharedRoutes')} ${t('community.previousPage')}`)
+const routeNextPageLabel = computed(() => `${t('community.sharedRoutes')} ${t('community.nextPage')}`)
 
 const loadRoutes = async () => {
   routeLoading.value = true
@@ -409,7 +507,7 @@ const loadRoutes = async () => {
     routes.value = response.data.content || []
     routeTotalPages.value = response.data.totalPages || 0
   } catch (error) {
-    console.error('Failed to load routes:', error)
+    console.error('Failed to load routes:', summarizeClientError(error))
     routes.value = []; routeTotalPages.value = 0
   } finally {
     routeLoading.value = false
@@ -418,6 +516,7 @@ const loadRoutes = async () => {
 
 const changeRoutePage = (p: number) => { routePage.value = p; loadRoutes(); window.scrollTo({ top: 0, behavior: 'smooth' }) }
 const viewRoute = (id: number) => router.push(`/community/${id}`)
+const getRouteCardLabel = (route: any) => `${t('community.sharedRoutes')} ${route?.title || ''}`.trim()
 
 // ========== Q&A state ==========
 const qaLoading = ref(true)
@@ -428,6 +527,14 @@ const qaFilters = reactive({ tag: '', sort: 'latest' })
 const showAskModal = ref(false)
 const qaSubmitting = ref(false)
 const newQuestion = reactive({ title: '', content: '', tags: [] as string[] })
+const qaSortOptionLabels = computed<Record<string, string>>(() => ({
+  latest: t('community.sortLatest'),
+  hot: t('community.sortHot'),
+  unsolved: t('community.sortUnanswered')
+}))
+const qaSortControlLabel = computed(() => `${t('community.travelQA')} ${qaSortOptionLabels.value[qaFilters.sort] || t('community.sortLatest')}`)
+const qaPreviousPageLabel = computed(() => `${t('community.travelQA')} ${t('community.previousPage')}`)
+const qaNextPageLabel = computed(() => `${t('community.travelQA')} ${t('community.nextPage')}`)
 
 interface TagOption { value: string; color: string }
 
@@ -461,7 +568,7 @@ const loadQuestions = async () => {
     questions.value = response.data.content || []
     qaTotalPages.value = response.data.totalPages || 0
   } catch (error) {
-    console.error('Failed to load questions:', error)
+    console.error('Failed to load questions:', summarizeClientError(error))
     questions.value = []; qaTotalPages.value = 0
   } finally {
     qaLoading.value = false
@@ -485,7 +592,7 @@ const submitQuestion = async () => {
     if (error.response?.status === 401 && !(await requireAuth())) {
       return
     } else {
-      alert(t('community.publishFailedRetry'))
+      showToast(t('community.publishFailedRetry'), 'error')
     }
   } finally {
     qaSubmitting.value = false
@@ -494,9 +601,10 @@ const submitQuestion = async () => {
 
 const changeQaPage = (p: number) => { qaPage.value = p; loadQuestions(); window.scrollTo({ top: 0, behavior: 'smooth' }) }
 const viewQuestion = (id: number) => router.push(`/community/question/${id}`)
+const getQuestionCardLabel = (question: any) => `${t('community.travelQA')} ${question?.title || ''}`.trim()
 
 const formatDate = (dateStr: string) => {
-  const locale = localStorage.getItem('locale') || 'zh'
+  const locale = readBrowserStorage('localStorage', 'locale', 'zh')
   return new Date(dateStr).toLocaleDateString(locale === 'bo' ? 'bo-CN' : 'zh-CN')
 }
 

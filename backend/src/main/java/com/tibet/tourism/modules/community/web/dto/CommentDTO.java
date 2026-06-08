@@ -8,10 +8,9 @@ public class CommentDTO {
     private Integer rating;
     private String imageUrl;
     private Integer likeCount;
-    private Long userId;
+    private boolean owner;
     private String nickname;
     private String avatar;
-    private PublicUserResponse user;
     private LocalDateTime createdAt;
 
     public Long getId() { return id; }
@@ -24,31 +23,34 @@ public class CommentDTO {
     public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
     public Integer getLikeCount() { return likeCount; }
     public void setLikeCount(Integer likeCount) { this.likeCount = likeCount; }
-    public Long getUserId() { return userId; }
-    public void setUserId(Long userId) { this.userId = userId; }
+    public boolean isOwner() { return owner; }
+    public void setOwner(boolean owner) { this.owner = owner; }
     public String getNickname() { return nickname; }
     public void setNickname(String nickname) { this.nickname = nickname; }
     public String getAvatar() { return avatar; }
     public void setAvatar(String avatar) { this.avatar = avatar; }
-    public PublicUserResponse getUser() { return user; }
-    public void setUser(PublicUserResponse user) { this.user = user; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 
     public static CommentDTO fromEntity(Comment comment) {
+        return fromEntity(comment, null);
+    }
+
+    public static CommentDTO fromEntity(Comment comment, Long currentUserId) {
         if (comment == null) throw new IllegalArgumentException("Comment cannot be null");
-        PublicUserResponse publicUser = PublicUserResponse.fromEntity(comment.getUser());
         CommentDTO dto = new CommentDTO();
         dto.setId(comment.getId());
         dto.setContent(comment.getContent());
         dto.setRating(comment.getRating());
         dto.setImageUrl(comment.getImageUrl());
         dto.setLikeCount(comment.getLikeCount());
-        dto.setUser(publicUser);
-        dto.setUserId(publicUser != null ? publicUser.id() : null);
-        dto.setNickname(publicUser != null ? publicUser.nickname() : null);
-        dto.setAvatar(publicUser != null ? publicUser.avatar() : null);
         dto.setCreatedAt(comment.getCreatedAt());
+        if (comment.getUser() != null) {
+            PublicUserResponse publicUser = PublicUserResponse.fromEntity(comment.getUser(), currentUserId);
+            dto.setOwner(publicUser.owner());
+            dto.setNickname(publicUser.nickname());
+            dto.setAvatar(publicUser.avatar());
+        }
         return dto;
     }
 }

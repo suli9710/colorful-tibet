@@ -1,207 +1,247 @@
 package com.tibet.tourism.modules.content.web;
+
+import com.tibet.tourism.common.validation.InputSanitizer;
 import com.tibet.tourism.modules.content.application.TibetanTranslationService;
 import com.tibet.tourism.modules.content.domain.TibetanDictionary;
 import com.tibet.tourism.modules.content.infra.TibetanDictionaryRepository;
 import com.tibet.tourism.modules.content.web.dto.DictionaryBatchAddRequest;
+import com.tibet.tourism.modules.content.web.dto.DictionaryBatchAddResponse;
+import com.tibet.tourism.modules.content.web.dto.DictionaryMessageResponse;
+import com.tibet.tourism.modules.content.web.dto.TibetanDictionaryRequest;
+import com.tibet.tourism.modules.content.web.dto.TibetanDictionaryResponse;
+import com.tibet.tourism.modules.content.web.dto.TibetanDictionaryUpdateRequest;
+import com.tibet.tourism.modules.content.web.dto.TibetanTranslationRequest;
+import com.tibet.tourism.modules.content.web.dto.TibetanTranslationResponse;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
-/**
- * 藏语词典管理控制器
- * 提供词典的CRUD操作和翻译功能
- */
 @RestController
+@Validated
 @RequestMapping("/api/admin/tibetan-dictionary")
+@PreAuthorize("hasRole('ADMIN')")
 public class TibetanDictionaryController {
 
     private static final int DICTIONARY_RESULT_LIMIT = 1000;
+    private static final int DICTIONARY_TYPE_MAX_LENGTH = 20;
+    private static final int CHINESE_TEXT_MAX_LENGTH = 500;
+    private static final int TIBETAN_TEXT_MAX_LENGTH = 10000;
+    private static final int SEARCH_TYPE_MAX_LENGTH = 20;
 
-    @Autowired
-    private TibetanDictionaryRepository dictionaryRepository;
+    private final TibetanDictionaryRepository dictionaryRepository;
+    private final TibetanTranslationService translationService;
 
-    @Autowired
-    private TibetanTranslationService translationService;
+    public TibetanDictionaryController(TibetanDictionaryRepository dictionaryRepository,
+                                       TibetanTranslationService translationService) {
+        this.dictionaryRepository = dictionaryRepository;
+        this.translationService = translationService;
+    }
 
-    /**
-     * 获取所有词典条目
-     */
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<List<TibetanDictionary>> getAllEntries(
-            @RequestParam(required = false) TibetanDictionary.Type type,
-            @RequestParam(required = false) String keyword) {
+    public ResponseEntity<List<TibetanDictionaryResponse>> getAllEntries(
+            @RequestParam(required = false) @Size(max = DICTIONARY_TYPE_MAX_LENGTH) String type,
+            @RequestParam(required = false) @Size(max = CHINESE_TEXT_MAX_LENGTH) String keyword) {
+        Optional<TibetanDictionary.Type> requestedType = parseDictionaryType(type);
+        String normalizedKeyword = InputSanitizer.optionalPlainText(
+                keyword, CHINESE_TEXT_MAX_LENGTH, "keyword");
+
         List<TibetanDictionary> entries;
-        if (keyword != null && !keyword.trim().isEmpty()) {
-            entries = dictionaryRepository.searchByChineseText(keyword, dictionaryPage());
-        } else if (type != null) {
-            entries = dictionaryRepository.findByType(type, dictionaryPage());
+        if (normalizedKeyword != null) {
+            entries = dictionaryRepository.searchByChineseText(normalizedKeyword, dictionaryPage());
+        } else if (requestedType.isPresent()) {
+            entries = dictionaryRepository.findByType(requestedType.get(), dictionaryPage());
         } else {
             entries = dictionaryRepository.findAll(dictionaryPage()).getContent();
         }
-        return ResponseEntity.ok(entries);
+        return ResponseEntity.ok(toResponses(entries));
     }
 
-    /**
-     * 根据ID获取词典条目
-     */
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<TibetanDictionary> getEntryById(@PathVariable Long id) {
-        Optional<TibetanDictionary> entry = dictionaryRepository.findById(id);
-        return entry.map(ResponseEntity::ok)
+    public ResponseEntity<TibetanDictionaryResponse> getEntryById(@PathVariable @Positive Long id) {
+        return dictionaryRepository.findById(id)
+                .map(TibetanDictionaryResponse::from)
+                .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    /**
-     * 创建新的词典条目
-     */
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> createEntry(@RequestBody TibetanDictionary entry) {
-        if (entry.getChineseText() == null || entry.getChineseText().trim().isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "中文文本不能为空"));
-        }
-        if (entry.getTibetanText() == null || entry.getTibetanText().trim().isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "藏语文本不能为空"));
-        }
-        if (entry.getType() == null) {
-            entry.setType(TibetanDictionary.Type.WORD);
+    public ResponseEntity<?> createEntry(@Valid @RequestBody TibetanDictionaryRequest request) {
+        String chineseText = InputSanitizer.requiredPlainText(
+                request.getChineseText(), CHINESE_TEXT_MAX_LENGTH, "chineseText");
+        String tibetanText = InputSanitizer.requiredTextBlock(
+                request.getTibetanText(), TIBETAN_TEXT_MAX_LENGTH, "tibetanText");
+        TibetanDictionary.Type type = parseDictionaryType(request.getType())
+                .orElse(TibetanDictionary.Type.WORD);
+
+        Optional<TibetanDictionary> existing = dictionaryRepository
+                .findByChineseTextAndType(chineseText, type);
+        if (existing.isPresent()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Dictionary entry already exists"));
         }
 
-        // 检查是否已存在
-        Optional<TibetanDictionary> existing = dictionaryRepository
-                .findByChineseTextAndType(entry.getChineseText().trim(), entry.getType());
-        if (existing.isPresent()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "该条目已存在"));
-        }
+        TibetanDictionary entry = new TibetanDictionary();
+        entry.setChineseText(chineseText);
+        entry.setTibetanText(tibetanText);
+        entry.setType(type);
+        entry.setUsageCount(request.getUsageCount() == null ? 0 : request.getUsageCount());
 
         TibetanDictionary saved = dictionaryRepository.save(entry);
-        return ResponseEntity.ok(saved);
+        return ResponseEntity.ok(TibetanDictionaryResponse.from(saved));
     }
 
-    /**
-     * 更新词典条目
-     */
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> updateEntry(@PathVariable Long id, @RequestBody TibetanDictionary entry) {
+    public ResponseEntity<?> updateEntry(@PathVariable @Positive Long id,
+                                         @Valid @RequestBody TibetanDictionaryUpdateRequest request) {
         Optional<TibetanDictionary> existing = dictionaryRepository.findById(id);
         if (existing.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
 
         TibetanDictionary existingEntry = existing.get();
-        if (entry.getChineseText() != null) {
-            existingEntry.setChineseText(entry.getChineseText().trim());
+        if (request.getChineseText() != null) {
+            existingEntry.setChineseText(InputSanitizer.requiredPlainText(
+                    request.getChineseText(), CHINESE_TEXT_MAX_LENGTH, "chineseText"));
         }
-        if (entry.getTibetanText() != null) {
-            existingEntry.setTibetanText(entry.getTibetanText().trim());
+        if (request.getTibetanText() != null) {
+            existingEntry.setTibetanText(InputSanitizer.requiredTextBlock(
+                    request.getTibetanText(), TIBETAN_TEXT_MAX_LENGTH, "tibetanText"));
         }
-        if (entry.getType() != null) {
-            existingEntry.setType(entry.getType());
+        if (request.getType() != null) {
+            existingEntry.setType(parseDictionaryType(request.getType())
+                    .orElseThrow(() -> new IllegalArgumentException("Invalid dictionary type")));
         }
 
         TibetanDictionary saved = dictionaryRepository.save(existingEntry);
-        return ResponseEntity.ok(saved);
+        return ResponseEntity.ok(TibetanDictionaryResponse.from(saved));
     }
 
-    /**
-     * 删除词典条目
-     */
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> deleteEntry(@PathVariable Long id) {
+    public ResponseEntity<DictionaryMessageResponse> deleteEntry(@PathVariable @Positive Long id) {
         if (!dictionaryRepository.existsById(id)) {
             return ResponseEntity.notFound().build();
         }
         dictionaryRepository.deleteById(id);
-        return ResponseEntity.ok(Map.of("message", "删除成功"));
+        return ResponseEntity.ok(new DictionaryMessageResponse("Deleted successfully"));
     }
 
-    /**
-     * 翻译文本
-     */
     @PostMapping("/translate")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> translate(@RequestBody Map<String, String> request) {
-        String chineseText = request.get("chineseText");
-        String typeStr = request.get("type");
-        
-        if (chineseText == null || chineseText.trim().isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "中文文本不能为空"));
-        }
+    public ResponseEntity<TibetanTranslationResponse> translate(
+            @Valid @RequestBody TibetanTranslationRequest request) {
+        parseDictionaryType(request.getType());
+        String chineseText = InputSanitizer.requiredPlainText(
+                request.getChineseText(), CHINESE_TEXT_MAX_LENGTH, "chineseText");
 
         String tibetanText = translationService.translate(chineseText);
         if (tibetanText == null) {
-            return ResponseEntity.ok(Map.of(
-                    "chineseText", chineseText,
-                    "tibetanText", null,
-                    "message", "未找到翻译，请手动添加词典条目"
-            ));
+            return ResponseEntity.ok(TibetanTranslationResponse.notFound(chineseText));
         }
 
-        return ResponseEntity.ok(Map.of(
-                "chineseText", chineseText,
-                "tibetanText", tibetanText
-        ));
+        return ResponseEntity.ok(TibetanTranslationResponse.translated(chineseText, tibetanText));
     }
 
-    /**
-     * 批量添加词典条目
-     */
     @PostMapping("/batch")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> batchAdd(@Valid @RequestBody DictionaryBatchAddRequest dto) {
-        TibetanDictionary.Type type = TibetanDictionary.Type.WORD;
-        if (dto.getType() != null) {
-            try {
-                type = TibetanDictionary.Type.valueOf(dto.getType().toUpperCase());
-            } catch (IllegalArgumentException e) {
-                // 使用默认值
-            }
-        }
+    public ResponseEntity<DictionaryBatchAddResponse> batchAdd(
+            @Valid @RequestBody DictionaryBatchAddRequest request) {
+        TibetanDictionary.Type type = parseDictionaryType(request.getType())
+                .orElse(TibetanDictionary.Type.WORD);
+        Map<String, String> translations = sanitizeTranslations(request.getTranslations());
 
-        List<TibetanDictionary> saved = translationService.batchAddEntries(dto.getTranslations(), type);
-        return ResponseEntity.ok(Map.of(
-                "message", "批量添加成功",
-                "count", saved.size(),
-                "entries", saved
-        ));
+        List<TibetanDictionary> saved = translationService.batchAddEntries(translations, type);
+        return ResponseEntity.ok(new DictionaryBatchAddResponse(
+                "Batch add succeeded",
+                saved.size(),
+                toResponses(saved)));
     }
 
-    /**
-     * 初始化默认词典
-     */
     @PostMapping("/initialize")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> initialize() {
+    public ResponseEntity<DictionaryMessageResponse> initialize() {
         translationService.initializeDefaultDictionary();
-        return ResponseEntity.ok(Map.of("message", "默认词典初始化成功"));
+        return ResponseEntity.ok(new DictionaryMessageResponse("Default dictionary initialized"));
     }
 
-    /**
-     * 搜索词典（支持中文和藏语）
-     */
     @GetMapping("/search")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<List<TibetanDictionary>> search(
-            @RequestParam String keyword,
-            @RequestParam(required = false, defaultValue = "chinese") String searchType) {
+    public ResponseEntity<List<TibetanDictionaryResponse>> search(
+            @RequestParam @NotBlank @Size(max = CHINESE_TEXT_MAX_LENGTH) String keyword,
+            @RequestParam(required = false, defaultValue = "chinese")
+            @Size(max = SEARCH_TYPE_MAX_LENGTH) String searchType) {
+        String normalizedKeyword = InputSanitizer.requiredPlainText(
+                keyword, CHINESE_TEXT_MAX_LENGTH, "keyword");
+
         List<TibetanDictionary> results;
-        if ("tibetan".equals(searchType)) {
-            results = dictionaryRepository.searchByTibetanText(keyword, dictionaryPage());
+        if (isTibetanSearch(searchType)) {
+            results = dictionaryRepository.searchByTibetanText(normalizedKeyword, dictionaryPage());
         } else {
-            results = dictionaryRepository.searchByChineseText(keyword, dictionaryPage());
+            results = dictionaryRepository.searchByChineseText(normalizedKeyword, dictionaryPage());
         }
-        return ResponseEntity.ok(results);
+        return ResponseEntity.ok(toResponses(results));
+    }
+
+    private Optional<TibetanDictionary.Type> parseDictionaryType(String value) {
+        String normalized = InputSanitizer.optionalPlainText(value, DICTIONARY_TYPE_MAX_LENGTH, "type");
+        if (normalized == null) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(TibetanDictionary.Type.valueOf(normalized.toUpperCase(Locale.ROOT)));
+        } catch (IllegalArgumentException exception) {
+            throw new IllegalArgumentException("Invalid dictionary type");
+        }
+    }
+
+    private boolean isTibetanSearch(String searchType) {
+        String normalized = InputSanitizer.optionalPlainText(
+                searchType, SEARCH_TYPE_MAX_LENGTH, "searchType");
+        if (normalized == null || "chinese".equalsIgnoreCase(normalized)) {
+            return false;
+        }
+        if ("tibetan".equalsIgnoreCase(normalized)) {
+            return true;
+        }
+        throw new IllegalArgumentException("Invalid search type");
+    }
+
+    private Map<String, String> sanitizeTranslations(Map<String, String> translations) {
+        if (translations == null || translations.isEmpty()) {
+            throw new IllegalArgumentException("Translations are required");
+        }
+
+        Map<String, String> sanitized = new LinkedHashMap<>();
+        translations.forEach((chineseText, tibetanText) -> {
+            String normalizedChinese = InputSanitizer.requiredPlainText(
+                    chineseText, CHINESE_TEXT_MAX_LENGTH, "chineseText");
+            String normalizedTibetan = InputSanitizer.requiredTextBlock(
+                    tibetanText, TIBETAN_TEXT_MAX_LENGTH, "tibetanText");
+            if (sanitized.putIfAbsent(normalizedChinese, normalizedTibetan) != null) {
+                throw new IllegalArgumentException("Duplicate dictionary translation");
+            }
+        });
+        return sanitized;
+    }
+
+    private List<TibetanDictionaryResponse> toResponses(List<TibetanDictionary> entries) {
+        return entries.stream()
+                .map(TibetanDictionaryResponse::from)
+                .toList();
     }
 
     private PageRequest dictionaryPage() {

@@ -1,4 +1,5 @@
 package com.tibet.tourism.modules.admin.web;
+import com.tibet.tourism.common.api.PageResponse;
 import com.tibet.tourism.common.validation.InputSanitizer;
 import com.tibet.tourism.modules.admin.web.dto.CommunityAnswerUpdateRequest;
 import com.tibet.tourism.modules.admin.web.dto.CommunityContentUpdateRequest;
@@ -22,7 +23,6 @@ import jakarta.validation.Valid;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
@@ -68,10 +68,10 @@ public class AdminCommunityController {
     }
 
     @GetMapping("/community/routes")
-    public ResponseEntity<Page<Map<String, Object>>> getCommunityRoutes(
+    public ResponseEntity<PageResponse<Map<String, Object>>> getCommunityRoutes(
             @PageableDefault(size = 50) Pageable pageable) {
-        return ResponseEntity.ok(sharedRouteRepository.findAllByOrderByCreatedAtDesc(pageable)
-                .map(route -> toAdminSharedRoute(route)));
+        return ResponseEntity.ok(PageResponse.from(sharedRouteRepository.findAllByOrderByCreatedAtDesc(pageable)
+                .map(route -> toAdminSharedRoute(route))));
     }
 
     @PutMapping("/community/routes/{id}")
@@ -126,10 +126,10 @@ public class AdminCommunityController {
     }
 
     @GetMapping("/community/comments")
-    public ResponseEntity<Page<Map<String, Object>>> getCommunityComments(
+    public ResponseEntity<PageResponse<Map<String, Object>>> getCommunityComments(
             @PageableDefault(size = 50) Pageable pageable) {
-        return ResponseEntity.ok(routeCommentRepository.findAllByOrderByCreatedAtDesc(pageable)
-                .map(comment -> toAdminRouteComment(comment)));
+        return ResponseEntity.ok(PageResponse.from(routeCommentRepository.findAllByOrderByCreatedAtDesc(pageable)
+                .map(comment -> toAdminRouteComment(comment))));
     }
 
     @PutMapping("/community/comments/{id}")
@@ -170,10 +170,10 @@ public class AdminCommunityController {
     }
 
     @GetMapping("/community/spot-comments")
-    public ResponseEntity<Page<Map<String, Object>>> getCommunitySpotComments(
+    public ResponseEntity<PageResponse<Map<String, Object>>> getCommunitySpotComments(
             @PageableDefault(size = 50) Pageable pageable) {
-        return ResponseEntity.ok(commentRepository.findAllByOrderByCreatedAtDesc(pageable)
-                .map(comment -> toAdminSpotComment(comment)));
+        return ResponseEntity.ok(PageResponse.from(commentRepository.findAllByOrderByCreatedAtDesc(pageable)
+                .map(comment -> toAdminSpotComment(comment))));
     }
 
     @PutMapping("/community/spot-comments/{id}")
@@ -216,10 +216,10 @@ public class AdminCommunityController {
     }
 
     @GetMapping("/community/questions")
-    public ResponseEntity<Page<Map<String, Object>>> getCommunityQuestions(
+    public ResponseEntity<PageResponse<Map<String, Object>>> getCommunityQuestions(
             @PageableDefault(size = 50) Pageable pageable) {
-        return ResponseEntity.ok(travelQuestionRepository.findAllByOrderByCreatedAtDesc(pageable)
-                .map(question -> toAdminQuestion(question)));
+        return ResponseEntity.ok(PageResponse.from(travelQuestionRepository.findAllByOrderByCreatedAtDesc(pageable)
+                .map(question -> toAdminQuestion(question))));
     }
 
     @PutMapping("/community/questions/{id}")
@@ -269,10 +269,10 @@ public class AdminCommunityController {
     }
 
     @GetMapping("/community/answers")
-    public ResponseEntity<Page<Map<String, Object>>> getCommunityAnswers(
+    public ResponseEntity<PageResponse<Map<String, Object>>> getCommunityAnswers(
             @PageableDefault(size = 50) Pageable pageable) {
-        return ResponseEntity.ok(travelAnswerRepository.findAllByOrderByCreatedAtDesc(pageable)
-                .map(answer -> toAdminAnswer(answer)));
+        return ResponseEntity.ok(PageResponse.from(travelAnswerRepository.findAllByOrderByCreatedAtDesc(pageable)
+                .map(answer -> toAdminAnswer(answer))));
     }
 
     @PutMapping("/community/answers/{id}")

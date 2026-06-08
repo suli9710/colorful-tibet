@@ -41,11 +41,11 @@ public class RecommendationScheduledService {
     @Scheduled(cron = "${recommendation.item-similarity.cron:0 30 3 * * ?}")
     public void refreshItemSimilarityMatrixIfStale() {
         if (!itemSimilarityEnabled) {
-            logger.debug("Item-Based相似度矩阵刷新已禁用");
+            logger.debug("Item similarity matrix refresh disabled");
             return;
         }
         if (!itemBasedRecommendationService.isSimilarityMatrixStale()) {
-            logger.debug("Item-Based相似度矩阵未过期，跳过刷新");
+            logger.debug("Item similarity matrix still fresh; skipping refresh");
             return;
         }
         itemBasedRecommendationService.precomputeItemSimilarityMatrix();
@@ -56,7 +56,8 @@ public class RecommendationScheduledService {
             try {
                 itemBasedRecommendationService.precomputeItemSimilarityMatrix();
             } catch (RuntimeException ex) {
-                logger.error("异步刷新Item-Based相似度矩阵失败", ex);
+                logger.error("Async item similarity matrix refresh failed: error={}",
+                        RecommendationLogPrivacy.exceptionSummary(ex));
             }
         });
     }

@@ -180,13 +180,13 @@ import { useI18n } from 'vue-i18n'
 import api from '../api'
 import MotionBlock from '../components/motion/MotionBlock.vue'
 import { motionEase } from '../motion/presets'
-import { useAuthStore } from '../stores/auth'
 import { useAuthGuard } from '../composables/useAuthGuard'
+import { showToast } from '../composables/useToast'
+import { safeClientErrorMessage, summarizeClientError } from '../utils/errorMonitoring'
 
 const { t } = useI18n()
 
 const router = useRouter()
-const auth = useAuthStore()
 const { requireAuth } = useAuthGuard()
 
 const form = ref({
@@ -224,15 +224,16 @@ const submitRoute = async () => {
       budget: form.value.budget,
       preference: form.value.preference
     })
-    alert(t('createRoute.publishSuccess'))
+    showToast(t('createRoute.publishSuccess'), 'success')
     router.push('/community')
   } catch (error: any) {
-    console.error('Failed to share route:', error)
+    console.error('Failed to share route:', summarizeClientError(error))
     if (error.response && error.response.status === 401) {
-      if (!(await requireAuth())) return
+      showToast(t('createRoute.loginExpired'), 'warning')
+      router.push({ path: '/login', query: { redirect: router.currentRoute.value.fullPath } })
     } else {
-      const errorMsg = error.response?.data?.error || t('createRoute.publishFailed')
-      alert(errorMsg)
+      const errorMsg = safeClientErrorMessage(error, t('createRoute.publishFailed'))
+      showToast(errorMsg, 'error')
     }
   } finally {
     submitting.value = false

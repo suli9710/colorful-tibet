@@ -70,7 +70,7 @@ public class GuideChatUsageService {
                     return redisDecision;
                 }
             } catch (Exception e) {
-                log.warn("Redis guide chat usage check failed, using in-memory fallback: {}", e.getMessage());
+                log.warn("Redis guide chat usage check failed, using in-memory fallback: {}", AiLogPrivacy.exceptionSummary(e));
             }
         }
 

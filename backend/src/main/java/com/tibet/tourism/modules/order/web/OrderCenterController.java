@@ -18,11 +18,14 @@ import java.util.NoSuchElementException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 public class OrderCenterController {
+
+    private static final String ORDER_REQUEST_FAILED = "Order request could not be processed";
+    private static final String ORDER_ACTION_UNAVAILABLE = "Order action is not available";
+    private static final String PAYMENT_CALLBACK_FAILED = "Payment callback could not be processed";
 
     private final OrderCenterService orderCenterService;
     private final JwtAuthSupport jwtAuthSupport;
@@ -60,7 +63,7 @@ public class OrderCenterController {
         } catch (NoSuchElementException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "订单商品不存在"));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", StringUtils.hasText(e.getMessage()) ? e.getMessage() : "订单参数不合法"));
+            return ResponseEntity.badRequest().body(Map.of("error", ORDER_REQUEST_FAILED));
         }
     }
 
@@ -106,7 +109,7 @@ public class OrderCenterController {
         } catch (NoSuchElementException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "订单不存在"));
         } catch (IllegalStateException e) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", e.getMessage()));
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", ORDER_ACTION_UNAVAILABLE));
         }
     }
 
@@ -121,7 +124,7 @@ public class OrderCenterController {
         } catch (NoSuchElementException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "订单不存在"));
         } catch (IllegalStateException e) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", e.getMessage()));
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", ORDER_ACTION_UNAVAILABLE));
         }
     }
 
@@ -135,7 +138,7 @@ public class OrderCenterController {
         } catch (NoSuchElementException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "订单不存在"));
         } catch (IllegalStateException e) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", e.getMessage()));
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", ORDER_ACTION_UNAVAILABLE));
         }
     }
 
@@ -151,10 +154,10 @@ public class OrderCenterController {
         RiskResult risk = riskAssessmentService.assess(
                 recaptchaToken, fingerprint, user.getId(), behaviorData,
                 httpRequest.getRemoteAddr(), "/api/payments/callbacks/mock");
-        if (risk.decision() == RiskResult.Decision.BLOCK) {
+        if (risk.decision() != RiskResult.Decision.ALLOW) {
             return ResponseEntity.status(403).body(Map.of(
                     "error", "请求被安全系统拦截",
-                    "code", "ANTIBOT_BLOCK"));
+                    "code", "ANTIBOT_" + risk.decision().name()));
         }
 
         try {
@@ -166,7 +169,7 @@ public class OrderCenterController {
         } catch (IllegalStateException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "支付回调未启用"));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.badRequest().body(Map.of("error", PAYMENT_CALLBACK_FAILED));
         }
     }
 }

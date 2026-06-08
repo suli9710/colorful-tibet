@@ -47,33 +47,73 @@
         :initial="authItemInitial"
         :animate="authItemAnimate"
         :transition="authItemTransition(0.18)"
+        :aria-busy="loading"
+        :aria-describedby="registerErrorMessage ? registerErrorId : undefined"
         @submit.prevent="handleRegister"
       >
         <div class="space-y-4">
           <motion.div :initial="authItemInitial" :animate="authItemAnimate" :transition="authItemTransition(0.28)">
             <label for="username" class="sr-only">{{ t('login.username') }}</label>
             <input id="username" name="username" type="text" required v-model="form.username"
-                   class="appearance-none rounded-xl relative block w-full px-4 py-3 border border-tibet-gold/25 placeholder-tibet-brown/40 text-tibet-dark bg-tibet-white focus:outline-none focus:ring-2 focus:ring-tibet-gold/60 focus:border-transparent sm:text-sm input-focus"
-                   :placeholder="t('login.username')">
+                   autocomplete="username"
+                   autocapitalize="none"
+                   spellcheck="false"
+                   :disabled="loading"
+                   :aria-describedby="usernameDescription"
+                   :aria-invalid="registerFieldInvalid"
+                   class="appearance-none rounded-xl relative block w-full px-4 py-3 border border-tibet-gold/25 placeholder-tibet-brown/40 text-tibet-dark bg-tibet-white focus:outline-none focus:ring-2 focus:ring-tibet-gold/60 focus:border-transparent disabled:cursor-not-allowed disabled:opacity-70 sm:text-sm input-focus"
+                   :placeholder="t('login.username')"
+                   @input="clearRegisterError">
+            <p id="register-username-help" class="sr-only">{{ t('login.username') }}</p>
           </motion.div>
           <motion.div :initial="authItemInitial" :animate="authItemAnimate" :transition="authItemTransition(0.34)">
             <label for="nickname" class="sr-only">{{ t('register.nickname') }}</label>
             <input id="nickname" name="nickname" type="text" required v-model="form.nickname"
-                   class="appearance-none rounded-xl relative block w-full px-4 py-3 border border-tibet-gold/25 placeholder-tibet-brown/40 text-tibet-dark bg-tibet-white focus:outline-none focus:ring-2 focus:ring-tibet-gold/60 focus:border-transparent sm:text-sm input-focus"
-                   :placeholder="t('register.nicknamePlaceholder')">
+                   autocomplete="nickname"
+                   :disabled="loading"
+                   :aria-describedby="nicknameDescription"
+                   :aria-invalid="registerFieldInvalid"
+                   class="appearance-none rounded-xl relative block w-full px-4 py-3 border border-tibet-gold/25 placeholder-tibet-brown/40 text-tibet-dark bg-tibet-white focus:outline-none focus:ring-2 focus:ring-tibet-gold/60 focus:border-transparent disabled:cursor-not-allowed disabled:opacity-70 sm:text-sm input-focus"
+                   :placeholder="t('register.nicknamePlaceholder')"
+                   @input="clearRegisterError">
+            <p id="register-nickname-help" class="sr-only">{{ t('register.nickname') }}</p>
           </motion.div>
           <motion.div :initial="authItemInitial" :animate="authItemAnimate" :transition="authItemTransition(0.4)">
             <label for="password" class="sr-only">{{ t('login.password') }}</label>
             <input id="password" name="password" type="password" required v-model="form.password"
-                   class="appearance-none rounded-xl relative block w-full px-4 py-3 border border-tibet-gold/25 placeholder-tibet-brown/40 text-tibet-dark bg-tibet-white focus:outline-none focus:ring-2 focus:ring-tibet-gold/60 focus:border-transparent sm:text-sm input-focus"
-                   :placeholder="t('login.password')">
+                   autocomplete="new-password"
+                   minlength="6"
+                   :disabled="loading"
+                   :aria-describedby="passwordDescription"
+                   :aria-invalid="registerFieldInvalid"
+                   class="appearance-none rounded-xl relative block w-full px-4 py-3 border border-tibet-gold/25 placeholder-tibet-brown/40 text-tibet-dark bg-tibet-white focus:outline-none focus:ring-2 focus:ring-tibet-gold/60 focus:border-transparent disabled:cursor-not-allowed disabled:opacity-70 sm:text-sm input-focus"
+                   :placeholder="t('login.password')"
+                   @input="clearRegisterError">
+            <p id="register-password-help" class="sr-only">{{ t('login.password') }}</p>
           </motion.div>
           <motion.div :initial="authItemInitial" :animate="authItemAnimate" :transition="authItemTransition(0.46)">
             <label for="confirmPassword" class="sr-only">{{ t('register.confirmPassword') }}</label>
             <input id="confirmPassword" name="confirmPassword" type="password" required v-model="confirmPassword"
-                   class="appearance-none rounded-xl relative block w-full px-4 py-3 border border-tibet-gold/25 placeholder-tibet-brown/40 text-tibet-dark bg-tibet-white focus:outline-none focus:ring-2 focus:ring-tibet-gold/60 focus:border-transparent sm:text-sm input-focus"
-                   :placeholder="t('register.confirmPassword')">
+                   autocomplete="new-password"
+                   minlength="6"
+                   :disabled="loading"
+                   :aria-describedby="confirmPasswordDescription"
+                   :aria-invalid="registerFieldInvalid"
+                   class="appearance-none rounded-xl relative block w-full px-4 py-3 border border-tibet-gold/25 placeholder-tibet-brown/40 text-tibet-dark bg-tibet-white focus:outline-none focus:ring-2 focus:ring-tibet-gold/60 focus:border-transparent disabled:cursor-not-allowed disabled:opacity-70 sm:text-sm input-focus"
+                   :placeholder="t('register.confirmPassword')"
+                   @input="clearRegisterError">
+            <p id="register-confirm-password-help" class="sr-only">{{ t('register.confirmPassword') }}</p>
           </motion.div>
+        </div>
+
+        <div
+          v-if="registerErrorMessage"
+          :id="registerErrorId"
+          role="alert"
+          aria-live="assertive"
+          class="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700"
+        >
+          {{ registerErrorMessage }}
         </div>
 
         <motion.div
@@ -90,14 +130,14 @@
           <motion.button type="submit" :disabled="loading"
                   :whileHover="loading ? {} : authSubmitHover"
                   :whileTap="loading ? {} : authSubmitPress"
-                  class="tibet-btn w-full flex justify-center py-3 text-base disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none">
+                  class="tibet-btn relative flex w-full min-w-0 items-center justify-center px-4 py-3 text-center text-base leading-snug disabled:cursor-not-allowed disabled:opacity-50 disabled:transform-none">
             <span v-if="loading" class="absolute left-0 inset-y-0 flex items-center pl-3 z-10">
-              <svg class="animate-spin h-5 w-5 text-tibet-yellow" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <svg class="animate-spin h-5 w-5 text-tibet-yellow" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
             </span>
-            <span class="relative z-10">{{ loading ? t('register.registering') : t('register.registerNow') }}</span>
+            <span class="relative z-10 min-w-0 whitespace-normal break-words px-6 sm:whitespace-nowrap">{{ loading ? t('register.registering') : t('register.registerNow') }}</span>
           </motion.button>
         </motion.div>
       </motion.form>
@@ -120,11 +160,13 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { motion, useReducedMotion } from 'motion-v'
 import api from '../api'
+import { useToast } from '../composables/useToast'
+import { safeClientErrorMessage, summarizeClientError } from '../utils/errorMonitoring'
 import {
   RecaptchaError,
   getRecaptchaToken,
@@ -151,10 +193,13 @@ import {
 } from '../motion/presets'
 
 const { t } = useI18n()
+const { showToast } = useToast()
 
 const router = useRouter()
 const prefersReducedMotion = useReducedMotion()
 const loading = ref(false)
+const registerErrorMessage = ref('')
+const registerErrorId = 'register-form-error'
 const confirmPassword = ref('')
 const recaptchaContainer = ref<HTMLElement | null>(null)
 const recaptchaWidgetId = ref<number | null>(null)
@@ -163,10 +208,29 @@ const form = ref({
   nickname: '',
   password: ''
 })
+const registerFieldInvalid = computed(() => registerErrorMessage.value ? 'true' : undefined)
+const describedBy = (helpId: string) => computed(() => [
+  helpId,
+  registerErrorMessage.value ? registerErrorId : ''
+].filter(Boolean).join(' '))
+const usernameDescription = describedBy('register-username-help')
+const nicknameDescription = describedBy('register-nickname-help')
+const passwordDescription = describedBy('register-password-help')
+const confirmPasswordDescription = describedBy('register-confirm-password-help')
+
+const clearRegisterError = () => {
+  registerErrorMessage.value = ''
+}
 
 const handleRegister = async () => {
+  if (loading.value) return
+
+  registerErrorMessage.value = ''
+
   if (form.value.password !== confirmPassword.value) {
-    alert(t('register.passwordMismatch'))
+    const message = t('register.passwordMismatch')
+    registerErrorMessage.value = message
+    showToast(message, 'warning')
     return
   }
 
@@ -184,17 +248,20 @@ const handleRegister = async () => {
     await api.post('/auth/register', form.value, {
       headers: recaptchaToken ? { 'X-Recaptcha-Token': recaptchaToken } : {}
     })
-    alert(t('register.registerSuccess'))
+    showToast(t('register.registerSuccess'), 'success')
     router.push('/login')
   } catch (error: any) {
     if (isRecaptchaError(error)) {
-      alert(t('security.recaptchaFailed'))
+      const message = t('security.recaptchaFailed')
+      registerErrorMessage.value = message
+      showToast(message, 'error')
       resetRecaptchaWidget(recaptchaWidgetId.value)
       return
     }
-    console.error('Register failed:', error)
-    const serverMessage = error?.response?.data?.message || error?.response?.data?.error
-    alert(serverMessage || t('register.registerFailed'))
+    console.error('Register failed:', summarizeClientError(error))
+    const message = safeClientErrorMessage(error, t('register.registerFailed'))
+    registerErrorMessage.value = message
+    showToast(message, 'error')
   } finally {
     loading.value = false
   }

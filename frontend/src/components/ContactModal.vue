@@ -185,6 +185,7 @@ import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { AnimatePresence, motion, useReducedMotion } from 'motion-v'
 import { cardTransition, motionEase } from '../motion/presets'
+import { summarizeClientError } from '../utils/errorMonitoring'
 
 interface Props {
   modelValue: boolean
@@ -211,7 +212,7 @@ const copyToClipboard = async (text: string) => {
       showToast.value = false
     }, 2000)
   } catch (err) {
-    console.error('Failed to copy:', err)
+    console.error('Failed to copy:', summarizeClientError(err))
   }
 }
 </script>

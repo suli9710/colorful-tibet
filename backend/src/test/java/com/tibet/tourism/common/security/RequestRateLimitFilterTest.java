@@ -320,6 +320,34 @@ class RequestRateLimitFilterTest {
     }
 
     @Test
+    @DisplayName("non-positive rate limit config falls back to conservative minimums")
+    void nonPositiveLimitConfigUsesConservativeMinimums() throws Exception {
+        setField("defaultRequests", 0);
+        setField("defaultWindowSeconds", 0L);
+
+        MockHttpServletResponse allowed = doFilter(apiRequest("GET", "/api/spots"));
+        MockHttpServletResponse blocked = doFilter(apiRequest("GET", "/api/spots"));
+
+        assertThat(allowed.getStatus()).isEqualTo(200);
+        assertThat(allowed.getHeader("X-RateLimit-Limit")).isEqualTo("1");
+        assertThat(blocked.getStatus()).isEqualTo(429);
+        assertThat(blocked.getContentAsString()).contains("Request rate limit exceeded");
+    }
+
+    @Test
+    @DisplayName("overly large window config is clamped instead of overflowing")
+    void overlyLargeWindowConfigIsClamped() throws Exception {
+        setField("defaultRequests", 1);
+        setField("defaultWindowSeconds", Long.MAX_VALUE);
+
+        MockHttpServletResponse allowed = doFilter(apiRequest("GET", "/api/spots"));
+
+        assertThat(allowed.getStatus()).isEqualTo(200);
+        assertThat(allowed.getHeader("X-RateLimit-Limit")).isEqualTo("1");
+        assertThat(allowed.getHeader("X-RateLimit-Reset")).isNotNull();
+    }
+
+    @Test
     @DisplayName("sliding window prevents 2x burst at window boundary")
     void slidingWindowPreventsBoundaryBurst() throws Exception {
         setField("defaultRequests", 10);

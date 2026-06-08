@@ -30,15 +30,14 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { marked } from 'marked'
-import { sanitizeHtml } from '../utils/sanitize'
+import { renderMarkdownToSafeHtml } from '../utils/sanitize'
 import { getLegalMarkdown } from '../content/legal'
 
 const { t, locale } = useI18n()
 
 const renderedContent = computed(() => {
   const markdown = getLegalMarkdown('terms', locale.value)
-  return sanitizeHtml(marked(markdown) as string)
+  return renderMarkdownToSafeHtml(markdown)
 })
 </script>
 
@@ -83,5 +82,22 @@ const renderedContent = computed(() => {
 .legal-markdown :deep(ol) {
   list-style-position: inside;
   margin: 0.75rem 0 1.25rem;
+}
+
+.legal-markdown :deep(a),
+.legal-markdown :deep(code) {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.legal-markdown :deep(a) {
+  color: #2563eb;
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+
+.legal-markdown :deep(pre) {
+  max-width: 100%;
+  overflow-x: auto;
 }
 </style>

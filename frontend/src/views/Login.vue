@@ -47,22 +47,36 @@
         :initial="authItemInitial"
         :animate="authItemAnimate"
         :transition="authItemTransition(0.18)"
+        :aria-busy="loading"
+        :aria-describedby="errorMessage ? loginErrorId : undefined"
         @submit.prevent="handleLogin"
       >
         <div class="space-y-4">
           <motion.div :initial="authItemInitial" :animate="authItemAnimate" :transition="authItemTransition(0.28)">
             <label for="username" class="sr-only">{{ t('login.username') }}</label>
             <input id="username" name="username" type="text" required v-model="form.username"
-                   class="appearance-none rounded-xl relative block w-full px-4 py-3 border border-tibet-gold/25 placeholder-tibet-brown/40 text-tibet-dark bg-tibet-white focus:outline-none focus:ring-2 focus:ring-tibet-gold/60 focus:border-transparent sm:text-sm input-focus"
+                   autocomplete="username"
+                   autocapitalize="none"
+                   spellcheck="false"
+                   :disabled="loading"
+                   :aria-describedby="usernameDescription"
+                   :aria-invalid="loginFieldInvalid"
+                   class="appearance-none rounded-xl relative block w-full px-4 py-3 border border-tibet-gold/25 placeholder-tibet-brown/40 text-tibet-dark bg-tibet-white focus:outline-none focus:ring-2 focus:ring-tibet-gold/60 focus:border-transparent disabled:cursor-not-allowed disabled:opacity-70 sm:text-sm input-focus"
                    :placeholder="t('login.username')"
                    @input="clearError">
+            <p id="login-username-help" class="sr-only">{{ t('login.username') }}</p>
           </motion.div>
           <motion.div :initial="authItemInitial" :animate="authItemAnimate" :transition="authItemTransition(0.36)">
             <label for="password" class="sr-only">{{ t('login.password') }}</label>
             <input id="password" name="password" type="password" required v-model="form.password"
-                   class="appearance-none rounded-xl relative block w-full px-4 py-3 border border-tibet-gold/25 placeholder-tibet-brown/40 text-tibet-dark bg-tibet-white focus:outline-none focus:ring-2 focus:ring-tibet-gold/60 focus:border-transparent sm:text-sm input-focus"
+                   autocomplete="current-password"
+                   :disabled="loading"
+                   :aria-describedby="passwordDescription"
+                   :aria-invalid="loginFieldInvalid"
+                   class="appearance-none rounded-xl relative block w-full px-4 py-3 border border-tibet-gold/25 placeholder-tibet-brown/40 text-tibet-dark bg-tibet-white focus:outline-none focus:ring-2 focus:ring-tibet-gold/60 focus:border-transparent disabled:cursor-not-allowed disabled:opacity-70 sm:text-sm input-focus"
                    :placeholder="t('login.password')"
                    @input="clearError">
+            <p id="login-password-help" class="sr-only">{{ t('login.password') }}</p>
           </motion.div>
           <motion.div
             v-if="requiresSecondaryPassword"
@@ -76,28 +90,38 @@
                    inputmode="numeric"
                    maxlength="6"
                    pattern="[0-9]{6}"
-                   class="appearance-none rounded-xl relative block w-full px-4 py-3 border border-tibet-gold/25 placeholder-tibet-brown/40 text-tibet-dark bg-tibet-white focus:outline-none focus:ring-2 focus:ring-tibet-gold/60 focus:border-transparent sm:text-sm input-focus"
+                   :disabled="loading"
+                   :aria-describedby="secondaryPasswordDescription"
+                   :aria-invalid="loginFieldInvalid"
+                   class="appearance-none rounded-xl relative block w-full px-4 py-3 border border-tibet-gold/25 placeholder-tibet-brown/40 text-tibet-dark bg-tibet-white focus:outline-none focus:ring-2 focus:ring-tibet-gold/60 focus:border-transparent disabled:cursor-not-allowed disabled:opacity-70 sm:text-sm input-focus"
                    :placeholder="t('login.secondaryPassword')"
                    @input="clearError">
+            <p id="login-secondary-password-help" class="sr-only">{{ t('login.secondaryPassword') }}</p>
           </motion.div>
         </div>
 
-        <div v-if="errorMessage" class="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+        <div
+          v-if="errorMessage"
+          :id="loginErrorId"
+          role="alert"
+          aria-live="assertive"
+          class="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700"
+        >
           {{ errorMessage }}<span v-if="lockCountdown > 0">（{{ lockCountdown }}秒后可重试）</span>
         </div>
 
         <motion.div :initial="authItemInitial" :animate="authItemAnimate" :transition="authItemTransition(0.44)">
-          <motion.button type="submit" :disabled="loading || lockCountdown > 0"
-                  :whileHover="(loading || lockCountdown > 0) ? {} : authSubmitHover"
-                  :whileTap="(loading || lockCountdown > 0) ? {} : authSubmitPress"
-                  class="tibet-btn w-full flex justify-center py-3 text-base disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none">
+          <motion.button type="submit" :disabled="isLoginSubmitDisabled"
+                  :whileHover="isLoginSubmitDisabled ? {} : authSubmitHover"
+                  :whileTap="isLoginSubmitDisabled ? {} : authSubmitPress"
+                  class="tibet-btn relative flex w-full min-w-0 items-center justify-center px-4 py-3 text-center text-base leading-snug disabled:cursor-not-allowed disabled:opacity-50 disabled:transform-none">
             <span v-if="loading" class="absolute left-0 inset-y-0 flex items-center pl-3 z-10">
-              <svg class="animate-spin h-5 w-5 text-tibet-yellow" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <svg class="animate-spin h-5 w-5 text-tibet-yellow" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
             </span>
-            <span class="relative z-10">{{ lockCountdown > 0 ? `请等待 ${lockCountdown} 秒` : loading ? t('login.loggingIn') : t('common.login') }}</span>
+            <span class="relative z-10 min-w-0 whitespace-normal break-words px-6 sm:whitespace-nowrap">{{ loginSubmitLabel }}</span>
           </motion.button>
         </motion.div>
       </motion.form>
@@ -120,12 +144,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { motion, useReducedMotion } from 'motion-v'
 import api, { clearTokenCache } from '../api'
 import { useAuthStore } from '../stores/auth'
+import { safeClientErrorMessage, summarizeClientError } from '../utils/errorMonitoring'
 import { getRecaptchaToken, isRecaptchaError, isRecaptchaV3Enabled } from '../utils/recaptcha'
 import {
   authCardAnimate,
@@ -151,12 +176,26 @@ const loading = ref(false)
 const errorMessage = ref('')
 const lockCountdown = ref(0)
 let countdownTimer: ReturnType<typeof setInterval> | null = null
+const loginErrorId = 'login-form-error'
 const form = ref({
   username: '',
   password: '',
   secondaryPassword: ''
 })
 const requiresSecondaryPassword = ref(false)
+const loginFieldInvalid = computed(() => errorMessage.value ? 'true' : undefined)
+const describedBy = (helpId: string) => computed(() => [
+  helpId,
+  errorMessage.value ? loginErrorId : ''
+].filter(Boolean).join(' '))
+const usernameDescription = describedBy('login-username-help')
+const passwordDescription = describedBy('login-password-help')
+const secondaryPasswordDescription = describedBy('login-secondary-password-help')
+const isLoginSubmitDisabled = computed(() => loading.value || lockCountdown.value > 0)
+const loginSubmitLabel = computed(() => {
+  if (lockCountdown.value > 0) return `请等待 ${lockCountdown.value} 秒`
+  return loading.value ? t('login.loggingIn') : t('common.login')
+})
 
 function clearError() {
   errorMessage.value = ''
@@ -182,11 +221,6 @@ function stopCountdown() {
   lockCountdown.value = 0
 }
 
-function parseLockSeconds(message: string): number {
-  const match = message.match(/(\d+)\s*秒/)
-  return match ? parseInt(match[1], 10) : 0
-}
-
 function parseRetryAfter(value: unknown): number {
   const retryAfter = Array.isArray(value) ? value[0] : value
   if (typeof retryAfter !== 'string' && typeof retryAfter !== 'number') {
@@ -196,7 +230,21 @@ function parseRetryAfter(value: unknown): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 0
 }
 
+function readRetrySecondsFromBody(value: unknown): number {
+  if (typeof value !== 'object' || value === null) {
+    return 0
+  }
+
+  const retrySeconds = (value as Record<string, unknown>).retryAfterSeconds
+    ?? (value as Record<string, unknown>).retryAfter
+    ?? (value as Record<string, unknown>).lockRemainingSeconds
+
+  return parseRetryAfter(retrySeconds)
+}
+
 const handleLogin = async () => {
+  if (isLoginSubmitDisabled.value) return
+
   errorMessage.value = ''
   loading.value = true
   try {
@@ -226,13 +274,15 @@ const handleLogin = async () => {
     }
     if (error.response?.status === 449 && error.response?.data?.requiresSecondaryAuth) {
       requiresSecondaryPassword.value = true
-      errorMessage.value = t('login.secondaryPasswordRequired')
+      errorMessage.value = `${t('profile.fillAllFields')}: ${t('login.secondaryPassword')}`
       return
     }
-    const msg = error.response?.data?.message || error.response?.data?.error || t('login.loginFailed')
+    console.error('Login failed:', summarizeClientError(error))
+    const msg = safeClientErrorMessage(error, t('login.loginFailed'))
     errorMessage.value = msg
 
-    const lockSeconds = parseRetryAfter(error.response?.headers?.['retry-after']) || parseLockSeconds(msg)
+    const lockSeconds = parseRetryAfter(error.response?.headers?.['retry-after'])
+      || readRetrySecondsFromBody(error.response?.data)
     if (lockSeconds > 0) {
       startCountdown(lockSeconds)
     }

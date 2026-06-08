@@ -34,7 +34,7 @@ public class UserDetailsServiceImpl implements UserDetailsService {
     @Transactional
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new UsernameNotFoundException("User Not Found with username: " + username));
+                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
 
         // 根据用户角色设置权限
         List<GrantedAuthority> authorities = new ArrayList<>();
@@ -45,7 +45,7 @@ public class UserDetailsServiceImpl implements UserDetailsService {
             if (user.getRole() == User.Role.ADMIN && piiReaderUsernames().contains(user.getUsername())) {
                 authorities.add(new SimpleGrantedAuthority("HOTEL_BOOKING_PII_READ"));
             }
-            logger.debug("Loaded authorities for user {}: {}", username, roleName);
+            logger.debug("Loaded authorities for user user#{}: {}", PiiMasker.shortHash(username), roleName);
         }
 
         return org.springframework.security.core.userdetails.User

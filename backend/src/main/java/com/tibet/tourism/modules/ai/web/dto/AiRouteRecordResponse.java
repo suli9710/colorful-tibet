@@ -1,10 +1,12 @@
 package com.tibet.tourism.modules.ai.web.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.tibet.tourism.modules.ai.domain.AiRouteRecord;
 import java.time.LocalDateTime;
 
 public record AiRouteRecordResponse(
         Long id,
+        @JsonInclude(JsonInclude.Include.NON_NULL)
         String jobId,
         String title,
         String content,
@@ -19,9 +21,17 @@ public record AiRouteRecordResponse(
         LocalDateTime updatedAt
 ) {
     public static AiRouteRecordResponse from(AiRouteRecord record) {
+        return from(record, false);
+    }
+
+    public static AiRouteRecordResponse fromLatest(AiRouteRecord record) {
+        return from(record, record.getStatus() == AiRouteRecord.Status.RUNNING);
+    }
+
+    private static AiRouteRecordResponse from(AiRouteRecord record, boolean exposeJobId) {
         return new AiRouteRecordResponse(
                 record.getId(),
-                record.getJobId(),
+                exposeJobId ? record.getJobId() : null,
                 record.getTitle(),
                 record.getContent(),
                 record.getDays(),

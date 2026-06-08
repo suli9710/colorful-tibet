@@ -1,6 +1,7 @@
 package com.tibet.tourism.modules.recommendation.application.strategy;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.tibet.tourism.modules.recommendation.application.RecommendationLogPrivacy;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
@@ -115,10 +116,11 @@ public class RecommendationCacheService {
     private void logRedisCacheFailure(String operation, RuntimeException ex) {
         if (!redisCacheWarningLogged) {
             redisCacheWarningLogged = true;
-            logger.warn("Redis cache unavailable; using local in-memory cache. operation={}, cause={}",
-                    operation, ex.getMessage());
+            logger.warn("Redis cache unavailable; using local in-memory cache. operation={}, error={}",
+                    operation, RecommendationLogPrivacy.exceptionSummary(ex));
         } else {
-            logger.debug("Redis cache operation failed: {}", operation, ex);
+            logger.debug("Redis cache operation failed: operation={}, error={}",
+                    operation, RecommendationLogPrivacy.exceptionSummary(ex));
         }
     }
 

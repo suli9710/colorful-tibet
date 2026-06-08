@@ -57,7 +57,7 @@ public class CompanionInferenceService {
      * @return 旅伴类型推断结果
      */
     public CompanionInference inferCompanionType(Long userId) {
-        logger.info("🔍 开始推断用户 {} 的旅伴类型", userId);
+        logger.info("开始推断用户旅伴类型");
         
         // 1. 基于预订票数推断
         CompanionInference bookingInference = inferFromBookings(userId);

@@ -3,11 +3,15 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tibet.tourism.common.security.OutboundUrlValidator;
+import com.tibet.tourism.common.security.SensitiveLogSanitizer;
 import com.tibet.tourism.modules.spot.domain.ScenicSpot;
 import com.tibet.tourism.modules.spot.web.dto.PriceInfo;
 import com.tibet.tourism.modules.user.domain.User;
 import jakarta.annotation.PostConstruct;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.util.*;
 import java.util.regex.Matcher;
@@ -28,6 +32,7 @@ public class PriceFetchService {
 
     private static final Logger logger = LoggerFactory.getLogger(PriceFetchService.class);
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final int LOG_HASH_LENGTH = 12;
 
     @Autowired
     private WebClient.Builder webClientBuilder;
@@ -96,9 +101,9 @@ public class PriceFetchService {
                     return priceInfo;
                 }
             } catch (Exception e) {
-                logger.warn("Price fetch strategy failed. strategy={}, spotId={}, cause={}",
-                        strategy.getClass().getSimpleName(), spot.getId(), e.getMessage());
-                logger.debug("Price fetch strategy failure details", e);
+                logger.warn("Price fetch strategy failed. strategy={}, spotId={}, detail={}",
+                        strategy.getClass().getSimpleName(), spot.getId(), SensitiveLogSanitizer.exceptionSummary(e));
+                logger.debug("Price fetch strategy failure details: {}", SensitiveLogSanitizer.exceptionSummary(e));
             }
         }
 
@@ -223,8 +228,9 @@ public class PriceFetchService {
                 return info;
 
             } catch (Exception e) {
-                logger.warn("Scrapling service strategy failed. spotId={}, cause={}", spot.getId(), e.getMessage());
-                logger.debug("Scrapling service strategy failure details", e);
+                logger.warn("Scrapling service strategy failed. spotId={}, detail={}",
+                        spot.getId(), SensitiveLogSanitizer.exceptionSummary(e));
+                logger.debug("Scrapling service strategy failure details: {}", SensitiveLogSanitizer.exceptionSummary(e));
                 return null;
             }
         }
@@ -324,8 +330,9 @@ public class PriceFetchService {
                 return parseAiResponse(response, "AI提取");
 
             } catch (Exception e) {
-                logger.warn("AI price extraction failed. spotId={}, cause={}", spot.getId(), e.getMessage());
-                logger.debug("AI price extraction failure details", e);
+                logger.warn("AI price extraction failed. spotId={}, detail={}",
+                        spot.getId(), SensitiveLogSanitizer.exceptionSummary(e));
+                logger.debug("AI price extraction failure details: {}", SensitiveLogSanitizer.exceptionSummary(e));
                 return null;
             }
         }
@@ -361,8 +368,8 @@ public class PriceFetchService {
 
                 return info;
             } catch (Exception e) {
-                logger.warn("Failed to parse AI price response: {}", e.getMessage());
-                logger.debug("Raw AI price response: {}", response);
+                logger.warn("Failed to parse AI price response: {}", SensitiveLogSanitizer.exceptionSummary(e));
+                logger.debug("AI price response rejected: {}", summarizeExternalContent(response));
             }
             return null;
         }
@@ -385,6 +392,29 @@ public class PriceFetchService {
      * 策略3：网页爬虫提取价格
      * 使用正则表达式从网页HTML中提取价格信息
      */
+    /** Summarizes untrusted upstream text without logging raw content. */
+    static String summarizeExternalContent(String value) {
+        if (value == null) {
+            return "length=0, sha256=none";
+        }
+
+        return "length=" + value.length() + ", sha256=" + sha256Prefix(value);
+    }
+
+    private static String sha256Prefix(String value) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(value.getBytes(StandardCharsets.UTF_8));
+            StringBuilder builder = new StringBuilder(LOG_HASH_LENGTH);
+            for (int i = 0; i < hash.length && builder.length() < LOG_HASH_LENGTH; i++) {
+                builder.append(String.format("%02x", hash[i]));
+            }
+            return builder.toString();
+        } catch (NoSuchAlgorithmException e) {
+            return "unavailable";
+        }
+    }
+
     static class WebScrapingStrategy implements PriceFetchStrategy {
         private final WebClient.Builder webClientBuilder;
 
@@ -409,8 +439,9 @@ public class PriceFetchService {
                             allPrices.addAll(prices);
                         }
                     } catch (Exception e) {
-                        logger.warn("Failed to fetch price page. url={}, cause={}", searchUrl, e.getMessage());
-                        logger.debug("Price page fetch failure details", e);
+                        logger.warn("Failed to fetch price page. url={}, detail={}",
+                                summarizeExternalContent(searchUrl), SensitiveLogSanitizer.exceptionSummary(e));
+                        logger.debug("Price page fetch failure details: {}", SensitiveLogSanitizer.exceptionSummary(e));
                     }
                 }
 
@@ -425,8 +456,9 @@ public class PriceFetchService {
                 }
 
             } catch (Exception e) {
-                logger.warn("Web scraping price extraction failed. spotId={}, cause={}", spot.getId(), e.getMessage());
-                logger.debug("Web scraping price extraction failure details", e);
+                logger.warn("Web scraping price extraction failed. spotId={}, detail={}",
+                        spot.getId(), SensitiveLogSanitizer.exceptionSummary(e));
+                logger.debug("Web scraping price extraction failure details: {}", SensitiveLogSanitizer.exceptionSummary(e));
             }
             return null;
         }

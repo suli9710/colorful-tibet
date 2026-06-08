@@ -1,5 +1,6 @@
 package com.tibet.tourism.modules.spot.web;
-import com.tibet.tourism.common.util.LocaleHelper;
+import com.tibet.tourism.common.api.PageResponse;
+import com.tibet.tourism.common.security.SensitiveLogSanitizer;
 import com.tibet.tourism.common.validation.InputSanitizer;
 import com.tibet.tourism.modules.recommendation.application.ColdStartOptimizationService;
 import com.tibet.tourism.modules.recommendation.application.ItemBasedRecommendationService;
@@ -11,6 +12,7 @@ import com.tibet.tourism.modules.spot.application.CompanionInferenceService;
 import com.tibet.tourism.modules.spot.application.ScenicSpotService;
 import com.tibet.tourism.modules.spot.domain.ScenicSpot;
 import com.tibet.tourism.modules.spot.web.dto.ScenicSpotHeatmapPointDTO;
+import com.tibet.tourism.modules.spot.web.dto.ScenicSpotResponse;
 import com.tibet.tourism.modules.spot.web.dto.UserPreferenceDTO;
 import com.tibet.tourism.modules.user.domain.User;
 import com.tibet.tourism.modules.user.infra.UserRepository;
@@ -37,6 +39,7 @@ public class ScenicSpotController {
     private static final Set<String> ALLOWED_SPOT_SORT_FIELDS = Set.of(
             "id", "name", "category", "ticketPrice", "rating", "visitCount", "createdAt");
     private static final Sort DEFAULT_SPOT_SORT = Sort.by("id");
+    private static final int MAX_SIMILAR_SPOTS_LIMIT = 20;
 
     @Autowired
     private ScenicSpotService scenicSpotService;
@@ -57,7 +60,7 @@ public class ScenicSpotController {
     private UserRepository userRepository;
 
     @GetMapping
-    public Page<ScenicSpot> getAllSpots(
+    public PageResponse<ScenicSpotResponse> getAllSpots(
             @RequestParam(required = false) String category,
             @RequestParam(required = false, defaultValue = "zh") String locale,
             @PageableDefault(size = 20) Pageable pageable) {
@@ -70,15 +73,13 @@ public class ScenicSpotController {
             spots = scenicSpotService.getAllSpots(safePageable);
         }
 
-        spots.forEach(spot -> LocaleHelper.resolveScenicSpotLocale(spot, locale));
-        return spots;
+        return PageResponse.from(spots.map(spot -> ScenicSpotResponse.fromEntity(spot, locale)));
     }
 
     @GetMapping("/{id}")
-    public ScenicSpot getSpotById(@PathVariable Long id, @RequestParam(required = false, defaultValue = "zh") String locale) {
+    public ScenicSpotResponse getSpotById(@PathVariable Long id, @RequestParam(required = false, defaultValue = "zh") String locale) {
         ScenicSpot spot = scenicSpotService.getSpotById(id);
-        LocaleHelper.resolveScenicSpotLocale(spot, locale);
-        return spot;
+        return ScenicSpotResponse.fromEntity(spot, locale);
     }
 
     @GetMapping("/heatmap")
@@ -89,20 +90,19 @@ public class ScenicSpotController {
     }
 
     @GetMapping("/search")
-    public Page<ScenicSpot> searchSpots(
+    public PageResponse<ScenicSpotResponse> searchSpots(
             @RequestParam String keyword,
             @RequestParam(required = false, defaultValue = "zh") String locale,
             @PageableDefault(size = 20) Pageable pageable) {
         Pageable safePageable = InputSanitizer.sanitizePageable(
                 pageable, ALLOWED_SPOT_SORT_FIELDS, DEFAULT_SPOT_SORT, 20, 100);
         Page<ScenicSpot> spots = scenicSpotService.searchSpots(keyword, safePageable);
-        spots.forEach(spot -> LocaleHelper.resolveScenicSpotLocale(spot, locale));
-        return spots;
+        return PageResponse.from(spots.map(spot -> ScenicSpotResponse.fromEntity(spot, locale)));
     }
 
     @GetMapping("/recommendations")
     @PreAuthorize("isAuthenticated()")
-    public List<ScenicSpot> getRecommendations(
+    public List<ScenicSpotResponse> getRecommendations(
             @RequestParam Long userId,
             @RequestParam(required = false, defaultValue = "zh") String locale,
             // 上下文参数（可选）
@@ -126,27 +126,59 @@ public class ScenicSpotController {
                 timeOfDay, companion, budget, travelDays, preferredActivities,
                 considerDistance, considerBudget);
         
-        List<ScenicSpot> spots = recommendationService.recommendSpotsForUser(userId, context);
-        spots.forEach(spot -> LocaleHelper.resolveScenicSpotLocale(spot, locale));
-        return spots;
+        return recommendForUser(userId, context, locale);
+    }
+
+    @GetMapping("/recommendations/me")
+    @PreAuthorize("isAuthenticated()")
+    public List<ScenicSpotResponse> getMyRecommendations(
+            @RequestParam(required = false, defaultValue = "zh") String locale,
+            // 涓婁笅鏂囧弬鏁帮紙鍙€夛級
+            @RequestParam(required = false) String season,
+            @RequestParam(required = false) String weather,
+            @RequestParam(required = false) String currentLocation,
+            @RequestParam(required = false) Double currentLatitude,
+            @RequestParam(required = false) Double currentLongitude,
+            @RequestParam(required = false) String timeOfDay,
+            @RequestParam(required = false) String companion,
+            @RequestParam(required = false) Integer budget,
+            @RequestParam(required = false) Integer travelDays,
+            @RequestParam(required = false) String preferredActivities,
+            @RequestParam(required = false, defaultValue = "true") Boolean considerDistance,
+            @RequestParam(required = false, defaultValue = "true") Boolean considerBudget,
+            Authentication authentication) {
+        Long currentUserId = currentUserId(authentication);
+        RecommendationContext context = RecommendationContextBuilder.buildFromParams(
+                season, weather, currentLocation, currentLatitude, currentLongitude,
+                timeOfDay, companion, budget, travelDays, preferredActivities,
+                considerDistance, considerBudget);
+
+        return recommendForUser(currentUserId, context, locale);
     }
     
     @PostMapping("/recommendations")
     @PreAuthorize("isAuthenticated()")
-    public List<ScenicSpot> getRecommendationsWithContext(
+    public List<ScenicSpotResponse> getRecommendationsWithContext(
             @RequestParam Long userId,
             @RequestParam(required = false, defaultValue = "zh") String locale,
             @RequestBody(required = false) RecommendationContext context,
             Authentication authentication) {
         requireSelfOrAdmin(userId, authentication);
         
-        List<ScenicSpot> spots = recommendationService.recommendSpotsForUser(userId, context);
-        spots.forEach(spot -> LocaleHelper.resolveScenicSpotLocale(spot, locale));
-        return spots;
+        return recommendForUser(userId, context, locale);
+    }
+
+    @PostMapping("/recommendations/me")
+    @PreAuthorize("isAuthenticated()")
+    public List<ScenicSpotResponse> getMyRecommendationsWithContext(
+            @RequestParam(required = false, defaultValue = "zh") String locale,
+            @RequestBody(required = false) RecommendationContext context,
+            Authentication authentication) {
+        return recommendForUser(currentUserId(authentication), context, locale);
     }
 
     @GetMapping("/recommendations/debug")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasRole('ADMIN')")
     public RecommendationDebugResponse getRecommendationDebug(
             @RequestParam Long userId,
             @RequestParam(required = false, defaultValue = "zh") String locale,
@@ -171,15 +203,11 @@ public class ScenicSpotController {
                 timeOfDay, companion, budget, travelDays, preferredActivities,
                 considerDistance, considerBudget);
         
-        RecommendationDebugResponse response = recommendationService.recommendWithDebug(userId, context);
-        if (response.getRecommendations() != null) {
-            response.getRecommendations().forEach(spot -> LocaleHelper.resolveScenicSpotLocale(spot, locale));
-        }
-        return response;
+        return recommendationService.recommendWithDebug(userId, context, locale);
     }
 
     @PostMapping("/recommendations/debug")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasRole('ADMIN')")
     public RecommendationDebugResponse getRecommendationDebugWithContext(
             @RequestParam Long userId,
             @RequestParam(required = false, defaultValue = "zh") String locale,
@@ -187,11 +215,7 @@ public class ScenicSpotController {
             Authentication authentication) {
         requireSelfOrAdmin(userId, authentication);
 
-        RecommendationDebugResponse response = recommendationService.recommendWithDebug(userId, context);
-        if (response.getRecommendations() != null) {
-            response.getRecommendations().forEach(spot -> LocaleHelper.resolveScenicSpotLocale(spot, locale));
-        }
-        return response;
+        return recommendationService.recommendWithDebug(userId, context, locale);
     }
     
     /**
@@ -217,14 +241,14 @@ public class ScenicSpotController {
             long endTime = System.currentTimeMillis();
             return Map.of(
                 "success", true,
-                "message", "景点相似度矩阵计算完成",
+                "message", "Scenic spot similarity matrix computed",
                 "duration", endTime - startTime
             );
         } catch (Exception e) {
-            logger.error("Failed to precompute scenic spot similarity matrix", e);
+            logger.error("Failed to precompute scenic spot similarity matrix: {}", SensitiveLogSanitizer.exceptionSummary(e));
             return Map.of(
                 "success", false,
-                "message", "计算失败，请稍后重试"
+                "message", "Calculation failed; please retry later"
             );
         }
     }
@@ -235,12 +259,18 @@ public class ScenicSpotController {
     @GetMapping("/{id}/similar")
     public Map<String, Object> getSimilarSpots(
             @PathVariable Long id,
-            @RequestParam(required = false, defaultValue = "10") int limit) {
-        Map<Long, Double> similarSpots = itemBasedRecommendationService.getSimilarSpots(id, limit);
+            @RequestParam(required = false, defaultValue = "10") int limit,
+            @RequestParam(required = false, defaultValue = "zh") String locale) {
+        int safeLimit = Math.min(Math.max(limit, 1), MAX_SIMILAR_SPOTS_LIMIT);
+        Map<Long, Double> similarSpots = itemBasedRecommendationService.getSimilarSpots(id, safeLimit);
+        List<ScenicSpotResponse> spots = scenicSpotService
+                .getSpotsByIdsPreservingOrder(similarSpots.keySet().stream().toList()).stream()
+                .map(spot -> ScenicSpotResponse.fromEntity(spot, locale))
+                .toList();
         return Map.of(
             "spotId", id,
-            "similarSpots", similarSpots,
-            "count", similarSpots.size()
+            "spots", spots,
+            "count", spots.size()
         );
     }
     
@@ -249,7 +279,7 @@ public class ScenicSpotController {
      */
     @PostMapping("/recommendations/cold-start")
     @PreAuthorize("isAuthenticated()")
-    public List<ScenicSpot> getColdStartRecommendations(
+    public List<ScenicSpotResponse> getColdStartRecommendations(
             @RequestParam Long userId,
             @RequestParam(required = false, defaultValue = "zh") String locale,
             @RequestBody(required = false) UserPreferenceDTO preferences,
@@ -273,8 +303,9 @@ public class ScenicSpotController {
             recommendations = coldStartOptimizationService.recommendForNewUserByAttributes(userId);
         }
         
-        recommendations.forEach(spot -> LocaleHelper.resolveScenicSpotLocale(spot, locale));
-        return recommendations;
+        return recommendations.stream()
+                .map(spot -> ScenicSpotResponse.fromEntity(spot, locale))
+                .toList();
     }
 
     /**
@@ -282,7 +313,7 @@ public class ScenicSpotController {
      */
     @GetMapping("/recommendations/cold-start/location")
     @PreAuthorize("isAuthenticated()")
-    public List<ScenicSpot> getColdStartRecommendationsByLocation(
+    public List<ScenicSpotResponse> getColdStartRecommendationsByLocation(
             @RequestParam Long userId,
             @RequestParam Double latitude,
             @RequestParam Double longitude,
@@ -293,8 +324,9 @@ public class ScenicSpotController {
 
         List<ScenicSpot> recommendations = coldStartOptimizationService
                 .recommendForNewUserByLocation(latitude, longitude, maxDistanceKm);
-        recommendations.forEach(spot -> LocaleHelper.resolveScenicSpotLocale(spot, locale));
-        return recommendations;
+        return recommendations.stream()
+                .map(spot -> ScenicSpotResponse.fromEntity(spot, locale))
+                .toList();
     }
     
     /**
@@ -306,19 +338,33 @@ public class ScenicSpotController {
         requireSelfOrAdmin(userId, authentication);
         boolean isNew = coldStartOptimizationService.isNewUser(userId);
         return Map.of(
-            "userId", userId,
             "isNewUser", isNew
         );
     }
 
     private void requireSelfOrAdmin(Long userId, Authentication authentication) {
-        if (authentication == null || !authentication.isAuthenticated()) {
-            throw new AccessDeniedException("Authentication required");
-        }
-        User currentUser = userRepository.findByUsername(authentication.getName())
-                .orElseThrow(() -> new AccessDeniedException("User not found"));
+        User currentUser = currentUser(authentication);
         if (currentUser.getRole() != User.Role.ADMIN && !currentUser.getId().equals(userId)) {
             throw new AccessDeniedException("Cannot access another user's recommendation data");
         }
+    }
+
+    private Long currentUserId(Authentication authentication) {
+        return currentUser(authentication).getId();
+    }
+
+    private User currentUser(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new AccessDeniedException("Authentication required");
+        }
+        return userRepository.findByUsername(authentication.getName())
+                .orElseThrow(() -> new AccessDeniedException("User not found"));
+    }
+
+    private List<ScenicSpotResponse> recommendForUser(Long userId, RecommendationContext context, String locale) {
+        List<ScenicSpot> spots = recommendationService.recommendSpotsForUser(userId, context);
+        return spots.stream()
+                .map(spot -> ScenicSpotResponse.fromEntity(spot, locale))
+                .toList();
     }
 }

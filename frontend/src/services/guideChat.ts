@@ -1,6 +1,8 @@
 import axios from 'axios'
 import api, { endpoints } from '../api'
+import { readBrowserStorage } from '../utils/browserStorage'
 import { getRecaptchaToken, isRecaptchaV3Enabled } from '../utils/recaptcha'
+import { summarizeClientError } from '../utils/errorMonitoring'
 
 export interface ChatMessage {
   id: number
@@ -38,6 +40,66 @@ interface IntentRule {
   response: string
   action?: 'navigate' | 'generate'
   actionLabel?: string
+}
+
+export const MAX_GUIDE_CHAT_MESSAGE_CHARS = 280
+const MAX_GUIDE_CHAT_RESPONSE_CHARS = 1200
+
+const CONTROL_CHAR_PATTERN = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g
+const ZERO_WIDTH_PATTERN = /[\u200B-\u200D\uFEFF]/g
+const TECHNICAL_OUTPUT_PATTERN = /(?:sk-[A-Za-z0-9_-]{10,}|x-recaptcha-token|recaptcha|authorization\s*[:=]|bearer\s+[A-Za-z0-9._-]{8,}|api[-_\s]*key\s*[:=]|(?:access|refresh)[-_\s]*token\s*[:=]|(?:provider|model)\s*[:=]|stack\s*trace|(?:axios|runtime|nullpointer|illegalargument)?exception|org\.springframework|com\.tibet\.tourism|java\.|at\s+[\w.$]+\([^)]*\))/i
+const GUIDE_CHAT_SAFE_FALLBACK_MESSAGE = '小导游暂时无法给出云端回答，先用本地安全建议兜底。你可以继续问西藏路线、景点、季节或高原适应相关问题。'
+const GUIDE_CHAT_RATE_LIMIT_MESSAGE = '小导游需要稍微休息一下，避免连续请求过多。请等一会儿再继续问西藏路线、景点或高原适应问题。'
+const GUIDE_CHAT_CHALLENGE_MESSAGE = '为了保护服务，小导游需要先完成一次安全校验。请稍后重试，或换个更具体的西藏旅行问题。'
+
+interface SafeGuideChatContent {
+  content: string
+  sanitized: boolean
+}
+
+export function normalizeGuideChatInput(text: string): string {
+  const normalized = text
+    .replace(CONTROL_CHAR_PATTERN, ' ')
+    .replace(ZERO_WIDTH_PATTERN, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  const chars = Array.from(normalized)
+  return chars.length > MAX_GUIDE_CHAT_MESSAGE_CHARS
+    ? chars.slice(0, MAX_GUIDE_CHAT_MESSAGE_CHARS).join('')
+    : normalized
+}
+
+function normalizeGuideChatOutput(text: string): string {
+  const normalized = text
+    .replace(CONTROL_CHAR_PATTERN, ' ')
+    .replace(ZERO_WIDTH_PATTERN, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  const chars = Array.from(normalized)
+  return chars.length > MAX_GUIDE_CHAT_RESPONSE_CHARS
+    ? `${chars.slice(0, MAX_GUIDE_CHAT_RESPONSE_CHARS).join('')}...`
+    : normalized
+}
+
+function safeGuideChatContent(value: unknown, fallback = GUIDE_CHAT_SAFE_FALLBACK_MESSAGE): SafeGuideChatContent {
+  if (typeof value !== 'string') {
+    return { content: '', sanitized: false }
+  }
+
+  const content = normalizeGuideChatOutput(value)
+  if (!content) {
+    return { content: '', sanitized: false }
+  }
+
+  if (TECHNICAL_OUTPUT_PATTERN.test(content)) {
+    return { content: fallback, sanitized: true }
+  }
+
+  return { content, sanitized: false }
+}
+
+export function sanitizeGuideChatResponseContent(value: unknown, fallback = GUIDE_CHAT_SAFE_FALLBACK_MESSAGE): string {
+  return safeGuideChatContent(value, fallback).content
 }
 
 const OFF_TOPIC_RESPONSE = '扎西德勒，我只聊西藏旅行相关内容。我们把话题拉回藏地吧：你想了解拉萨初访、林芝风光、珠峰线路，还是高原适应？'
@@ -111,12 +173,12 @@ let nextMessageId = 1
 let lastFallbackIndex = -1
 
 function isTibetTravelTopic(input: string): boolean {
-  const normalized = input.trim()
+  const normalized = normalizeGuideChatInput(input)
   return greetingPattern.test(normalized) || tibetTravelPattern.test(normalized)
 }
 
 function matchIntent(input: string): IntentRule | null {
-  const normalized = input.trim()
+  const normalized = normalizeGuideChatInput(input)
   for (const rule of intentRules) {
     for (const pattern of rule.patterns) {
       pattern.lastIndex = 0
@@ -163,7 +225,7 @@ function normalizeAction(action?: string): 'navigate' | 'generate' | undefined {
   return action === 'navigate' || action === 'generate' ? action : undefined
 }
 
-function coerceRetryAfter(value: unknown, fallbackSeconds = 45): number {
+export function coerceRetryAfter(value: unknown, fallbackSeconds = 45): number {
   if (typeof value === 'number' && Number.isFinite(value)) {
     return Math.max(1, Math.min(Math.ceil(value), 3600))
   }
@@ -176,16 +238,35 @@ function coerceRetryAfter(value: unknown, fallbackSeconds = 45): number {
   return fallbackSeconds
 }
 
+export function resolveGuideChatLocale(storage?: Pick<Storage, 'getItem'> | null): 'zh' | 'bo' {
+  try {
+    const locale = storage === undefined
+      ? readBrowserStorage('localStorage', 'locale', 'zh')
+      : storage?.getItem('locale')
+    return locale === 'bo' ? 'bo' : 'zh'
+  } catch {
+    return 'zh'
+  }
+}
+
+export function summarizeGuideChatError(error: unknown): string {
+  if (axios.isAxiosError(error)) {
+    const status = error.response?.status
+    return status ? `guide chat request failed with status ${status}` : 'guide chat request failed'
+  }
+  return error instanceof Error && error.name ? error.name : 'unexpected guide chat error'
+}
+
 function limitedGuideMessage(data?: GuideChatApiResponse, retryHeader?: unknown): ChatMessage {
   const retryAfterSeconds = coerceRetryAfter(data?.retryAfterSeconds ?? retryHeader, 45)
+  const challengeRequired = Boolean(data?.challengeRequired)
   return toGuideMessage(
-    data?.content?.trim()
-      || '小导游需要稍微休息一下，避免连续请求过多。请等一会儿再继续问西藏路线、景点或高原适应问题。',
+    challengeRequired ? GUIDE_CHAT_CHALLENGE_MESSAGE : GUIDE_CHAT_RATE_LIMIT_MESSAGE,
     {
       fallback: true,
       limited: true,
       retryAfterSeconds,
-      challengeRequired: Boolean(data?.challengeRequired)
+      challengeRequired
     }
   )
 }
@@ -194,7 +275,7 @@ export function createUserMessage(text: string): ChatMessage {
   return {
     id: nextMessageId++,
     role: 'user',
-    text: text.trim()
+    text: normalizeGuideChatInput(text)
   }
 }
 
@@ -203,11 +284,21 @@ export function createPendingGuideMessage(): ChatMessage {
 }
 
 export function getLocalGuideReply(text: string): ChatMessage {
-  return localGuideMessage(text)
+  return localGuideMessage(normalizeGuideChatInput(text))
+}
+
+export function createNetworkFallbackGuideMessage(text: string): ChatMessage {
+  const retryText = normalizeGuideChatInput(text)
+  return {
+    ...localGuideMessage(retryText),
+    networkFallback: true,
+    retryText
+  }
 }
 
 export function processUserMessage(text: string): ChatMessage[] {
-  return [createUserMessage(text), localGuideMessage(text)]
+  const normalized = normalizeGuideChatInput(text)
+  return [createUserMessage(normalized), localGuideMessage(normalized)]
 }
 
 export async function requestGuideChat(
@@ -216,31 +307,45 @@ export async function requestGuideChat(
   recaptchaToken = '',
   retriedChallenge = false
 ): Promise<ChatMessage> {
-  const trimmed = text.trim()
-  const locale = localStorage.getItem('locale') || 'zh'
+  const trimmed = normalizeGuideChatInput(text)
+  if (!trimmed) {
+    return localGuideMessage('')
+  }
+  const locale = resolveGuideChatLocale()
 
   try {
     const response = await api.post<GuideChatApiResponse>(endpoints.guide.chat, {
       message: trimmed,
-      history: history.slice(-8),
+      history: history
+        .slice(-8)
+        .map(item => ({
+          role: item.role,
+          content: normalizeGuideChatInput(item.content)
+        }))
+        .filter(item => item.content),
       locale
     }, recaptchaToken
       ? { headers: { 'X-Recaptcha-Token': recaptchaToken } }
       : undefined)
 
     const data = response.data
-    const content = data.content?.trim()
+    const contentResult = safeGuideChatContent(data.content)
+    const content = contentResult.content
     if (!content) {
       return localGuideMessage(trimmed)
     }
 
     const action = normalizeAction(data.action)
+    const actionLabelResult = data.actionLabel
+      ? safeGuideChatContent(data.actionLabel, '')
+      : { content: '', sanitized: false }
+    const limited = Boolean(data.limited)
     return toGuideMessage(content, {
-      fallback: Boolean(data.fallback),
-      limited: Boolean(data.limited),
-      retryAfterSeconds: data.retryAfterSeconds,
+      fallback: Boolean(data.fallback) || contentResult.sanitized || actionLabelResult.sanitized,
+      limited,
+      retryAfterSeconds: limited ? coerceRetryAfter(data.retryAfterSeconds, 45) : undefined,
       challengeRequired: Boolean(data.challengeRequired),
-      ...(action ? { action, actionLabel: data.actionLabel || '去规划路线' } : {})
+      ...(action ? { action, actionLabel: actionLabelResult.content || '去规划路线' } : {})
     })
   } catch (error) {
     if (axios.isAxiosError<GuideChatApiResponse>(error) && error.response?.status === 428) {
@@ -252,7 +357,7 @@ export async function requestGuideChat(
           }
         } catch (recaptchaError) {
           if (import.meta.env.DEV) {
-            console.warn('Guide chat reCAPTCHA failed:', recaptchaError)
+            console.warn('Guide chat reCAPTCHA failed:', summarizeClientError(recaptchaError))
           }
         }
       }

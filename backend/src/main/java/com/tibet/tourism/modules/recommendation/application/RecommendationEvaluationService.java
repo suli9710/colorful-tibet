@@ -99,7 +99,7 @@ public class RecommendationEvaluationService {
         response.setEvaluatedAt(LocalDateTime.now());
         response.setUserResults(includeUserResults ? userResults : Collections.emptyList());
 
-        logger.info("推荐离线评估完成: users={}, k={}, precision={}, recall={}, hitRate={}, durationMs={}",
+        logger.info("Recommendation offline evaluation completed: users={}, k={}, precision={}, recall={}, hitRate={}, durationMs={}",
                 evaluatedUserCount,
                 k,
                 response.getPrecisionAtK(),

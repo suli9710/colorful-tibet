@@ -58,4 +58,22 @@ class PriceUpdateServiceTest {
         assertThat(spot.getTicketPrice()).isNull();
         verify(scenicSpotRepository, never()).save(any(ScenicSpot.class));
     }
+
+    @Test
+    void priceFetchFailureDoesNotExposeRawExceptionMessage() {
+        ScenicSpot spot = new ScenicSpot();
+        spot.setId(2L);
+        spot.setName("Namtso");
+
+        when(scenicSpotRepository.findById(2L)).thenReturn(Optional.of(spot));
+        when(priceFetchService.fetchPrice(spot))
+                .thenThrow(new IllegalStateException("upstream token leaked in provider response"));
+
+        PriceUpdateService.PriceUpdateResult result = service.updateSpotPrice(2L, true);
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getMessage()).isEqualTo("PRICE_UPDATE_FAILED");
+        assertThat(result.getMessage()).doesNotContain("token", "provider response");
+        assertThat(result.getPriceInfo()).isNull();
+    }
 }

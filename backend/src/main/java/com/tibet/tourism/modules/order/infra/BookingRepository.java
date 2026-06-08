@@ -20,6 +20,10 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     @Query("SELECT b FROM Booking b WHERE b.user.id = :userId")
     List<Booking> findByUserId(@Param("userId") Long userId);
 
+    @EntityGraph(attributePaths = {"user", "spot"})
+    @Query("SELECT b FROM Booking b WHERE b.id = :id AND b.user.id = :userId")
+    Optional<Booking> findByIdAndUserId(@Param("id") Long id, @Param("userId") Long userId);
+
     @Query("SELECT COUNT(b) FROM Booking b WHERE b.status = 'CONFIRMED'")
     long countConfirmed();
 

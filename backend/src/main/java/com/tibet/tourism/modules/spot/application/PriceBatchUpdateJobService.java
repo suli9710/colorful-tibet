@@ -1,5 +1,6 @@
 package com.tibet.tourism.modules.spot.application;
 
+import com.tibet.tourism.common.security.SensitiveLogSanitizer;
 import com.tibet.tourism.modules.spot.domain.ScenicSpot;
 import com.tibet.tourism.modules.spot.infra.ScenicSpotRepository;
 import java.math.BigDecimal;
@@ -90,14 +91,15 @@ public class PriceBatchUpdateJobService {
                     }
                 } catch (Exception e) {
                     job.incrementFailed();
-                    log.warn("Price batch job spot failed: jobId={}, spotId={}, error={}",
-                            job.jobId, spot.getId(), e.getMessage());
+                    log.warn("Price batch job spot failed: jobId={}, spotId={}, detail={}",
+                            job.jobId, spot.getId(), SensitiveLogSanitizer.exceptionSummary(e));
                 }
             }
 
             job.complete();
         } catch (Exception e) {
-            log.error("Price batch update job failed: jobId={}", job.jobId, e);
+            log.error("Price batch update job failed: jobId={}, detail={}",
+                    job.jobId, SensitiveLogSanitizer.exceptionSummary(e));
             job.fail("Price batch update failed");
         } finally {
             cleanupJobs();

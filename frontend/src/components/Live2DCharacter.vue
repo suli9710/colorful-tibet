@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { summarizeClientError } from '../utils/errorMonitoring'
 
 declare global {
   interface Window {
@@ -93,7 +94,7 @@ async function initWidget() {
     instance.setMotion(props.motion)
     emit('ready', instance)
   } catch (err) {
-    console.error('Live2D widget init failed:', err)
+    console.error('Live2D widget init failed:', summarizeClientError(err))
     loadError.value = true
   }
 }

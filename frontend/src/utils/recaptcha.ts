@@ -130,7 +130,7 @@ export async function getRecaptchaToken(action: string): Promise<string> {
     return token
   } catch (error) {
     if (isRecaptchaError(error)) throw error
-    throw new RecaptchaError(error instanceof Error ? error.message : undefined)
+    throw new RecaptchaError()
   }
 }
 

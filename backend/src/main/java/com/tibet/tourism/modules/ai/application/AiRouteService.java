@@ -243,7 +243,7 @@ public class AiRouteService {
                             User currentUser, String locale, SseEmitter emitter) {
         emitter.onTimeout(() -> log.warn("SSE emitter timed out after {}s", streamTimeout.getSeconds()));
         emitter.onError(throwable -> log.warn("SSE emitter error (client may have disconnected): {}",
-                throwable.getMessage() != null ? throwable.getMessage() : throwable.getClass().getSimpleName()));
+                AiLogPrivacy.exceptionSummary(throwable)));
 
         RouteStreamListener listener = new RouteStreamListener() {
             @Override
@@ -490,7 +490,7 @@ public class AiRouteService {
             event.put("type", type);
             emitter.send(SseEmitter.event().data(objectMapper.writeValueAsString(event)));
         } catch (IOException e) {
-            log.warn("Failed to send SSE event type={}: {}", type, e.getMessage());
+            log.warn("Failed to send SSE event type={}: {}", type, AiLogPrivacy.exceptionSummary(e));
         }
     }
 

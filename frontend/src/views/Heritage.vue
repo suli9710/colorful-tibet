@@ -984,9 +984,9 @@
                     <div class="flex min-w-0 flex-wrap items-center gap-2">
                       <div class="w-6 h-6 rounded-full bg-tibet-red/10 flex items-center justify-center text-tibet-red text-[10px] font-bold overflow-hidden">
                         <img v-if="comment.avatar" :src="comment.avatar" class="w-full h-full object-cover" />
-                        <span v-else>{{ (comment.nickname || comment.username)?.charAt(0) }}</span>
+                        <span v-else>{{ (comment.nickname || t('heritage.anonymous')).charAt(0) }}</span>
                       </div>
-                      <span class="text-xs font-medium text-stone-700">{{ comment.nickname || comment.username }}</span>
+                      <span class="text-xs font-medium text-stone-700">{{ comment.nickname || t('heritage.anonymous') }}</span>
                       <span v-if="comment.rating" class="text-[11px] text-amber-500">
                         {{ '★'.repeat(comment.rating) }}
                       </span>
@@ -994,7 +994,7 @@
                     <div class="flex items-center gap-2">
                       <span class="text-[10px] text-stone-400">{{ formatDate(comment.createdAt) }}</span>
                       <button
-                        v-if="authStore.user?.id === comment.userId"
+                        v-if="comment.owner"
                         type="button"
                         class="text-[10px] text-red-400 hover:text-red-600 transition"
                         @click="deleteComment(comment.id)"
@@ -1062,6 +1062,9 @@ import type {
   HeritageItem
 } from '../api'
 import { useAuthStore } from '../stores/auth'
+import { useToast } from '../composables/useToast'
+import { createTextCardPopupContent } from '../utils/domText'
+import { summarizeClientError } from '../utils/errorMonitoring'
 import type * as Leaflet from 'leaflet'
 import {
   cardExit,
@@ -1077,6 +1080,7 @@ import {
 } from '../motion/presets'
 
 const { t, locale } = useI18n()
+const { showToast } = useToast()
 
 const heritageCategories = computed(() => [
   {
@@ -1892,7 +1896,7 @@ const fetchFeaturedInheritors = async (items: HeritageItem[]) => {
     })
     featuredInheritors.value = Array.from(merged.values()).slice(0, 6)
   } catch (error) {
-    console.error('Failed to fetch featured inheritors:', error)
+    console.error('Failed to fetch featured inheritors:', summarizeClientError(error))
   } finally {
     featuredInheritorsLoading.value = false
   }
@@ -1903,7 +1907,7 @@ const fetchUpcomingEvents = async () => {
     const response = await api.get(endpoints.heritage.upcomingEvents, { params: { size: 6 } })
     upcomingEvents.value = response.data?.content || response.data || []
   } catch (error) {
-    console.error('Failed to fetch upcoming heritage events:', error)
+    console.error('Failed to fetch upcoming heritage events:', summarizeClientError(error))
   }
 }
 
@@ -1932,7 +1936,7 @@ const fetchHeritageItems = async (keyword?: string) => {
       featuredInheritors.value = []
     }
   } catch (error) {
-    console.error('Failed to fetch heritage items:', error)
+    console.error('Failed to fetch heritage items:', summarizeClientError(error))
   } finally {
     loading.value = false
     searchLoading.value = false
@@ -2004,7 +2008,7 @@ const loadDetailData = async (item: HeritageItem) => {
     itemEvents.value = eventsRes?.data || []
     mergeFeaturedInheritors(itemInheritors.value)
   } catch (e) {
-    console.error('Failed to load detail data:', e)
+    console.error('Failed to load detail data:', summarizeClientError(e))
   } finally {
     commentsLoading.value = false
   }
@@ -2029,7 +2033,7 @@ const toggleLike = async () => {
     selectedItem.value = { ...selectedItem.value, likeCount: nextLikeCount }
     updateHeritageItem(selectedItem.value.id, { likeCount: nextLikeCount })
   } catch (e) {
-    console.error('Failed to toggle like:', e)
+    console.error('Failed to toggle like:', summarizeClientError(e))
   }
 }
 
@@ -2052,7 +2056,7 @@ const submitComment = async () => {
     newCommentContent.value = ''
     newCommentRating.value = 5
   } catch (e) {
-    console.error('Failed to submit comment:', e)
+    console.error('Failed to submit comment:', summarizeClientError(e))
   } finally {
     submittingComment.value = false
   }
@@ -2069,7 +2073,7 @@ const deleteComment = async (commentId: number) => {
       updateHeritageItem(selectedItem.value.id, { commentCount: nextCommentCount })
     }
   } catch (e) {
-    console.error('Failed to delete comment:', e)
+    console.error('Failed to delete comment:', summarizeClientError(e))
   }
 }
 
@@ -2120,7 +2124,7 @@ const openDetail = (item: HeritageItem) => {
 const openBaikeUrl = (url?: string | null) => {
   const safeUrl = safeExternalUrl(url)
   if (!safeUrl) {
-    window.alert(t('security.invalidExternalLink'))
+    showToast(t('security.invalidExternalLink'), 'warning')
     return
   }
   window.open(safeUrl, '_blank', 'noopener,noreferrer')
@@ -2147,16 +2151,31 @@ const clearMap = () => {
   markers = []
 }
 
-const htmlEscapeMap: Record<string, string> = {
-  '&': '&amp;',
-  '<': '&lt;',
-  '>': '&gt;',
-  '"': '&quot;',
-  "'": '&#39;'
+const createExperienceMarkerBadge = (tag: string) => {
+  const badge = document.createElement('span')
+  badge.textContent = tag
+  badge.style.display = 'inline-flex'
+  badge.style.alignItems = 'center'
+  badge.style.justifyContent = 'center'
+  badge.style.minWidth = '26px'
+  badge.style.height = '26px'
+  badge.style.padding = '0 7px'
+  badge.style.borderRadius = '999px'
+  badge.style.background = '#ef4444'
+  badge.style.color = '#fff'
+  badge.style.fontSize = '12px'
+  badge.style.fontWeight = '700'
+  badge.style.boxShadow = '0 8px 18px rgba(127,29,29,.28)'
+  badge.style.border = '2px solid rgba(255,255,255,.9)'
+  return badge
 }
 
-const escapeHtml = (value: string): string =>
-  value.replace(/[&<>"']/g, char => htmlEscapeMap[char] || char)
+const buildExperiencePopupContent = (spot: ExperienceSpot) =>
+  createTextCardPopupContent(spot.name, [
+    { text: spot.address, color: '#57534e' },
+    { text: spot.brief, color: '#78716c' },
+    { text: spot.highlight, color: '#dc2626' }
+  ])
 
 const PI = Math.PI
 const A = 6378245.0
@@ -2223,25 +2242,18 @@ const addExperienceMarkers = (L: typeof Leaflet) => {
         title: spot.name,
         icon: L.divIcon({
           className: 'heritage-map-marker',
-          html: `<span style="display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:26px;padding:0 7px;border-radius:999px;background:#ef4444;color:#fff;font-size:12px;font-weight:700;box-shadow:0 8px 18px rgba(127,29,29,.28);border:2px solid rgba(255,255,255,.9);">${escapeHtml(spot.tag)}</span>`,
+          html: createExperienceMarkerBadge(spot.tag),
           iconSize: [34, 34],
           iconAnchor: [17, 17],
           popupAnchor: [0, -16]
         })
       })
 
-      marker.bindPopup(`
-        <div style="padding:6px 2px;min-width:190px;max-width:240px;">
-          <h3 style="margin:0 0 8px 0;font-size:15px;font-weight:700;color:#1c1917;">${escapeHtml(spot.name)}</h3>
-          <p style="margin:4px 0;font-size:12px;color:#57534e;line-height:1.55;">${escapeHtml(spot.address)}</p>
-          <p style="margin:6px 0 0 0;font-size:12px;color:#78716c;line-height:1.55;">${escapeHtml(spot.brief)}</p>
-          <p style="margin:6px 0 0 0;font-size:12px;color:#dc2626;line-height:1.55;">${escapeHtml(spot.highlight)}</p>
-        </div>
-      `)
+      marker.bindPopup(buildExperiencePopupContent(spot))
       marker.addTo(leafletMap)
       markers.push(marker)
     } catch (error) {
-      console.error('添加标记失败:', error)
+      console.error('Failed to add heritage map marker:', summarizeClientError(error))
     }
   })
 
@@ -2300,7 +2312,7 @@ const initMap = async () => {
     window.setTimeout(finishMapLoad, 8000)
   } catch (error) {
     if (initVersion !== mapInitVersion) return
-    console.error('地图初始化失败:', error)
+    console.error('Failed to initialize heritage map:', summarizeClientError(error))
     mapError.value = true
     mapLoading.value = false
   }

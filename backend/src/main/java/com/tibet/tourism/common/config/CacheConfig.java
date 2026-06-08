@@ -1,5 +1,7 @@
 package com.tibet.tourism.common.config;
 
+import com.tibet.tourism.common.security.PiiMasker;
+import com.tibet.tourism.common.security.SensitiveLogSanitizer;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
@@ -103,8 +105,11 @@ public class CacheConfig implements CachingConfigurer {
 
     private void logCacheError(String operation, RuntimeException exception, Cache cache, Object key) {
         String cacheName = cache == null ? "unknown" : cache.getName();
-        logger.warn("Redis cache {} failed, fallback to method execution. cache={}, key={}, cause={}",
-                operation, cacheName, key, exception.getMessage());
-        logger.debug("Redis cache error details", exception);
+        String keyHash = key == null ? "none" : PiiMasker.shortHash(String.valueOf(key));
+        String exceptionSummary = SensitiveLogSanitizer.exceptionSummary(exception);
+        logger.warn("Redis cache {} failed, fallback to method execution. cache={}, keyHash={}, cause={}",
+                operation, cacheName, keyHash, exceptionSummary);
+        logger.debug("Redis cache error details: operation={}, cache={}, keyHash={}, cause={}",
+                operation, cacheName, keyHash, exceptionSummary);
     }
 }

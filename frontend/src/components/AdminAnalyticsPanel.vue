@@ -84,7 +84,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { ECharts } from '@/lib/echarts'
+import type { ECharts } from '@/lib/echartsAdmin'
 
 interface AnalyticsStats {
   userCount: number
@@ -118,14 +118,14 @@ const newsChartEl = ref<HTMLElement | null>(null)
 const panelEl = ref<HTMLElement | null>(null)
 const charts: ECharts[] = []
 const { t, locale } = useI18n()
-type EChartsKit = ReturnType<typeof import('@/lib/echarts').ensureECharts>
+type EChartsKit = ReturnType<typeof import('@/lib/echartsAdmin').ensureAdminECharts>
 let echartsLoader: Promise<EChartsKit> | null = null
 let chartInitRun = 0
 let resizeObserver: ResizeObserver | null = null
 
 const loadECharts = async () => {
   if (!echartsLoader) {
-    echartsLoader = import('@/lib/echarts').then(module => module.ensureECharts())
+    echartsLoader = import('@/lib/echartsAdmin').then(module => module.ensureAdminECharts())
   }
 
   return echartsLoader

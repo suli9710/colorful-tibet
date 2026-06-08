@@ -17,6 +17,7 @@ import com.tibet.tourism.common.security.JwtUtils;
 import com.tibet.tourism.common.security.LoginAttemptService;
 import com.tibet.tourism.common.security.antibot.AntibotProperties;
 import com.tibet.tourism.common.security.antibot.RecaptchaService;
+import com.tibet.tourism.modules.auth.domain.AuthFailureException;
 import com.tibet.tourism.modules.auth.domain.AuthForbiddenException;
 import com.tibet.tourism.modules.auth.domain.SecondaryAuthRequiredException;
 import com.tibet.tourism.modules.auth.domain.AuthRateLimitException;
@@ -25,9 +26,12 @@ import com.tibet.tourism.modules.auth.web.dto.RegisterRequest;
 import com.tibet.tourism.modules.user.domain.User;
 import com.tibet.tourism.modules.user.infra.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.OptionalDouble;
 import java.util.Optional;
+import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -109,8 +113,67 @@ class AuthApplicationServiceTest {
 
         assertThat(result.jwt()).isEqualTo("jwt-token");
         assertThat(result.csrfToken()).isEqualTo("csrf-token");
-        assertThat(result.user()).containsEntry("username", "lzh");
+        assertThat(result.user())
+                .doesNotContainKeys("id", "username", "nickname")
+                .containsEntry("avatar", "/avatars/lzh.png")
+                .containsEntry("avatarUrl", "/avatars/lzh.png")
+                .containsEntry("role", User.Role.ADMIN)
+                .containsEntry("mustChangePassword", false);
         assertThat(superAdmin.getAllowedLoginFingerprintHash()).isNull();
+    }
+
+    @Test
+    void invalidSuperAdminTotpUsesGenericLoginFailure() {
+        User superAdmin = user("lzh", User.Role.ADMIN);
+        stubAuthenticatedUser("lzh", superAdmin);
+
+        assertThatThrownBy(() -> service.login(loginRequest("lzh", "031224", "not-digits"), httpRequest))
+                .isInstanceOf(AuthFailureException.class)
+                .hasMessageContaining("Invalid username or password");
+
+        verify(loginAttemptService).recordFailure("lzh", "127.0.0.1");
+    }
+
+    @Test
+    void blankLoginRequestUsesGenericFailureWithoutAttemptEvaluation() {
+        assertThatThrownBy(() -> service.login(null, httpRequest))
+                .isInstanceOf(AuthFailureException.class)
+                .hasMessageContaining("Invalid username or password");
+
+        verify(loginAttemptService, never()).evaluate(anyString(), anyString());
+    }
+
+    @Test
+    void unexpectedAuthenticationProviderFailureUsesGenericFailureWithoutLockingUser() {
+        when(authenticationManager.authenticate(any(Authentication.class)))
+                .thenThrow(new IllegalStateException("jdbc password=secret-token"));
+
+        assertThatThrownBy(() -> service.login(loginRequest("admin", "admin-pass", ""), httpRequest))
+                .isInstanceOf(AuthFailureException.class)
+                .hasMessageContaining("Invalid username or password")
+                .hasMessageNotContaining("secret-token");
+
+        verify(loginAttemptService, never()).recordFailure(anyString(), anyString());
+        verify(jwtUtils, never()).generateJwtToken(any(Authentication.class), anyLong());
+    }
+
+    @Test
+    void authenticatedPrincipalWithoutUserRecordUsesGenericLoginFailure() {
+        UserDetails principal = org.springframework.security.core.userdetails.User
+                .withUsername("ghost")
+                .password("encoded")
+                .roles("USER")
+                .build();
+        Authentication authentication =
+                new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());
+        when(authenticationManager.authenticate(any(Authentication.class))).thenReturn(authentication);
+        when(userRepository.findByUsername("ghost")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.login(loginRequest("ghost", "admin-pass", ""), httpRequest))
+                .isInstanceOf(AuthFailureException.class)
+                .hasMessageContaining("Invalid username or password");
+
+        verify(jwtUtils, never()).generateJwtToken(any(Authentication.class), anyLong());
     }
 
     @Test
@@ -149,7 +212,24 @@ class AuthApplicationServiceTest {
         LoginResult result = service.login(loginRequest("admin", "admin-pass", ""), httpRequest);
 
         assertThat(result.jwt()).isEqualTo("jwt-token");
-        assertThat(result.user()).containsEntry("username", "admin");
+        assertThat(result.user())
+                .doesNotContainKeys("id", "username", "nickname")
+                .containsEntry("role", User.Role.ADMIN)
+                .containsEntry("mustChangePassword", false);
+    }
+
+    @Test
+    void loginReturnsDistinctPublicNickname() {
+        User traveler = user("traveler", User.Role.USER);
+        traveler.setNickname(" Snow Road Guest ");
+        stubAuthenticatedUser("traveler", traveler);
+
+        LoginResult result = service.login(loginRequest("traveler", "user-pass", ""), httpRequest);
+
+        assertThat(result.user())
+                .doesNotContainKeys("id", "username")
+                .containsEntry("nickname", "Snow Road Guest")
+                .containsEntry("role", User.Role.USER);
     }
 
     @Test
@@ -246,6 +326,79 @@ class AuthApplicationServiceTest {
                 .hasMessageContaining("Registration failed");
     }
 
+    @Test
+    void registerDoesNotDefaultNicknameToLoginUsername() {
+        RegisterRequest request = new RegisterRequest();
+        request.setUsername("traveler");
+        request.setPassword("Strong1!");
+        when(passwordEncoder.encode("Strong1!")).thenReturn("encoded-password");
+        when(userRepository.existsByUsernameIgnoreCase("traveler")).thenReturn(false);
+
+        service.register(request, httpRequest);
+
+        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).saveAndFlush(captor.capture());
+        assertThat(captor.getValue().getUsername()).isEqualTo("traveler");
+        assertThat(captor.getValue().getNickname()).isNull();
+    }
+
+    @Test
+    void registerStoresTrimmedDistinctPublicNickname() {
+        RegisterRequest request = new RegisterRequest();
+        request.setUsername("traveler");
+        request.setNickname(" Snow Road Guest ");
+        request.setPassword("Strong1!");
+        when(passwordEncoder.encode("Strong1!")).thenReturn("encoded-password");
+        when(userRepository.existsByUsernameIgnoreCase("traveler")).thenReturn(false);
+
+        service.register(request, httpRequest);
+
+        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).saveAndFlush(captor.capture());
+        assertThat(captor.getValue().getNickname()).isEqualTo("Snow Road Guest");
+    }
+
+    @Test
+    void registerSuppressesNicknameMatchingLoginUsername() {
+        RegisterRequest request = new RegisterRequest();
+        request.setUsername("traveler");
+        request.setNickname(" TRAVELER ");
+        request.setPassword("Strong1!");
+        when(passwordEncoder.encode("Strong1!")).thenReturn("encoded-password");
+        when(userRepository.existsByUsernameIgnoreCase("traveler")).thenReturn(false);
+
+        service.register(request, httpRequest);
+
+        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).saveAndFlush(captor.capture());
+        assertThat(captor.getValue().getNickname()).isNull();
+    }
+
+    @Test
+    void duplicateRegistrationPaysPasswordHashCostBeforeGenericFailure() {
+        RegisterRequest request = new RegisterRequest();
+        request.setUsername("traveler");
+        request.setPassword("Strong1!");
+        when(passwordEncoder.encode("Strong1!")).thenReturn("encoded-password");
+        when(userRepository.existsByUsernameIgnoreCase("traveler")).thenReturn(true);
+
+        assertThatThrownBy(() -> service.register(request, httpRequest))
+                .isInstanceOf(com.tibet.tourism.modules.auth.domain.DuplicateRegistrationException.class)
+                .hasMessageContaining("Registration failed");
+
+        verify(passwordEncoder).encode("Strong1!");
+        verify(userRepository, never()).saveAndFlush(any(User.class));
+    }
+
+    @Test
+    void registrationRecaptchaLogMasksClientIp() throws Exception {
+        String source = Files.readString(Path.of(
+                "src/main/java/com/tibet/tourism/modules/auth/application/AuthApplicationService.java"));
+
+        assertThat(source).contains("PiiMasker.maskIp(clientIp)");
+        assertThat(source).doesNotContain("Registration rejected by reCAPTCHA: ip={}, score={}, minScore={}\",\n                    clientIp");
+    }
+
     private AuthApplicationService serviceWithTotpSecret(String totpSecret) {
         return serviceWithTotpSecret(totpSecret, false);
     }
@@ -286,6 +439,7 @@ class AuthApplicationServiceTest {
         user.setId(1L);
         user.setUsername(username);
         user.setNickname(username);
+        user.setAvatar("/avatars/" + username + ".png");
         user.setRole(role);
         user.setPassword("encoded");
         return user;

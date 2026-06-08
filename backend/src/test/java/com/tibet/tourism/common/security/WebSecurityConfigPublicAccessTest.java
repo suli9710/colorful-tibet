@@ -86,6 +86,10 @@ class WebSecurityConfigPublicAccessTest {
                 get("/api/spots/1/similar"),
                 get("/api/news"),
                 get("/api/heritage"),
+                get("/api/heritage/1"),
+                get("/api/heritage/1/comments"),
+                get("/api/heritage/1/inheritors"),
+                get("/api/heritage/1/events"),
                 get("/api/heritage/events/upcoming"),
                 get("/api/tibet-specialty/culture-tips"),
                 get("/api/tibet-specialty/phrasebook"),
@@ -118,12 +122,12 @@ class WebSecurityConfigPublicAccessTest {
                 post("/api/auth/logout"),
                 post("/api/news"),
                 put("/api/news/1"),
-                get("/api/heritage/1"),
-                get("/api/heritage/1/comments"),
-                get("/api/heritage/1/inheritors"),
-                get("/api/heritage/1/events"),
                 post("/api/heritage"),
+                post("/api/heritage/1/like"),
+                get("/api/heritage/1/like-status"),
+                post("/api/heritage/1/comments"),
                 put("/api/heritage/1"),
+                delete("/api/heritage/1/comments/100"),
                 post("/api/payments/callbacks/mock"),
                 post("/api/hotel-bookings/hotels"),
                 post("/api/hotel-bookings/room-types/1"),
@@ -146,6 +150,10 @@ class WebSecurityConfigPublicAccessTest {
                 "/api/spots/1/similar",
                 "/api/news",
                 "/api/heritage",
+                "/api/heritage/1",
+                "/api/heritage/1/comments",
+                "/api/heritage/1/inheritors",
+                "/api/heritage/1/events",
                 "/api/heritage/events/upcoming",
                 "/api/tibet-specialty/culture-tips",
                 "/api/tibet-specialty/phrasebook",
@@ -177,6 +185,8 @@ class WebSecurityConfigPublicAccessTest {
                 "/api/payments/callbacks/mock",
                 "/api/news",
                 "/api/heritage",
+                "/api/heritage/1/like",
+                "/api/heritage/1/comments",
                 "/api/hotel-bookings/hotels",
                 "/api/hotel-bookings/room-types/1",
                 "/api/routes/shared/1/comments",
@@ -197,24 +207,18 @@ class WebSecurityConfigPublicAccessTest {
 
         @DeleteMapping({
                 "/api/routes/shared/1",
-                "/api/community/questions/1"
+                "/api/community/questions/1",
+                "/api/heritage/1/comments/100"
         })
         public Map<String, String> deleteProbe() {
             return Map.of("status", "ok");
         }
 
-        @GetMapping("/api/routes/shared/1/like-status")
-        public Map<String, String> protectedReadProbe() {
-            return Map.of("status", "ok");
-        }
-
         @GetMapping({
-                "/api/heritage/1",
-                "/api/heritage/1/comments",
-                "/api/heritage/1/inheritors",
-                "/api/heritage/1/events"
+                "/api/routes/shared/1/like-status",
+                "/api/heritage/1/like-status"
         })
-        public Map<String, String> protectedHeritageReadProbe() {
+        public Map<String, String> protectedReadProbe() {
             return Map.of("status", "ok");
         }
     }

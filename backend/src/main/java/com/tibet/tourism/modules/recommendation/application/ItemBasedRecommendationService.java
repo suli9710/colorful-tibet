@@ -68,14 +68,12 @@ public class ItemBasedRecommendationService {
      */
     public boolean precomputeItemSimilarityMatrix() {
         if (!precomputeInProgress.compareAndSet(false, true)) {
-            logger.info("景点相似度矩阵正在计算中，跳过本次触发");
+            logger.info("Item similarity precompute already running; skipping trigger");
             return false;
         }
 
         try {
-            logger.info("═══════════════════════════════════════════════════════════");
-            logger.info("🔄 开始预计算景点相似度矩阵");
-            logger.info("═══════════════════════════════════════════════════════════");
+            logger.info("Item similarity precompute started");
 
             long startTime = System.currentTimeMillis();
 
@@ -85,7 +83,7 @@ public class ItemBasedRecommendationService {
                     .map(ScenicSpot::getId)
                     .filter(Objects::nonNull)
                     .collect(Collectors.toCollection(LinkedHashSet::new));
-            logger.info("📊 景点总数: {}", allSpots.size());
+            logger.info("Item similarity precompute spots loaded: spotCount={}", allSpots.size());
 
             if (allSpotIds.isEmpty()) {
                 itemSimilarityMatrix = new ConcurrentHashMap<>();
@@ -98,12 +96,12 @@ public class ItemBasedRecommendationService {
                     PageRequest.of(0, Math.max(1, maxHistoriesForPrecompute), Sort.by(Sort.Direction.DESC, "visitDate")))
                     .getContent();
             Map<Long, Map<Long, Double>> userItemMatrix = buildUserItemMatrix(allHistories);
-            logger.info("📊 用户-景点矩阵: {} 用户 × {} 景点",
+            logger.info("Item similarity user-item matrix built: userCount={}, spotCount={}",
                     userItemMatrix.size(),
                     allSpotIds.size());
 
             Map<ItemPair, ItemPairStats> pairStats = buildCoVisitPairStats(userItemMatrix);
-            logger.info("📊 共现景点对: {}", pairStats.size());
+            logger.info("Item similarity co-visit pairs built: pairCount={}", pairStats.size());
 
             Map<Long, Map<Long, Double>> similarityMatrix = buildSimilarityMatrix(allSpotIds, pairStats);
             itemSimilarityMatrix = similarityMatrix;
@@ -111,13 +109,13 @@ public class ItemBasedRecommendationService {
             saveSimilarityMatrixToCache(similarityMatrix, itemSimilarityMatrixUpdatedAt);
 
             long endTime = System.currentTimeMillis();
-            logger.info("✅ 景点相似度矩阵计算完成，耗时: {}ms", endTime - startTime);
-            logger.info("📊 平均每个景点有 {} 个相似景点",
+            logger.info("Item similarity precompute completed: durationMs={}", endTime - startTime);
+            logger.info("Item similarity precompute summary: averageSimilarItems={}",
                     itemSimilarityMatrix.values().stream()
                             .mapToInt(Map::size)
                             .average()
                             .orElse(0.0));
-            logger.info("═══════════════════════════════════════════════════════════\n");
+            logger.info("Item similarity matrix stored: rowCount={}", itemSimilarityMatrix.size());
             return true;
         } finally {
             precomputeInProgress.set(false);
@@ -133,7 +131,7 @@ public class ItemBasedRecommendationService {
 
         itemSimilarityMatrix = new ConcurrentHashMap<>(cachedMatrix);
         itemSimilarityMatrixUpdatedAt = extractUpdatedAt(cachedValue).orElse(System.currentTimeMillis());
-        logger.info("从Redis加载景点相似度矩阵: rows={}, updatedAt={}",
+        logger.info("Item similarity matrix loaded from Redis: rows={}, updatedAt={}",
                 cachedMatrix.size(), itemSimilarityMatrixUpdatedAt);
         return true;
     }
@@ -286,7 +284,7 @@ public class ItemBasedRecommendationService {
             matrixSnapshot = itemSimilarityMatrix;
         }
         if (matrixSnapshot.isEmpty()) {
-            logger.warn("⚠️  景点相似度矩阵为空，开始预计算...");
+            logger.warn("Item similarity matrix empty; starting precompute");
             precomputeItemSimilarityMatrix();
             matrixSnapshot = itemSimilarityMatrix;
         }
@@ -332,7 +330,7 @@ public class ItemBasedRecommendationService {
             }
         }
 
-        logger.info("📊 Item-Based CF生成 {} 个候选景点", itemScores.size());
+        logger.info("Item-Based CF candidates generated: candidateCount={}", itemScores.size());
 
         return itemScores;
     }
@@ -422,10 +420,11 @@ public class ItemBasedRecommendationService {
     private void logRedisCacheFailure(String operation, RuntimeException ex) {
         if (!redisCacheWarningLogged) {
             redisCacheWarningLogged = true;
-            logger.warn("Redis item similarity cache unavailable; using local matrix only. operation={}, cause={}",
-                    operation, ex.getMessage());
+            logger.warn("Redis item similarity cache unavailable; using local matrix only. operation={}, error={}",
+                    operation, RecommendationLogPrivacy.exceptionSummary(ex));
         } else {
-            logger.debug("Redis item similarity cache operation failed: {}", operation, ex);
+            logger.debug("Redis item similarity cache operation failed: operation={}, error={}",
+                    operation, RecommendationLogPrivacy.exceptionSummary(ex));
         }
     }
 

@@ -1,4 +1,6 @@
 package com.tibet.tourism.modules.community.web;
+
+import com.tibet.tourism.common.api.PageResponse;
 import com.tibet.tourism.common.validation.InputSanitizer;
 import com.tibet.tourism.modules.community.domain.Favorite;
 import com.tibet.tourism.modules.community.domain.TravelRoute;
@@ -6,6 +8,8 @@ import com.tibet.tourism.modules.community.infra.FavoriteRepository;
 import com.tibet.tourism.modules.community.infra.TravelRouteRepository;
 import com.tibet.tourism.modules.user.domain.User;
 import com.tibet.tourism.modules.user.infra.UserRepository;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Set;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,7 +23,12 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/favorites")
@@ -42,33 +51,34 @@ public class FavoriteController {
     public ResponseEntity<?> getMyFavorites(@PageableDefault(size = 20) Pageable pageable) {
         User user = getCurrentUser();
         if (user == null) {
-            return ResponseEntity.status(401).body(Map.of("error", "未登录"));
+            return ResponseEntity.status(401).body(Map.of("error", "Authentication required"));
         }
         Pageable safePageable = InputSanitizer.sanitizePageable(
                 pageable, ALLOWED_FAVORITE_SORT_FIELDS, DEFAULT_FAVORITE_SORT, 20, 100);
-        Page<Favorite> favorites = favoriteRepository.findByUserOrderByCreatedAtDesc(user, safePageable);
-        return ResponseEntity.ok(favorites);
+        Page<FavoriteResponse> favorites = favoriteRepository.findByUserOrderByCreatedAtDesc(user, safePageable)
+                .map(FavoriteResponse::from);
+        return ResponseEntity.ok(PageResponse.from(favorites));
     }
 
     @PostMapping("/{routeId}")
     public ResponseEntity<?> addFavorite(@PathVariable Long routeId) {
         User user = getCurrentUser();
         if (user == null) {
-            return ResponseEntity.status(401).body(Map.of("error", "未登录"));
+            return ResponseEntity.status(401).body(Map.of("error", "Authentication required"));
         }
         TravelRoute route = travelRouteRepository.findById(routeId).orElse(null);
         if (route == null) {
             return ResponseEntity.notFound().build();
         }
         if (favoriteRepository.existsByUserAndRoute(user, route)) {
-            return ResponseEntity.ok(Map.of("message", "已收藏", "favorited", true));
+            return ResponseEntity.ok(Map.of("message", "Already favorited", "favorited", true));
         }
         Favorite favorite = new Favorite();
         favorite.setUser(user);
         favorite.setRoute(route);
         favoriteRepository.save(favorite);
         long count = favoriteRepository.countByRoute(route);
-        return ResponseEntity.ok(Map.of("message", "收藏成功", "favorited", true, "favoriteCount", count));
+        return ResponseEntity.ok(Map.of("message", "Favorite added", "favorited", true, "favoriteCount", count));
     }
 
     @DeleteMapping("/{routeId}")
@@ -76,7 +86,7 @@ public class FavoriteController {
     public ResponseEntity<?> removeFavorite(@PathVariable Long routeId) {
         User user = getCurrentUser();
         if (user == null) {
-            return ResponseEntity.status(401).body(Map.of("error", "未登录"));
+            return ResponseEntity.status(401).body(Map.of("error", "Authentication required"));
         }
         TravelRoute route = travelRouteRepository.findById(routeId).orElse(null);
         if (route == null) {
@@ -84,7 +94,7 @@ public class FavoriteController {
         }
         favoriteRepository.deleteByUserAndRoute(user, route);
         long count = favoriteRepository.countByRoute(route);
-        return ResponseEntity.ok(Map.of("message", "取消收藏", "favorited", false, "favoriteCount", count));
+        return ResponseEntity.ok(Map.of("message", "Favorite removed", "favorited", false, "favoriteCount", count));
     }
 
     @GetMapping("/{routeId}/status")
@@ -108,5 +118,48 @@ public class FavoriteController {
             return userRepository.findByUsername(((UserDetails) auth.getPrincipal()).getUsername()).orElse(null);
         }
         return null;
+    }
+
+    public record FavoriteResponse(
+            Long id,
+            LocalDateTime createdAt,
+            RouteSummary route) {
+
+        private static FavoriteResponse from(Favorite favorite) {
+            return new FavoriteResponse(
+                    favorite.getId(),
+                    favorite.getCreatedAt(),
+                    RouteSummary.from(favorite.getRoute()));
+        }
+    }
+
+    public record RouteSummary(
+            Long id,
+            String name,
+            String nameTibetan,
+            String description,
+            String descriptionTibetan,
+            Integer days,
+            BigDecimal price,
+            TravelRoute.Difficulty difficulty,
+            String temperature,
+            String geography) {
+
+        private static RouteSummary from(TravelRoute route) {
+            if (route == null) {
+                return null;
+            }
+            return new RouteSummary(
+                    route.getId(),
+                    route.getName(),
+                    route.getNameTibetan(),
+                    route.getDescription(),
+                    route.getDescriptionTibetan(),
+                    route.getDays(),
+                    route.getPrice(),
+                    route.getDifficulty(),
+                    route.getTemperature(),
+                    route.getGeography());
+        }
     }
 }

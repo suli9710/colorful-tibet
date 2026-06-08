@@ -9,8 +9,9 @@ import com.tibet.tourism.modules.hotel.infra.HotelRepository;
 import com.tibet.tourism.modules.hotel.infra.RoomTypeRepository;
 import com.tibet.tourism.modules.hotel.web.dto.HotelBookingRequest;
 import com.tibet.tourism.modules.hotel.web.dto.HotelBookingResponse;
+import com.tibet.tourism.modules.hotel.web.dto.PublicHotelResponse;
+import com.tibet.tourism.modules.hotel.web.dto.PublicRoomTypeResponse;
 import com.tibet.tourism.modules.order.application.OrderCenterService;
-import com.tibet.tourism.modules.order.domain.Booking;
 import com.tibet.tourism.modules.user.domain.User;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -58,18 +59,23 @@ public class HotelBookingService {
     }
 
     @Transactional(readOnly = true)
-    public List<RoomType> getRoomTypes(Long hotelId) {
-        return roomTypeRepository.findByHotelIdOrderBySortOrderAsc(hotelId);
+    public List<PublicRoomTypeResponse> getRoomTypes(Long hotelId) {
+        return roomTypeRepository.findByHotelIdOrderBySortOrderAsc(hotelId).stream()
+                .map(PublicRoomTypeResponse::from)
+                .toList();
     }
 
     @Transactional(readOnly = true)
-    public List<Hotel> getAllHotels() {
-        return hotelRepository.findAll(PageRequest.of(0, 200, Sort.by("id"))).getContent();
+    public List<PublicHotelResponse> getAllHotels() {
+        return hotelRepository.findAll(PageRequest.of(0, 200, Sort.by("id"))).getContent().stream()
+                .map(PublicHotelResponse::from)
+                .toList();
     }
 
     @Transactional(readOnly = true)
-    public Optional<Hotel> getHotel(Long id) {
-        return hotelRepository.findById(id);
+    public Optional<PublicHotelResponse> getHotel(Long id) {
+        return hotelRepository.findById(id)
+                .map(PublicHotelResponse::from);
     }
 
     @Transactional
@@ -152,11 +158,9 @@ public class HotelBookingService {
 
     @Transactional
     public HotelBooking cancelBooking(User user, Long id) {
-        HotelBooking booking = hotelBookingRepository.findById(id)
-                .orElseThrow(() -> new NoSuchElementException("Booking not found"));
-
-        if (!booking.getUser().getId().equals(user.getId()) && user.getRole() != User.Role.ADMIN) {
-            throw new SecurityException("Unauthorized");
+        HotelBooking booking = findBookingForMutation(user, id);
+        if (!isAdmin(user) && !isOwner(booking, user)) {
+            throw new NoSuchElementException("Booking not found");
         }
 
         transitionStatus(booking, HotelBooking.Status.CANCELLED);
@@ -167,15 +171,13 @@ public class HotelBookingService {
 
     @Transactional
     public void deleteBooking(User user, Long id) {
-        HotelBooking booking = hotelBookingRepository.findById(id)
-                .orElseThrow(() -> new NoSuchElementException("Booking not found"));
+        HotelBooking booking = findBookingForMutation(user, id);
         if (booking.getDeletedAt() != null) {
             throw new NoSuchElementException("Booking not found");
         }
-        boolean isAdmin = user.getRole() == User.Role.ADMIN;
-        boolean isOwner = booking.getUser() != null && booking.getUser().getId().equals(user.getId());
-        if (!isAdmin && !isOwner) {
-            throw new SecurityException("Unauthorized");
+        boolean isAdmin = isAdmin(user);
+        if (!isAdmin && !isOwner(booking, user)) {
+            throw new NoSuchElementException("Booking not found");
         }
         if (!isAdmin && booking.getStatus() != HotelBooking.Status.CANCELLED) {
             throw new IllegalStateException("仅已取消酒店预订可以删除");
@@ -185,6 +187,25 @@ public class HotelBookingService {
         }
         booking.setDeletedAt(LocalDateTime.now());
         hotelBookingRepository.save(booking);
+    }
+
+    private HotelBooking findBookingForMutation(User user, Long id) {
+        if (isAdmin(user)) {
+            return hotelBookingRepository.findById(id)
+                    .orElseThrow(() -> new NoSuchElementException("Booking not found"));
+        }
+        return hotelBookingRepository.findByIdAndUserId(id, user.getId())
+                .orElseThrow(() -> new NoSuchElementException("Booking not found"));
+    }
+
+    private boolean isOwner(HotelBooking booking, User user) {
+        return booking.getUser() != null
+                && user.getId() != null
+                && user.getId().equals(booking.getUser().getId());
+    }
+
+    private boolean isAdmin(User user) {
+        return user.getRole() == User.Role.ADMIN;
     }
 
     private void validateBookingRequest(HotelBookingRequest request, RoomType roomType) {
@@ -259,10 +280,6 @@ public class HotelBookingService {
         boolean ownerView = piiView == PiiView.OWNER;
         return new HotelBookingResponse(
                 booking.getId(),
-                booking.getUser() == null ? null : new HotelBookingResponse.UserSummary(
-                        booking.getUser().getId(),
-                        booking.getUser().getUsername(),
-                        booking.getUser().getNickname()),
                 hotel == null ? null : new HotelBookingResponse.HotelSummary(
                         hotel.getId(),
                         hotel.getName(),

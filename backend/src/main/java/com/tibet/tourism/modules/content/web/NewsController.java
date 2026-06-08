@@ -1,4 +1,5 @@
 package com.tibet.tourism.modules.content.web;
+import com.tibet.tourism.common.api.PageResponse;
 import com.tibet.tourism.common.validation.InputSanitizer;
 import com.tibet.tourism.modules.content.application.NewsService;
 import com.tibet.tourism.modules.content.domain.News;
@@ -23,12 +24,13 @@ public class NewsController {
     private NewsService newsService;
 
     @GetMapping
-    public Page<NewsDTO> getAllNews(
+    public PageResponse<NewsDTO> getAllNews(
             @RequestParam(required = false, defaultValue = "zh") String locale,
             @PageableDefault(size = 20) Pageable pageable) {
         Pageable safePageable = InputSanitizer.sanitizePageable(
                 pageable, ALLOWED_NEWS_SORT_FIELDS, DEFAULT_NEWS_SORT, 20, 100);
-        return newsService.getAllNews(safePageable)
+        Page<NewsDTO> newsPage = newsService.getAllNews(safePageable)
                 .map(news -> NewsDTO.fromEntity(news, locale));
+        return PageResponse.from(newsPage);
     }
 }

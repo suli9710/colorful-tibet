@@ -1,4 +1,5 @@
 package com.tibet.tourism.modules.admin.web;
+import com.tibet.tourism.common.api.PageResponse;
 import com.tibet.tourism.common.validation.InputSanitizer;
 import com.tibet.tourism.modules.admin.web.dto.NewsRequest;
 import com.tibet.tourism.modules.content.application.TibetanTranslationService;
@@ -6,10 +7,10 @@ import com.tibet.tourism.modules.content.domain.News;
 import com.tibet.tourism.modules.content.domain.TibetanDictionary;
 import com.tibet.tourism.modules.content.infra.NewsRepository;
 import jakarta.validation.Valid;
+import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Optional;
 import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
@@ -33,9 +34,9 @@ public class AdminNewsController {
     }
 
     @GetMapping("/news")
-    public ResponseEntity<Page<News>> getAllNews(
+    public ResponseEntity<PageResponse<NewsResponse>> getAllNews(
             @PageableDefault(size = 50, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
-        return ResponseEntity.ok(newsRepository.findAll(pageable));
+        return ResponseEntity.ok(PageResponse.from(newsRepository.findAll(pageable).map(NewsResponse::from)));
     }
 
     @PostMapping("/news")
@@ -83,7 +84,7 @@ public class AdminNewsController {
         }
 
         newsRepository.save(news);
-        return ResponseEntity.ok(news);
+        return ResponseEntity.ok(NewsResponse.from(news));
     }
 
     @PutMapping("/news/{id}")
@@ -140,7 +141,7 @@ public class AdminNewsController {
         }
 
         newsRepository.save(news);
-        return ResponseEntity.ok(news);
+        return ResponseEntity.ok(NewsResponse.from(news));
     }
 
     @DeleteMapping("/news/{id}")
@@ -151,5 +152,29 @@ public class AdminNewsController {
         }
         newsRepository.deleteById(id);
         return ResponseEntity.ok(Map.of("message", "删除成功"));
+    }
+    public record NewsResponse(
+            Long id,
+            String title,
+            String titleTibetan,
+            String content,
+            String contentTibetan,
+            News.Category category,
+            String imageUrl,
+            Integer viewCount,
+            LocalDateTime createdAt
+    ) {
+        private static NewsResponse from(News news) {
+            return new NewsResponse(
+                    news.getId(),
+                    news.getTitle(),
+                    news.getTitleTibetan(),
+                    news.getContent(),
+                    news.getContentTibetan(),
+                    news.getCategory(),
+                    news.getImageUrl(),
+                    news.getViewCount(),
+                    news.getCreatedAt());
+        }
     }
 }

@@ -359,6 +359,9 @@ import {
 } from 'lucide-vue-next'
 import MotionModal from './motion/MotionModal.vue'
 import api, { endpoints } from '../api'
+import { useConfirm } from '../composables/useConfirm'
+import { useToast } from '../composables/useToast'
+import { safeClientErrorMessage, summarizeClientError } from '../utils/errorMonitoring'
 
 type CommunityTab = 'routes' | 'questions' | 'comments' | 'spotComments' | 'answers'
 type CommunityType = 'route' | 'question' | 'comment' | 'spotComment' | 'answer'
@@ -372,6 +375,8 @@ interface CommunityTabConfig {
 }
 
 const { t, locale } = useI18n()
+const { showConfirm } = useConfirm()
+const { showToast } = useToast()
 
 const showPanel = ref(false)
 const activeTab = ref<CommunityTab>('routes')
@@ -458,10 +463,13 @@ const fetchCommunityContent = async () => {
   })
 
   if (failed.length > 0) {
-    console.error('Failed to load some community content:', failed)
+    console.error('Failed to load some community content:', failed.map(({ result, request }) => ({
+      key: request.key,
+      error: result.status === 'rejected' ? summarizeClientError(result.reason) : 'unknown'
+    })))
     if (failed.length === requests.length) {
       const firstError: any = failed[0].result.status === 'rejected' ? failed[0].result.reason : null
-      communityError.value = firstError?.response?.data?.error || firstError?.response?.data?.message || t('admin.loadCommunityFailed')
+      communityError.value = safeClientErrorMessage(firstError, t('admin.loadCommunityFailed'))
     }
   }
   loadingCommunity.value = false
@@ -560,17 +568,21 @@ const saveCommunityItem = async () => {
 
     await fetchCommunityContent()
     closeCommunityModal()
-    alert(t('admin.saveSuccess'))
+    showToast(t('admin.saveSuccess'), 'success')
   } catch (error: any) {
-    console.error('Failed to save community item:', error)
-    alert(error.response?.data?.error || t('admin.saveFailed'))
+    console.error('Failed to save community item:', summarizeClientError(error))
+    showToast(safeClientErrorMessage(error, t('admin.saveFailed')), 'error')
   } finally {
     savingCommunity.value = false
   }
 }
 
 const deleteCommunityItem = async (type: CommunityType, id: number) => {
-  if (!confirm(t('admin.confirmDeleteCommunityItem', { type: typeLabel(type) }))) return
+  const confirmed = await showConfirm({
+    message: t('admin.confirmDeleteCommunityItem', { type: typeLabel(type) }),
+    tone: 'danger'
+  })
+  if (!confirmed) return
 
   try {
     if (type === 'route') {
@@ -585,10 +597,10 @@ const deleteCommunityItem = async (type: CommunityType, id: number) => {
       await api.delete(endpoints.adminCommunity.deleteAnswer(id))
     }
     await fetchCommunityContent()
-    alert(t('admin.deleteSuccess'))
+    showToast(t('admin.deleteSuccess'), 'success')
   } catch (error: any) {
-    console.error('Failed to delete community item:', error)
-    alert(error.response?.data?.error || t('admin.deleteFailed'))
+    console.error('Failed to delete community item:', summarizeClientError(error))
+    showToast(safeClientErrorMessage(error, t('admin.deleteFailed')), 'error')
   }
 }
 

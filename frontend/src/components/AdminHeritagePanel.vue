@@ -284,6 +284,9 @@ import api, {
 } from '../api'
 import ImageUploadField from './ImageUploadField.vue'
 import MotionModal from './motion/MotionModal.vue'
+import { useConfirm } from '../composables/useConfirm'
+import { useToast } from '../composables/useToast'
+import { summarizeClientError } from '../utils/errorMonitoring'
 
 type HeritageItemForm = {
   name: string
@@ -324,6 +327,8 @@ type EventForm = {
 }
 
 const { t, te } = useI18n()
+const { showConfirm } = useConfirm()
+const { showToast } = useToast()
 
 const text = (key: string, fallback: string) => te(key) ? t(key) : fallback
 const adminPageParams = { page: 0, size: 100 }
@@ -418,7 +423,7 @@ const fetchItems = async () => {
     const response = await api.get(endpoints.adminHeritage.list, { params: adminPageParams })
     items.value = toList(response.data)
   } catch (error) {
-    console.error('Failed to fetch heritage items:', error)
+    console.error('Failed to fetch heritage items:', summarizeClientError(error))
     items.value = []
   } finally {
     loading.value = false
@@ -468,17 +473,21 @@ const saveItem = async () => {
     }
     await fetchItems()
     closeItemModal()
-    alert(text('admin.saveSuccess', '保存成功'))
+    showToast(text('admin.saveSuccess', '保存成功'), 'success')
   } catch (error) {
-    console.error('Failed to save heritage item:', error)
-    alert(text('admin.saveFailed', '保存失败'))
+    console.error('Failed to save heritage item:', summarizeClientError(error))
+    showToast(text('admin.saveFailed', '保存失败'), 'error')
   } finally {
     savingItem.value = false
   }
 }
 
 const deleteItem = async (item: HeritageItem) => {
-  if (!confirm(text('admin.confirmDelete', '确定要删除吗？'))) return
+  const confirmed = await showConfirm({
+    message: text('admin.confirmDelete', '确定要删除吗？'),
+    tone: 'danger'
+  })
+  if (!confirmed) return
   try {
     await api.delete(endpoints.adminHeritage.delete(item.id))
     if (expandedItemId.value === item.id) {
@@ -486,8 +495,8 @@ const deleteItem = async (item: HeritageItem) => {
     }
     await fetchItems()
   } catch (error) {
-    console.error('Failed to delete heritage item:', error)
-    alert(text('admin.deleteFailed', '删除失败'))
+    console.error('Failed to delete heritage item:', summarizeClientError(error))
+    showToast(text('admin.deleteFailed', '删除失败'), 'error')
   }
 }
 
@@ -514,7 +523,7 @@ const loadRelations = async (itemId: number) => {
     inheritors.value = Array.isArray(inheritorResponse.data) ? inheritorResponse.data : []
     events.value = Array.isArray(eventResponse.data) ? eventResponse.data : []
   } catch (error) {
-    console.error('Failed to fetch heritage relations:', error)
+    console.error('Failed to fetch heritage relations:', summarizeClientError(error))
     inheritors.value = []
     events.value = []
   } finally {
@@ -558,21 +567,26 @@ const saveInheritor = async () => {
     await loadRelations(expandedItemId.value)
     resetInheritorForm()
   } catch (error) {
-    console.error('Failed to save inheritor:', error)
-    alert(text('admin.saveFailed', '保存失败'))
+    console.error('Failed to save inheritor:', summarizeClientError(error))
+    showToast(text('admin.saveFailed', '保存失败'), 'error')
   } finally {
     savingInheritor.value = false
   }
 }
 
 const deleteInheritor = async (id: number) => {
-  if (!expandedItemId.value || !confirm(text('admin.confirmDelete', '确定要删除吗？'))) return
+  if (!expandedItemId.value) return
+  const confirmed = await showConfirm({
+    message: text('admin.confirmDelete', '确定要删除吗？'),
+    tone: 'danger'
+  })
+  if (!confirmed) return
   try {
     await api.delete(endpoints.adminHeritage.deleteInheritor(id))
     await loadRelations(expandedItemId.value)
   } catch (error) {
-    console.error('Failed to delete inheritor:', error)
-    alert(text('admin.deleteFailed', '删除失败'))
+    console.error('Failed to delete inheritor:', summarizeClientError(error))
+    showToast(text('admin.deleteFailed', '删除失败'), 'error')
   }
 }
 
@@ -613,21 +627,26 @@ const saveEvent = async () => {
     await loadRelations(expandedItemId.value)
     resetEventForm()
   } catch (error) {
-    console.error('Failed to save event:', error)
-    alert(text('admin.saveFailed', '保存失败'))
+    console.error('Failed to save event:', summarizeClientError(error))
+    showToast(text('admin.saveFailed', '保存失败'), 'error')
   } finally {
     savingEvent.value = false
   }
 }
 
 const deleteEvent = async (id: number) => {
-  if (!expandedItemId.value || !confirm(text('admin.confirmDelete', '确定要删除吗？'))) return
+  if (!expandedItemId.value) return
+  const confirmed = await showConfirm({
+    message: text('admin.confirmDelete', '确定要删除吗？'),
+    tone: 'danger'
+  })
+  if (!confirmed) return
   try {
     await api.delete(endpoints.adminHeritage.deleteEvent(id))
     await loadRelations(expandedItemId.value)
   } catch (error) {
-    console.error('Failed to delete event:', error)
-    alert(text('admin.deleteFailed', '删除失败'))
+    console.error('Failed to delete event:', summarizeClientError(error))
+    showToast(text('admin.deleteFailed', '删除失败'), 'error')
   }
 }
 

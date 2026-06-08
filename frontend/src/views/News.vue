@@ -56,7 +56,12 @@
              :whileHover="{ y: -5, scale: 1.012 }"
              :whilePress="{ scale: 0.996 }">
           <div class="w-full h-44 sm:h-48 relative flex-shrink-0">
-            <img :src="item.imageUrl || '/images/news/default-news.jpg'" :alt="item.title" class="w-full h-full object-cover tibet-image-hover will-change-transform" onerror="this.src='/images/spots/布达拉宫.jpg'">
+            <img
+              :src="resolveNewsImage(item)"
+              :alt="item.title"
+              class="w-full h-full object-cover tibet-image-hover will-change-transform"
+              @error="handleNewsImageError(item)"
+            >
             <div class="absolute top-0 left-0 bg-tibet-red text-tibet-yellow px-3 py-1 m-3 rounded-full text-xs font-medium shadow-lg sm:m-4">
               {{ getCategoryLabel(item.category) }}
             </div>
@@ -86,7 +91,12 @@
       >
         <template v-if="selectedItem">
               <div class="relative h-48 sm:h-64 md:h-96">
-                <img :src="selectedItem.imageUrl || '/images/news/default-news.jpg'" :alt="selectedItem.title" class="w-full h-full object-cover" onerror="this.src='/images/spots/布达拉宫.jpg'">
+                <img
+                  :src="resolveNewsImage(selectedItem)"
+                  :alt="selectedItem.title"
+                  class="w-full h-full object-cover"
+                  @error="handleNewsImageError(selectedItem)"
+                >
                 <button @click="closeDetail" class="absolute top-3 right-3 bg-black/50 text-white p-2 rounded-full hover:bg-black/70 transition-colors sm:top-4 sm:right-4">
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -125,6 +135,8 @@ import {
   revealInView,
   revealTransition
 } from '../motion/presets'
+import { summarizeClientError } from '../utils/errorMonitoring'
+import { markNewsImageFailed, resolveNewsImage as resolveNewsImageSrc } from '../utils/newsImages'
 
 const { t, locale } = useI18n()
 
@@ -133,15 +145,19 @@ interface NewsItem {
   title: string
   content: string
   category: 'POLICY' | 'EVENT' | 'NOTICE'
-  imageUrl: string
+  imageUrl?: string | null
   viewCount: number
   createdAt: string
 }
+
+const NEWS_DEFAULT_IMAGE = '/images/news/default-news.jpg'
+const NEWS_FALLBACK_IMAGE = '/images/spots/布达拉宫.jpg'
 
 const newsItems = ref<NewsItem[]>([])
 const loading = ref(true)
 const selectedCategory = ref<string>('ALL')
 const selectedItem = ref<NewsItem | null>(null)
+const failedNewsImages = ref<Record<string, boolean>>({})
 
 const categories = computed(() => [
   { label: t('common.all'), value: 'ALL' },
@@ -167,13 +183,21 @@ const formatDate = (dateStr: string) => {
   })
 }
 
+const resolveNewsImage = (item: NewsItem) => {
+  return resolveNewsImageSrc(item, failedNewsImages.value)
+}
+
+const handleNewsImageError = (item: NewsItem) => {
+  markNewsImageFailed(item, failedNewsImages.value)
+}
+
 const fetchNews = async () => {
   try {
     // API拦截器会自动添加locale参数，根据localStorage中的locale设置
     const response = await api.get(endpoints.news.list)
     newsItems.value = response.data?.content || response.data || []
   } catch (error) {
-    console.error('Failed to fetch news:', error)
+    console.error('Failed to fetch news:', summarizeClientError(error))
   } finally {
     loading.value = false
   }

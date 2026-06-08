@@ -1,6 +1,5 @@
 package com.tibet.tourism.modules.recommendation.web.dto;
-import com.tibet.tourism.modules.spot.domain.ScenicSpot;
-import com.tibet.tourism.modules.user.domain.User;
+import com.tibet.tourism.modules.spot.web.dto.ScenicSpotResponse;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -14,7 +13,7 @@ public class RecommendationDebugResponse {
     private List<SimilarUserEntry> similarUsers;
     private List<CandidateScoreEntry> candidateScores;
     private Map<String, Double> tagProfile;
-    private List<ScenicSpot> recommendations;
+    private List<ScenicSpotResponse> recommendations;
     private Map<Long, String> recommendationReasons; // 推荐原因：spotId -> reason
 
     public Map<Long, String> getRecommendationReasons() {
@@ -81,11 +80,11 @@ public class RecommendationDebugResponse {
         this.tagProfile = tagProfile;
     }
 
-    public List<ScenicSpot> getRecommendations() {
+    public List<ScenicSpotResponse> getRecommendations() {
         return recommendations;
     }
 
-    public void setRecommendations(List<ScenicSpot> recommendations) {
+    public void setRecommendations(List<ScenicSpotResponse> recommendations) {
         this.recommendations = recommendations;
     }
 

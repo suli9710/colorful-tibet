@@ -1,9 +1,11 @@
 package com.tibet.tourism.modules.community.web;
+import com.tibet.tourism.common.api.PageResponse;
 import com.tibet.tourism.common.error.AuthenticationRequiredException;
 import com.tibet.tourism.common.error.BusinessException;
 import com.tibet.tourism.common.error.ResourceNotFoundException;
 import com.tibet.tourism.common.error.UnauthorizedActionException;
 import com.tibet.tourism.common.security.JwtAuthSupport;
+import com.tibet.tourism.common.security.SensitiveLogSanitizer;
 import com.tibet.tourism.common.validation.InputSanitizer;
 import com.tibet.tourism.modules.community.application.SharedRouteService;
 import com.tibet.tourism.modules.community.domain.RouteComment;
@@ -37,6 +39,10 @@ import org.springframework.web.bind.annotation.*;
 public class SharedRouteController {
 
     private static final Logger logger = LoggerFactory.getLogger(SharedRouteController.class);
+    private static final String ERROR_AUTHENTICATION_REQUIRED = "Authentication required";
+    private static final String ERROR_PERMISSION_DENIED = "Permission denied";
+    private static final String ERROR_NOT_FOUND = "Resource not found";
+    private static final String ERROR_INVALID_REQUEST = "Invalid request";
 
     private static final Set<String> ALLOWED_ROUTE_SORT_FIELDS = Set.of(
             "createdAt", "updatedAt", "viewCount", "likeCount", "commentCount", "days");
@@ -61,19 +67,28 @@ public class SharedRouteController {
         }
     }
 
+    private Long getOptionalCurrentUserId(HttpServletRequest request) {
+        try {
+            Optional<User> currentUser = jwtAuthSupport.resolveOptionalCurrentUser(request);
+            return currentUser == null ? null : currentUser.map(User::getId).orElse(null);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     private ResponseEntity<Map<String, String>> safeBadRequest(Exception e) {
-        logger.warn("Shared route request failed: {}", e.getMessage());
+        logger.warn("Shared route request failed: {}", SensitiveLogSanitizer.exceptionSummary(e));
         if (e instanceof AuthenticationRequiredException) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", e.getMessage()));
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", ERROR_AUTHENTICATION_REQUIRED));
         }
         if (e instanceof UnauthorizedActionException || e instanceof SecurityException) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", e.getMessage()));
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", ERROR_PERMISSION_DENIED));
         }
         if (e instanceof ResourceNotFoundException) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", ERROR_NOT_FOUND));
         }
         if (e instanceof BusinessException || e instanceof IllegalArgumentException) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.badRequest().body(Map.of("error", ERROR_INVALID_REQUEST));
         }
         return ResponseEntity.badRequest().body(Map.of("error", "请求处理失败，请检查输入后重试"));
     }
@@ -83,15 +98,16 @@ public class SharedRouteController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<?> shareRoute(@Valid @RequestBody ShareRouteRequest dto, HttpServletRequest request) {
         try {
+            long userId = getCurrentUserId(request);
             SharedRoute route = routeService.shareRoute(
-                    getCurrentUserId(request),
+                    userId,
                     dto.getTitle(),
                     dto.getContent(),
                     dto.getDays(),
                     dto.getBudget(),
                     dto.getPreference()
             );
-            return ResponseEntity.ok(SharedRouteResponse.fromEntity(route));
+            return ResponseEntity.ok(SharedRouteResponse.fromEntity(route, userId));
         } catch (Exception e) {
             return safeBadRequest(e);
         }
@@ -105,7 +121,8 @@ public class SharedRouteController {
             @RequestParam(required = false) String preference,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
-            @RequestParam(defaultValue = "createdAt") String sortField) {
+            @RequestParam(defaultValue = "createdAt") String sortField,
+            HttpServletRequest request) {
 
         String safeSortField = InputSanitizer.safeSortField(sortField, ALLOWED_ROUTE_SORT_FIELDS, "createdAt");
         Sort sort = Sort.by(Sort.Direction.DESC, safeSortField);
@@ -114,17 +131,18 @@ public class SharedRouteController {
                 InputSanitizer.normalizePageSize(size, 10, 50),
                 sort);
         
+        Long currentUserId = getOptionalCurrentUserId(request);
         Page<SharedRouteResponse> routes = routeService.getRoutes(days, budget, preference, pageable)
-                .map(SharedRouteResponse::fromEntity);
-        return ResponseEntity.ok(routes);
+                .map(route -> SharedRouteResponse.fromEntity(route, currentUserId));
+        return ResponseEntity.ok(PageResponse.from(routes));
     }
 
     // 获取路线详情
     @GetMapping("/shared/{id}")
-    public ResponseEntity<?> getRouteDetail(@PathVariable Long id) {
+    public ResponseEntity<?> getRouteDetail(@PathVariable Long id, HttpServletRequest request) {
         try {
             SharedRoute route = routeService.getRoute(id);
-            return ResponseEntity.ok(SharedRouteResponse.fromEntity(route));
+            return ResponseEntity.ok(SharedRouteResponse.fromEntity(route, getOptionalCurrentUserId(request)));
         } catch (Exception e) {
             return ResponseEntity.notFound().build();
         }
@@ -194,7 +212,7 @@ public class SharedRouteController {
             Long userId = getCurrentUserId(request);
             String content = payload.get("content");
             RouteComment comment = routeService.addComment(id, userId, content);
-            return ResponseEntity.ok(RouteCommentResponse.fromEntity(comment));
+            return ResponseEntity.ok(RouteCommentResponse.fromEntity(comment, userId));
         } catch (Exception e) {
             return safeBadRequest(e);
         }
@@ -202,10 +220,11 @@ public class SharedRouteController {
 
     // 获取评论列表
     @GetMapping("/shared/{id}/comments")
-    public ResponseEntity<?> getComments(@PathVariable Long id) {
+    public ResponseEntity<?> getComments(@PathVariable Long id, HttpServletRequest request) {
         try {
+            Long currentUserId = getOptionalCurrentUserId(request);
             List<RouteCommentResponse> comments = routeService.getComments(id).stream()
-                    .map(RouteCommentResponse::fromEntity)
+                    .map(comment -> RouteCommentResponse.fromEntity(comment, currentUserId))
                     .toList();
             return ResponseEntity.ok(comments);
         } catch (Exception e) {
@@ -236,7 +255,7 @@ public class SharedRouteController {
             User user = userRepository.findById(getCurrentUserId(request))
                     .orElseThrow(() -> new ResourceNotFoundException("User not found"));
             List<SharedRouteResponse> routes = routeService.getRoutesByAuthor(user).stream()
-                    .map(SharedRouteResponse::fromEntity)
+                    .map(route -> SharedRouteResponse.fromEntity(route, user.getId()))
                     .toList();
             return ResponseEntity.ok(routes);
         } catch (Exception e) {

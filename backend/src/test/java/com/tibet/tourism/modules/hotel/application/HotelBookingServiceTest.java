@@ -1,27 +1,43 @@
 package com.tibet.tourism.modules.hotel.application;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyString;
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.tibet.tourism.modules.hotel.domain.Hotel;
 import com.tibet.tourism.modules.hotel.domain.HotelBooking;
+import com.tibet.tourism.modules.hotel.domain.RoomType;
 import com.tibet.tourism.modules.hotel.infra.HotelBookingRepository;
 import com.tibet.tourism.modules.hotel.infra.HotelRepository;
 import com.tibet.tourism.modules.hotel.infra.RoomTypeRepository;
 import com.tibet.tourism.modules.order.application.OrderCenterService;
-import com.tibet.tourism.modules.order.domain.Booking;
 import com.tibet.tourism.modules.user.domain.User;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.mockito.Mock;
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import org.springframework.data.domain.Sort;
 
 @ExtendWith(MockitoExtension.class)
 class HotelBookingServiceTest {
@@ -45,6 +61,7 @@ class HotelBookingServiceTest {
 
         user = new User();
         user.setId(1L);
+        user.setUsername("traveler");
         user.setRole(User.Role.USER);
 
         admin = new User();
@@ -55,7 +72,7 @@ class HotelBookingServiceTest {
     @Test
     void userCanDeleteOwnCancelledHotelBooking() {
         HotelBooking booking = booking(99L, user, HotelBooking.Status.CANCELLED);
-        when(hotelBookingRepository.findById(99L)).thenReturn(Optional.of(booking));
+        when(hotelBookingRepository.findByIdAndUserId(99L, user.getId())).thenReturn(Optional.of(booking));
 
         hotelBookingService.deleteBooking(user, 99L);
 
@@ -66,29 +83,56 @@ class HotelBookingServiceTest {
     @Test
     void userCannotDeleteOwnActiveHotelBooking() {
         HotelBooking booking = booking(99L, user, HotelBooking.Status.CONFIRMED);
-        when(hotelBookingRepository.findById(99L)).thenReturn(Optional.of(booking));
+        when(hotelBookingRepository.findByIdAndUserId(99L, user.getId())).thenReturn(Optional.of(booking));
 
-        IllegalStateException error = assertThrows(
-                IllegalStateException.class,
-                () -> hotelBookingService.deleteBooking(user, 99L));
+        assertThrows(IllegalStateException.class, () -> hotelBookingService.deleteBooking(user, 99L));
 
-        assertEquals("仅已取消酒店预订可以删除", error.getMessage());
         assertNull(booking.getDeletedAt());
         verify(hotelBookingRepository, never()).save(any());
     }
 
     @Test
     void userCannotDeleteSomeoneElsesHotelBooking() {
-        User owner = new User();
-        owner.setId(3L);
-        owner.setRole(User.Role.USER);
-        HotelBooking booking = booking(99L, owner, HotelBooking.Status.CANCELLED);
-        when(hotelBookingRepository.findById(99L)).thenReturn(Optional.of(booking));
+        when(hotelBookingRepository.findByIdAndUserId(99L, user.getId())).thenReturn(Optional.empty());
 
-        assertThrows(SecurityException.class, () -> hotelBookingService.deleteBooking(user, 99L));
+        assertThrows(NoSuchElementException.class, () -> hotelBookingService.deleteBooking(user, 99L));
 
-        assertNull(booking.getDeletedAt());
+        verify(hotelBookingRepository, never()).findById(99L);
         verify(hotelBookingRepository, never()).save(any());
+    }
+
+    @Test
+    void userCannotCancelAnonymizedHotelBooking() {
+        when(hotelBookingRepository.findByIdAndUserId(99L, user.getId())).thenReturn(Optional.empty());
+
+        assertThrows(NoSuchElementException.class, () -> hotelBookingService.cancelBooking(user, 99L));
+
+        verify(hotelBookingRepository, never()).findById(99L);
+        verify(hotelBookingRepository, never()).save(any());
+        verify(orderCenterService, never()).cancelLegacyMirror(any(), anyString(), any(), anyString());
+    }
+
+    @Test
+    void userCannotDeleteAnonymizedHotelBooking() {
+        when(hotelBookingRepository.findByIdAndUserId(99L, user.getId())).thenReturn(Optional.empty());
+
+        assertThrows(NoSuchElementException.class, () -> hotelBookingService.deleteBooking(user, 99L));
+
+        verify(hotelBookingRepository, never()).findById(99L);
+        verify(hotelBookingRepository, never()).save(any());
+    }
+
+    @Test
+    void userCanCancelOwnHotelBooking() {
+        HotelBooking booking = booking(99L, user, HotelBooking.Status.CONFIRMED);
+        when(hotelBookingRepository.findByIdAndUserId(99L, user.getId())).thenReturn(Optional.of(booking));
+        when(hotelBookingRepository.save(booking)).thenReturn(booking);
+
+        hotelBookingService.cancelBooking(user, 99L);
+
+        assertEquals(HotelBooking.Status.CANCELLED, booking.getStatus());
+        verify(hotelBookingRepository).save(booking);
+        verify(orderCenterService).cancelLegacyMirror(eq(user), eq("LEGACY_HOTEL_BOOKING"), eq(99L), anyString());
     }
 
     @Test
@@ -118,7 +162,7 @@ class HotelBookingServiceTest {
     }
 
     @Test
-    void userBookingListKeepsOwnGuestNameButMasksPhone() {
+    void userBookingListKeepsOwnGuestNameButMasksPhone() throws Exception {
         HotelBooking booking = bookingWithPii(99L, user);
         when(hotelBookingRepository.findByUserIdOrderByCreatedAtDesc(user.getId(), PageRequest.of(0, 20)))
                 .thenReturn(new PageImpl<>(List.of(booking)));
@@ -128,6 +172,12 @@ class HotelBookingServiceTest {
 
         assertEquals("Alice Zhang", response.guestName());
         assertEquals("138****8000", response.phone());
+        String json = new ObjectMapper()
+                .registerModule(new JavaTimeModule())
+                .writeValueAsString(response);
+        assertFalse(json.contains("\"user\""));
+        assertFalse(json.contains("\"username\""));
+        assertFalse(json.contains("traveler"));
     }
 
     @Test
@@ -139,6 +189,57 @@ class HotelBookingServiceTest {
 
         assertEquals("Alice Zhang", response.guestName());
         assertEquals("13800138000", response.phone());
+    }
+
+    @Test
+    void publicHotelListMapsEntitiesToPublicDtos() {
+        Hotel hotel = publicHotelEntity();
+        when(hotelRepository.findAll(PageRequest.of(0, 200, Sort.by("id"))))
+                .thenReturn(new PageImpl<>(List.of(hotel)));
+
+        var response = hotelBookingService.getAllHotels().get(0);
+
+        assertEquals(5L, response.id());
+        assertEquals("Lhasa Hotel", response.name());
+        assertEquals("Lhasa", response.location());
+        assertEquals("800-1200", response.priceRange());
+        assertEquals(new BigDecimal("4.8"), response.rating());
+        assertEquals("/images/hotel.jpg", response.imageUrl());
+        assertEquals("wifi, oxygen", response.facilities());
+    }
+
+    @Test
+    void publicHotelDetailMapsEntityToPublicDto() {
+        Hotel hotel = publicHotelEntity();
+        when(hotelRepository.findById(5L)).thenReturn(Optional.of(hotel));
+
+        var response = hotelBookingService.getHotel(5L).orElseThrow();
+
+        assertEquals(5L, response.id());
+        assertEquals("Lhasa Hotel", response.name());
+        assertEquals("Lhasa", response.location());
+    }
+
+    @Test
+    void publicRoomTypesMapEntitiesToPublicDtos() {
+        RoomType roomType = new RoomType();
+        roomType.setId(8L);
+        roomType.setName("Deluxe King");
+        roomType.setPrice(new BigDecimal("880.00"));
+        roomType.setCapacity(2);
+        roomType.setImageUrl("/images/room.jpg");
+        roomType.setAmenities("oxygen, breakfast");
+        roomType.setSortOrder(99);
+        when(roomTypeRepository.findByHotelIdOrderBySortOrderAsc(5L)).thenReturn(List.of(roomType));
+
+        var response = hotelBookingService.getRoomTypes(5L).get(0);
+
+        assertEquals(8L, response.id());
+        assertEquals("Deluxe King", response.name());
+        assertEquals(new BigDecimal("880.00"), response.price());
+        assertEquals(2, response.capacity());
+        assertEquals("/images/room.jpg", response.imageUrl());
+        assertEquals("oxygen, breakfast", response.amenities());
     }
 
     private HotelBooking booking(Long id, User owner, HotelBooking.Status status) {
@@ -168,5 +269,19 @@ class HotelBookingServiceTest {
         booking.setTotalPrice(new BigDecimal("1848"));
         booking.setCreatedAt(LocalDateTime.parse("2026-06-01T12:00:00"));
         return booking;
+    }
+
+    private Hotel publicHotelEntity() {
+        Hotel hotel = new Hotel();
+        hotel.setId(5L);
+        hotel.setName("Lhasa Hotel");
+        hotel.setLocation("Lhasa");
+        hotel.setPhone("13900139000");
+        hotel.setPriceRange("800-1200");
+        hotel.setRating(new BigDecimal("4.8"));
+        hotel.setImageUrl("/images/hotel.jpg");
+        hotel.setFacilities("wifi, oxygen");
+        hotel.setCreatedAt(LocalDateTime.parse("2026-06-01T12:00:00"));
+        return hotel;
     }
 }

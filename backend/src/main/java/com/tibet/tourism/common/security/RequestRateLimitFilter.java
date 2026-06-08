@@ -36,6 +36,8 @@ public class RequestRateLimitFilter extends OncePerRequestFilter {
     private static final Logger logger = LoggerFactory.getLogger(RequestRateLimitFilter.class);
     private static final int MAX_TRACKED_WINDOWS = 20_000;
     private static final long CLEANUP_INTERVAL_MILLIS = Duration.ofMinutes(1).toMillis();
+    private static final long MIN_RATE_LIMIT_WINDOW_MILLIS = 1_000L;
+    private static final long MAX_RATE_LIMIT_WINDOW_MILLIS = Duration.ofDays(1).toMillis();
     static final String INCREMENT_WITH_EXPIRE_LUA =
             """
             local current = redis.call('INCR', KEYS[1])
@@ -150,7 +152,7 @@ public class RequestRateLimitFilter extends OncePerRequestFilter {
             response.setHeader(HttpHeaders.RETRY_AFTER, String.valueOf(decision.retryAfterSeconds()));
             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
             response.setCharacterEncoding("UTF-8");
-            response.getWriter().write("{\"error\":\"Too Many Requests\",\"message\":\"请求过于频繁，请稍后再试\"}");
+            response.getWriter().write("{\"error\":\"Too Many Requests\",\"message\":\"Request rate limit exceeded\"}");
             return;
         }
 
@@ -167,7 +169,7 @@ public class RequestRateLimitFilter extends OncePerRequestFilter {
                 }
                 recordRedisFallback("empty-result", "Redis script returned no count");
             } catch (Exception e) {
-                recordRedisFallback("exception", e.getMessage());
+                recordRedisFallback("exception", SensitiveLogSanitizer.exceptionSummary(e));
             }
         }
 
@@ -241,27 +243,35 @@ public class RequestRateLimitFilter extends OncePerRequestFilter {
     private LimitRule resolveRule(String path, String method) {
         String normalized = path.toLowerCase();
         if (normalized.startsWith("/api/auth/register")) {
-            return new LimitRule("register", registerRequests, Duration.ofSeconds(registerWindowSeconds).toMillis());
+            return new LimitRule("register", registerRequests, configuredWindowMillis(registerWindowSeconds));
         }
         if (normalized.startsWith("/api/auth/login")) {
-            return new LimitRule("auth", authRequests, Duration.ofSeconds(authWindowSeconds).toMillis());
+            return new LimitRule("auth", authRequests, configuredWindowMillis(authWindowSeconds));
         }
         if ("GET".equalsIgnoreCase(method) && normalized.startsWith("/api/routes/generate/jobs/")) {
-            return new LimitRule("default", defaultRequests, Duration.ofSeconds(defaultWindowSeconds).toMillis());
+            return new LimitRule("default", defaultRequests, configuredWindowMillis(defaultWindowSeconds));
         }
         if (normalized.startsWith("/api/routes/generate")) {
-            return new LimitRule("ai", aiRequests, Duration.ofSeconds(aiWindowSeconds).toMillis());
+            return new LimitRule("ai", aiRequests, configuredWindowMillis(aiWindowSeconds));
         }
         if (normalized.startsWith("/api/guide/chat")) {
-            return new LimitRule("guide-chat", guideChatRequests, Duration.ofSeconds(guideChatWindowSeconds).toMillis());
+            return new LimitRule("guide-chat", guideChatRequests, configuredWindowMillis(guideChatWindowSeconds));
         }
         if (normalized.contains("/upload-image") || normalized.endsWith("/upload-avatar")) {
-            return new LimitRule("upload", uploadRequests, Duration.ofSeconds(uploadWindowSeconds).toMillis());
+            return new LimitRule("upload", uploadRequests, configuredWindowMillis(uploadWindowSeconds));
         }
         if (normalized.startsWith("/api/admin/")) {
-            return new LimitRule("admin", adminRequests, Duration.ofSeconds(adminWindowSeconds).toMillis());
+            return new LimitRule("admin", adminRequests, configuredWindowMillis(adminWindowSeconds));
         }
-        return new LimitRule("default", defaultRequests, Duration.ofSeconds(defaultWindowSeconds).toMillis());
+        return new LimitRule("default", defaultRequests, configuredWindowMillis(defaultWindowSeconds));
+    }
+
+    private long configuredWindowMillis(long windowSeconds) {
+        if (windowSeconds <= 0) {
+            return MIN_RATE_LIMIT_WINDOW_MILLIS;
+        }
+        long maxSeconds = TimeUnit.MILLISECONDS.toSeconds(MAX_RATE_LIMIT_WINDOW_MILLIS);
+        return TimeUnit.SECONDS.toMillis(Math.min(windowSeconds, maxSeconds));
     }
 
     private String clientIp(HttpServletRequest request) {
@@ -288,6 +298,14 @@ public class RequestRateLimitFilter extends OncePerRequestFilter {
     }
 
     private record LimitRule(String name, int maxRequests, long windowMillis) {
+        private static final int MIN_REQUESTS = 1;
+
+        private LimitRule {
+            maxRequests = Math.max(MIN_REQUESTS, maxRequests);
+            windowMillis = Math.min(
+                    MAX_RATE_LIMIT_WINDOW_MILLIS,
+                    Math.max(MIN_RATE_LIMIT_WINDOW_MILLIS, windowMillis));
+        }
     }
 
     private record RateDecision(boolean allowed, int remaining, long retryAfterSeconds, long resetEpochSeconds) {

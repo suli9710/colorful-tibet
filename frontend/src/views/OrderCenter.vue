@@ -78,16 +78,42 @@
         </div>
       </section>
 
-      <div v-if="errorMessage" class="mb-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
-        {{ errorMessage }}
+      <div v-if="errorMessage && orders.length" role="alert" class="mb-5 flex flex-col gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700 sm:flex-row sm:items-center sm:justify-between">
+        <span>{{ errorMessage }}</span>
+        <button
+          type="button"
+          class="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-100 disabled:opacity-50"
+          :disabled="loading"
+          @click="loadOrders(selectedOrderId)"
+        >
+          <RefreshCw class="h-3.5 w-3.5" :class="{ 'animate-spin': loading }" />
+          重试
+        </button>
       </div>
-      <div v-if="statusMessage" class="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
+      <div v-if="statusMessage" role="status" aria-live="polite" class="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
         {{ statusMessage }}
       </div>
 
       <div v-if="loading && !orders.length" class="rounded-3xl border border-white/60 bg-white/75 p-12 text-center text-tibet-brown/60">
         <div class="mx-auto mb-4 h-11 w-11 animate-spin rounded-full border-2 border-tibet-gold/30 border-b-tibet-gold"></div>
         <p class="text-sm font-semibold">正在加载咨询记录</p>
+      </div>
+
+      <div v-else-if="errorMessage && !orders.length" role="alert" class="rounded-3xl border border-rose-200 bg-rose-50 px-6 py-12 text-center shadow-sm">
+        <PackageCheck class="mx-auto h-12 w-12 text-rose-500" />
+        <h2 class="mt-4 text-xl font-bold text-rose-900">咨询记录加载失败</h2>
+        <p class="mx-auto mt-2 max-w-md text-sm leading-6 text-rose-700">
+          {{ errorMessage }}
+        </p>
+        <button
+          type="button"
+          class="mt-6 inline-flex items-center justify-center gap-2 rounded-xl bg-tibet-red px-4 py-2.5 text-sm font-semibold text-tibet-yellow disabled:opacity-50"
+          :disabled="loading"
+          @click="loadOrders(selectedOrderId)"
+        >
+          <RefreshCw class="h-4 w-4" :class="{ 'animate-spin': loading }" />
+          重新加载
+        </button>
       </div>
 
       <div v-else-if="!orders.length" class="rounded-3xl border border-white/60 bg-white/80 px-6 py-12 text-center shadow-sm">
@@ -153,7 +179,15 @@
           </article>
 
           <div v-if="!filteredOrders.length" class="rounded-2xl border border-white/60 bg-white/75 p-8 text-center text-sm text-tibet-brown/60">
-            当前筛选下没有咨询记录。
+            <p>当前筛选下没有咨询记录。</p>
+            <button
+              v-if="selectedTab !== 'ALL' || query"
+              type="button"
+              class="mt-4 rounded-xl border border-tibet-gold/25 bg-white px-4 py-2 text-sm font-semibold text-tibet-brown transition hover:bg-amber-50"
+              @click="resetFilters"
+            >
+              清除筛选
+            </button>
           </div>
         </section>
 
@@ -279,7 +313,7 @@
                       placeholder="可选，便于客服处理"
                     ></textarea>
                   </label>
-                  <p v-if="actionError" class="mt-3 text-xs font-medium text-rose-600">{{ actionError }}</p>
+                  <p v-if="actionError" role="alert" class="mt-3 text-xs font-medium text-rose-600">{{ actionError }}</p>
                   <div class="mt-4 flex justify-end gap-2">
                     <button type="button" class="rounded-xl px-3 py-2 text-sm font-semibold text-tibet-brown/60 hover:bg-gray-100" @click="resetActionForm">收起</button>
                     <button type="submit" class="rounded-xl bg-tibet-dark px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" :disabled="actionLoading">
@@ -299,6 +333,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import {
   Ban,
   CalendarDays,
@@ -315,7 +350,10 @@ import {
   X
 } from 'lucide-vue-next'
 import api, { endpoints } from '../api'
+import { useConfirm } from '../composables/useConfirm'
+import { useToast } from '../composables/useToast'
 import { useAuthStore } from '../stores/auth'
+import { safeClientErrorMessage, summarizeClientError } from '../utils/errorMonitoring'
 
 interface OrderItem {
   id: number
@@ -358,7 +396,10 @@ interface Order {
 }
 
 const router = useRouter()
+const { t } = useI18n()
 const auth = useAuthStore()
+const { showConfirm } = useConfirm()
+const { showToast } = useToast()
 
 const orders = ref<Order[]>([])
 const selectedOrderId = ref<number | null>(null)
@@ -457,8 +498,8 @@ const loadOrders = async (preferredId?: number | null) => {
     selectedOrderId.value = orders.value.some(order => order.id === nextId) ? nextId : null
     if (!selectedOrderId.value) resetActionForm()
   } catch (error: any) {
-    console.error('Failed to load consultation records:', error)
-    errorMessage.value = error.response?.data?.error || '咨询记录加载失败'
+    console.error('Failed to load consultation records:', summarizeClientError(error))
+    errorMessage.value = safeClientErrorMessage(error, '咨询记录加载失败')
   } finally {
     loading.value = false
   }
@@ -472,6 +513,11 @@ const selectOrder = (id: number) => {
 const closeOrderDetail = () => {
   selectedOrderId.value = null
   resetActionForm()
+}
+
+const resetFilters = () => {
+  selectedTab.value = 'ALL'
+  query.value = ''
 }
 
 const beginCancelAction = () => {
@@ -498,8 +544,8 @@ const submitCancelAction = async () => {
     resetActionForm()
     await loadOrders(order.id)
   } catch (error: any) {
-    console.error('Consultation cancel failed:', error)
-    actionError.value = error.response?.data?.error || '操作失败，请稍后重试'
+    console.error('Consultation cancel failed:', summarizeClientError(error))
+    actionError.value = safeClientErrorMessage(error, '操作失败，请稍后重试')
   } finally {
     actionLoading.value = false
   }
@@ -510,7 +556,13 @@ const canDelete = (order: Order) => ['CANCELLED', 'EXPIRED', 'REFUNDED'].include
 
 const deleteClosedOrder = async (order: Order) => {
   if (!canDelete(order) || deletingOrderId.value) return
-  if (!window.confirm(`确定删除咨询记录 ${order.orderNo}？删除后列表中将不再显示。`)) return
+  const confirmed = await showConfirm({
+    message: `确定删除咨询记录 ${order.orderNo}？删除后列表中将不再显示。`,
+    confirmLabel: t('common.delete'),
+    cancelLabel: t('common.cancel'),
+    tone: 'danger'
+  })
+  if (!confirmed) return
 
   deletingOrderId.value = order.id
   errorMessage.value = ''
@@ -520,9 +572,11 @@ const deleteClosedOrder = async (order: Order) => {
     orders.value = orders.value.filter(item => item.id !== order.id)
     if (selectedOrderId.value === order.id) closeOrderDetail()
     statusMessage.value = '已删除关闭的咨询记录。'
+    showToast(statusMessage.value, 'success')
   } catch (error: any) {
-    console.error('Failed to delete consultation record:', error)
-    errorMessage.value = error.response?.data?.error || '咨询记录删除失败，请稍后重试'
+    console.error('Failed to delete consultation record:', summarizeClientError(error))
+    errorMessage.value = safeClientErrorMessage(error, '咨询记录删除失败，请稍后重试')
+    showToast(errorMessage.value, 'error')
   } finally {
     deletingOrderId.value = null
   }

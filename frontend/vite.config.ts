@@ -60,10 +60,6 @@ export default defineConfig(({ command }) => ({
         manualChunks(id) {
           const normalizedId = id.replace(/\\/g, '/')
           if (!normalizedId.includes('/node_modules/')) return
-          if (
-            normalizedId.includes('/node_modules/echarts/') ||
-            normalizedId.includes('/node_modules/zrender/')
-          ) return 'echarts'
           if (normalizedId.includes('/node_modules/leaflet/')) return 'leaflet'
           if (normalizedId.includes('/node_modules/motion-')) return 'motion'
           if (normalizedId.includes('/node_modules/lucide-vue-next/')) return 'ui'

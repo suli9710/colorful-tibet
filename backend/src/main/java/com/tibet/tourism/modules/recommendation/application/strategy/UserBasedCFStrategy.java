@@ -51,7 +51,8 @@ public class UserBasedCFStrategy implements ScoringStrategy {
                 .filter(Objects::nonNull)
                 .collect(Collectors.toConcurrentMap(Map.Entry::getKey, Map.Entry::getValue, (v1, v2) -> v1));
 
-        logger.info("👥 找到 {} 个相似用户（相似度 >= {}）", userSimilarityMap.size(), config.getMinSimilarity());
+        logger.info("User-Based CF similar users found: count={}, minSimilarity={}",
+                userSimilarityMap.size(), config.getMinSimilarity());
 
         cacheService.cacheSimilarity(userId, userSimilarityMap);
 

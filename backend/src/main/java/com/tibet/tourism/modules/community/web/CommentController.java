@@ -1,6 +1,8 @@
 package com.tibet.tourism.modules.community.web;
+import com.tibet.tourism.common.api.PageResponse;
 import com.tibet.tourism.common.error.ResourceNotFoundException;
 import com.tibet.tourism.common.security.JwtAuthSupport;
+import com.tibet.tourism.common.security.SensitiveLogSanitizer;
 import com.tibet.tourism.common.validation.InputSanitizer;
 import com.tibet.tourism.modules.community.domain.Comment;
 import com.tibet.tourism.modules.community.domain.CommentLike;
@@ -15,9 +17,10 @@ import com.tibet.tourism.modules.user.domain.User;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
@@ -34,6 +37,8 @@ import org.springframework.web.multipart.MultipartFile;
 @RestController
 @RequestMapping("/api/comments")
 public class CommentController {
+    private static final Logger logger = LoggerFactory.getLogger(CommentController.class);
+    private static final String SAFE_UPLOAD_ERROR_MESSAGE = "Image upload failed";
 
     private static final Set<String> ALLOWED_COMMENT_SORT_FIELDS = Set.of(
             "id", "createdAt", "rating", "likeCount");
@@ -55,13 +60,18 @@ public class CommentController {
     private JwtAuthSupport jwtAuthSupport;
 
     @GetMapping("/spot/{spotId}")
-    public Page<CommentDTO> getCommentsBySpot(
+    public PageResponse<CommentDTO> getCommentsBySpot(
             @PathVariable long spotId,
-            @PageableDefault(size = 20) Pageable pageable) {
+            @PageableDefault(size = 20) Pageable pageable,
+            HttpServletRequest request) {
         Pageable safePageable = InputSanitizer.sanitizePageable(
                 pageable, ALLOWED_COMMENT_SORT_FIELDS, DEFAULT_COMMENT_SORT, 20, 100);
-        return commentRepository.findBySpotIdOrderByCreatedAtDesc(spotId, safePageable)
-                .map(CommentDTO::fromEntity);
+        Long currentUserId = jwtAuthSupport.resolveOptionalCurrentUser(request)
+                .map(User::getId)
+                .orElse(null);
+        Page<CommentDTO> comments = commentRepository.findBySpotIdOrderByCreatedAtDesc(spotId, safePageable)
+                .map(comment -> CommentDTO.fromEntity(comment, currentUserId));
+        return PageResponse.from(comments);
     }
 
     @PostMapping
@@ -83,7 +93,7 @@ public class CommentController {
 
         Comment saved = commentRepository.save(comment);
 
-        return ResponseEntity.ok(CommentDTO.fromEntity(saved));
+        return ResponseEntity.ok(CommentDTO.fromEntity(saved, user.getId()));
     }
     
     @PostMapping("/{commentId}/like")
@@ -167,11 +177,30 @@ public class CommentController {
             response.put("imageUrl", imageUrl);
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException ex) {
-            response.put("message", ex.getMessage());
+            logger.warn("Comment image upload rejected: {}, file={}",
+                    SensitiveLogSanitizer.exceptionSummary(ex), safeUploadSummary(file));
+            response.put("message", SAFE_UPLOAD_ERROR_MESSAGE);
             return ResponseEntity.badRequest().body(response);
         } catch (Exception ex) {
-            response.put("message", "上传失败，请稍后重试");
+            logger.warn("Comment image upload failed: {}, file={}",
+                    SensitiveLogSanitizer.exceptionSummary(ex), safeUploadSummary(file));
+            response.put("message", SAFE_UPLOAD_ERROR_MESSAGE);
             return ResponseEntity.internalServerError().body(response);
         }
+    }
+
+    private static String safeUploadSummary(MultipartFile file) {
+        if (file == null) {
+            return "size=unknown,empty=true,nameHash=empty,contentTypeHash=empty";
+        }
+        return "size=" + file.getSize()
+                + ",empty=" + file.isEmpty()
+                + ",nameHash=" + shortHash(file.getOriginalFilename())
+                + ",contentTypeHash=" + shortHash(file.getContentType());
+    }
+
+    private static String shortHash(String value) {
+        String hash = InputSanitizer.sha256HexForStorage(value);
+        return hash == null ? "empty" : hash.substring(0, 12);
     }
 }

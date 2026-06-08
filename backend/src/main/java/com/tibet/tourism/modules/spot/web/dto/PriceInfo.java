@@ -1,5 +1,6 @@
 package com.tibet.tourism.modules.spot.web.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -75,6 +76,7 @@ public class PriceInfo {
         this.confidence = confidence;
     }
 
+    @JsonIgnore
     public String getRawData() {
         return rawData;
     }

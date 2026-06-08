@@ -93,6 +93,13 @@ services:
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=128m,mode=1777
     depends_on:
       mysql:
         condition: service_healthy
@@ -217,6 +224,17 @@ services:
     volumes:
       - ./certs:/etc/nginx/certs:ro
       - /var/www/certbot:/var/www/certbot:ro
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /etc/nginx/conf.d:rw,noexec,nosuid,nodev,size=1m,uid=101,gid=101,mode=0755
+      - /var/cache/nginx:rw,noexec,nosuid,nodev,size=32m,uid=101,gid=101,mode=0755
+      - /var/run:rw,noexec,nosuid,nodev,size=4m,uid=101,gid=101,mode=0755
+      - /run:rw,noexec,nosuid,nodev,size=4m,uid=101,gid=101,mode=0755
+      - /tmp:rw,noexec,nosuid,nodev,size=16m,mode=1777
     depends_on:
       backend:
         condition: service_healthy

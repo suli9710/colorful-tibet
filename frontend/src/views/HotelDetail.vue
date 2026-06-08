@@ -183,8 +183,10 @@ import { getCanonicalRegion, localizeApiRoom, localizeHotel } from '../data/hote
 import api, { endpoints } from '../api'
 import MobileStickyActionBar from '../components/MobileStickyActionBar.vue'
 import { openExternalBooking } from '../utils/externalBooking'
+import { useToast } from '../composables/useToast'
 
 const { t, locale } = useI18n()
+const { showToast } = useToast()
 const route = useRoute()
 const hotelId = Number(route.params.id || 1)
 const rawHotel = ref<any>({})
@@ -207,7 +209,7 @@ const openHotelBooking = (room?: { name?: string }) => {
     location: hotel.value.city || hotel.value.address
   })
   if (!opened) {
-    alert(t('spotDetail.externalBookBlocked'))
+    showToast(t('spotDetail.externalBookBlocked'), 'warning')
   }
 }
 
@@ -215,7 +217,7 @@ const openHotelNavigation = () => {
   window.open(
     `https://uri.amap.com/navigation?to=${hotel.value.lng},${hotel.value.lat},${encodeURIComponent(hotel.value.name)}&mode=car&utm_source=colorful-tibet`,
     '_blank',
-    'noopener'
+    'noopener,noreferrer'
   )
 }
 

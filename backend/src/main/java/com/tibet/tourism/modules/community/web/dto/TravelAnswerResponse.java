@@ -12,12 +12,16 @@ public record TravelAnswerResponse(
         LocalDateTime createdAt
 ) {
     public static TravelAnswerResponse fromEntity(TravelAnswer answer) {
+        return fromEntity(answer, null);
+    }
+
+    public static TravelAnswerResponse fromEntity(TravelAnswer answer, Long currentUserId) {
         if (answer == null) {
             return null;
         }
         return new TravelAnswerResponse(
                 answer.getId(),
-                PublicUserResponse.fromEntity(answer.getUser()),
+                PublicUserResponse.fromEntity(answer.getUser(), currentUserId),
                 answer.getContent(),
                 answer.getLikeCount(),
                 answer.getIsAccepted(),

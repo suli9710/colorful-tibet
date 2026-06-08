@@ -25,6 +25,10 @@ public interface HotelBookingRepository extends JpaRepository<HotelBooking, Long
     Optional<HotelBooking> findById(@Param("id") Long id);
 
     @EntityGraph(attributePaths = {"user", "hotel"})
+    @Query("SELECT hb FROM HotelBooking hb WHERE hb.id = :id AND hb.user.id = :userId AND hb.deletedAt IS NULL")
+    Optional<HotelBooking> findByIdAndUserId(@Param("id") Long id, @Param("userId") Long userId);
+
+    @EntityGraph(attributePaths = {"user", "hotel"})
     @Query("SELECT hb FROM HotelBooking hb WHERE hb.user.id = :userId AND hb.deletedAt IS NULL ORDER BY hb.createdAt DESC")
     List<HotelBooking> findByUserIdOrderByCreatedAtDesc(@Param("userId") Long userId);
 

@@ -62,7 +62,8 @@ public class ColdStartOptimizationService {
             List<UserVisitHistory> history = historyRepository.findBySpotId(spotId);
             return history == null || history.size() < NEW_ITEM_THRESHOLD;
         } catch (Exception e) {
-            logger.warn("检查新物品状态失败: spotId={}, error={}", spotId, e.getMessage());
+            logger.warn("New item status check failed: spotId={}, error={}",
+                    spotId, RecommendationLogPrivacy.exceptionSummary(e));
             return false;
         }
     }
@@ -72,7 +73,8 @@ public class ColdStartOptimizationService {
      * 策略1：基于用户属性的推荐（城市、IP地址等）
      */
     public List<ScenicSpot> recommendForNewUserByAttributes(Long userId) {
-        logger.info("新用户冷启动推荐（基于用户属性）: userId={}", userId);
+        logger.info("Cold-start attribute recommendation started: user={}",
+                RecommendationLogPrivacy.userRef(userId));
         
         Optional<User> userOpt = userRepository.findById(userId);
         if (!userOpt.isPresent()) {
@@ -92,14 +94,15 @@ public class ColdStartOptimizationService {
                     .limit(5)
                     .collect(Collectors.toList());
             recommendations.addAll(citySpots);
-            logger.info("基于城市 {} 推荐 {} 个景点", user.getCity(), citySpots.size());
+            logger.info("Cold-start city signal matched: user={}, cityProvided=true, resultCount={}",
+                    RecommendationLogPrivacy.userRef(userId), citySpots.size());
         }
         
         // 策略2：基于热门景点（如果城市推荐不足）
         if (recommendations.size() < 5) {
             List<ScenicSpot> popularSpots = getCachedPopularSpots(10 - recommendations.size());
             recommendations.addAll(popularSpots);
-            logger.info("补充热门景点 {} 个", popularSpots.size());
+            logger.info("Cold-start popular fallback added: addedCount={}", popularSpots.size());
         }
         
         // 去重
@@ -119,8 +122,12 @@ public class ColdStartOptimizationService {
             String preferredCategory,
             String companionType) {
         
-        logger.info("新用户冷启动推荐（基于偏好问卷）: userId={}, tags={}, category={}, companion={}", 
-                userId, preferredTags, preferredCategory, companionType);
+        logger.info(
+                "Cold-start preference recommendation started: user={}, tagCount={}, categoryProvided={}, companionProvided={}",
+                RecommendationLogPrivacy.userRef(userId),
+                RecommendationLogPrivacy.collectionSize(preferredTags),
+                RecommendationLogPrivacy.hasText(preferredCategory),
+                RecommendationLogPrivacy.hasText(companionType));
         
         List<ScenicSpot> candidates = new ArrayList<>();
         
@@ -137,7 +144,8 @@ public class ColdStartOptimizationService {
                         PageRequest.of(0, MAX_CACHED_SPOTS, Sort.by("id"))).getContent();
                 candidates.addAll(categorySpots);
             } catch (IllegalArgumentException e) {
-                logger.warn("无效的类别: {}", preferredCategory);
+                logger.warn("Invalid cold-start category supplied: length={}",
+                        RecommendationLogPrivacy.textLength(preferredCategory));
             }
         }
 
@@ -166,8 +174,9 @@ public class ColdStartOptimizationService {
             Double longitude, 
             Double maxDistanceKm) {
         
-        logger.info("新用户冷启动推荐（基于位置）: lat={}, lng={}, maxDistance={}km", 
-                latitude, longitude, maxDistanceKm);
+        logger.info("Cold-start location recommendation started: locationProvided={}, maxDistanceKm={}",
+                RecommendationLogPrivacy.locationProvided(latitude, longitude),
+                RecommendationLogPrivacy.roundedDistanceKm(maxDistanceKm));
         
         if (latitude == null || longitude == null) {
             return Collections.emptyList();
@@ -198,7 +207,8 @@ public class ColdStartOptimizationService {
      * 基于内容相似度推荐新景点
      */
     public List<ScenicSpot> recommendNewItems(Long userId) {
-        logger.info("新物品冷启动推荐: userId={}", userId);
+        logger.info("Cold-start new item recommendation started: user={}",
+                RecommendationLogPrivacy.userRef(userId));
         
         // 使用缓存的景点列表，只调用一次
         List<ScenicSpot> allSpots = getCachedSpotList();
@@ -270,7 +280,13 @@ public class ColdStartOptimizationService {
             String preferredCategory,
             String companionType) {
         
-        logger.info("混合冷启动推荐: userId={}", userId);
+        logger.info(
+                "Hybrid cold-start recommendation started: user={}, locationProvided={}, tagCount={}, categoryProvided={}, companionProvided={}",
+                RecommendationLogPrivacy.userRef(userId),
+                RecommendationLogPrivacy.locationProvided(latitude, longitude),
+                RecommendationLogPrivacy.collectionSize(preferredTags),
+                RecommendationLogPrivacy.hasText(preferredCategory),
+                RecommendationLogPrivacy.hasText(companionType));
         
         Map<Long, Double> candidateScores = new HashMap<>();
         

@@ -94,12 +94,12 @@
               <thead class="bg-stone-50">
                 <tr>
                   <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">{{ t('admin.orderId') }}</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">{{ t('admin.user') }}</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">{{ t('admin.booker') }}</th>
                   <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">{{ t('admin.hotelAndRoom') }}</th>
                   <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">{{ t('admin.checkInOut') }}</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">{{ t('admin.booker') }}</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">{{ t('hotel.guests') }} / {{ t('hotel.nights') }}</th>
                   <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">{{ t('admin.amount') }}</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">{{ t('admin.role') }}</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">{{ t('admin.status') }}</th>
                   <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">{{ t('admin.orderedAt') }}</th>
                   <th class="px-6 py-3 text-right text-xs font-medium text-stone-500 uppercase tracking-wider">{{ t('admin.action') }}</th>
                 </tr>
@@ -107,20 +107,23 @@
               <tbody class="bg-white divide-y divide-stone-200">
                 <tr v-for="order in hotelOrders" :key="order.id" class="hover:bg-stone-50">
                   <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-500">{{ order.id }}</td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-stone-800">{{ order.user?.username || '-' }}</td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-stone-800">
+                    <div>{{ displayHotelOrderGuest(order) }}</div>
+                    <div class="text-xs font-normal text-stone-400">{{ maskHotelOrderPhone(order.phone) }}</div>
+                  </td>
                   <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-600">
-                    <div>{{ order.hotel?.name || t('admin.unknownHotel') }}</div>
-                    <div class="text-xs text-stone-400">{{ order.roomName }}</div>
+                    <div>{{ displayHotelOrderName(order) }}</div>
+                    <div class="text-xs text-stone-400">{{ displayHotelOrderRoom(order) }}</div>
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-500">
-                    <div>{{ order.checkInDate }}</div>
-                    <div class="text-xs text-stone-400">{{ t('admin.toDate', { date: order.checkOutDate }) }}</div>
+                    <div>{{ displayHotelOrderDate(order.checkInDate) }}</div>
+                    <div class="text-xs text-stone-400">{{ t('admin.toDate', { date: displayHotelOrderDate(order.checkOutDate) }) }}</div>
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-600">
-                    <div>{{ order.guestName }}</div>
-                    <div class="text-xs text-stone-400">{{ order.phone }}</div>
+                    <div>{{ displayHotelOrderOccupancy(order) }}</div>
+                    <div v-if="displayHotelOrderNote(order)" class="mt-1 max-w-xs truncate text-xs text-stone-400">{{ displayHotelOrderNote(order) }}</div>
                   </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-red-600">¥{{ order.totalPrice }}</td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-red-600">{{ formatHotelOrderCurrency(order.totalPrice) }}</td>
                   <td class="px-6 py-4 whitespace-nowrap">
                     <select
                       :value="order.status"
@@ -137,7 +140,7 @@
                       <option value="CANCELLED">{{ t('admin.statusLabel.CANCELLED') }}</option>
                     </select>
                   </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-500">{{ formatDateTime(order.createdAt) }}</td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-500">{{ displayHotelOrderDateTime(order.createdAt) }}</td>
                   <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <button @click="deleteHotelOrder(order.id)" class="text-red-600 hover:text-red-900">{{ t('common.delete') }}</button>
                   </td>
@@ -401,10 +404,10 @@
                 </div>
                 <div class="flex flex-wrap gap-3 text-sm font-medium">
                   <button v-if="u.locked" @click="unlockUser(u)" class="text-green-600 hover:text-green-900">{{ t('admin.unlock') }}</button>
-                  <button v-if="u.role !== 'ADMIN' && !u.locked" @click="updateRole(u.id, 'ADMIN')" class="text-blue-600 hover:text-blue-900">{{ t('admin.setAdmin') }}</button>
-                  <button v-else-if="u.username !== 'lzh' && !u.locked" @click="updateRole(u.id, 'USER')" class="text-orange-600 hover:text-orange-900">{{ t('admin.unsetAdmin') }}</button>
+                  <button v-if="canChangeUserRole(u) && u.role !== 'ADMIN'" @click="updateRole(u.id, 'ADMIN')" class="text-blue-600 hover:text-blue-900">{{ t('admin.setAdmin') }}</button>
+                  <button v-else-if="canChangeUserRole(u) && u.role === 'ADMIN'" @click="updateRole(u.id, 'USER')" class="text-orange-600 hover:text-orange-900">{{ t('admin.unsetAdmin') }}</button>
                   <button v-if="canDeleteUser(u)" @click="deleteUser(u)" class="text-red-600 hover:text-red-900">{{ t('common.delete') }}</button>
-                  <span v-if="u.username === 'lzh'" class="text-gray-400">{{ t('admin.notOperable') }}</span>
+                  <span v-if="u.protectedAccount" class="text-gray-400">{{ t('admin.notOperable') }}</span>
                 </div>
               </div>
             </div>
@@ -451,10 +454,10 @@
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <button v-if="u.locked" @click="unlockUser(u)" class="text-green-600 hover:text-green-900 mr-4">{{ t('admin.unlock') }}</button>
-                    <button v-if="u.role !== 'ADMIN' && !u.locked" @click="updateRole(u.id, 'ADMIN')" class="text-blue-600 hover:text-blue-900 mr-4">{{ t('admin.setAdmin') }}</button>
-                    <button v-else-if="u.username !== 'lzh' && !u.locked" @click="updateRole(u.id, 'USER')" class="text-orange-600 hover:text-orange-900 mr-4">{{ t('admin.unsetAdmin') }}</button>
+                    <button v-if="canChangeUserRole(u) && u.role !== 'ADMIN'" @click="updateRole(u.id, 'ADMIN')" class="text-blue-600 hover:text-blue-900 mr-4">{{ t('admin.setAdmin') }}</button>
+                    <button v-else-if="canChangeUserRole(u) && u.role === 'ADMIN'" @click="updateRole(u.id, 'USER')" class="text-orange-600 hover:text-orange-900 mr-4">{{ t('admin.unsetAdmin') }}</button>
                     <button v-if="canDeleteUser(u)" @click="deleteUser(u)" class="text-red-600 hover:text-red-900">{{ t('common.delete') }}</button>
-                    <span v-if="u.username === 'lzh'" class="text-gray-400 cursor-not-allowed">{{ t('admin.notOperable') }}</span>
+                    <span v-if="u.protectedAccount" class="text-gray-400 cursor-not-allowed">{{ t('admin.notOperable') }}</span>
                     </td>
                   </tr>
                 </tbody>
@@ -982,17 +985,19 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { defineAsyncComponent, ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import AdminAnalyticsPanel from '../components/AdminAnalyticsPanel.vue'
 import AdminCommunityPanel from '../components/AdminCommunityPanel.vue'
 import AdminHeritagePanel from '../components/AdminHeritagePanel.vue'
 import AdminSecurityPosturePanel from '../components/AdminSecurityPosturePanel.vue'
 import ImageUploadField from '../components/ImageUploadField.vue'
 import MotionModal from '../components/motion/MotionModal.vue'
-import api, { endpoints, clearTokenCache, type SecurityPostureResponse } from '../api'
+import api, { endpoints, clearTokenCache, type AdminUserSummary, type SecurityPostureResponse } from '../api'
 import { useAuthStore } from '../stores/auth'
+import { useConfirm } from '../composables/useConfirm'
+import { useToast } from '../composables/useToast'
+import { safeClientErrorMessage, summarizeClientError } from '../utils/errorMonitoring'
 
 interface Stats {
   userCount: number
@@ -1011,9 +1016,37 @@ interface Stats {
   updatedAt?: string
 }
 
+interface HotelOrder {
+  id: number
+  hotel?: {
+    id?: number
+    name?: string | null
+    location?: string | null
+    imageUrl?: string | null
+  } | null
+  hotelName?: string | null
+  roomName?: string | null
+  checkInDate?: string | null
+  checkOutDate?: string | null
+  guests?: number | string | null
+  nights?: number | string | null
+  guestName?: string | null
+  phone?: string | null
+  note?: string | null
+  totalPrice?: number | string | null
+  status: string
+  createdAt?: string | null
+}
+
 const { t, locale, te } = useI18n()
 const router = useRouter()
 const auth = useAuthStore()
+const { showConfirm } = useConfirm()
+const { showToast } = useToast()
+const AdminAnalyticsPanel = defineAsyncComponent(() => import('../components/AdminAnalyticsPanel.vue'))
+
+const confirmDanger = (message: string) => showConfirm({ message, tone: 'danger' })
+const apiErrorMessage = (error: unknown, fallback: string) => safeClientErrorMessage(error, fallback)
 
 const stats = ref<Stats>({
   userCount: 0,
@@ -1038,10 +1071,8 @@ const fetchSecurityPosture = async () => {
     const response = await api.get(endpoints.admin.securityPosture)
     securityPosture.value = response.data
   } catch (error: any) {
-    console.error('获取安全态势失败：', error)
-    securityPostureError.value = error.response?.data?.message
-      || error.response?.data?.error
-      || t('admin.securityPosture.loadFailed')
+    console.error('Failed to fetch security posture:', summarizeClientError(error))
+    securityPostureError.value = safeClientErrorMessage(error, t('admin.securityPosture.loadFailed'))
   } finally {
     loadingSecurityPosture.value = false
   }
@@ -1055,7 +1086,7 @@ const fetchStats = async () => {
     }
 
     if (!auth.isAdmin) {
-      alert(t('admin.unauthorizedAdmin'))
+      showToast(t('admin.unauthorizedAdmin'), 'warning')
       await router.push('/')
       return
     }
@@ -1065,7 +1096,7 @@ const fetchStats = async () => {
     stats.value = response.data
     analyticsData.value = response.data
   } catch (error: any) {
-    console.error('获取统计数据失败：', error)
+    console.error('Failed to fetch admin stats:', summarizeClientError(error))
     const status = error.response?.status
     if (status === 401) {
       auth.logout()
@@ -1074,10 +1105,10 @@ const fetchStats = async () => {
       return
     }
     if (status === 403) {
-      alert(t('admin.forbiddenAdmin'))
+      showToast(t('admin.forbiddenAdmin'), 'warning')
       await router.push('/')
     } else {
-      analyticsError.value = error.response?.data?.message || error.response?.data?.error || t('admin.analyticsLoadFailed')
+      analyticsError.value = safeClientErrorMessage(error, t('admin.analyticsLoadFailed'))
     }
   } finally {
     loading.value = false
@@ -1116,6 +1147,65 @@ const getStatusClass = (status: string) => {
 const getStatusLabel = (status: string) => {
   const key = `admin.statusLabel.${status}`
   return te(key) ? t(key) : status
+}
+
+const normalizeDisplayText = (value: unknown) => String(value ?? '').trim()
+
+const displayHotelOrderGuest = (order: HotelOrder) =>
+  normalizeDisplayText(order.guestName) || t('common.unknown')
+
+const maskHotelOrderPhone = (phone: unknown) => {
+  const digits = normalizeDisplayText(phone).replace(/\D/g, '')
+  if (!digits) return t('common.unknown')
+  if (digits.length <= 4) return '*'.repeat(Math.max(4, digits.length))
+
+  const prefix = digits.length >= 7 ? `${digits.slice(0, 3)} ` : ''
+  return `${prefix}**** ${digits.slice(-4)}`
+}
+
+const displayHotelOrderName = (order: HotelOrder) =>
+  normalizeDisplayText(order.hotel?.name || order.hotelName) || t('admin.unknownHotel')
+
+const displayHotelOrderRoom = (order: HotelOrder) =>
+  normalizeDisplayText(order.roomName) || t('common.unknown')
+
+const displayHotelOrderDate = (date: unknown) =>
+  normalizeDisplayText(date) || t('common.unknown')
+
+const displayHotelOrderDateTime = (date: unknown) => {
+  const dateText = normalizeDisplayText(date)
+  if (!dateText) return t('common.unknown')
+
+  const formattedDate = formatDateTime(dateText)
+  return formattedDate === '-' ? t('common.unknown') : formattedDate
+}
+
+const formatHotelOrderCount = (value: unknown, unitKey: string) => {
+  const count = Number(value)
+  return Number.isFinite(count) && count > 0 ? `${count}${t(unitKey)}` : ''
+}
+
+const displayHotelOrderOccupancy = (order: HotelOrder) => {
+  const parts = [
+    formatHotelOrderCount(order.guests, 'hotel.guests'),
+    formatHotelOrderCount(order.nights, 'common.nightsUnit')
+  ].filter(Boolean)
+
+  return parts.length ? parts.join(' · ') : t('common.unknown')
+}
+
+const displayHotelOrderNote = (order: HotelOrder) => normalizeDisplayText(order.note)
+
+const formatHotelOrderCurrency = (value: unknown) => {
+  const amount = Number(value)
+  if (!Number.isFinite(amount)) return t('common.unknown')
+
+  const price = amount.toLocaleString(activeDateLocale.value, {
+    minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
+    maximumFractionDigits: 2
+  })
+
+  return t('common.priceCny', { price })
 }
 
 const routeSourceLabel = (route: any) => {
@@ -1187,8 +1277,7 @@ const getClickCountPercentage = (spot: any) => {
   return Math.round((currentCount / maxCount) * 100)
 }
 
-const users = ref<any[]>([])
-const currentUser = ref<any>(null) // 当前登录用户信息
+const users = ref<AdminUserSummary[]>([])
 const spots = ref<any[]>([])
 const loadingSpots = ref(false)
 const fetchingPriceId = ref<number | null>(null)
@@ -1253,19 +1342,13 @@ const fetchUsers = async () => {
     const response = await api.get(endpoints.admin.users, { params: adminPageParams })
     const userData = toList(response.data)
     if (Array.isArray(userData)) {
-      users.value = userData
+      users.value = userData as AdminUserSummary[]
     } else {
-      console.error('响应数据格式错误:', response.data)
+      console.error('Unexpected users response shape')
       users.value = []
     }
   } catch (error: any) {
-    console.error('获取用户数据失败:', error)
-    if (error.response) {
-      console.error('响应状态:', error.response.status)
-      console.error('响应数据:', error.response.data)
-    } else if (error.request) {
-      console.error('请求已发送但无响应:', error.request)
-    }
+    console.error('Failed to fetch users:', summarizeClientError(error))
     users.value = []
   }
 }
@@ -1280,34 +1363,25 @@ const fetchSpots = async () => {
     if (Array.isArray(spotsData)) {
       spots.value = spotsData
     } else {
-      console.error('❌ 响应数据格式错误:', response.data)
+      console.error('Unexpected spots response shape')
       spotsError.value = t('admin.malformedResponse', { type: typeof response.data })
       spots.value = []
     }
   } catch (error: any) {
-    console.error('❌ 获取景点数据失败:', error)
-    console.error('错误类型:', error.constructor.name)
-    console.error('错误消息:', error.message)
+    console.error('Failed to fetch spots:', summarizeClientError(error))
     
     if (error.response) {
-      console.error('响应状态:', error.response.status)
-      console.error('响应头:', error.response.headers)
-      console.error('响应数据:', error.response.data)
-      
       if (error.response.status === 401) {
         spotsError.value = t('admin.unauthorizedAdmin')
       } else if (error.response.status === 403) {
         spotsError.value = t('admin.forbiddenAdmin')
       } else {
-        spotsError.value = error.response.data?.message || t('admin.serverError', { status: error.response.status })
+        spotsError.value = safeClientErrorMessage(error, t('admin.serverError', { status: error.response.status }))
       }
     } else if (error.request) {
-      console.error('请求已发送但无响应')
-      console.error('请求配置:', error.config)
       spotsError.value = t('admin.connectionFailed')
     } else {
-      console.error('请求配置错误:', error.config)
-      spotsError.value = error.message || t('admin.unknownError')
+      spotsError.value = safeClientErrorMessage(error, t('admin.unknownError'))
     }
     spots.value = []
   } finally {
@@ -1356,18 +1430,18 @@ const updateSpotImage = async () => {
     }
 
     if (Object.keys(payload).length === 0) {
-      alert(t('admin.fillOneField'))
+      showToast(t('admin.fillOneField'), 'warning')
       updating.value = false
       return
     }
     
     await api.put(endpoints.admin.updateSpot(editingSpot.value.id), payload)
-    alert(t('admin.spotUpdateSuccess'))
+    showToast(t('admin.spotUpdateSuccess'), 'success')
     await fetchSpots()
     closeEditModal()
   } catch (error) {
-    console.error('Failed to update spot:', error)
-    alert(t('admin.updateFailed'))
+    console.error('Failed to update spot:', summarizeClientError(error))
+    showToast(t('admin.updateFailed'), 'error')
   } finally {
     updating.value = false
   }
@@ -1380,14 +1454,14 @@ const fetchSpotPrice = async (spot: any) => {
     const response = await api.get(endpoints.prices.fetch(spot.id))
     const data = response.data
     if (data.success && data.priceInfo) {
-      alert(t('admin.priceFetched', { name: spot.name, price: data.priceInfo.basePrice || data.priceInfo.peakSeasonPrice || 'N/A' }))
+      showToast(t('admin.priceFetched', { name: spot.name, price: data.priceInfo.basePrice || data.priceInfo.peakSeasonPrice || 'N/A' }), 'success')
       await fetchSpots()
     } else {
-      alert(t('admin.priceFetchFailed', { name: spot.name }))
+      showToast(t('admin.priceFetchFailed', { name: spot.name }), 'error')
     }
   } catch (error: any) {
-    console.error('Failed to fetch price:', error)
-    alert(t('admin.priceFetchFailed', { name: spot.name }))
+    console.error('Failed to fetch price:', summarizeClientError(error))
+    showToast(t('admin.priceFetchFailed', { name: spot.name }), 'error')
   } finally {
     fetchingPriceId.value = null
   }
@@ -1395,7 +1469,7 @@ const fetchSpotPrice = async (spot: any) => {
 
 // 批量抓取所有景点价格
 const batchFetchPrices = async () => {
-  if (!confirm(t('admin.confirmBatchFetch'))) return
+  if (!(await showConfirm(t('admin.confirmBatchFetch')))) return
   batchFetching.value = true
   priceBatchJob.value = null
   try {
@@ -1412,60 +1486,60 @@ const batchFetchPrices = async () => {
       throw new Error(priceBatchJob.value.errorMessage || 'Batch price update failed')
     }
 
-    alert(t('admin.batchFetchDone', {
+    showToast(t('admin.batchFetchDone', {
       updated: priceBatchJob.value?.success || 0,
       failed: priceBatchJob.value?.failed || 0
-    }))
+    }), 'success')
     await fetchSpots()
   } catch (error: any) {
-    console.error('Failed to batch fetch prices:', error)
-    alert(t('admin.batchFetchFailed'))
+    console.error('Failed to batch fetch prices:', summarizeClientError(error))
+    showToast(t('admin.batchFetchFailed'), 'error')
   } finally {
     batchFetching.value = false
   }
 }
 
 const updateRole = async (userId: number, newRole: string) => {
-  if (!confirm(t('admin.confirmRoleChange', { role: getRoleLabel(newRole) }))) return
+  if (!(await showConfirm(t('admin.confirmRoleChange', { role: getRoleLabel(newRole) })))) return
 
   try {
     await api.post(endpoints.admin.updateRole(userId), { role: newRole })
     await fetchUsers() // 刷新列表
-    alert(t('admin.operationSuccess'))
+    showToast(t('admin.operationSuccess'), 'success')
   } catch (error) {
-    console.error('Failed to update role:', error)
-    alert(t('admin.operationFailed'))
+    console.error('Failed to update role:', summarizeClientError(error))
+    showToast(t('admin.operationFailed'), 'error')
   }
 }
 
-const deleteUser = async (user: any) => {
-  if (!confirm(t('admin.confirmDeleteUser', { name: user.username }))) return
+const deleteUser = async (user: AdminUserSummary) => {
+  if (!(await confirmDanger(t('admin.confirmDeleteUser', { name: user.username })))) return
 
   try {
     await api.delete(endpoints.admin.deleteUser(user.id))
-    alert(t('admin.userDeleted', { name: user.username }))
+    showToast(t('admin.userDeleted', { name: user.username }), 'success')
     await fetchUsers()
   } catch (error: any) {
-    console.error('Failed to delete user:', error)
-    alert(error.response?.data?.error || t('admin.deleteFailed'))
+    console.error('Failed to delete user:', summarizeClientError(error))
+    showToast(apiErrorMessage(error, t('admin.deleteFailed')), 'error')
   }
 }
 
-const unlockUser = async (user: any) => {
-  if (!confirm(t('admin.confirmUnlock', { name: user.username }))) return
+const unlockUser = async (user: AdminUserSummary) => {
+  if (!(await showConfirm(t('admin.confirmUnlock', { name: user.username })))) return
 
   try {
     await api.post(endpoints.admin.unlockUser(user.id))
-    alert(t('admin.unlockSuccess', { name: user.username }))
+    showToast(t('admin.unlockSuccess', { name: user.username }), 'success')
     await fetchUsers()
   } catch (error: any) {
-    console.error('Failed to unlock user:', error)
-    alert(error.response?.data?.error || t('admin.operationFailed'))
+    console.error('Failed to unlock user:', summarizeClientError(error))
+    showToast(apiErrorMessage(error, t('admin.operationFailed')), 'error')
   }
 }
 
 // Hotel orders management
-const hotelOrders = ref<any[]>([])
+const hotelOrders = ref<HotelOrder[]>([])
 const loadingHotelOrders = ref(false)
 const showAllHotelOrders = ref(false)
 const showRecentOrders = ref(false)
@@ -1476,9 +1550,9 @@ const fetchHotelOrders = async () => {
   loadingHotelOrders.value = true
   try {
     const response = await api.get(endpoints.hotelBookings.all, { params: adminPageParams })
-    hotelOrders.value = toList(response.data)
+    hotelOrders.value = toList(response.data) as HotelOrder[]
   } catch (error: any) {
-    console.error('Failed to fetch hotel orders:', error)
+    console.error('Failed to fetch hotel orders:', summarizeClientError(error))
     hotelOrders.value = []
   } finally {
     loadingHotelOrders.value = false
@@ -1494,21 +1568,21 @@ const updateHotelOrderStatus = async (orderId: number, status: string) => {
     await api.put(endpoints.hotelBookings.updateStatus(orderId), { status })
     await refreshOperationalData()
   } catch (error) {
-    console.error('Failed to update hotel order status:', error)
-    alert(t('admin.statusUpdateFailed'))
+    console.error('Failed to update hotel order status:', summarizeClientError(error))
+    showToast(t('admin.statusUpdateFailed'), 'error')
   }
 }
 
 const deleteHotelOrder = async (orderId: number) => {
-  if (!confirm(t('admin.confirmDeleteOrder'))) return
+  if (!(await confirmDanger(t('admin.confirmDeleteOrder')))) return
   try {
     await api.delete(endpoints.hotelBookings.delete(orderId))
     hotelOrders.value = hotelOrders.value.filter(order => order.id !== orderId)
     await refreshOperationalData()
-    alert(t('admin.deleteSuccess'))
+    showToast(t('admin.deleteSuccess'), 'success')
   } catch (error) {
-    console.error('Failed to delete hotel order:', error)
-    alert(t('admin.deleteFailed'))
+    console.error('Failed to delete hotel order:', summarizeClientError(error))
+    showToast(t('admin.deleteFailed'), 'error')
   }
 }
 
@@ -1516,13 +1590,13 @@ const fetchNews = async () => {
   loadingNews.value = true
   try {
     if (!(await auth.ensureSession())) {
-      alert(t('admin.notLoggedIn'))
+      showToast(t('admin.notLoggedIn'), 'warning')
       await router.push('/login')
       return
     }
 
     if (!auth.isAdmin) {
-      alert(t('admin.noAdminPermission'))
+      showToast(t('admin.noAdminPermission'), 'warning')
       return
     }
     
@@ -1532,32 +1606,25 @@ const fetchNews = async () => {
     if (Array.isArray(newsData)) {
       newsList.value = newsData
     } else {
-      console.error('❌ 响应数据格式错误:', response.data)
+      console.error('Unexpected news response shape')
       newsList.value = []
     }
   } catch (error: any) {
-    console.error('❌ 获取资讯数据失败:', error)
-    console.error('错误类型:', error.constructor?.name)
-    console.error('错误消息:', error.message)
+    console.error('Failed to fetch news:', summarizeClientError(error))
     
     if (error.response) {
-      console.error('响应状态:', error.response.status)
-      console.error('响应数据:', error.response.data)
-      
       if (error.response.status === 401) {
-        alert(t('admin.unauthorizedAdmin'))
+        showToast(t('admin.unauthorizedAdmin'), 'warning')
       } else if (error.response.status === 403) {
-        alert(t('admin.forbiddenAdmin'))
+        showToast(t('admin.forbiddenAdmin'), 'warning')
       } else {
-        const errorMsg = error.response.data?.message || error.response.data || t('admin.serverError', { status: error.response.status })
-        alert(t('admin.fetchNewsFailed', { message: errorMsg }))
+        const errorMsg = safeClientErrorMessage(error, t('admin.serverError', { status: error.response.status }))
+        showToast(t('admin.fetchNewsFailed', { message: errorMsg }), 'error')
       }
     } else if (error.request) {
-      console.error('请求已发送但无响应')
-      alert(t('admin.connectionFailed'))
+      showToast(t('admin.connectionFailed'), 'error')
     } else {
-      console.error('请求配置错误:', error.config)
-      alert(t('admin.fetchNewsFailed', { message: error.message || t('admin.unknownError') }))
+      showToast(t('admin.fetchNewsFailed', { message: safeClientErrorMessage(error, t('admin.unknownError')) }), 'error')
     }
     newsList.value = []
   } finally {
@@ -1619,7 +1686,7 @@ const closeNewsModal = () => {
 
 const saveNews = async () => {
   if (!newsForm.value.title || !newsForm.value.content || !newsForm.value.category) {
-    alert(t('admin.fillNewsFields'))
+    showToast(t('admin.fillNewsFields'), 'warning')
     return
   }
 
@@ -1640,34 +1707,34 @@ const saveNews = async () => {
     if (editingNews.value.id) {
       // Update existing news
       await api.put(endpoints.admin.updateNews(editingNews.value.id), payload)
-      alert(t('admin.newsUpdateSuccess'))
+      showToast(t('admin.newsUpdateSuccess'), 'success')
     } else {
       // Create new news
       await api.post(endpoints.admin.createNews, payload)
-      alert(t('admin.newsCreateSuccess'))
+      showToast(t('admin.newsCreateSuccess'), 'success')
     }
     await fetchNews()
     closeNewsModal()
   } catch (error) {
-    console.error('Failed to save news:', error)
-    alert(t('admin.saveFailed'))
+    console.error('Failed to save news:', summarizeClientError(error))
+    showToast(t('admin.saveFailed'), 'error')
   } finally {
     updatingNews.value = false
   }
 }
 
 const deleteNewsItem = async (id: number) => {
-  if (!confirm(t('admin.confirmDeleteNews'))) {
+  if (!(await confirmDanger(t('admin.confirmDeleteNews')))) {
     return
   }
 
   try {
     await api.delete(endpoints.admin.deleteNews(id))
-    alert(t('admin.deleteSuccess'))
+    showToast(t('admin.deleteSuccess'), 'success')
     await fetchNews()
   } catch (error) {
-    console.error('Failed to delete news:', error)
-    alert(t('admin.deleteFailed'))
+    console.error('Failed to delete news:', summarizeClientError(error))
+    showToast(t('admin.deleteFailed'), 'error')
   }
 }
 
@@ -1689,18 +1756,9 @@ const getCategoryClass = (category: string) => {
   return classes[category] || 'bg-gray-100 text-gray-800'
 }
 
-// 判断当前用户是否是超级管理员（lzh）
-const canDeleteUser = (user: any) => {
-  return user?.role === 'USER'
-    && user?.username !== 'lzh'
-    && user?.username !== currentUser.value?.username
-}
-
-// 加载当前用户信息
-const loadCurrentUser = async () => {
-  await auth.ensureSession()
-  currentUser.value = auth.user
-}
+// The backend owns admin account action policy; the UI only renders it.
+const canChangeUserRole = (user: AdminUserSummary) => Boolean(user.roleMutable) && !user.locked
+const canDeleteUser = (user: AdminUserSummary) => Boolean(user.deletable)
 
 // Carousel management
 const carousels = ref<any[]>([])
@@ -1740,16 +1798,16 @@ const saveCarousel = async () => {
     }
     await fetchCarousels()
     closeCarouselModal()
-    alert(t('admin.saveSuccess'))
-  } catch (e) { alert(t('admin.saveFailed')) }
+    showToast(t('admin.saveSuccess'), 'success')
+  } catch (e) { showToast(t('admin.saveFailed'), 'error') }
 }
 
 const deleteCarousel = async (id: number) => {
-  if (!confirm(t('admin.confirmDelete'))) return
+  if (!(await confirmDanger(t('admin.confirmDelete')))) return
   try {
     await api.delete(endpoints.carousels.adminDelete(id))
     await fetchCarousels()
-  } catch (e) { alert(t('admin.deleteFailed')) }
+  } catch (e) { showToast(t('admin.deleteFailed'), 'error') }
 }
 
 // Route management
@@ -1843,16 +1901,16 @@ const saveRoute = async () => {
     }
     await fetchAdminRoutes()
     closeRouteModal()
-    alert(t('admin.saveSuccess'))
-  } catch (e) { alert(t('admin.saveFailed')) }
+    showToast(t('admin.saveSuccess'), 'success')
+  } catch (e) { showToast(t('admin.saveFailed'), 'error') }
 }
 
 const deleteRoute = async (id: number) => {
-  if (!confirm(t('admin.confirmDelete'))) return
+  if (!(await confirmDanger(t('admin.confirmDelete')))) return
   try {
     await api.delete(endpoints.adminRoutes.delete(id))
     await fetchAdminRoutes()
-  } catch (e) { alert(t('admin.deleteFailed')) }
+  } catch (e) { showToast(t('admin.deleteFailed'), 'error') }
 }
 
 // Hotel management
@@ -1895,16 +1953,16 @@ const saveHotel = async () => {
     }
     await fetchAdminHotels()
     closeHotelModal()
-    alert(t('admin.saveSuccess'))
-  } catch (e) { alert(t('admin.saveFailed')) }
+    showToast(t('admin.saveSuccess'), 'success')
+  } catch (e) { showToast(t('admin.saveFailed'), 'error') }
 }
 
 const deleteHotel = async (id: number) => {
-  if (!confirm(t('admin.confirmDelete'))) return
+  if (!(await confirmDanger(t('admin.confirmDelete')))) return
   try {
     await api.delete(endpoints.adminHotels.delete(id))
     await fetchAdminHotels()
-  } catch (e) { alert(t('admin.deleteFailed')) }
+  } catch (e) { showToast(t('admin.deleteFailed'), 'error') }
 }
 
 // Room type management (inline in expanded cards)
@@ -1935,21 +1993,21 @@ const addRoomTypeInline = async (hotelId: number) => {
     roomTypeForm.value = { name: '', price: 0, capacity: 2, amenities: '' }
     const res = await api.get(endpoints.adminHotels.roomTypes(hotelId))
     expandedRoomTypes.value = Array.isArray(res.data) ? res.data : []
-  } catch (e) { alert(t('admin.addFailed')) }
+  } catch (e) { showToast(t('admin.addFailed'), 'error') }
 }
 
 const deleteRoomTypeInline = async (roomTypeId: number, hotelId: number) => {
-  if (!confirm(t('admin.confirmDeleteRoomType'))) return
+  if (!(await confirmDanger(t('admin.confirmDeleteRoomType')))) return
   try {
     await api.delete(endpoints.adminHotels.deleteRoomType(roomTypeId))
     const res = await api.get(endpoints.adminHotels.roomTypes(hotelId))
     expandedRoomTypes.value = Array.isArray(res.data) ? res.data : []
-  } catch (e) { alert(t('admin.deleteFailed')) }
+  } catch (e) { showToast(t('admin.deleteFailed'), 'error') }
 }
 
 onMounted(async () => {
-  await loadCurrentUser()
-  if (!auth.hasValidSession()) {
+  const hasSession = await auth.ensureSession()
+  if (!hasSession || !auth.hasValidSession()) {
     await router.push('/login')
     return
   }

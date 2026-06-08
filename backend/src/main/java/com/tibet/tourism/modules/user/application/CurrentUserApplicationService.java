@@ -17,6 +17,7 @@ import java.util.Map;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 @Service
@@ -51,10 +52,12 @@ public class CurrentUserApplicationService {
         User user = getUser(userId);
 
         Map<String, Object> response = new HashMap<>();
-        response.put("id", user.getId());
-        response.put("username", user.getUsername());
-        response.put("nickname", user.getNickname());
+        String nickname = publicNickname(user);
+        if (nickname != null) {
+            response.put("nickname", nickname);
+        }
         response.put("avatar", user.getAvatar());
+        response.put("avatarUrl", user.getAvatar());
         response.put("role", user.getRole());
         response.put("createdAt", user.getCreatedAt());
         response.put("mustChangePassword", Boolean.TRUE.equals(user.getMustChangePassword()));
@@ -131,5 +134,18 @@ public class CurrentUserApplicationService {
     private User getUser(Long userId) {
         return userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+    }
+
+    private String publicNickname(User user) {
+        String nickname = user.getNickname();
+        if (!StringUtils.hasText(nickname)) {
+            return null;
+        }
+        String normalizedNickname = nickname.trim();
+        String username = user.getUsername();
+        if (StringUtils.hasText(username) && normalizedNickname.equalsIgnoreCase(username.trim())) {
+            return null;
+        }
+        return normalizedNickname;
     }
 }

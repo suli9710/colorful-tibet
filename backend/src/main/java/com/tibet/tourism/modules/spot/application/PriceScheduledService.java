@@ -1,5 +1,6 @@
 package com.tibet.tourism.modules.spot.application;
 
+import com.tibet.tourism.common.security.SensitiveLogSanitizer;
 import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
@@ -82,7 +83,7 @@ public class PriceScheduledService {
                     result.getSkipCount(),
                     result.getTotalCount());
         } catch (Exception e) {
-            logger.error("{} failed", label, e);
+            logger.error("{} failed: {}", label, SensitiveLogSanitizer.exceptionSummary(e));
         } finally {
             releaseJobLock(lockName, lockToken);
         }
@@ -107,7 +108,8 @@ public class PriceScheduledService {
             }
             return token;
         } catch (RuntimeException e) {
-            logger.warn("Skipping {} because the distributed lock could not be acquired: {}", label, e.getMessage());
+            logger.warn("Skipping {} because the distributed lock could not be acquired: {}",
+                    label, SensitiveLogSanitizer.exceptionSummary(e));
             return null;
         }
     }
@@ -119,7 +121,8 @@ public class PriceScheduledService {
         try {
             redisTemplate.execute(RELEASE_LOCK_SCRIPT, List.of(lockKey(lockName)), lockToken);
         } catch (RuntimeException e) {
-            logger.warn("Failed to release price update lock {}: {}", lockName, e.getMessage());
+            logger.warn("Failed to release price update lock {}: {}",
+                    lockName, SensitiveLogSanitizer.exceptionSummary(e));
         }
     }
 

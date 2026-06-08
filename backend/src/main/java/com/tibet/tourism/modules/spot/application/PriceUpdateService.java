@@ -1,6 +1,7 @@
 package com.tibet.tourism.modules.spot.application;
 
 import com.tibet.tourism.common.error.ResourceNotFoundException;
+import com.tibet.tourism.common.security.SensitiveLogSanitizer;
 import com.tibet.tourism.modules.spot.domain.ScenicSpot;
 import com.tibet.tourism.modules.spot.infra.ScenicSpotRepository;
 import com.tibet.tourism.modules.spot.web.dto.PriceInfo;
@@ -75,7 +76,9 @@ public class PriceUpdateService {
             scenicSpotRepository.save(spot);
             return new PriceUpdateResult(true, "PRICE_UPDATED", priceInfo);
         } catch (Exception e) {
-            return new PriceUpdateResult(false, "PRICE_UPDATE_FAILED: " + e.getMessage(), null);
+            logger.warn("Price update failed: spotId={}, detail={}",
+                    spotId, SensitiveLogSanitizer.exceptionSummary(e));
+            return new PriceUpdateResult(false, "PRICE_UPDATE_FAILED", null);
         }
     }
 
@@ -106,7 +109,8 @@ public class PriceUpdateService {
                         }
                     } catch (Exception e) {
                         failCount.incrementAndGet();
-                        logger.error("Batch price update failed: spotId={}, error={}", spot.getId(), e.getMessage());
+                        logger.error("Batch price update failed: spotId={}, detail={}",
+                                spot.getId(), SensitiveLogSanitizer.exceptionSummary(e));
                     }
                 }
             }, priceUpdateExecutor);

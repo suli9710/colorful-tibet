@@ -2,14 +2,12 @@ package com.tibet.tourism.modules.order.web.dto;
 
 import com.tibet.tourism.modules.order.domain.Booking;
 import com.tibet.tourism.modules.spot.domain.ScenicSpot;
-import com.tibet.tourism.modules.user.domain.User;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 public record BookingResponse(
         Long id,
-        UserSummary user,
         SpotSummary spot,
         Long spotId,
         LocalDate visitDate,
@@ -18,13 +16,6 @@ public record BookingResponse(
         String status,
         LocalDateTime createdAt
 ) {
-    public record UserSummary(
-            Long id,
-            String username,
-            String nickname
-    ) {
-    }
-
     public record SpotSummary(
             Long id,
             String name,
@@ -34,11 +25,9 @@ public record BookingResponse(
     }
 
     public static BookingResponse fromEntity(Booking booking) {
-        User user = booking.getUser();
         ScenicSpot spot = booking.getSpot();
         return new BookingResponse(
                 booking.getId(),
-                user == null ? null : new UserSummary(user.getId(), user.getUsername(), user.getNickname()),
                 spot == null ? null : new SpotSummary(spot.getId(), spot.getName(), spot.getLocation(), spot.getImageUrl()),
                 spot == null ? null : spot.getId(),
                 booking.getVisitDate(),

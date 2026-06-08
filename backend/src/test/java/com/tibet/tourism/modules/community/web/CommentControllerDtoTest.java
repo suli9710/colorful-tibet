@@ -1,9 +1,13 @@
 package com.tibet.tourism.modules.community.web;
 
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -27,8 +31,10 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(controllers = CommentController.class)
@@ -63,26 +69,83 @@ class CommentControllerDtoTest {
     private TrustedProxyIpResolver trustedProxyIpResolver;
 
     @Test
-    void spotCommentsReturnPublicUserWithoutLoginUsername() throws Exception {
+    void spotCommentsReturnPublicAuthorWithoutInternalUserId() throws Exception {
         Comment comment = comment(publicUser());
 
+        when(jwtAuthSupport.resolveOptionalCurrentUser(any())).thenReturn(Optional.empty());
         when(commentRepository.findBySpotIdOrderByCreatedAtDesc(any(Long.class), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(comment)));
 
         mockMvc.perform(get("/api/comments/spot/5"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].id").value(10))
-                .andExpect(jsonPath("$.content[0].userId").value(7))
+                .andExpect(jsonPath("$.content[0].owner").value(false))
                 .andExpect(jsonPath("$.content[0].nickname").value("Public Nickname"))
                 .andExpect(jsonPath("$.content[0].avatar").value("/avatars/u7.png"))
-                .andExpect(jsonPath("$.content[0].user.id").value(7))
-                .andExpect(jsonPath("$.content[0].user.nickname").value("Public Nickname"))
-                .andExpect(jsonPath("$.content[0].user.avatar").value("/avatars/u7.png"))
+                .andExpect(jsonPath("$.content[0].userId").doesNotExist())
+                .andExpect(jsonPath("$.content[0].user_id").doesNotExist())
+                .andExpect(jsonPath("$.content[0].user").doesNotExist())
                 .andExpect(jsonPath("$.content[0].username").doesNotExist())
-                .andExpect(jsonPath("$.content[0].user.username").doesNotExist())
-                .andExpect(jsonPath("$.content[0].user.phone").doesNotExist())
-                .andExpect(jsonPath("$.content[0].user.ipAddress").doesNotExist())
-                .andExpect(jsonPath("$.content[0].user.allowedLoginFingerprintHash").doesNotExist());
+                .andExpect(jsonPath("$.content[0].phone").doesNotExist())
+                .andExpect(jsonPath("$.content[0].ipAddress").doesNotExist())
+                .andExpect(jsonPath("$.content[0].allowedLoginFingerprintHash").doesNotExist())
+                .andExpect(content().string(not(containsString("\"userId\""))))
+                .andExpect(content().string(not(containsString("\"user_id\""))));
+    }
+
+    @Test
+    void spotCommentsExposeOnlyOwnerFlagForAuthenticatedAuthor() throws Exception {
+        User user = publicUser();
+        Comment comment = comment(user);
+
+        when(jwtAuthSupport.resolveOptionalCurrentUser(any())).thenReturn(Optional.of(user));
+        when(commentRepository.findBySpotIdOrderByCreatedAtDesc(any(Long.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(comment)));
+
+        mockMvc.perform(get("/api/comments/spot/5"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].owner").value(true))
+                .andExpect(jsonPath("$.content[0].nickname").value("Public Nickname"))
+                .andExpect(jsonPath("$.content[0].avatar").value("/avatars/u7.png"))
+                .andExpect(jsonPath("$.content[0].userId").doesNotExist())
+                .andExpect(jsonPath("$.content[0].user_id").doesNotExist())
+                .andExpect(jsonPath("$.content[0].user").doesNotExist())
+                .andExpect(content().string(not(containsString("\"userId\""))))
+                .andExpect(content().string(not(containsString("\"user_id\""))));
+    }
+
+    @Test
+    void spotCommentsReturnStablePageEnvelopeWithoutSpringDataInternals() throws Exception {
+        User user = publicUser();
+        Comment comment = comment(user);
+
+        when(jwtAuthSupport.resolveOptionalCurrentUser(any())).thenReturn(Optional.of(user));
+        when(commentRepository.findBySpotIdOrderByCreatedAtDesc(any(Long.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(comment), PageRequest.of(1, 2), 5));
+
+        mockMvc.perform(get("/api/comments/spot/5?page=1&size=2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isArray())
+                .andExpect(jsonPath("$.content[0].id").value(10))
+                .andExpect(jsonPath("$.content[0].owner").value(true))
+                .andExpect(jsonPath("$.page").value(1))
+                .andExpect(jsonPath("$.size").value(2))
+                .andExpect(jsonPath("$.totalElements").value(5))
+                .andExpect(jsonPath("$.totalPages").value(3))
+                .andExpect(jsonPath("$.pageable").doesNotExist())
+                .andExpect(jsonPath("$.sort").doesNotExist())
+                .andExpect(jsonPath("$.number").doesNotExist())
+                .andExpect(jsonPath("$.numberOfElements").doesNotExist())
+                .andExpect(jsonPath("$.first").doesNotExist())
+                .andExpect(jsonPath("$.last").doesNotExist())
+                .andExpect(jsonPath("$.empty").doesNotExist())
+                .andExpect(content().string(not(containsString("\"pageable\""))))
+                .andExpect(content().string(not(containsString("\"sort\""))))
+                .andExpect(content().string(not(containsString("\"number\""))))
+                .andExpect(content().string(not(containsString("\"numberOfElements\""))))
+                .andExpect(content().string(not(containsString("\"first\""))))
+                .andExpect(content().string(not(containsString("\"last\""))))
+                .andExpect(content().string(not(containsString("\"empty\""))));
     }
 
     @Test
@@ -113,21 +176,55 @@ class CommentControllerDtoTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(10))
-                .andExpect(jsonPath("$.userId").value(7))
+                .andExpect(jsonPath("$.owner").value(true))
                 .andExpect(jsonPath("$.nickname").value("Public Nickname"))
                 .andExpect(jsonPath("$.avatar").value("/avatars/u7.png"))
-                .andExpect(jsonPath("$.user.id").value(7))
-                .andExpect(jsonPath("$.user.nickname").value("Public Nickname"))
-                .andExpect(jsonPath("$.user.avatar").value("/avatars/u7.png"))
+                .andExpect(jsonPath("$.userId").doesNotExist())
+                .andExpect(jsonPath("$.user_id").doesNotExist())
+                .andExpect(jsonPath("$.user").doesNotExist())
                 .andExpect(jsonPath("$.username").doesNotExist())
-                .andExpect(jsonPath("$.user.username").doesNotExist())
-                .andExpect(jsonPath("$.user.phone").doesNotExist())
-                .andExpect(jsonPath("$.user.ipAddress").doesNotExist())
-                .andExpect(jsonPath("$.user.allowedLoginFingerprintHash").doesNotExist())
                 .andExpect(jsonPath("$.password").doesNotExist())
                 .andExpect(jsonPath("$.phone").doesNotExist())
                 .andExpect(jsonPath("$.ipAddress").doesNotExist())
-                .andExpect(jsonPath("$.allowedLoginFingerprintHash").doesNotExist());
+                .andExpect(jsonPath("$.allowedLoginFingerprintHash").doesNotExist())
+                .andExpect(content().string(not(containsString("\"userId\""))))
+                .andExpect(content().string(not(containsString("\"user_id\""))));
+    }
+
+    @Test
+    void commentImageUploadDoesNotExposeStorageValidationDetails() throws Exception {
+        when(fileStorageService.storeCommentImage(any()))
+                .thenThrow(new IllegalArgumentException("Unsupported content type: application/x-msdownload"));
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "payload.exe",
+                "application/x-msdownload",
+                "not-an-image".getBytes());
+
+        mockMvc.perform(multipart("/api/comments/upload-image").file(file))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Image upload failed"))
+                .andExpect(content().string(not(containsString("application/x-msdownload"))))
+                .andExpect(content().string(not(containsString("Unsupported content type"))));
+    }
+
+    @Test
+    void commentImageUploadDoesNotExposeUnexpectedExceptionDetails() throws Exception {
+        when(fileStorageService.storeCommentImage(any()))
+                .thenThrow(new RuntimeException("s3://private-bucket/token=secret"));
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "photo.jpg",
+                "image/jpeg",
+                "not-an-image".getBytes());
+
+        mockMvc.perform(multipart("/api/comments/upload-image").file(file))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.message").value("Image upload failed"))
+                .andExpect(content().string(not(containsString("private-bucket"))))
+                .andExpect(content().string(not(containsString("token=secret"))));
     }
 
     private static User publicUser() {

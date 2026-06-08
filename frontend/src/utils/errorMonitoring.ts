@@ -18,7 +18,7 @@ interface ErrorPayload {
 const ERROR_REPORT_URL = import.meta.env.VITE_FRONTEND_ERROR_REPORT_URL as string | undefined
 const RELEASE = (import.meta.env.VITE_APP_VERSION as string | undefined) || 'development'
 const MAX_REPORTS_PER_MINUTE = 5
-const SENSITIVE_KEY_PATTERN = '(?:token|secret|password|authorization|code|key|api[_-]?key|access[_-]?token|refresh[_-]?token|xsrf[_-]?token|csrf[_-]?token|x-xsrf-token|session|cookie)'
+const SENSITIVE_KEY_PATTERN = '(?:token|jwt|secret|password|authorization|code|key|api[_-]?key|access[_-]?token|refresh[_-]?token|auth[_-]?token|id[_-]?token|jwt[_-]?token|user[_-]?token|bearer[_-]?token|xsrf[_-]?token|csrf[_-]?token|x-xsrf-token|session|cookie)'
 const QUERY_REDACTION_PATTERN = new RegExp(`\\b(${SENSITIVE_KEY_PATTERN}=)[^&\\s]+`, 'gi')
 const JSON_STRING_REDACTION_PATTERN = new RegExp(`(["'])(${SENSITIVE_KEY_PATTERN})\\1(\\s*:\\s*)(["'])[^"'\\r\\n]*\\4`, 'gi')
 const JSON_BARE_REDACTION_PATTERN = new RegExp(`(["'])(${SENSITIVE_KEY_PATTERN})\\1(\\s*:\\s*)([^"',}\\]\\s]+)`, 'gi')
@@ -58,6 +58,44 @@ function stringifyUnknown(value: unknown): string {
   } catch {
     return String(value)
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function readNestedRecord(value: Record<string, unknown>, key: string): Record<string, unknown> | undefined {
+  const nested = value[key]
+  return isRecord(nested) ? nested : undefined
+}
+
+function readText(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value : undefined
+}
+
+export function summarizeClientError(error: unknown): string {
+  if (!isRecord(error)) {
+    return truncate(redactForErrorReport(stringifyUnknown(error)), 500) || 'Unknown client error'
+  }
+
+  const response = readNestedRecord(error, 'response')
+  const config = readNestedRecord(error, 'config')
+  const status = typeof response?.status === 'number' ? response.status : undefined
+  const method = readText(config?.method)?.toUpperCase()
+  const url = truncate(redactForErrorReport(readText(config?.url)), 240)
+  const message = truncate(redactForErrorReport(readText(error.message)), 240)
+  const parts = [
+    status ? `status=${status}` : undefined,
+    method ? `method=${method}` : undefined,
+    url ? `url=${url}` : undefined,
+    message ? `message=${message}` : undefined
+  ].filter(Boolean)
+
+  return parts.length ? `Client request failed (${parts.join(', ')})` : 'Client request failed'
+}
+
+export function safeClientErrorMessage(_error: unknown, fallback: string): string {
+  return truncate(redactForErrorReport(fallback), 240) || 'Operation failed'
 }
 
 function normalizeError(error: unknown): Pick<ErrorPayload, 'name' | 'message' | 'stack'> {

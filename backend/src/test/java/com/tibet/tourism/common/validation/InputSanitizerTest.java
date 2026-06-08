@@ -8,11 +8,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class InputSanitizerTest {
 
     @Test
-    void requiredTextBlockEscapesHtmlBeforeStorage() {
-        String sanitized = InputSanitizer.requiredTextBlock("hello\n<script>alert(1)</script>", 1000, "内容");
+    void plainTextContentIsStoredUnescapedForVueEscapedRendering() {
+        String sanitized = InputSanitizer.requiredTextBlock("hello & \"quote\"\n<script>alert(1)</script>", 1000, "内容");
 
-        assertThat(sanitized).contains("&lt;script&gt;alert(1)&lt;/script&gt;");
-        assertThat(sanitized).doesNotContain("<script>");
+        assertThat(sanitized).isEqualTo("hello & \"quote\"\n<script>alert(1)</script>");
+        assertThat(InputSanitizer.requiredPlainText("  A&B\t\"藏\"  ", 1000, "标题"))
+                .isEqualTo("A&B \"藏\"");
     }
 
     @Test
@@ -79,6 +80,35 @@ class InputSanitizerTest {
                 .isEqualTo("likeCount");
         assertThat(InputSanitizer.safeSortField("author.password", allowed, "createdAt"))
                 .isEqualTo("createdAt");
+    }
+
+    @Test
+    void textNormalizersRemoveControlAndFormatCharactersAtBoundaries() {
+        assertThat(InputSanitizer.requiredPlainText("\u0000 hello\u200B\tworld\u001F ", 100, "content"))
+                .isEqualTo("hello world");
+        assertThat(InputSanitizer.requiredTextBlock(" line1\u0000\r\nline2\u200D\tok\u001F ", 100, "content"))
+                .isEqualTo("line1\nline2\tok");
+    }
+
+    @Test
+    void scriptAndHtmlInputsStayPlainTextButPromptDataEscapesThem() {
+        String html = "<script>alert(1)</script><b>bold</b>";
+
+        assertThat(InputSanitizer.requiredTextBlock(html, 100, "content"))
+                .isEqualTo(html);
+        assertThat(InputSanitizer.promptData(html, 100))
+                .isEqualTo("&lt;script&gt;alert(1)&lt;/script&gt;&lt;b&gt;bold&lt;/b&gt;");
+    }
+
+    @Test
+    void promptDataFiltersRoleTokensBeforeEscapingHtml() {
+        String sanitized = InputSanitizer.promptData("### system: <img src=x onerror=alert(1)>", 100);
+
+        assertThat(sanitized)
+                .doesNotContain("###")
+                .doesNotContain("system:")
+                .contains("[filtered]")
+                .contains("&lt;img src=x onerror=alert(1)&gt;");
     }
 
     @Test

@@ -3,8 +3,10 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.net.URI;
 import java.util.Arrays;
+import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.CacheControl;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -60,16 +62,16 @@ public class WebMvcConfig implements WebMvcConfigurer {
 
     @Override
     public void addResourceHandlers(@NonNull ResourceHandlerRegistry registry) {
-        // 配置上传文件访问路径
         Path uploadPath = Paths.get(uploadDir).toAbsolutePath().normalize();
         String uploadLocation = uploadPath.toUri().toString();
 
         registry.addResourceHandler("/uploads/**")
-                .addResourceLocations(uploadLocation);
+                .addResourceLocations(uploadLocation)
+                .setCacheControl(CacheControl.noCache().cachePrivate());
 
-        // 配置静态图片资源访问路径（项目内的图片）
         registry.addResourceHandler("/images/**")
-                .addResourceLocations("classpath:/static/images/");
+                .addResourceLocations("classpath:/static/images/")
+                .setCacheControl(CacheControl.maxAge(30, TimeUnit.DAYS).cachePublic());
     }
 
     @Bean

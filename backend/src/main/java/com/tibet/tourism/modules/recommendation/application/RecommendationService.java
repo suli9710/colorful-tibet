@@ -13,6 +13,7 @@ import com.tibet.tourism.modules.recommendation.web.dto.RecommendationDebugRespo
 import com.tibet.tourism.modules.spot.application.CompanionInferenceService;
 import com.tibet.tourism.modules.spot.domain.ScenicSpot;
 import com.tibet.tourism.modules.spot.infra.ScenicSpotRepository;
+import com.tibet.tourism.modules.spot.web.dto.ScenicSpotResponse;
 import com.tibet.tourism.modules.user.domain.User;
 import com.tibet.tourism.modules.user.domain.UserVisitHistory;
 import com.tibet.tourism.modules.user.infra.UserVisitHistoryRepository;
@@ -70,9 +71,11 @@ public class RecommendationService {
     }
 
     public List<ScenicSpot> recommendSpotsForUser(Long userId, RecommendationContext recommendationContext) {
-        logger.info("🎯 开始为用户 {} 生成推荐", userId);
+        String userRef = RecommendationLogPrivacy.userRef(userId);
+        logger.info("Recommendation generation started: user={}", userRef);
         ComputationContext ctx = computeContext(userId, recommendationContext);
-        logger.info("✅ 推荐完成，共生成 {} 个推荐结果", ctx.recommendations.size());
+        logger.info("Recommendation generation completed: user={}, resultCount={}",
+                userRef, ctx.recommendations.size());
         return ctx.recommendations;
     }
 
@@ -81,8 +84,16 @@ public class RecommendationService {
     }
 
     public RecommendationDebugResponse recommendWithDebug(Long userId, RecommendationContext recommendationContext) {
+        return recommendWithDebug(userId, recommendationContext, "zh");
+    }
+
+    public RecommendationDebugResponse recommendWithDebug(
+            Long userId,
+            RecommendationContext recommendationContext,
+            String locale) {
         long startTime = System.currentTimeMillis();
-        logger.info("🎯 [DEBUG模式] 开始为用户 {} 生成推荐", userId);
+        String userRef = RecommendationLogPrivacy.userRef(userId);
+        logger.info("Recommendation debug generation started: user={}", userRef);
 
         ComputationContext ctx = computeContext(userId, recommendationContext);
 
@@ -90,7 +101,7 @@ public class RecommendationService {
         response.setUserId(userId);
         response.setHasHistory(ctx.hasHistory);
         response.setFallbackUsed(ctx.fallbackUsed);
-        response.setRecommendations(ctx.recommendations);
+        response.setRecommendations(toRecommendationResponses(ctx.recommendations, locale));
         response.setTagProfile(ctx.tagProfile);
         response.setHistory(buildHistoryEntries(ctx.currentUserHistory));
         response.setSimilarUsers(Collections.emptyList());
@@ -109,7 +120,8 @@ public class RecommendationService {
         response.setRecommendationReasons(generateRecommendationReasons(ctx));
         response.setComputationTimeMs(System.currentTimeMillis() - startTime);
 
-        logger.info("✅ [DEBUG模式] 推荐完成，耗时: {}ms", response.getComputationTimeMs());
+        logger.info("Recommendation debug generation completed: user={}, durationMs={}",
+                userRef, response.getComputationTimeMs());
         return response;
     }
 
@@ -128,7 +140,9 @@ public class RecommendationService {
                 if (recommendationContext == null) recommendationContext = new RecommendationContext();
                 recommendationContext.setCompanion(inferredCompanion);
             } catch (Exception e) {
-                logger.warn("⚠️  旅伴类型推断失败: {}", e.getMessage());
+                logger.warn("Companion inference failed: user={}, error={}",
+                        RecommendationLogPrivacy.userRef(userId),
+                        RecommendationLogPrivacy.exceptionSummary(e));
             }
         }
 
@@ -176,9 +190,11 @@ public class RecommendationService {
         Map<Long, Double> itemBasedScores = Collections.emptyMap();
         try {
             itemBasedScores = itemBasedRecommendationService.recommendByItemCF(userId, visitedSpotIds);
-            logger.info("🎯 Item-Based CF生成 {} 个候选景点", itemBasedScores.size());
+            logger.info("Item-Based CF candidates generated: candidateCount={}", itemBasedScores.size());
         } catch (Exception e) {
-            logger.warn("⚠️  Item-Based CF推荐失败: {}", e.getMessage());
+            logger.warn("Item-Based CF recommendation failed: user={}, error={}",
+                    RecommendationLogPrivacy.userRef(userId),
+                    RecommendationLogPrivacy.exceptionSummary(e));
         }
         Map<Long, Double> normalizedItemBased = normalizeScores(itemBasedScores);
 
@@ -247,6 +263,15 @@ public class RecommendationService {
         Map<Long, Double> normalized = new HashMap<>();
         scores.forEach((id, score) -> normalized.put(id, (score - min) / range));
         return normalized;
+    }
+
+    private List<ScenicSpotResponse> toRecommendationResponses(List<ScenicSpot> recommendations, String locale) {
+        if (recommendations == null) {
+            return Collections.emptyList();
+        }
+        return recommendations.stream()
+                .map(spot -> ScenicSpotResponse.fromEntity(spot, locale))
+                .collect(Collectors.toList());
     }
 
     private List<HistoryEntry> buildHistoryEntries(List<UserVisitHistory> histories) {

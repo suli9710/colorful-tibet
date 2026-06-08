@@ -1,4 +1,6 @@
 package com.tibet.tourism.modules.recommendation.application;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.tibet.tourism.modules.recommendation.application.strategy.ContentBasedStrategy;
 import com.tibet.tourism.modules.recommendation.application.strategy.ContextAwarePostProcessor;
 import com.tibet.tourism.modules.recommendation.application.strategy.DiversityReranker;
@@ -11,6 +13,7 @@ import com.tibet.tourism.modules.spot.application.CompanionInferenceService;
 import com.tibet.tourism.modules.spot.domain.ScenicSpot;
 import com.tibet.tourism.modules.spot.domain.SpotTag;
 import com.tibet.tourism.modules.spot.infra.ScenicSpotRepository;
+import com.tibet.tourism.modules.spot.web.dto.ScenicSpotResponse;
 import com.tibet.tourism.modules.user.domain.User;
 import com.tibet.tourism.modules.user.domain.UserVisitHistory;
 import com.tibet.tourism.modules.user.infra.UserVisitHistoryRepository;
@@ -29,6 +32,9 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class RecommendationServiceTest {
+
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
+            .registerModule(new JavaTimeModule());
 
     @Mock private UserVisitHistoryRepository historyRepository;
     @Mock private ScenicSpotRepository spotRepository;
@@ -148,6 +154,8 @@ class RecommendationServiceTest {
         when(contentBasedStrategy.score(eq(1L), anyList(), anySet())).thenReturn(Map.of(4L, 0.5));
         when(diversityReranker.rerank(anyMap(), anySet(), any())).thenReturn(List.of(spot4));
         when(spotRepository.findAllById(anyList())).thenReturn(List.of(spot4));
+        spot4.setNum(99);
+        spot4.setCreatedAt(LocalDateTime.parse("2026-01-02T03:04:05"));
 
         RecommendationDebugResponse response = recommendationService.recommendWithDebug(1L);
 
@@ -156,8 +164,30 @@ class RecommendationServiceTest {
         assertFalse(response.isFallbackUsed());
         assertTrue(response.isHasHistory());
         assertNotNull(response.getRecommendations());
+        assertInstanceOf(ScenicSpotResponse.class, response.getRecommendations().get(0));
         assertNotNull(response.getAlgorithmConfig());
         assertTrue(response.getComputationTimeMs() >= 0);
+    }
+
+    @Test
+    void testRecommendWithDebugSerializesRecommendationsAsPublicDtos() throws Exception {
+        when(historyRepository.findByUserId(1L)).thenReturn(userHistories);
+        when(companionInferenceService.getCompanionType(1L)).thenReturn("ALONE");
+        when(contentBasedStrategy.getTagProfile(eq(1L), anyList(), anySet())).thenReturn(Map.of("瀹", 5.0));
+        when(userBasedCFStrategy.score(eq(1L), anyList(), anySet())).thenReturn(Map.of(4L, 0.8));
+        when(itemBasedRecommendationService.recommendByItemCF(eq(1L), anySet())).thenReturn(Collections.emptyMap());
+        when(contentBasedStrategy.score(eq(1L), anyList(), anySet())).thenReturn(Map.of(4L, 0.5));
+        when(diversityReranker.rerank(anyMap(), anySet(), any())).thenReturn(List.of(spot4));
+        when(spotRepository.findAllById(anyList())).thenReturn(List.of(spot4));
+        spot4.setNum(99);
+        spot4.setCreatedAt(LocalDateTime.parse("2026-01-02T03:04:05"));
+
+        RecommendationDebugResponse response = recommendationService.recommendWithDebug(1L, null, "zh");
+
+        String json = OBJECT_MAPPER.writeValueAsString(response);
+        assertTrue(json.contains("\"recommendations\""));
+        assertFalse(json.contains("\"num\""));
+        assertFalse(json.contains("\"createdAt\""));
     }
 
     @Test

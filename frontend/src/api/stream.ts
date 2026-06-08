@@ -1,6 +1,8 @@
 import { expireAuthSession } from './index'
-import { isAbortError, readJsonSseStream, readResponseText, type JsonSseMessage } from './sse'
+import { isAbortError, readJsonSseStream, type JsonSseMessage } from './sse'
 import { apiBaseURL, isSameOriginApi } from '../utils/apiOrigin'
+import { readBrowserStorage } from '../utils/browserStorage'
+import { safeClientErrorMessage } from '../utils/errorMonitoring'
 
 const sameOriginApi = isSameOriginApi(apiBaseURL)
 
@@ -12,11 +14,7 @@ function readCookie(name: string): string {
 }
 
 function getCurrentLocale(): string {
-  try {
-    return typeof localStorage === 'undefined' ? 'zh' : localStorage.getItem('locale') || 'zh'
-  } catch {
-    return 'zh'
-  }
+  return readBrowserStorage('localStorage', 'locale', 'zh') === 'bo' ? 'bo' : 'zh'
 }
 
 export interface StreamMeta {
@@ -61,6 +59,13 @@ type StreamEventObject = Record<string, unknown>
 const routeGenerationRateLimitMessage = 'AI route generation is temporarily rate limited. Please wait a moment before starting a new route.'
 const routeJobRateLimitMessage = 'AI route job status check is temporarily rate limited. Please wait a moment and retry.'
 const routeStreamRateLimitMessage = 'AI route stream recovery is temporarily rate limited. Please wait a moment and retry.'
+const routeGenerationFailedMessage = 'AI route generation failed. Please try again.'
+const routeStreamFailedMessage = 'Stream connection failed. Please try again.'
+const safeLocalErrorMessages = new Set([
+  routeGenerationRateLimitMessage,
+  routeJobRateLimitMessage,
+  routeStreamRateLimitMessage
+])
 
 function asObject(value: unknown): StreamEventObject | null {
   return value && typeof value === 'object' && !Array.isArray(value)
@@ -85,8 +90,11 @@ function getMessageType(message: JsonSseMessage<unknown>, event: StreamEventObje
   return message.event && message.event !== 'message' ? message.event : ''
 }
 
-function getStreamErrorMessage(error: unknown): string {
-  return error instanceof Error && error.message ? error.message : 'Stream connection failed'
+function getStreamErrorMessage(error: unknown, fallback = routeStreamFailedMessage): string {
+  if (error instanceof Error && safeLocalErrorMessages.has(error.message)) {
+    return error.message
+  }
+  return safeClientErrorMessage(error, fallback)
 }
 
 function isRouteGenerationJobSnapshot(value: unknown): value is RouteGenerationJobSnapshot {
@@ -115,14 +123,13 @@ function normalizeMeta(value: unknown): StreamMeta | null {
 async function throwIfErrorResponse(response: Response, rateLimitMessage: string): Promise<void> {
   if (response.ok) return
 
-  const errorText = await readResponseText(response)
   if (response.status === 401) {
     expireAuthSession('/login')
   }
   if (response.status === 429) {
-    throw new Error(errorText || rateLimitMessage)
+    throw new Error(rateLimitMessage)
   }
-  throw new Error(errorText || `HTTP ${response.status}`)
+  throw new Error(`HTTP ${response.status}`)
 }
 
 export async function startRouteGenerationJob(
@@ -232,7 +239,7 @@ export async function streamRouteGenerationJob(
             callbacks.onDone?.(firstString(event.content, payload?.content, event.text, payload?.text) || fullText)
             return false
           case 'error':
-            callbacks.onError?.(firstString(event.message, payload?.message) || 'AI route generation failed')
+            callbacks.onError?.(routeGenerationFailedMessage)
             return false
         }
       }
@@ -312,7 +319,7 @@ export async function generateRouteStream(
             callbacks.onDone?.(firstString(event.content, payload?.content, event.text, payload?.text) || fullText)
             return false
           case 'error':
-            callbacks.onError?.(firstString(event.message, payload?.message) || 'Unknown stream error')
+            callbacks.onError?.(routeGenerationFailedMessage)
             return false
         }
       }

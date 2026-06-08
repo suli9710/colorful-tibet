@@ -2,6 +2,7 @@ import axios from 'axios'
 import { clearStoredAuth } from '../stores/auth'
 import { getDeviceFingerprint } from '../utils/deviceFingerprint'
 import { apiBaseURL, isSameOriginApi } from '../utils/apiOrigin'
+import { summarizeClientError } from '../utils/errorMonitoring'
 import {
   clearTokenCache,
   DEFAULT_TIMEOUT_MS,
@@ -43,7 +44,7 @@ export function handleUnauthorizedResponse(error: any) {
   const requestUrl = String(error.config?.url || '')
 
   if (import.meta.env.DEV) {
-    console.error(`[401] ${method.toUpperCase()} ${requestUrl}`, error.response?.data)
+    console.error(`[401] ${summarizeClientError(error)}`)
   }
 
   if (requestUrl.includes('/admin')) {

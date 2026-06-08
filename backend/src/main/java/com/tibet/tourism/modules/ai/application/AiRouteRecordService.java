@@ -56,7 +56,7 @@ public class AiRouteRecordService {
                                               String content) {
         AiRouteRecord record = findByJob(user.getId(), jobId).orElseGet(AiRouteRecord::new);
         record.setUser(userRepository.getReferenceById(user.getId()));
-        record.setJobId(blankToNull(jobId));
+        record.setJobId(null);
         record.setTitle(extractTitle(content, days));
         record.setContent(content == null ? "" : content.trim());
         record.setDays(days);
@@ -87,7 +87,7 @@ public class AiRouteRecordService {
                                   String preference, String locale, String errorMessage) {
         AiRouteRecord record = findByJob(user.getId(), jobId).orElseGet(AiRouteRecord::new);
         record.setUser(userRepository.getReferenceById(user.getId()));
-        record.setJobId(blankToNull(jobId));
+        record.setJobId(null);
         record.setTitle(hasContent(record.getContent()) ? extractTitle(record.getContent(), days) : AiRouteRecord.defaultTitle(days));
         record.setDays(days);
         record.setBudget(normalizeKey(budget));
@@ -101,7 +101,7 @@ public class AiRouteRecordService {
     @Transactional(readOnly = true)
     public Optional<AiRouteRecordResponse> latestFor(User user) {
         return routeRecordRepository.findFirstByUserOrderByUpdatedAtDesc(user)
-                .map(AiRouteRecordResponse::from);
+                .map(AiRouteRecordResponse::fromLatest);
     }
 
     @Transactional(readOnly = true)

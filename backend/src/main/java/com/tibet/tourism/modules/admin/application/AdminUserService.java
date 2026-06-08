@@ -97,6 +97,26 @@ public class AdminUserService {
 
     public record RoleUpdateResult(boolean success, int status, String message) {}
     public record DeleteUserResult(boolean success, int status, String message) {}
+    public record UserActionPolicy(boolean protectedAccount, boolean deletable, boolean roleMutable) {}
+
+    public UserActionPolicy actionPolicyFor(User targetUser, Authentication authentication) {
+        String operatorUsername = authenticatedUsername(authentication);
+        String targetUsername = targetUser == null ? "" : targetUser.getUsername();
+        User.Role targetRole = targetUser == null ? null : targetUser.getRole();
+        boolean protectedAccount = isSuperAdminAccount(targetUser);
+        boolean operatorIsSuperAdmin = isSuperAdminUsername(operatorUsername);
+        boolean operatorIsTarget = sameUsername(operatorUsername, targetUsername);
+
+        boolean deletable = operatorIsSuperAdmin
+                && !protectedAccount
+                && !operatorIsTarget
+                && targetRole == User.Role.USER;
+        boolean roleMutable = operatorIsSuperAdmin
+                && !protectedAccount
+                && !operatorIsTarget;
+
+        return new UserActionPolicy(protectedAccount, deletable, roleMutable);
+    }
 
     public RoleUpdateResult updateRole(User user, String role, Authentication authentication) {
         if (role == null) {
@@ -104,13 +124,13 @@ public class AdminUserService {
         }
         try {
             User.Role requestedRole = User.Role.valueOf(role.toUpperCase());
-            String operatorUsername = authentication == null ? "" : authentication.getName();
-            boolean operatorIsSuperAdmin = superAdminUsername.equals(operatorUsername);
+            String operatorUsername = authenticatedUsername(authentication);
+            boolean operatorIsSuperAdmin = isSuperAdminUsername(operatorUsername);
 
-            if (superAdminUsername.equals(user.getUsername())) {
+            if (isSuperAdminAccount(user)) {
                 return new RoleUpdateResult(false, 400, "不能修改超级管理员角色");
             }
-            if (operatorUsername.equals(user.getUsername()) && requestedRole != User.Role.ADMIN) {
+            if (sameUsername(operatorUsername, user.getUsername()) && requestedRole != User.Role.ADMIN) {
                 return new RoleUpdateResult(false, 400, "不能取消自己的管理员权限");
             }
             if (!operatorIsSuperAdmin && (requestedRole == User.Role.ADMIN || user.getRole() == User.Role.ADMIN)) {
@@ -130,18 +150,18 @@ public class AdminUserService {
 
     @Transactional
     public DeleteUserResult deleteUser(User targetUser, Authentication authentication) {
-        String operatorUsername = authentication == null ? "" : authentication.getName();
+        String operatorUsername = authenticatedUsername(authentication);
 
         if (authentication == null) {
             return new DeleteUserResult(false, 401, "未登录，不能删除用户");
         }
-        if (!superAdminUsername.equals(operatorUsername)) {
+        if (!isSuperAdminUsername(operatorUsername)) {
             return new DeleteUserResult(false, 403, "只有超级管理员可以删除用户");
         }
-        if (superAdminUsername.equals(targetUser.getUsername())) {
+        if (isSuperAdminAccount(targetUser)) {
             return new DeleteUserResult(false, 400, "不能删除超级管理员账号");
         }
-        if (operatorUsername.equals(targetUser.getUsername())) {
+        if (sameUsername(operatorUsername, targetUser.getUsername())) {
             return new DeleteUserResult(false, 400, "不能删除当前登录账号");
         }
         if (targetUser.getRole() != User.Role.USER) {
@@ -173,6 +193,24 @@ public class AdminUserService {
         userVisitHistoryRepository.deleteByUserId(userId);
         userRepository.delete(targetUser);
         return new DeleteUserResult(true, 200, "用户删除成功");
+    }
+
+    private String authenticatedUsername(Authentication authentication) {
+        return authentication == null || authentication.getName() == null ? "" : authentication.getName();
+    }
+
+    private boolean isSuperAdminAccount(User user) {
+        return user != null && isSuperAdminUsername(user.getUsername());
+    }
+
+    private boolean isSuperAdminUsername(String username) {
+        return superAdminUsername != null
+                && !superAdminUsername.isBlank()
+                && superAdminUsername.equals(username);
+    }
+
+    private boolean sameUsername(String first, String second) {
+        return first != null && first.equals(second);
     }
 
     private void anonymizeFinancialRecords(Long userId) {

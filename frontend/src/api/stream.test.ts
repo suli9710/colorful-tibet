@@ -3,6 +3,34 @@ import { generateRouteStream, streamRouteGenerationJob } from './stream'
 
 const encoder = new TextEncoder()
 
+class MemoryStorage implements Storage {
+  private values = new Map<string, string>()
+
+  get length() {
+    return this.values.size
+  }
+
+  clear() {
+    this.values.clear()
+  }
+
+  getItem(key: string) {
+    return this.values.get(key) ?? null
+  }
+
+  key(index: number) {
+    return Array.from(this.values.keys())[index] ?? null
+  }
+
+  removeItem(key: string) {
+    this.values.delete(key)
+  }
+
+  setItem(key: string, value: string) {
+    this.values.set(key, String(value))
+  }
+}
+
 function streamResponse(chunks: string[], init?: ResponseInit): Response {
   return new Response(new ReadableStream<Uint8Array>({
     start(controller) {
@@ -54,7 +82,7 @@ describe('route generation streams', () => {
 
   it('handles SSE error events without reading more frames', async () => {
     stubFetch(streamResponse([
-      'event: error\ndata: {"message":"provider failed"}\n\n',
+      'event: error\ndata: {"message":"provider failed with token=stream-secret at /srv/app/AiRouteService.java:42"}\n\n',
       'data: {"type":"delta","text":"ignored"}\n\n'
     ]))
 
@@ -69,7 +97,9 @@ describe('route generation streams', () => {
       }
     )
 
-    expect(errors).toHaveBeenCalledWith('provider failed')
+    expect(errors).toHaveBeenCalledWith('AI route generation failed. Please try again.')
+    expect(errors.mock.calls[0][0]).not.toContain('stream-secret')
+    expect(errors.mock.calls[0][0]).not.toContain('/srv/app')
     expect(deltas).not.toHaveBeenCalled()
   })
 
@@ -83,7 +113,28 @@ describe('route generation streams', () => {
 
     await streamRouteGenerationJob('job-1', { onError: errors })
 
-    expect(errors).toHaveBeenCalledWith(expect.stringContaining('readable body'))
+    expect(errors).toHaveBeenCalledWith('Stream connection failed. Please try again.')
+    expect(errors.mock.calls[0][0]).not.toContain('readable body')
+  })
+
+  it('keeps route job SSE error payloads off user-visible callbacks', async () => {
+    stubFetch(streamResponse([
+      'data: {"type":"error","payload":{"message":"stack trace token=job-secret /var/app/RouteJob.java:7"}}\n\n',
+      'data: {"type":"delta","text":"ignored"}\n\n'
+    ]))
+
+    const deltas = vi.fn()
+    const errors = vi.fn()
+
+    await streamRouteGenerationJob('job-1', {
+      onDelta: deltas,
+      onError: errors
+    })
+
+    expect(errors).toHaveBeenCalledWith('AI route generation failed. Please try again.')
+    expect(errors.mock.calls[0][0]).not.toContain('job-secret')
+    expect(errors.mock.calls[0][0]).not.toContain('/var/app')
+    expect(deltas).not.toHaveBeenCalled()
   })
 
   it('silently returns when the fetch is aborted', async () => {
@@ -96,10 +147,34 @@ describe('route generation streams', () => {
     expect(errors).not.toHaveBeenCalled()
   })
 
-  it('preserves HTTP 429 as a rejected rate-limit error', async () => {
+  it('keeps HTTP 429 errors on safe local rate-limit text', async () => {
     stubFetch(new Response('slow down', { status: 429 }))
 
-    await expect(streamRouteGenerationJob('job-1', {})).rejects.toThrow('slow down')
+    await expect(streamRouteGenerationJob('job-1', {})).rejects.toThrow('temporarily rate limited')
+  })
+
+  it('does not attach legacy localStorage tokens to stream requests', async () => {
+    const localStorage = new MemoryStorage()
+    localStorage.setItem('locale', 'bo')
+    localStorage.setItem('token', 'legacy-jwt-token')
+    localStorage.setItem('jwt', 'legacy-jwt-value')
+    vi.stubGlobal('window', { localStorage })
+    vi.stubGlobal('localStorage', localStorage)
+    stubFetch(streamResponse([
+      'data: {"type":"done","content":"ok"}\n\n'
+    ]))
+
+    await generateRouteStream(
+      { days: 3, budget: 'comfort', preference: 'natural' },
+      {}
+    )
+
+    const fetchMock = fetch as unknown as ReturnType<typeof vi.fn>
+    const headers = fetchMock.mock.calls[0][1]?.headers as Record<string, string>
+    expect(headers['Accept-Language']).toBe('bo')
+    expect(headers.Authorization).toBeUndefined()
+    expect(headers.authorization).toBeUndefined()
+    expect(JSON.stringify(headers)).not.toContain('legacy-jwt')
   })
 
   it('applies route job snapshots and cumulative deltas', async () => {

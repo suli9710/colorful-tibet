@@ -76,8 +76,7 @@ public class AiRouteController {
                             currentUser, null, days, safeRequest.getBudget(), safeRequest.getPreference(), locale, normalizedCached);
                     return ResponseEntity.ok(Map.of("content", normalizedCached, "cached", true));
                 }
-                logger.warn("Ignoring invalid cached AI route content for sync endpoint: userId={}, days={}",
-                        currentUser.getId(), days);
+                logger.warn("Ignoring invalid cached AI route content for sync endpoint: days={}", days);
             }
 
             AiQuotaService.QuotaConsumptionResult quota = aiQuotaService.tryConsumeQuota(currentUser.getId());
@@ -97,10 +96,10 @@ public class AiRouteController {
 
             return ResponseEntity.ok(result);
         } catch (IllegalStateException e) {
-            logger.warn("AI route generation configuration unavailable: {}", e.getMessage());
+            logger.warn("AI route generation configuration unavailable: {}", exceptionSummary(e));
             return ResponseEntity.badRequest().body(Map.of("error", "AI 路线生成配置不可用"));
         } catch (Exception e) {
-            logger.error("AI route generation failed", e);
+            logger.error("AI route generation failed: {}", exceptionSummary(e));
             return ResponseEntity.internalServerError().body(Map.of("error", "AI route generation failed"));
         }
     }
@@ -139,7 +138,7 @@ public class AiRouteController {
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                     .body(Map.of("error", "今日 AI 路线生成次数已用完，请明天再试", "remaining", e.getRemaining()));
         } catch (Exception e) {
-            logger.error("AI route job start failed", e);
+            logger.error("AI route job start failed: {}", exceptionSummary(e));
             return ResponseEntity.internalServerError().body(Map.of("error", "AI route generation failed"));
         }
     }
@@ -204,7 +203,7 @@ public class AiRouteController {
         try {
             emitter.send(SseEmitter.event().data("{\"type\":\"error\",\"message\":\"" + message + "\"}"));
         } catch (Exception e) {
-            logger.warn("Failed to write AI route SSE error event: {}", e.getMessage());
+            logger.warn("Failed to write AI route SSE error event: {}", exceptionSummary(e));
         }
         emitter.complete();
         return emitter;
@@ -219,5 +218,9 @@ public class AiRouteController {
             return "bo";
         }
         return "zh";
+    }
+
+    private String exceptionSummary(Exception exception) {
+        return exception == null ? "unknown" : exception.getClass().getSimpleName();
     }
 }

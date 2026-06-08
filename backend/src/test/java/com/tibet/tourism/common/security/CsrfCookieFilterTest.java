@@ -51,6 +51,37 @@ class CsrfCookieFilterTest {
     }
 
     @Test
+    void publicLoginRejectsCrossSiteOriginEvenWithoutAuthCookie() throws Exception {
+        MockHttpServletRequest request = apiRequest("POST", "/api/auth/login");
+        request.addHeader("Origin", "https://evil.example");
+
+        MockHttpServletResponse response = doFilter(request);
+
+        assertEquals(403, response.getStatus());
+    }
+
+    @Test
+    void publicLoginAcceptsAllowedOriginWithoutCsrfToken() throws Exception {
+        MockHttpServletRequest request = apiRequest("POST", "/api/auth/login");
+        request.addHeader("Origin", "http://localhost:5173");
+        request.addHeader("Sec-Fetch-Site", "same-site");
+
+        MockHttpServletResponse response = doFilter(request);
+
+        assertEquals(200, response.getStatus());
+    }
+
+    @Test
+    void publicRegisterRejectsCrossSiteFetchMetadataWithoutAuthCookie() throws Exception {
+        MockHttpServletRequest request = apiRequest("POST", "/api/auth/register");
+        request.addHeader("Sec-Fetch-Site", "cross-site");
+
+        MockHttpServletResponse response = doFilter(request);
+
+        assertEquals(403, response.getStatus());
+    }
+
+    @Test
     void registerRequestWithStaleAuthCookieBypassesCsrfCheck() throws Exception {
         MockHttpServletRequest request = apiRequest("POST", "/api/auth/register");
         request.setCookies(new Cookie(CookieAuthConstants.AUTH_COOKIE_NAME, SESSION_TOKEN));

@@ -48,13 +48,14 @@ public class AuthTokenFilter extends OncePerRequestFilter {
                     logger.warn("Admin request without JWT: {}", path);
                 }
             } else if (jwtUtils == null) {
+                SecurityContextHolder.clearContext();
                 logger.error("JwtUtils is null; injection failure");
             } else if (tokenRevocationService != null && tokenRevocationService.isRevoked(jwt)) {
-                logger.warn("Rejected revoked JWT for path: {}", path);
+                rejectJwt(path, "revoked");
             } else if (!jwtUtils.validateJwtToken(jwt)) {
-                logger.warn("JWT validation failed for path: {}", path);
+                rejectJwt(path, "invalid");
             } else if (userSessionVersionService != null && !userSessionVersionService.tokenMatchesCurrentSession(jwt)) {
-                logger.warn("Rejected stale JWT session version for path: {}", path);
+                rejectJwt(path, "stale-session");
             } else {
                 String username = jwtUtils.getUserNameFromJwtToken(jwt);
                 if (userDetailsService != null) {
@@ -64,12 +65,14 @@ public class AuthTokenFilter extends OncePerRequestFilter {
                     authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authentication);
                     if (path.startsWith("/api/admin/")) {
-                        logger.debug("Admin auth OK: user={}, authorities={}", username, userDetails.getAuthorities());
+                        logger.debug("Admin auth OK: user=user#{}, authorities={}",
+                                PiiMasker.shortHash(username), userDetails.getAuthorities());
                     }
                 }
             }
         } catch (Exception e) {
-            logger.error("Auth filter error for {}: {}", path, e.getMessage());
+            SecurityContextHolder.clearContext();
+            logger.error("Auth filter error for {}: {}", path, SensitiveLogSanitizer.exceptionSummary(e));
         }
 
         filterChain.doFilter(request, response);
@@ -89,5 +92,10 @@ public class AuthTokenFilter extends OncePerRequestFilter {
 
         var authCookie = WebUtils.getCookie(request, CookieAuthConstants.AUTH_COOKIE_NAME);
         return authCookie == null ? null : authCookie.getValue();
+    }
+
+    private void rejectJwt(String path, String reason) {
+        SecurityContextHolder.clearContext();
+        logger.warn("Rejected JWT for path: {}, reason={}", path, reason);
     }
 }
