@@ -363,11 +363,17 @@
                             class="w-full px-4 py-3 rounded-xl border border-tibet-gold/25 bg-gray-50 focus:border-tibet-red focus:ring-4 focus:ring-red-50 outline-none transition-all text-sm resize-none"></textarea>
                 </div>
                 <div>
-                  <label class="block text-sm font-semibold text-gray-700 mb-1.5">{{ t('community.questionTags') }}</label>
-                  <p class="text-xs text-gray-400 mb-2">{{ t('community.questionTagsHint') }}</p>
-                  <div class="flex flex-wrap gap-2">
+                  <span id="ask-question-tags-label" class="block text-sm font-semibold text-gray-700 mb-1.5">{{ t('community.questionTags') }}</span>
+                  <p id="ask-question-tags-hint" class="text-xs text-gray-400 mb-2">{{ t('community.questionTagsHint') }}</p>
+                  <div
+                    class="flex flex-wrap gap-2"
+                    role="group"
+                    aria-labelledby="ask-question-tags-label"
+                    aria-describedby="ask-question-tags-hint"
+                  >
                     <button type="button" v-for="tag in tagOptions" :key="tag.value"
                             @click="toggleTag(tag.value)"
+                            :aria-pressed="newQuestion.tags.includes(tag.value)"
                             class="px-3 py-1.5 rounded-lg text-xs font-medium transition-all border"
                             :style="newQuestion.tags.includes(tag.value) ? { backgroundColor: tag.color + '18', color: tag.color, borderColor: tag.color + '40' } : {}"
                             :class="newQuestion.tags.includes(tag.value) ? '' : 'bg-gray-50 text-gray-500 border-tibet-gold/25 hover:border-gray-300'">

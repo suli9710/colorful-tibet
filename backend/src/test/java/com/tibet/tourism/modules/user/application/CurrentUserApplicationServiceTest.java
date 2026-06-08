@@ -130,6 +130,17 @@ class CurrentUserApplicationServiceTest {
     }
 
     @Test
+    void updateAvatarAcceptsLegacyLocalAvatarPath() {
+        when(userRepository.findById(7L)).thenReturn(Optional.of(user));
+
+        String avatarUrl = service.updateAvatar(7L, "/avatars/u7.png");
+
+        assertThat(avatarUrl).isEqualTo("/avatars/u7.png");
+        assertThat(user.getAvatar()).isEqualTo("/avatars/u7.png");
+        verify(userRepository).save(user);
+    }
+
+    @Test
     void updateAvatarRejectsExternalAvatarUrlBeforeLoadingUser() {
         assertThatThrownBy(() -> service.updateAvatar(7L, "https://cdn.example.com/avatar.png?signature=secret"))
                 .isInstanceOf(IllegalArgumentException.class);

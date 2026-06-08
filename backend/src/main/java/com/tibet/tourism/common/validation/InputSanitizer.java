@@ -28,7 +28,7 @@ public final class InputSanitizer {
     private static final Pattern TAG_SEPARATOR = Pattern.compile("[,，;；\\s]+");
     private static final Pattern SAFE_TAG = Pattern.compile("^[\\p{L}\\p{M}\\p{N}#-]{1,24}$");
     private static final Pattern SAFE_LOCAL_ASSET_PATH =
-            Pattern.compile("^/(uploads|images)/(?:[\\p{L}\\p{M}\\p{N}_-]+/)*[\\p{L}\\p{M}\\p{N}_-][\\p{L}\\p{M}\\p{N}._-]*$");
+            Pattern.compile("^/(uploads|images|avatars)/(?:[\\p{L}\\p{M}\\p{N}_-]+/)*[\\p{L}\\p{M}\\p{N}_-][\\p{L}\\p{M}\\p{N}._-]*$");
     private static final Pattern SAFE_APP_LINK_PATH =
             Pattern.compile("^/[\\p{L}\\p{M}\\p{N}][\\p{L}\\p{M}\\p{N}/._~?#=&%+-]{0,511}$");
 

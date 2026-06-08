@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import questionDetailSource from './QuestionDetail.vue?raw'
+import rawExtraMessages from '../i18n/locales/extra.json'
+
+const extraMessages = rawExtraMessages as {
+  zh: { questionDetail: Record<string, unknown> }
+  bo: { questionDetail: Record<string, unknown> }
+}
 
 describe('question detail action accessibility safeguards', () => {
   it('keeps question action buttons disabled and busy while requests are in flight', () => {
@@ -29,10 +35,30 @@ describe('question detail action accessibility safeguards', () => {
       'const questionLikeAccessibleName = computed(() => {',
       'const normalizePublicUserName = (value: unknown)'
     )
-    expect(likeNameSource).toContain("isLiked.value ? '取消点赞问题' : '点赞问题'")
-    expect(likeNameSource).toContain("isLiked.value ? '当前已点赞' : '当前未点赞'")
     expect(likeNameSource).toContain('const count = question.value?.likeCount ?? 0')
-    expect(likeNameSource).toContain('return `${action}，${state}，${count} 次点赞`')
+    expect(likeNameSource).toContain("return t('questionDetail.likeQuestionAria', {")
+    expect(likeNameSource).toContain("t(isLiked.value ? 'questionDetail.unlikeQuestionAction' : 'questionDetail.likeQuestionAction')")
+    expect(likeNameSource).toContain("t(isLiked.value ? 'questionDetail.likedState' : 'questionDetail.notLikedState')")
+    expect(likeNameSource).toContain('count')
+  })
+
+  it('keeps localized question like accessible-name messages for supported locales', () => {
+    const requiredKeys = [
+      'likeQuestionAction',
+      'unlikeQuestionAction',
+      'likedState',
+      'notLikedState',
+      'likeQuestionAria'
+    ]
+
+    for (const locale of ['zh', 'bo'] as const) {
+      const questionDetail = extraMessages[locale].questionDetail
+
+      for (const key of requiredKeys) {
+        expect(questionDetail).toHaveProperty(key)
+        expect(questionDetail[key]).toBeDefined()
+      }
+    }
   })
 
   it('sets in-flight guards before awaiting auth or confirmation work', () => {

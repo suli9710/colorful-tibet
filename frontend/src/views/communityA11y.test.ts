@@ -33,6 +33,12 @@ describe('community list UX and accessibility guardrails', () => {
     expect(routeCommunitySource).toContain('id="ask-question-title"')
     expect(routeCommunitySource).toContain('for="ask-question-content"')
     expect(routeCommunitySource).toContain('id="ask-question-content"')
+    expect(routeCommunitySource).toContain('id="ask-question-tags-label"')
+    expect(routeCommunitySource).toContain('id="ask-question-tags-hint"')
+    expect(routeCommunitySource).toContain('role="group"')
+    expect(routeCommunitySource).toContain('aria-labelledby="ask-question-tags-label"')
+    expect(routeCommunitySource).toContain('aria-describedby="ask-question-tags-hint"')
+    expect(routeCommunitySource).toContain(':aria-pressed="newQuestion.tags.includes(tag.value)"')
   })
 
   it('keeps filters, paging, and creation actions labelled or titled', () => {
