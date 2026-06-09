@@ -7,7 +7,9 @@ import com.tibet.tourism.modules.hotel.infra.HotelRepository;
 import com.tibet.tourism.modules.hotel.infra.RoomTypeRepository;
 import com.tibet.tourism.modules.order.domain.Booking;
 import com.tibet.tourism.modules.order.domain.CancellationPolicy;
+import com.tibet.tourism.modules.order.domain.Invoice;
 import com.tibet.tourism.modules.order.domain.InventoryLock;
+import com.tibet.tourism.modules.order.domain.OrderAuditLog;
 import com.tibet.tourism.modules.order.domain.OrderItem;
 import com.tibet.tourism.modules.order.domain.PaymentTransaction;
 import com.tibet.tourism.modules.order.domain.PaymentTransactionReservation;
@@ -30,9 +32,11 @@ import com.tibet.tourism.modules.user.domain.User;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.IntStream;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import org.junit.jupiter.api.BeforeEach;
@@ -208,7 +212,7 @@ class OrderCenterServiceTest {
     @Test
     void getMyOrdersClampsPageSizeAndUsesDefaultSortForUnsafeSort() {
         PlatformOrder order = payableOrder("ORD-PAGED", PlatformOrder.Status.CONFIRMED);
-        when(orderRepository.findByUserId(eq(1L), any(Pageable.class)))
+        when(orderRepository.findVisibleByUserId(eq(1L), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(order), PageRequest.of(0, 50), 75));
 
         var page = orderCenterService.getMyOrders(
@@ -216,12 +220,36 @@ class OrderCenterServiceTest {
                 PageRequest.of(0, 500, Sort.by(Sort.Direction.ASC, "customerPhone")));
 
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
-        verify(orderRepository).findByUserId(eq(1L), pageableCaptor.capture());
+        verify(orderRepository).findVisibleByUserId(eq(1L), pageableCaptor.capture());
         Pageable safePageable = pageableCaptor.getValue();
         assertEquals(50, safePageable.getPageSize());
         assertEquals(Sort.by(Sort.Direction.DESC, "createdAt"), safePageable.getSort());
         assertEquals(75, page.getTotalElements());
         assertEquals(1, page.getContent().size());
+        assertEquals("ORD-PAGED", page.getContent().get(0).orderNo());
+    }
+
+    @Test
+    void getMyOrdersReturnsSummaryWithoutExpandingChildCollections() {
+        PlatformOrder order = spy(payableOrder("ORD-SUMMARY", PlatformOrder.Status.CONFIRMED));
+        lenient().doThrow(new AssertionError("List summaries must not load order items"))
+                .when(order).getItems();
+        lenient().doThrow(new AssertionError("List summaries must not load payment transactions"))
+                .when(order).getPaymentTransactions();
+        lenient().doThrow(new AssertionError("List summaries must not load refunds"))
+                .when(order).getRefunds();
+        lenient().doThrow(new AssertionError("List summaries must not load vouchers"))
+                .when(order).getVouchers();
+        lenient().doThrow(new AssertionError("List summaries must not load invoices"))
+                .when(order).getInvoices();
+        when(orderRepository.findVisibleByUserId(eq(1L), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(order), PageRequest.of(0, 20), 1));
+
+        var page = orderCenterService.getMyOrders(user, PageRequest.of(0, 20));
+
+        assertEquals(1, page.getContent().size());
+        assertEquals("ORD-SUMMARY", page.getContent().get(0).orderNo());
+        assertEquals("Test order", page.getContent().get(0).productSummary());
     }
 
     @Test
@@ -785,20 +813,25 @@ class OrderCenterServiceTest {
     }
 
     @Test
-    void deleteClosedOrderRemovesOrderAndInventoryLocks() {
+    void deleteClosedOrderHidesOrderAndPreservesAuditLogs() {
         PlatformOrder order = new PlatformOrder();
         order.setId(99L);
         order.setUser(user);
         order.setStatus(PlatformOrder.Status.EXPIRED);
-        InventoryLock lock = new InventoryLock();
+        OrderAuditLog existingAuditLog = new OrderAuditLog();
+        existingAuditLog.setAction("EXPIRED");
+        order.addAuditLog(existingAuditLog);
 
-        when(orderRepository.findByIdAndUserIdForUpdate(99L, 1L)).thenReturn(Optional.of(order));
-        when(inventoryLockRepository.findByOrder(order)).thenReturn(List.of(lock));
+        when(orderRepository.findVisibleByIdAndUserIdForUpdate(99L, 1L)).thenReturn(Optional.of(order));
 
         orderCenterService.deleteClosedOrder(user, 99L);
 
-        verify(inventoryLockRepository).deleteAll(List.of(lock));
-        verify(orderRepository).delete(order);
+        assertNotNull(order.getUserHiddenAt());
+        assertEquals(2, order.getAuditLogs().size());
+        assertSame(existingAuditLog, order.getAuditLogs().get(0));
+        assertEquals("USER_HIDDEN", order.getAuditLogs().get(1).getAction());
+        verify(inventoryLockRepository, never()).deleteAll(anyList());
+        verify(orderRepository, never()).delete(any());
     }
 
     @Test
@@ -808,7 +841,7 @@ class OrderCenterServiceTest {
         order.setUser(user);
         order.setStatus(PlatformOrder.Status.PENDING_PAYMENT);
 
-        when(orderRepository.findByIdAndUserIdForUpdate(99L, 1L)).thenReturn(Optional.of(order));
+        when(orderRepository.findVisibleByIdAndUserIdForUpdate(99L, 1L)).thenReturn(Optional.of(order));
 
         IllegalStateException error = assertThrows(
                 IllegalStateException.class,
@@ -828,7 +861,7 @@ class OrderCenterServiceTest {
         lock.setStatus(InventoryLock.Status.LOCKED);
         lock.setActiveLockKey("HOTEL_ROOM:20:30:2026-06-01");
 
-        when(orderRepository.findByIdAndUserIdForUpdate(99L, 1L)).thenReturn(Optional.of(order));
+        when(orderRepository.findVisibleByIdAndUserIdForUpdate(99L, 1L)).thenReturn(Optional.of(order));
         when(inventoryLockRepository.findByOrder(order)).thenReturn(List.of(lock));
 
         var response = orderCenterService.getOrder(user, 99L);
@@ -839,13 +872,84 @@ class OrderCenterServiceTest {
     }
 
     @Test
+    void expirePendingOrdersContinuesPastFirstOrderAndInventoryLockBatches() {
+        List<PlatformOrder> firstOrderBatch = IntStream.range(0, 100)
+                .mapToObj(index -> {
+                    PlatformOrder order = payableOrder("ORD-BATCH-" + index, PlatformOrder.Status.PENDING_PAYMENT);
+                    order.setId(1000L + index);
+                    order.setExpiresAt(LocalDateTime.now().minusMinutes(5));
+                    return order;
+                })
+                .toList();
+        PlatformOrder secondOrderBatchOrder = payableOrder("ORD-BATCH-101", PlatformOrder.Status.PENDING_PAYMENT);
+        secondOrderBatchOrder.setId(2000L);
+        secondOrderBatchOrder.setExpiresAt(LocalDateTime.now().minusMinutes(5));
+
+        List<InventoryLock> firstLockBatch = IntStream.range(0, 100)
+                .mapToObj(index -> expiredInventoryLock("LOCK-BATCH-" + index))
+                .toList();
+        InventoryLock secondLockBatchLock = expiredInventoryLock("LOCK-BATCH-101");
+        PageRequest batchPage = PageRequest.of(0, 100);
+
+        when(orderRepository.findByStatusAndExpiresAtBeforeForUpdate(
+                eq(PlatformOrder.Status.PENDING_PAYMENT), any(LocalDateTime.class), eq(batchPage)))
+                .thenReturn(firstOrderBatch, List.of(secondOrderBatchOrder));
+        when(inventoryLockRepository.findByOrder(any(PlatformOrder.class))).thenReturn(List.of());
+        when(inventoryLockRepository.findExpiredLocks(
+                eq(InventoryLock.Status.LOCKED), any(LocalDateTime.class), eq(batchPage)))
+                .thenReturn(firstLockBatch, List.of(secondLockBatchLock));
+
+        orderCenterService.expirePendingOrders();
+
+        assertEquals(PlatformOrder.Status.EXPIRED, firstOrderBatch.get(0).getStatus());
+        assertEquals(PlatformOrder.Status.EXPIRED, secondOrderBatchOrder.getStatus());
+        assertEquals(InventoryLock.Status.EXPIRED, firstLockBatch.get(0).getStatus());
+        assertNull(firstLockBatch.get(0).getActiveLockKey());
+        assertEquals(InventoryLock.Status.EXPIRED, secondLockBatchLock.getStatus());
+        assertNull(secondLockBatchLock.getActiveLockKey());
+        verify(orderRepository, times(2)).findByStatusAndExpiresAtBeforeForUpdate(
+                eq(PlatformOrder.Status.PENDING_PAYMENT), any(LocalDateTime.class), eq(batchPage));
+        verify(inventoryLockRepository, times(2)).findExpiredLocks(
+                eq(InventoryLock.Status.LOCKED), any(LocalDateTime.class), eq(batchPage));
+        verify(inventoryLockRepository, times(101)).save(any(InventoryLock.class));
+    }
+
+    @Test
+    void getOrderStillReturnsFullChildCollections() {
+        PlatformOrder order = paidOrderWithItem();
+        order.setId(123L);
+        order.setOrderNo("ORD-FULL");
+        OrderItem item = order.getItems().get(0);
+        RefundOrder refund = pendingRefund(order, item, BigDecimal.valueOf(100));
+        refund.setProcessedAt(LocalDateTime.of(2026, 6, 2, 10, 0));
+        issuedVoucher(order, item);
+        Invoice invoice = new Invoice();
+        invoice.setId(701L);
+        invoice.setInvoiceNo("INV-701");
+        invoice.setInvoiceTitle("Traveler");
+        invoice.setAmount(BigDecimal.valueOf(600));
+        invoice.setStatus(Invoice.Status.REQUESTED);
+        order.addInvoice(invoice);
+
+        when(orderRepository.findVisibleByIdAndUserIdForUpdate(123L, 1L)).thenReturn(Optional.of(order));
+
+        var response = orderCenterService.getOrder(user, 123L);
+
+        assertEquals(1, response.items().size());
+        assertEquals(1, response.paymentTransactions().size());
+        assertEquals(1, response.refunds().size());
+        assertEquals(1, response.vouchers().size());
+        assertEquals(1, response.invoices().size());
+    }
+
+    @Test
     void getOrderRejectsMissingAuthenticatedUserBeforeRepositoryLookup() {
         AuthenticationRequiredException error = assertThrows(
                 AuthenticationRequiredException.class,
                 () -> orderCenterService.getOrder(null, 99L));
 
         assertEquals("Authentication required", error.getMessage());
-        verify(orderRepository, never()).findByIdAndUserIdForUpdate(any(), any());
+        verify(orderRepository, never()).findVisibleByIdAndUserIdForUpdate(any(), any());
     }
 
     @Test
@@ -868,7 +972,7 @@ class OrderCenterServiceTest {
         order.setCustomerName("Traveler");
         order.setCustomerPhone("13900000000");
 
-        when(orderRepository.findByIdAndUserIdForUpdate(99L, 1L)).thenReturn(Optional.of(order));
+        when(orderRepository.findVisibleByIdAndUserIdForUpdate(99L, 1L)).thenReturn(Optional.of(order));
 
         var response = orderCenterService.getOrder(user, 99L);
 
@@ -883,7 +987,7 @@ class OrderCenterServiceTest {
         item.setServiceStartDate(LocalDate.now().plusDays(1));
         item.setCancellationPolicyId(5L);
 
-        when(orderRepository.findByIdAndUserIdForUpdate(99L, 1L)).thenReturn(Optional.of(order));
+        when(orderRepository.findVisibleByIdAndUserIdForUpdate(99L, 1L)).thenReturn(Optional.of(order));
         when(cancellationPolicyRepository.findById(5L))
                 .thenReturn(Optional.of(policy(72, new BigDecimal("0.50"))));
 
@@ -900,7 +1004,7 @@ class OrderCenterServiceTest {
         item.setServiceStartDate(LocalDate.now().plusDays(10));
         item.setCancellationPolicyId(5L);
 
-        when(orderRepository.findByIdAndUserIdForUpdate(99L, 1L)).thenReturn(Optional.of(order));
+        when(orderRepository.findVisibleByIdAndUserIdForUpdate(99L, 1L)).thenReturn(Optional.of(order));
         when(cancellationPolicyRepository.findById(5L))
                 .thenReturn(Optional.of(policy(72, new BigDecimal("0.50"))));
 
@@ -921,7 +1025,7 @@ class OrderCenterServiceTest {
         pending.setStatus(RefundOrder.Status.REQUESTED);
         pending.setAmount(BigDecimal.valueOf(100));
         order.addRefund(pending);
-        when(orderRepository.findByIdAndUserIdForUpdate(99L, 1L)).thenReturn(Optional.of(order));
+        when(orderRepository.findVisibleByIdAndUserIdForUpdate(99L, 1L)).thenReturn(Optional.of(order));
 
         IllegalStateException error = assertThrows(
                 IllegalStateException.class,
@@ -938,7 +1042,7 @@ class OrderCenterServiceTest {
         completed.setStatus(RefundOrder.Status.COMPLETED);
         completed.setAmount(BigDecimal.valueOf(600));
         order.addRefund(completed);
-        when(orderRepository.findByIdAndUserIdForUpdate(99L, 1L)).thenReturn(Optional.of(order));
+        when(orderRepository.findVisibleByIdAndUserIdForUpdate(99L, 1L)).thenReturn(Optional.of(order));
 
         IllegalStateException error = assertThrows(
                 IllegalStateException.class,
@@ -1228,6 +1332,14 @@ class OrderCenterServiceTest {
         lock.setOrderItem(item);
         lock.setStatus(InventoryLock.Status.CONFIRMED);
         lock.setActiveLockKey("SCENIC_SPOT:10:2026-06-01");
+        return lock;
+    }
+
+    private InventoryLock expiredInventoryLock(String activeLockKey) {
+        InventoryLock lock = new InventoryLock();
+        lock.setStatus(InventoryLock.Status.LOCKED);
+        lock.setActiveLockKey(activeLockKey);
+        lock.setExpiresAt(LocalDateTime.now().minusMinutes(5));
         return lock;
     }
 

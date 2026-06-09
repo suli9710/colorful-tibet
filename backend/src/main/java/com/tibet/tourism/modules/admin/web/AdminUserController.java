@@ -90,42 +90,40 @@ public class AdminUserController {
     }
 
     @PostMapping("/users/{id}/unlock")
-    public ResponseEntity<?> unlockUser(@PathVariable Long id) {
-        User user = userRepository.findById(id).orElse(null);
-        if (user == null) {
+    public ResponseEntity<?> unlockUser(@PathVariable Long id, Authentication authentication) {
+        AdminUserService.UnlockUserResult result = adminUserService.unlockLogin(id, authentication);
+        if (result.success()) {
+            return ResponseEntity.ok(Map.of("message", result.message()));
+        }
+        if (result.status() == 404) {
             return ResponseEntity.notFound().build();
         }
-        loginAttemptService.reset(user.getUsername());
-        return ResponseEntity.ok(Map.of("message", "已解除登录锁定"));
+        return ResponseEntity.status(result.status()).body(Map.of("error", result.message()));
     }
 
     @PostMapping("/users/{id}/role")
     public ResponseEntity<?> updateUserRole(@PathVariable Long id,
                                             @RequestBody Map<String, String> request,
                                             Authentication authentication) {
-        Optional<User> userOpt = userRepository.findById(id);
-        if (userOpt.isEmpty()) {
-            return ResponseEntity.notFound().build();
-        }
-
         AdminUserService.RoleUpdateResult result = adminUserService.updateRole(
-                userOpt.get(), request.get("role"), authentication);
+                id, request.get("role"), authentication);
         if (result.success()) {
             return ResponseEntity.ok(Map.of("message", result.message()));
+        }
+        if (result.status() == 404) {
+            return ResponseEntity.notFound().build();
         }
         return ResponseEntity.status(result.status()).body(Map.of("error", result.message()));
     }
 
     @DeleteMapping("/users/{id}")
     public ResponseEntity<?> deleteUser(@PathVariable Long id, Authentication authentication) {
-        Optional<User> userOpt = userRepository.findById(id);
-        if (userOpt.isEmpty()) {
-            return ResponseEntity.notFound().build();
-        }
-
-        AdminUserService.DeleteUserResult result = adminUserService.deleteUser(userOpt.get(), authentication);
+        AdminUserService.DeleteUserResult result = adminUserService.deleteUser(id, authentication);
         if (result.success()) {
             return ResponseEntity.ok(Map.of("message", result.message()));
+        }
+        if (result.status() == 404) {
+            return ResponseEntity.notFound().build();
         }
         return ResponseEntity.status(result.status()).body(Map.of("error", result.message()));
     }

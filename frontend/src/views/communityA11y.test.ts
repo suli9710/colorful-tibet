@@ -58,6 +58,21 @@ describe('community list UX and accessibility guardrails', () => {
     expect(routeCommunitySource).toContain('aria-live="polite"')
   })
 
+  it('keeps route and Q&A loading and failure states accessible and retryable', () => {
+    expect(routeCommunitySource.match(/role="status"/g)?.length).toBeGreaterThanOrEqual(3)
+    expect(routeCommunitySource).toContain('aria-busy="true"')
+    expect(routeCommunitySource).toContain("text('community.loadingRoutes', '路线列表加载中')")
+    expect(routeCommunitySource).toContain("text('community.loadingQuestions', '问答列表加载中')")
+    expect(routeCommunitySource).toContain('v-else-if="routeError"')
+    expect(routeCommunitySource).toContain('v-else-if="qaError"')
+    expect(routeCommunitySource).toContain("routeError.value = text('community.routesLoadFailed'")
+    expect(routeCommunitySource).toContain("qaError.value = text('community.questionsLoadFailed'")
+    expect(routeCommunitySource).toContain('@click="loadRoutes"')
+    expect(routeCommunitySource).toContain('@click="loadQuestions"')
+    expect(routeCommunitySource.indexOf('v-else-if="routeError"')).toBeLessThan(routeCommunitySource.indexOf('v-else-if="routes.length === 0"'))
+    expect(routeCommunitySource.indexOf('v-else-if="qaError"')).toBeLessThan(routeCommunitySource.indexOf('v-else-if="questions.length === 0"'))
+  })
+
   it('keeps clickable cards reachable and actionable from the keyboard', () => {
     expect(routeCommunitySource.match(/role="button"/g)?.length).toBeGreaterThanOrEqual(2)
     expect(routeCommunitySource.match(/tabindex="0"/g)?.length).toBeGreaterThanOrEqual(2)

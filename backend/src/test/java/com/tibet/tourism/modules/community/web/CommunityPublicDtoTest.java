@@ -23,6 +23,9 @@ import com.tibet.tourism.modules.community.domain.RouteComment;
 import com.tibet.tourism.modules.community.domain.SharedRoute;
 import com.tibet.tourism.modules.community.domain.TravelAnswer;
 import com.tibet.tourism.modules.community.domain.TravelQuestion;
+import com.tibet.tourism.modules.community.web.dto.PublicUserResponse;
+import com.tibet.tourism.modules.community.web.dto.SharedRouteSummaryResponse;
+import com.tibet.tourism.modules.community.web.dto.TravelQuestionSummaryResponse;
 import com.tibet.tourism.modules.user.domain.User;
 import com.tibet.tourism.modules.user.infra.UserRepository;
 import java.time.LocalDateTime;
@@ -73,8 +76,9 @@ class CommunityPublicDtoTest {
                 nullable(Integer.class),
                 nullable(String.class),
                 nullable(String.class),
-                any(Pageable.class)))
-                .thenReturn(new PageImpl<>(List.of(sharedRoute())));
+                any(Pageable.class),
+                nullable(Long.class)))
+                .thenReturn(new PageImpl<>(List.of(sharedRouteSummary())));
 
         mockMvc.perform(get("/api/routes/shared"))
                 .andExpect(status().isOk())
@@ -109,7 +113,7 @@ class CommunityPublicDtoTest {
     }
 
     @Test
-    void sharedRouteCommentsDoNotExposeNestedUserOrRouteEntities() throws Exception {
+    void sharedRouteCommentsExposeOnlyPublicUserAndParentRouteSummary() throws Exception {
         RouteComment comment = new RouteComment();
         comment.setId(300L);
         comment.setRoute(sharedRoute());
@@ -123,7 +127,10 @@ class CommunityPublicDtoTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].user.id").doesNotExist())
                 .andExpect(jsonPath("$[0].user.owner").value(false))
-                .andExpect(jsonPath("$[0].route").doesNotExist())
+                .andExpect(jsonPath("$[0].route.id").value(100))
+                .andExpect(jsonPath("$[0].route.title").value("Lhasa route"))
+                .andExpect(jsonPath("$[0].route.content").doesNotExist())
+                .andExpect(jsonPath("$[0].route.author").doesNotExist())
                 .andExpect(jsonPath("$[0].user.username").doesNotExist())
                 .andExpect(jsonPath("$[0].user.phone").doesNotExist())
                 .andExpect(jsonPath("$[0].user.ipAddress").doesNotExist())
@@ -132,16 +139,17 @@ class CommunityPublicDtoTest {
 
     @Test
     void questionListReturnsPublicAuthorOnly() throws Exception {
-        when(qaService.getQuestions(
+        when(qaService.getQuestionSummaries(
                 nullable(String.class),
-                any(String.class),
                 nullable(String.class),
-                any(Pageable.class)))
-                .thenReturn(new PageImpl<>(List.of(question())));
+                any(Pageable.class),
+                nullable(Long.class)))
+                .thenReturn(new PageImpl<>(List.of(questionSummary())));
 
         mockMvc.perform(get("/api/community/questions"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].content").doesNotExist())
+                .andExpect(jsonPath("$.content[0].excerpt").value("How to prepare?"))
                 .andExpect(jsonPath("$.content[0].author.id").doesNotExist())
                 .andExpect(jsonPath("$.content[0].author.owner").value(false))
                 .andExpect(jsonPath("$.content[0].isResolved").value(false))
@@ -270,6 +278,27 @@ class CommunityPublicDtoTest {
         return route;
     }
 
+    private static SharedRouteSummaryResponse sharedRouteSummary() {
+        return new SharedRouteSummaryResponse(
+                100L,
+                new PublicUserResponse("Public Nickname", "/avatars/u7.png", false),
+                "Lhasa route",
+                3,
+                "budget",
+                "culture",
+                SharedRoute.SourceType.USER,
+                null,
+                null,
+                null,
+                null,
+                null,
+                10,
+                2,
+                1,
+                LocalDateTime.parse("2026-01-02T03:04:05"),
+                LocalDateTime.parse("2026-01-03T03:04:05"));
+    }
+
     private static TravelQuestion question() {
         TravelQuestion question = new TravelQuestion();
         question.setId(200L);
@@ -284,5 +313,20 @@ class CommunityPublicDtoTest {
         question.setCreatedAt(LocalDateTime.parse("2026-01-02T03:04:05"));
         question.setUpdatedAt(LocalDateTime.parse("2026-01-03T03:04:05"));
         return question;
+    }
+
+    private static TravelQuestionSummaryResponse questionSummary() {
+        return new TravelQuestionSummaryResponse(
+                200L,
+                PublicUserResponse.fromEntity(publicUser()),
+                "Altitude question",
+                "How to prepare?",
+                "altitude",
+                20,
+                1,
+                3,
+                false,
+                LocalDateTime.parse("2026-01-02T03:04:05"),
+                LocalDateTime.parse("2026-01-03T03:04:05"));
     }
 }

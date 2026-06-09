@@ -5,11 +5,11 @@
         <div>
           <div class="inline-flex items-center gap-2 rounded-full border border-tibet-gold/25 bg-white/80 px-3 py-1 text-xs font-semibold text-tibet-red">
             <ReceiptText class="h-3.5 w-3.5" />
-            平台不收款
+            {{ t('orderCenter.noPlatformPaymentBadge') }}
           </div>
-          <h1 class="mt-4 text-2xl font-bold text-tibet-dark sm:text-4xl">咨询记录中心</h1>
+          <h1 class="mt-4 text-2xl font-bold text-tibet-dark sm:text-4xl">{{ t('orderCenter.title') }}</h1>
           <p class="mt-2 max-w-2xl text-sm leading-6 text-tibet-brown/65">
-            这里汇总景点、酒店和行程节点的咨询意向。实际购买、出票、入住和售后确认请以第三方有资质平台为准。
+            {{ t('orderCenter.subtitle') }}
           </p>
         </div>
 
@@ -19,7 +19,7 @@
             class="inline-flex items-center justify-center gap-2 rounded-xl border border-tibet-gold/25 bg-white/80 px-4 py-2.5 text-sm font-semibold text-tibet-brown hover:bg-amber-50"
           >
             <Sparkles class="h-4 w-4" />
-            继续规划
+            {{ t('orderCenter.continuePlanning') }}
           </router-link>
           <button
             type="button"
@@ -28,7 +28,7 @@
             @click="loadOrders(selectedOrderId)"
           >
             <RefreshCw class="h-4 w-4" :class="{ 'animate-spin': loading }" />
-            刷新
+            {{ t('common.refresh') }}
           </button>
         </div>
       </header>
@@ -55,6 +55,7 @@
               v-for="tab in statusTabs"
               :key="tab.key"
               type="button"
+              :aria-pressed="selectedTab === tab.key"
               class="inline-flex shrink-0 items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold transition"
               :class="selectedTab === tab.key ? 'bg-tibet-dark text-white shadow-sm' : 'text-tibet-brown/65 hover:bg-white/80'"
               @click="selectedTab = tab.key"
@@ -72,7 +73,8 @@
               v-model.trim="query"
               type="search"
               class="w-full rounded-xl border border-tibet-gold/20 bg-white/85 py-2.5 pl-9 pr-3 text-sm text-tibet-dark outline-none transition focus:border-tibet-gold/50 focus:ring-2 focus:ring-tibet-gold/10"
-              placeholder="搜索咨询编号、项目或凭证"
+              :placeholder="t('orderCenter.searchPlaceholder')"
+              :aria-label="t('orderCenter.searchPlaceholder')"
             >
           </label>
         </div>
@@ -87,21 +89,28 @@
           @click="loadOrders(selectedOrderId)"
         >
           <RefreshCw class="h-3.5 w-3.5" :class="{ 'animate-spin': loading }" />
-          重试
+          {{ t('common.retry') }}
         </button>
       </div>
       <div v-if="statusMessage" role="status" aria-live="polite" class="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
         {{ statusMessage }}
       </div>
 
-      <div v-if="loading && !orders.length" class="rounded-3xl border border-white/60 bg-white/75 p-12 text-center text-tibet-brown/60">
+      <div
+        v-if="loading && !orders.length"
+        class="rounded-3xl border border-white/60 bg-white/75 p-12 text-center text-tibet-brown/60"
+        role="status"
+        aria-live="polite"
+        aria-busy="true"
+        aria-atomic="true"
+      >
         <div class="mx-auto mb-4 h-11 w-11 animate-spin rounded-full border-2 border-tibet-gold/30 border-b-tibet-gold"></div>
-        <p class="text-sm font-semibold">正在加载咨询记录</p>
+        <p class="text-sm font-semibold">{{ t('orderCenter.loading') }}</p>
       </div>
 
       <div v-else-if="errorMessage && !orders.length" role="alert" class="rounded-3xl border border-rose-200 bg-rose-50 px-6 py-12 text-center shadow-sm">
         <PackageCheck class="mx-auto h-12 w-12 text-rose-500" />
-        <h2 class="mt-4 text-xl font-bold text-rose-900">咨询记录加载失败</h2>
+        <h2 class="mt-4 text-xl font-bold text-rose-900">{{ t('orderCenter.loadErrorTitle') }}</h2>
         <p class="mx-auto mt-2 max-w-md text-sm leading-6 text-rose-700">
           {{ errorMessage }}
         </p>
@@ -112,19 +121,19 @@
           @click="loadOrders(selectedOrderId)"
         >
           <RefreshCw class="h-4 w-4" :class="{ 'animate-spin': loading }" />
-          重新加载
+          {{ t('common.reload') }}
         </button>
       </div>
 
       <div v-else-if="!orders.length" class="rounded-3xl border border-white/60 bg-white/80 px-6 py-12 text-center shadow-sm">
         <PackageCheck class="mx-auto h-12 w-12 text-tibet-gold" />
-        <h2 class="mt-4 text-xl font-bold text-tibet-dark">还没有咨询记录</h2>
+        <h2 class="mt-4 text-xl font-bold text-tibet-dark">{{ t('orderCenter.emptyTitle') }}</h2>
         <p class="mx-auto mt-2 max-w-md text-sm leading-6 text-tibet-brown/60">
-          从景点、酒店或 AI 行程页提交咨询后，这里会显示客服和第三方确认进度。
+          {{ t('orderCenter.emptyDescription') }}
         </p>
         <div class="mt-6 flex flex-wrap justify-center gap-3">
-          <router-link to="/route-planner" class="rounded-xl bg-tibet-red px-4 py-2.5 text-sm font-semibold text-tibet-yellow">生成行程</router-link>
-          <router-link to="/hotels" class="rounded-xl border border-tibet-gold/25 bg-white px-4 py-2.5 text-sm font-semibold text-tibet-brown">浏览酒店</router-link>
+          <router-link to="/route-planner" class="rounded-xl bg-tibet-red px-4 py-2.5 text-sm font-semibold text-tibet-yellow">{{ t('orderCenter.createItinerary') }}</router-link>
+          <router-link to="/hotels" class="rounded-xl border border-tibet-gold/25 bg-white px-4 py-2.5 text-sm font-semibold text-tibet-brown">{{ t('orderCenter.browseHotels') }}</router-link>
         </div>
       </div>
 
@@ -156,12 +165,12 @@
                   </span>
                   <span class="text-xs text-tibet-brown/45">{{ order.orderNo }}</span>
                 </div>
-                <h2 class="mt-2 truncate text-base font-bold text-tibet-dark">{{ order.productSummary || '旅行咨询' }}</h2>
+                <h2 class="mt-2 truncate text-base font-bold text-tibet-dark">{{ order.productSummary || t('orderCenter.defaultProductSummary') }}</h2>
                 <p class="mt-1 line-clamp-2 text-sm text-tibet-brown/58">{{ itemSummary(order) }}</p>
               </div>
 
               <div class="shrink-0 text-left sm:text-right">
-                <p class="text-xs text-tibet-brown/45">参考价</p>
+                <p class="text-xs text-tibet-brown/45">{{ t('orderCenter.referencePrice') }}</p>
                 <p class="text-lg font-bold tabular-nums text-tibet-dark">{{ formatCurrency(order.payableAmount, order.currency) }}</p>
                 <p class="mt-1 text-xs font-medium" :class="confirmationMeta(order.paymentStatus).textClass">
                   {{ confirmationMeta(order.paymentStatus).label }}
@@ -176,24 +185,44 @@
               </span>
               <span class="inline-flex items-center gap-1.5">
                 <TicketCheck class="h-3.5 w-3.5 text-tibet-gold" />
-                {{ order.vouchers?.length || 0 }} 张凭证
+                {{ voucherSummaryLabel(order) }}
               </span>
               <span class="inline-flex items-center gap-1.5">
                 <FileText class="h-3.5 w-3.5 text-tibet-gold" />
-                {{ thirdPartyConfirmations(order).length }} 条第三方记录
+                {{ confirmationSummaryLabel(order) }}
               </span>
             </div>
           </article>
 
           <div v-if="!filteredOrders.length" class="rounded-2xl border border-white/60 bg-white/75 p-8 text-center text-sm text-tibet-brown/60">
-            <p>当前筛选下没有咨询记录。</p>
+            <p>{{ t('orderCenter.noFilteredResults') }}</p>
             <button
               v-if="selectedTab !== 'ALL' || query"
               type="button"
               class="mt-4 rounded-xl border border-tibet-gold/25 bg-white px-4 py-2 text-sm font-semibold text-tibet-brown transition hover:bg-amber-50"
               @click="resetFilters"
             >
-              清除筛选
+              {{ t('orderCenter.clearFilters') }}
+            </button>
+          </div>
+
+          <div
+            v-if="ordersTotalPages > 1"
+            class="mt-5 flex flex-wrap items-center justify-center gap-3"
+            role="navigation"
+            :aria-label="t('orderCenter.paginationLabel')"
+          >
+            <span class="text-sm text-tibet-brown/55" role="status" aria-live="polite">
+              {{ ordersPage + 1 }} / {{ ordersTotalPages }}
+            </span>
+            <button
+              type="button"
+              class="min-h-11 rounded-xl border border-tibet-gold/25 bg-white px-5 py-2 text-sm font-semibold text-tibet-brown transition hover:bg-amber-50 disabled:cursor-wait disabled:opacity-50"
+              :disabled="loadingMoreOrders || !hasMoreOrders"
+              :aria-busy="loadingMoreOrders"
+              @click="loadNextOrdersPage"
+            >
+              {{ loadingMoreOrders ? t('common.loading') : t('community.nextPage') }}
             </button>
           </div>
         </section>
@@ -204,12 +233,12 @@
               <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div class="min-w-0">
                   <p class="text-xs font-semibold text-tibet-brown/45">{{ selectedOrder.orderNo }}</p>
-                  <h2 class="mt-1 text-xl font-bold text-tibet-dark">{{ selectedOrder.productSummary || '旅行咨询' }}</h2>
+                  <h2 class="mt-1 text-xl font-bold text-tibet-dark">{{ selectedOrder.productSummary || t('orderCenter.defaultProductSummary') }}</h2>
                 </div>
                 <button
                   type="button"
                   class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-tibet-gold/20 bg-white/80 text-tibet-brown transition hover:bg-amber-50"
-                  aria-label="关闭咨询详情"
+                  :aria-label="t('orderCenter.closeDetail')"
                   @click="closeOrderDetail"
                 >
                   <X class="h-4 w-4" />
@@ -218,27 +247,47 @@
 
               <div class="mt-4 grid gap-3 sm:grid-cols-3">
                 <div>
-                  <p class="text-xs text-tibet-brown/45">参考价</p>
+                  <p class="text-xs text-tibet-brown/45">{{ t('orderCenter.referencePrice') }}</p>
                   <p class="mt-1 text-lg font-bold tabular-nums text-tibet-dark">{{ formatCurrency(selectedOrder.payableAmount, selectedOrder.currency) }}</p>
                 </div>
                 <div>
-                  <p class="text-xs text-tibet-brown/45">确认状态</p>
+                  <p class="text-xs text-tibet-brown/45">{{ t('orderCenter.confirmationStatus') }}</p>
                   <p class="mt-1 text-sm font-semibold" :class="confirmationMeta(selectedOrder.paymentStatus).textClass">
                     {{ confirmationMeta(selectedOrder.paymentStatus).label }}
                   </p>
                 </div>
                 <div>
-                  <p class="text-xs text-tibet-brown/45">创建时间</p>
+                  <p class="text-xs text-tibet-brown/45">{{ t('orderCenter.createdAt') }}</p>
                   <p class="mt-1 text-sm font-semibold text-tibet-dark">{{ formatDate(selectedOrder.createdAt) }}</p>
                 </div>
               </div>
             </div>
 
-            <div class="divide-y divide-tibet-gold/10">
+            <div
+              v-if="detailLoading"
+              class="px-5 py-8 text-center text-sm font-semibold text-tibet-brown/55"
+              role="status"
+              aria-live="polite"
+            >
+              <div class="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-tibet-gold/30 border-b-tibet-gold"></div>
+              {{ t('orderCenter.detailLoading') }}
+            </div>
+            <div v-else-if="detailErrorMessage" role="alert" class="px-5 py-6 text-center">
+              <p class="text-sm font-medium text-rose-700">{{ detailErrorMessage }}</p>
+              <button
+                type="button"
+                class="mt-4 inline-flex items-center justify-center gap-2 rounded-xl border border-rose-200 bg-white px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-100"
+                @click="loadOrderDetail(selectedOrder.id, true)"
+              >
+                <RefreshCw class="h-3.5 w-3.5" />
+                {{ t('orderCenter.reloadDetail') }}
+              </button>
+            </div>
+            <div v-else class="divide-y divide-tibet-gold/10">
               <section class="px-5 py-4">
-                <h3 class="mb-3 text-sm font-bold text-tibet-dark">咨询项目</h3>
+                <h3 class="mb-3 text-sm font-bold text-tibet-dark">{{ t('orderCenter.itemsTitle') }}</h3>
                 <div class="space-y-3">
-                  <div v-for="item in selectedOrder.items" :key="item.id" class="flex flex-col gap-2 sm:flex-row sm:gap-3">
+                  <div v-for="item in orderItems(selectedOrder)" :key="item.id" class="flex flex-col gap-2 sm:flex-row sm:gap-3">
                     <span class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-tibet-gold/10 text-tibet-gold">
                       <component :is="itemIcon(item.productType)" class="h-4 w-4" />
                     </span>
@@ -248,44 +297,47 @@
                         <span class="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-600">{{ itemTypeLabel(item.productType) }}</span>
                       </div>
                       <p class="mt-1 text-xs text-tibet-brown/55">
-                        {{ item.skuName || '标准咨询' }} · {{ formatServiceDate(item) }} · 数量 {{ item.quantity || 1 }}
+                        {{ item.skuName || t('orderCenter.standardConsultation') }} · {{ formatServiceDate(item) }} · {{ t('orderCenter.quantity', { count: item.quantity || 1 }) }}
                       </p>
                     </div>
                     <p class="shrink-0 text-sm font-bold tabular-nums text-tibet-dark sm:text-right">{{ formatCurrency(item.subtotal, selectedOrder.currency) }}</p>
                   </div>
+                  <p v-if="!orderItems(selectedOrder).length" class="text-sm text-tibet-brown/55">
+                    {{ t('orderCenter.noItemDetails') }}
+                  </p>
                 </div>
               </section>
 
               <section class="px-5 py-4">
-                <h3 class="mb-3 text-sm font-bold text-tibet-dark">凭证与确认</h3>
-                <div v-if="selectedOrder.vouchers?.length" class="space-y-2">
-                  <div v-for="voucher in selectedOrder.vouchers" :key="voucher.id" class="flex items-center justify-between gap-3 rounded-xl bg-emerald-50/75 px-3 py-2">
+                <h3 class="mb-3 text-sm font-bold text-tibet-dark">{{ t('orderCenter.vouchersTitle') }}</h3>
+                <div v-if="orderVouchers(selectedOrder).length" class="space-y-2">
+                  <div v-for="voucher in orderVouchers(selectedOrder)" :key="voucher.id" class="flex items-center justify-between gap-3 rounded-xl bg-emerald-50/75 px-3 py-2">
                     <div class="min-w-0">
                       <p class="truncate text-sm font-bold text-emerald-800">{{ voucher.voucherCode }}</p>
-                      <p class="text-xs text-emerald-700/65">{{ voucher.validFrom || '待确认' }} 至 {{ voucher.validUntil || '待确认' }}</p>
+                      <p class="text-xs text-emerald-700/65">{{ formatVoucherDate(voucher.validFrom) }} {{ t('orderCenter.dateRangeSeparator') }} {{ formatVoucherDate(voucher.validUntil) }}</p>
                     </div>
-                    <span class="rounded-full bg-white/75 px-2 py-1 text-[11px] font-semibold text-emerald-700">{{ voucher.status }}</span>
+                    <span class="rounded-full bg-white/75 px-2 py-1 text-[11px] font-semibold text-emerald-700">{{ voucherStatusLabel(voucher.status) }}</span>
                   </div>
                 </div>
-                <p v-else class="text-sm text-tibet-brown/55">暂无凭证。平台不出票，凭证以第三方平台为准。</p>
+                <p v-else class="text-sm text-tibet-brown/55">{{ t('orderCenter.noVouchers') }}</p>
               </section>
 
               <section class="px-5 py-4">
-                <h3 class="mb-3 text-sm font-bold text-tibet-dark">第三方记录</h3>
+                <h3 class="mb-3 text-sm font-bold text-tibet-dark">{{ t('orderCenter.thirdPartyTitle') }}</h3>
                 <div class="space-y-2">
                   <div v-for="confirmation in thirdPartyConfirmations(selectedOrder)" :key="confirmation.id" class="flex items-center justify-between gap-3 text-sm">
-                    <span class="text-tibet-brown/60">{{ confirmation.provider }} · {{ confirmation.status }}</span>
+                    <span class="text-tibet-brown/60">{{ confirmation.provider }} · {{ transactionStatusLabel(confirmation.status) }}</span>
                     <span class="font-semibold text-tibet-dark">{{ formatCurrency(confirmation.amount, selectedOrder.currency) }}</span>
                   </div>
                   <p v-if="!thirdPartyConfirmations(selectedOrder).length" class="text-sm text-tibet-brown/55">
-                    暂无第三方确认。请以跳转平台或客服反馈为准。
+                    {{ t('orderCenter.noThirdPartyConfirmations') }}
                   </p>
                 </div>
               </section>
 
               <section class="px-5 py-4">
                 <p class="mb-4 rounded-2xl bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800">
-                  本平台只保存咨询意向和导流记录，不处理站内收款、资金托管、出票或票据服务。
+                  {{ t('orderCenter.platformDisclaimer') }}
                 </p>
                 <div class="grid gap-2 sm:grid-cols-2">
                   <button
@@ -296,7 +348,7 @@
                     @click="beginCancelAction"
                   >
                     <Ban class="h-4 w-4" />
-                    取消咨询
+                    {{ t('orderCenter.cancelConsultation') }}
                   </button>
                   <button
                     v-if="canDelete(selectedOrder)"
@@ -306,25 +358,25 @@
                     @click="deleteClosedOrder(selectedOrder)"
                   >
                     <Trash2 class="h-4 w-4" />
-                    {{ deletingOrderId === selectedOrder.id ? '删除中' : '删除记录' }}
+                    {{ deletingOrderId === selectedOrder.id ? t('orderCenter.deleting') : t('orderCenter.deleteRecord') }}
                   </button>
                 </div>
 
                 <form v-if="cancelActionOpen" class="mt-4 rounded-2xl border border-tibet-gold/15 bg-white/75 p-4" @submit.prevent="submitCancelAction">
                   <label class="block">
-                    <span class="mb-1 block text-xs font-semibold text-tibet-brown/60">取消原因</span>
+                    <span class="mb-1 block text-xs font-semibold text-tibet-brown/60">{{ t('orderCenter.cancelReason') }}</span>
                     <textarea
                       v-model.trim="actionReason"
                       rows="3"
                       class="w-full resize-none rounded-xl border border-tibet-gold/20 bg-white px-3 py-2 text-sm outline-none focus:border-tibet-gold/50 focus:ring-2 focus:ring-tibet-gold/10"
-                      placeholder="可选，便于客服处理"
+                      :placeholder="t('orderCenter.cancelReasonPlaceholder')"
                     ></textarea>
                   </label>
                   <p v-if="actionError" role="alert" class="mt-3 text-xs font-medium text-rose-600">{{ actionError }}</p>
                   <div class="mt-4 flex justify-end gap-2">
-                    <button type="button" class="rounded-xl px-3 py-2 text-sm font-semibold text-tibet-brown/60 hover:bg-gray-100" @click="resetActionForm">收起</button>
+                    <button type="button" class="rounded-xl px-3 py-2 text-sm font-semibold text-tibet-brown/60 hover:bg-gray-100" @click="resetActionForm">{{ t('orderCenter.collapse') }}</button>
                     <button type="submit" class="rounded-xl bg-tibet-dark px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" :disabled="actionLoading">
-                      {{ actionLoading ? '处理中' : '确认取消' }}
+                      {{ actionLoading ? t('orderCenter.processing') : t('orderCenter.confirmCancel') }}
                     </button>
                   </div>
                 </form>
@@ -357,10 +409,12 @@ import {
   X
 } from 'lucide-vue-next'
 import api, { endpoints } from '../api'
+import { hasNextPage, mergeUniqueById, readPaginatedResponse, type PageMetadata, type PaginatedHttpResponse } from '../api/endpoints'
 import { useConfirm } from '../composables/useConfirm'
 import { useToast } from '../composables/useToast'
 import { useAuthStore } from '../stores/auth'
 import { safeClientErrorMessage, summarizeClientError } from '../utils/errorMonitoring'
+import { toFiniteAmount, toIntlLocale } from '../i18n/formatting'
 
 interface OrderItem {
   id: number
@@ -397,57 +451,108 @@ interface Order {
   productSummary?: string | null
   payableAmount?: number | string | null
   createdAt?: string | null
-  items: OrderItem[]
+  items?: OrderItem[] | null
   paymentTransactions?: ThirdPartyConfirmation[] | null
-  vouchers: Voucher[]
+  vouchers?: Voucher[] | null
 }
 
 const router = useRouter()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const auth = useAuthStore()
 const { showConfirm } = useConfirm()
 const { showToast } = useToast()
 
+const ordersPageSize = 20
 const orders = ref<Order[]>([])
+const ordersPageInfo = ref<PageMetadata>({
+  page: 0,
+  size: ordersPageSize,
+  totalElements: 0,
+  totalPages: 0
+})
 const selectedOrderId = ref<number | null>(null)
 const selectedTab = ref('ALL')
 const query = ref('')
 const loading = ref(false)
+const loadingMoreOrders = ref(false)
+const detailLoading = ref(false)
 const errorMessage = ref('')
+const detailErrorMessage = ref('')
 const statusMessage = ref('')
 const cancelActionOpen = ref(false)
 const deletingOrderId = ref<number | null>(null)
 const actionLoading = ref(false)
 const actionError = ref('')
 const actionReason = ref('')
+const selectedOrderDetail = ref<Order | null>(null)
+let ordersRequestSequence = 0
+let activeOrdersRefreshRequest = 0
+let activeOrdersLoadMoreRequest = 0
+let orderDetailRequestToken = 0
+let selectedOrderRevision = 0
 
-const statusLabels: Record<string, { label: string; className: string }> = {
-  PENDING_PAYMENT: { label: '待确认', className: 'border-amber-200 bg-amber-50 text-amber-700' },
-  PAID: { label: '第三方确认', className: 'border-sky-200 bg-sky-50 text-sky-700' },
-  CONFIRMED: { label: '已确认', className: 'border-emerald-200 bg-emerald-50 text-emerald-700' },
-  CANCELLED: { label: '已取消', className: 'border-gray-200 bg-gray-50 text-gray-600' },
-  REFUND_PENDING: { label: '售后沟通中', className: 'border-rose-200 bg-rose-50 text-rose-700' },
-  REFUNDED: { label: '已关闭', className: 'border-purple-200 bg-purple-50 text-purple-700' },
-  EXPIRED: { label: '已过期', className: 'border-gray-200 bg-gray-50 text-gray-500' }
+const statusLabelKeys: Record<string, string> = {
+  PENDING_PAYMENT: 'orderCenter.status.pendingPayment',
+  PAID: 'orderCenter.status.paid',
+  CONFIRMED: 'orderCenter.status.confirmed',
+  CANCELLED: 'orderCenter.status.cancelled',
+  REFUND_PENDING: 'orderCenter.status.refundPending',
+  REFUNDED: 'orderCenter.status.refunded',
+  EXPIRED: 'orderCenter.status.expired'
 }
 
-const confirmationLabels: Record<string, { label: string; textClass: string }> = {
-  UNPAID: { label: '待第三方确认', textClass: 'text-amber-700' },
-  PAID: { label: '第三方已确认', textClass: 'text-emerald-700' },
-  PARTIALLY_REFUNDED: { label: '售后沟通中', textClass: 'text-rose-700' },
-  REFUNDED: { label: '已关闭', textClass: 'text-purple-700' },
-  FAILED: { label: '无站内收款', textClass: 'text-rose-700' }
+const statusClassNames: Record<string, string> = {
+  PENDING_PAYMENT: 'border-amber-200 bg-amber-50 text-amber-700',
+  PAID: 'border-sky-200 bg-sky-50 text-sky-700',
+  CONFIRMED: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+  CANCELLED: 'border-gray-200 bg-gray-50 text-gray-600',
+  REFUND_PENDING: 'border-rose-200 bg-rose-50 text-rose-700',
+  REFUNDED: 'border-purple-200 bg-purple-50 text-purple-700',
+  EXPIRED: 'border-gray-200 bg-gray-50 text-gray-500'
 }
 
-const statusMeta = (status?: string) =>
-  statusLabels[status || ''] || { label: status || '未知', className: 'border-gray-200 bg-gray-50 text-gray-600' }
+const confirmationLabelKeys: Record<string, string> = {
+  UNPAID: 'orderCenter.confirmation.unpaid',
+  PAID: 'orderCenter.confirmation.paid',
+  PARTIALLY_REFUNDED: 'orderCenter.confirmation.partiallyRefunded',
+  REFUNDED: 'orderCenter.confirmation.refunded',
+  FAILED: 'orderCenter.confirmation.failed'
+}
 
-const confirmationMeta = (status?: string) =>
-  confirmationLabels[status || ''] || { label: status || '未知状态', textClass: 'text-tibet-brown/65' }
+const confirmationTextClasses: Record<string, string> = {
+  UNPAID: 'text-amber-700',
+  PAID: 'text-emerald-700',
+  PARTIALLY_REFUNDED: 'text-rose-700',
+  REFUNDED: 'text-purple-700',
+  FAILED: 'text-rose-700'
+}
 
-const thirdPartyConfirmations = (order: Order) => order.paymentTransactions || []
+const statusMeta = (status?: string) => ({
+  label: status && statusLabelKeys[status] ? t(statusLabelKeys[status]) : (status || t('orderCenter.status.unknown')),
+  className: statusClassNames[status || ''] || 'border-gray-200 bg-gray-50 text-gray-600'
+})
 
-const selectedOrder = computed(() => filteredOrders.value.find(order => order.id === selectedOrderId.value) || null)
+const confirmationMeta = (status?: string) => ({
+  label: status && confirmationLabelKeys[status] ? t(confirmationLabelKeys[status]) : (status || t('orderCenter.confirmation.unknown')),
+  textClass: confirmationTextClasses[status || ''] || 'text-tibet-brown/65'
+})
+
+const orderItems = (order: Order) => Array.isArray(order.items) ? order.items : []
+const orderVouchers = (order: Order) => Array.isArray(order.vouchers) ? order.vouchers : []
+const thirdPartyConfirmations = (order: Order) => Array.isArray(order.paymentTransactions) ? order.paymentTransactions : []
+const voucherSummaryLabel = (order: Order) => {
+  const count = orderVouchers(order).length
+  return count > 0 ? t('orderCenter.voucherCount', { count }) : t('orderCenter.voucherDetails')
+}
+const confirmationSummaryLabel = (order: Order) => {
+  const count = thirdPartyConfirmations(order).length
+  return count > 0 ? t('orderCenter.thirdPartyCount', { count }) : t('orderCenter.thirdPartyDetails')
+}
+
+const selectedOrder = computed(() => {
+  if (selectedOrderDetail.value?.id === selectedOrderId.value) return selectedOrderDetail.value
+  return filteredOrders.value.find(order => order.id === selectedOrderId.value) || null
+})
 
 const statusBucket = (order: Order) => {
   if (['CANCELLED', 'EXPIRED', 'REFUNDED'].includes(order.status)) return 'CLOSED'
@@ -460,11 +565,11 @@ const countByBucket = (bucket: string) =>
     : orders.value.filter(order => statusBucket(order) === bucket).length
 
 const statusTabs = computed(() => [
-  { key: 'ALL', label: '全部', count: countByBucket('ALL') },
-  { key: 'PENDING_PAYMENT', label: '待确认', count: countByBucket('PENDING_PAYMENT') },
-  { key: 'CONFIRMED', label: '已确认', count: countByBucket('CONFIRMED') },
-  { key: 'REFUND_PENDING', label: '售后中', count: countByBucket('REFUND_PENDING') },
-  { key: 'CLOSED', label: '已关闭', count: countByBucket('CLOSED') }
+  { key: 'ALL', label: t('orderCenter.tabs.all'), count: countByBucket('ALL') },
+  { key: 'PENDING_PAYMENT', label: t('orderCenter.tabs.pending'), count: countByBucket('PENDING_PAYMENT') },
+  { key: 'CONFIRMED', label: t('orderCenter.tabs.confirmed'), count: countByBucket('CONFIRMED') },
+  { key: 'REFUND_PENDING', label: t('orderCenter.tabs.afterSale'), count: countByBucket('REFUND_PENDING') },
+  { key: 'CLOSED', label: t('orderCenter.tabs.closed'), count: countByBucket('CLOSED') }
 ])
 
 const filteredOrders = computed(() => {
@@ -476,49 +581,154 @@ const filteredOrders = computed(() => {
 
     const searchable = [
       order.orderNo,
-      order.productSummary,
-      ...order.items.map(item => `${item.productName} ${item.skuName || ''}`),
-      ...order.vouchers.map(voucher => voucher.voucherCode)
+      order.productSummary
     ].join(' ').toLowerCase()
     return searchable.includes(keyword)
   })
 })
 
 const stats = computed(() => {
-  const voucherCount = orders.value.reduce((sum, order) => sum + (order.vouchers?.length || 0), 0)
-  const confirmationCount = orders.value.reduce((sum, order) => sum + thirdPartyConfirmations(order).length, 0)
   return [
-    { label: '全部咨询', value: String(orders.value.length), hint: '景点、酒店和行程节点', icon: ReceiptText },
-    { label: '待确认', value: String(countByBucket('PENDING_PAYMENT')), hint: '客服或第三方待确认', icon: PackageCheck },
-    { label: '已确认', value: String(countByBucket('CONFIRMED')), hint: '第三方或客服已反馈', icon: TicketCheck },
-    { label: '履约记录', value: `${voucherCount}/${confirmationCount}`, hint: '凭证 / 第三方记录', icon: FileText }
+    { label: t('orderCenter.stats.all'), value: String(orders.value.length), hint: t('orderCenter.stats.allHint'), icon: ReceiptText },
+    { label: t('orderCenter.stats.pending'), value: String(countByBucket('PENDING_PAYMENT')), hint: t('orderCenter.stats.pendingHint'), icon: PackageCheck },
+    { label: t('orderCenter.stats.confirmed'), value: String(countByBucket('CONFIRMED')), hint: t('orderCenter.stats.confirmedHint'), icon: TicketCheck },
+    { label: t('orderCenter.stats.archive'), value: `${countByBucket('CONFIRMED')}/${countByBucket('CLOSED')}`, hint: t('orderCenter.stats.archiveHint'), icon: FileText }
   ]
 })
 
-const loadOrders = async (preferredId?: number | null) => {
-  loading.value = true
+const ordersPage = computed(() => ordersPageInfo.value.page)
+const ordersTotalPages = computed(() => ordersPageInfo.value.totalPages)
+const hasMoreOrders = computed(() => hasNextPage(ordersPageInfo.value))
+
+const normalizeOrder = (order: Order): Order => ({
+  ...order,
+  items: orderItems(order),
+  paymentTransactions: thirdPartyConfirmations(order),
+  vouchers: orderVouchers(order)
+})
+
+const applyOrdersPage = (response: PaginatedHttpResponse, append = false) => {
+  const page = readPaginatedResponse<Order>(response, {
+    page: append ? ordersPageInfo.value.page + 1 : 0,
+    size: ordersPageSize
+  })
+  const normalizedContent = page.content.map(normalizeOrder)
+  const nextOrders = append ? mergeUniqueById(orders.value, normalizedContent) : normalizedContent
+
+  orders.value = nextOrders
+  ordersPageInfo.value = {
+    page: page.page,
+    size: page.size || ordersPageSize,
+    totalElements: page.totalElements,
+    totalPages: page.totalPages
+  }
+
+  return nextOrders
+}
+
+const pageAfterItemRemoval = (pageInfo: PageMetadata) => {
+  const totalElements = Math.max(0, pageInfo.totalElements - 1)
+  const size = pageInfo.size || ordersPageSize
+
+  return {
+    ...pageInfo,
+    totalElements,
+    totalPages: size > 0 && totalElements > 0 ? Math.ceil(totalElements / size) : 0
+  }
+}
+
+const loadOrders = async (preferredId?: number | null, page = 0, append = false) => {
+  const requestSequence = ++ordersRequestSequence
+  const selectionRevisionAtRequestStart = selectedOrderRevision
+  if (append) {
+    loadingMoreOrders.value = true
+    activeOrdersLoadMoreRequest = requestSequence
+  } else {
+    loading.value = true
+    activeOrdersRefreshRequest = requestSequence
+    loadingMoreOrders.value = false
+    activeOrdersLoadMoreRequest = 0
+  }
   errorMessage.value = ''
   try {
-    const { data } = await api.get(endpoints.orders.my, { params: { _ts: Date.now() } })
-    orders.value = Array.isArray(data) ? data : []
-    const nextId = preferredId ?? selectedOrderId.value
-    selectedOrderId.value = orders.value.some(order => order.id === nextId) ? nextId : null
-    if (!selectedOrderId.value) resetActionForm()
-  } catch (error: any) {
+    const response = await api.get(endpoints.orders.my, {
+      params: { page, size: ordersPageSize, _ts: Date.now() }
+    })
+    if (requestSequence !== ordersRequestSequence) return
+    const nextOrders = applyOrdersPage(response, append)
+    const nextId = selectionRevisionAtRequestStart === selectedOrderRevision
+      ? preferredId ?? selectedOrderId.value
+      : selectedOrderId.value
+    selectedOrderId.value = nextOrders.some(order => order.id === nextId) ? nextId : null
+    if (selectedOrderId.value) {
+      selectedOrderDetail.value = null
+      void loadOrderDetail(selectedOrderId.value, true)
+    } else {
+      resetActionForm()
+    }
+  } catch (error: unknown) {
+    if (requestSequence !== ordersRequestSequence) return
     console.error('Failed to load consultation records:', summarizeClientError(error))
-    errorMessage.value = safeClientErrorMessage(error, '咨询记录加载失败')
+    errorMessage.value = safeClientErrorMessage(error, t('orderCenter.loadFailed'))
   } finally {
-    loading.value = false
+    if (append) {
+      if (activeOrdersLoadMoreRequest === requestSequence) {
+        loadingMoreOrders.value = false
+        activeOrdersLoadMoreRequest = 0
+      }
+    } else {
+      if (activeOrdersRefreshRequest === requestSequence) {
+        loading.value = false
+        activeOrdersRefreshRequest = 0
+      }
+    }
+  }
+}
+
+const loadNextOrdersPage = async () => {
+  if (loading.value || loadingMoreOrders.value || !hasMoreOrders.value) return
+  await loadOrders(selectedOrderId.value, ordersPageInfo.value.page + 1, true)
+}
+
+const loadOrderDetail = async (id: number, force = false) => {
+  if (!force && selectedOrderDetail.value?.id === id && orderItems(selectedOrderDetail.value).length) return
+
+  const requestToken = ++orderDetailRequestToken
+  detailLoading.value = true
+  detailErrorMessage.value = ''
+  try {
+    const response = await api.get(endpoints.orders.detail(id), {
+      params: { _ts: Date.now() }
+    })
+    if (requestToken !== orderDetailRequestToken || selectedOrderId.value !== id) return
+    const detail = normalizeOrder(response.data as Order)
+    selectedOrderDetail.value = detail
+    orders.value = orders.value.map(order => order.id === detail.id ? { ...order, ...detail } : order)
+  } catch (error: unknown) {
+    if (requestToken === orderDetailRequestToken && selectedOrderId.value === id) {
+      console.error('Failed to load consultation detail:', summarizeClientError(error))
+      detailErrorMessage.value = safeClientErrorMessage(error, t('orderCenter.detailLoadFailed'))
+    }
+  } finally {
+    if (requestToken === orderDetailRequestToken) {
+      detailLoading.value = false
+    }
   }
 }
 
 const selectOrder = (id: number) => {
+  selectedOrderRevision += 1
   selectedOrderId.value = id
+  selectedOrderDetail.value = null
   resetActionForm()
+  void loadOrderDetail(id)
 }
 
 const closeOrderDetail = () => {
+  selectedOrderRevision += 1
   selectedOrderId.value = null
+  selectedOrderDetail.value = null
+  detailErrorMessage.value = ''
   resetActionForm()
 }
 
@@ -547,12 +757,13 @@ const submitCancelAction = async () => {
   try {
     const order = selectedOrder.value
     await api.post(endpoints.orders.cancel(order.id), { reason: actionReason.value || undefined })
-    statusMessage.value = '取消申请已提交。'
+    statusMessage.value = t('orderCenter.cancelSubmitted')
     resetActionForm()
     await loadOrders(order.id)
-  } catch (error: any) {
+    await loadOrderDetail(order.id, true)
+  } catch (error: unknown) {
     console.error('Consultation cancel failed:', summarizeClientError(error))
-    actionError.value = safeClientErrorMessage(error, '操作失败，请稍后重试')
+    actionError.value = safeClientErrorMessage(error, t('orderCenter.actionFailed'))
   } finally {
     actionLoading.value = false
   }
@@ -564,7 +775,7 @@ const canDelete = (order: Order) => ['CANCELLED', 'EXPIRED', 'REFUNDED'].include
 const deleteClosedOrder = async (order: Order) => {
   if (!canDelete(order) || deletingOrderId.value) return
   const confirmed = await showConfirm({
-    message: `确定删除咨询记录 ${order.orderNo}？删除后列表中将不再显示。`,
+    message: t('orderCenter.deleteConfirm', { orderNo: order.orderNo }),
     confirmLabel: t('common.delete'),
     cancelLabel: t('common.cancel'),
     tone: 'danger'
@@ -577,12 +788,13 @@ const deleteClosedOrder = async (order: Order) => {
   try {
     await api.delete(endpoints.orders.delete(order.id))
     orders.value = orders.value.filter(item => item.id !== order.id)
+    ordersPageInfo.value = pageAfterItemRemoval(ordersPageInfo.value)
     if (selectedOrderId.value === order.id) closeOrderDetail()
-    statusMessage.value = '已删除关闭的咨询记录。'
+    statusMessage.value = t('orderCenter.deleteSuccess')
     showToast(statusMessage.value, 'success')
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to delete consultation record:', summarizeClientError(error))
-    errorMessage.value = safeClientErrorMessage(error, '咨询记录删除失败，请稍后重试')
+    errorMessage.value = safeClientErrorMessage(error, t('orderCenter.deleteFailed'))
     showToast(errorMessage.value, 'error')
   } finally {
     deletingOrderId.value = null
@@ -590,19 +802,19 @@ const deleteClosedOrder = async (order: Order) => {
 }
 
 const formatCurrency = (value?: number | string | null, currency?: string | null) => {
-  const amount = Number(value ?? 0)
-  return new Intl.NumberFormat('zh-CN', {
+  const amount = toFiniteAmount(value)
+  return new Intl.NumberFormat(toIntlLocale(locale.value), {
     style: 'currency',
     currency: currency || 'CNY',
     maximumFractionDigits: amount % 1 === 0 ? 0 : 2
-  }).format(Number.isFinite(amount) ? amount : 0)
+  }).format(amount)
 }
 
 const formatDate = (value?: string | null) => {
-  if (!value) return '待确认'
+  if (!value) return t('common.pendingConfirm')
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
-  return new Intl.DateTimeFormat('zh-CN', {
+  return new Intl.DateTimeFormat(toIntlLocale(locale.value), {
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
@@ -611,16 +823,37 @@ const formatDate = (value?: string | null) => {
 }
 
 const formatServiceDate = (item: OrderItem) => {
-  if (!item.serviceStartDate) return '日期待确认'
+  if (!item.serviceStartDate) return t('orderCenter.pendingDate')
   if (!item.serviceEndDate || item.serviceEndDate === item.serviceStartDate) return item.serviceStartDate
-  return `${item.serviceStartDate} 至 ${item.serviceEndDate}`
+  return `${item.serviceStartDate} ${t('orderCenter.dateRangeSeparator')} ${item.serviceEndDate}`
 }
+
+const formatVoucherDate = (value?: string | null) => value || t('common.pendingConfirm')
+
+const voucherStatusLabelKeys: Record<string, string> = {
+  ISSUED: 'orderCenter.voucherStatus.issued',
+  CONSUMED: 'orderCenter.voucherStatus.consumed',
+  CANCELLED: 'orderCenter.voucherStatus.cancelled'
+}
+
+const transactionStatusLabelKeys: Record<string, string> = {
+  PENDING: 'orderCenter.transactionStatus.pending',
+  SUCCESS: 'orderCenter.transactionStatus.success',
+  FAILED: 'orderCenter.transactionStatus.failed',
+  REFUNDED: 'orderCenter.transactionStatus.refunded'
+}
+
+const voucherStatusLabel = (status?: string | null) =>
+  status && voucherStatusLabelKeys[status] ? t(voucherStatusLabelKeys[status]) : (status || t('common.unknown'))
+
+const transactionStatusLabel = (status?: string | null) =>
+  status && transactionStatusLabelKeys[status] ? t(transactionStatusLabelKeys[status]) : (status || t('common.unknown'))
 
 const itemTypeLabel = (type: string) => {
   const labels: Record<string, string> = {
-    SCENIC_SPOT: '景点门票',
-    HOTEL_ROOM: '酒店房型',
-    ROUTE_PACKAGE: '旅行线路'
+    SCENIC_SPOT: t('orderCenter.itemTypes.scenicSpot'),
+    HOTEL_ROOM: t('orderCenter.itemTypes.hotelRoom'),
+    ROUTE_PACKAGE: t('orderCenter.itemTypes.routePackage')
   }
   return labels[type] || type
 }
@@ -632,15 +865,16 @@ const itemIcon = (type: string) => {
 }
 
 const itemSummary = (order: Order) => {
-  if (!order.items?.length) return '暂无项目明细'
-  return order.items
+  const items = orderItems(order)
+  if (!items.length) return order.productSummary || t('orderCenter.detailFallback')
+  return items
     .slice(0, 3)
     .map(item => `${item.productName}${item.skuName ? ` - ${item.skuName}` : ''}`)
     .join(' / ')
 }
 
 const orderCardActionLabel = (order: Order) =>
-  `查看咨询详情：${order.productSummary || order.orderNo}`
+  t('orderCenter.orderCardAria', { summary: order.productSummary || order.orderNo })
 
 onMounted(async () => {
   if (!(await auth.ensureSession())) {

@@ -3,7 +3,6 @@ import com.tibet.tourism.common.error.BusinessException;
 import com.tibet.tourism.common.error.ResourceNotFoundException;
 import com.tibet.tourism.common.error.UnauthorizedActionException;
 import com.tibet.tourism.common.validation.InputSanitizer;
-import com.tibet.tourism.modules.community.domain.Comment;
 import com.tibet.tourism.modules.community.domain.RouteComment;
 import com.tibet.tourism.modules.community.domain.RouteLike;
 import com.tibet.tourism.modules.community.domain.SharedRoute;
@@ -11,20 +10,17 @@ import com.tibet.tourism.modules.community.infra.CommentRepository;
 import com.tibet.tourism.modules.community.infra.RouteCommentRepository;
 import com.tibet.tourism.modules.community.infra.RouteLikeRepository;
 import com.tibet.tourism.modules.community.infra.SharedRouteRepository;
-import com.tibet.tourism.modules.hotel.domain.Hotel;
+import com.tibet.tourism.modules.community.infra.SharedRouteSummaryRow;
+import com.tibet.tourism.modules.community.web.dto.PublicUserResponse;
+import com.tibet.tourism.modules.community.web.dto.SharedRouteSummaryResponse;
 import com.tibet.tourism.modules.user.domain.User;
 import com.tibet.tourism.modules.user.infra.UserRepository;
-import jakarta.persistence.criteria.Predicate;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -84,24 +80,21 @@ public class SharedRouteService {
 
     // 获取路线列表（带筛选）
     @Transactional(readOnly = true)
-    public Page<SharedRoute> getRoutes(Integer days, String budget, String preference, Pageable pageable) {
+    public Page<SharedRouteSummaryResponse> getRoutes(Integer days, String budget, String preference, Pageable pageable) {
+        return getRoutes(days, budget, preference, pageable, null);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<SharedRouteSummaryResponse> getRoutes(
+            Integer days,
+            String budget,
+            String preference,
+            Pageable pageable,
+            Long currentUserId) {
         String safeBudget = normalizeBudget(budget);
         String safePreference = normalizePreference(preference);
-        return routeRepository.findAll((Specification<SharedRoute>) (root, query, criteriaBuilder) -> {
-            List<Predicate> predicates = new ArrayList<>();
-
-            if (days != null) {
-                predicates.add(criteriaBuilder.equal(root.get("days"), days));
-            }
-            if (StringUtils.hasText(safeBudget)) {
-                predicates.add(criteriaBuilder.equal(root.get("budget"), safeBudget));
-            }
-            if (StringUtils.hasText(safePreference)) {
-                predicates.add(criteriaBuilder.equal(root.get("preference"), safePreference));
-            }
-
-            return criteriaBuilder.and(predicates.toArray(new Predicate[0]));
-        }, pageable);
+        return routeRepository.findSummaries(days, safeBudget, safePreference, pageable)
+                .map(row -> toSummaryResponse(row, currentUserId));
     }
 
     // 获取路线详情
@@ -140,18 +133,9 @@ public class SharedRouteService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        if (likeRepository.existsByRouteAndUser(route, user)) {
-            return new LikeResult(true, readRouteLikeCount(routeId));
-        }
-
-        RouteLike like = new RouteLike();
-        like.setRoute(route);
-        like.setUser(user);
-        try {
-            likeRepository.saveAndFlush(like);
+        int inserted = likeRepository.insertIgnore(route.getId(), user.getId());
+        if (inserted > 0) {
             routeRepository.incrementLikeCount(routeId);
-        } catch (DataIntegrityViolationException duplicate) {
-            // Concurrent duplicate like; the unique row already represents the desired state.
         }
         return new LikeResult(true, readRouteLikeCount(routeId));
     }
@@ -235,8 +219,70 @@ public class SharedRouteService {
 
     // 获取用户创建的路线列表
     @Transactional(readOnly = true)
-    public Page<SharedRoute> getRoutesByAuthor(User author, Pageable pageable) {
-        return routeRepository.findByAuthor(author, pageable);
+    public Page<SharedRouteSummaryResponse> getRoutesByAuthor(User author, Pageable pageable) {
+        if (author == null || author.getId() == null) {
+            throw new IllegalArgumentException("Author is required");
+        }
+        return getRoutesByAuthor(author.getId(), pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<SharedRouteSummaryResponse> getRoutesByAuthor(Long authorId, Pageable pageable) {
+        if (authorId == null) {
+            throw new IllegalArgumentException("Author is required");
+        }
+        return routeRepository.findSummariesByAuthorId(authorId, pageable)
+                .map(row -> toSummaryResponse(row, authorId));
+    }
+
+    private SharedRouteSummaryResponse toSummaryResponse(SharedRouteSummaryRow row, Long currentUserId) {
+        if (row == null) {
+            return null;
+        }
+        return new SharedRouteSummaryResponse(
+                row.id(),
+                publicAuthor(row.authorId(), row.authorUsername(), row.authorNickname(), row.authorAvatar(), currentUserId),
+                row.title(),
+                row.days(),
+                row.budget(),
+                row.preference(),
+                row.sourceType(),
+                row.sourceRouteId(),
+                row.price(),
+                row.difficulty(),
+                row.temperature(),
+                row.geography(),
+                row.viewCount(),
+                row.likeCount(),
+                row.commentCount(),
+                row.createdAt(),
+                row.updatedAt());
+    }
+
+    private PublicUserResponse publicAuthor(
+            Long authorId,
+            String username,
+            String nickname,
+            String avatar,
+            Long currentUserId) {
+        if (authorId == null && !StringUtils.hasText(username) && !StringUtils.hasText(nickname) && !StringUtils.hasText(avatar)) {
+            return null;
+        }
+        return new PublicUserResponse(
+                publicNickname(username, nickname),
+                avatar,
+                currentUserId != null && currentUserId.equals(authorId));
+    }
+
+    private String publicNickname(String username, String nickname) {
+        if (!StringUtils.hasText(nickname)) {
+            return null;
+        }
+        String normalizedNickname = nickname.trim();
+        if (StringUtils.hasText(username) && normalizedNickname.equalsIgnoreCase(username.trim())) {
+            return null;
+        }
+        return normalizedNickname;
     }
 
     private int readRouteLikeCount(Long routeId) {

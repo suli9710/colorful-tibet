@@ -12,6 +12,30 @@
       </motion.div>
 
       <motion.div
+        v-if="showBookingConfirmation"
+        class="flex flex-col gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-emerald-800 shadow-sm sm:flex-row sm:items-center sm:justify-between"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        :initial="{ opacity: 0, y: -8 }"
+        :animate="{ opacity: 1, y: 0 }"
+        :transition="{ duration: 0.24 }"
+      >
+        <div class="min-w-0">
+          <p class="text-sm font-bold">{{ t('hotel.ordersTitle') }} · {{ t('hotel.status.pending') }}</p>
+          <p class="mt-1 text-sm leading-relaxed text-emerald-700">{{ t('hotel.ordersSubtitle') }}</p>
+        </div>
+        <button
+          type="button"
+          class="min-h-10 shrink-0 rounded-xl border border-emerald-300 bg-white px-4 py-2 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
+          :aria-label="t('common.close')"
+          @click="dismissBookingConfirmation"
+        >
+          {{ t('common.close') }}
+        </button>
+      </motion.div>
+
+      <motion.div
         class="bg-white rounded-2xl shadow-xl border border-tibet-gold/20 p-4 sm:rounded-3xl sm:p-8"
         :initial="cardInitial"
         :animate="cardInView"
@@ -29,7 +53,7 @@
             type="button"
             class="mt-3 min-h-11 rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
             :aria-label="t('common.reload')"
-            @click="loadOrders"
+            @click="reloadOrders"
           >
             {{ t('common.reload') }}
           </button>
@@ -51,7 +75,7 @@
           aria-live="polite"
         >
           <p class="text-base font-semibold text-gray-800">{{ t('hotel.noOrders') }}</p>
-          <p class="mx-auto mt-2 max-w-md text-sm leading-relaxed text-gray-500">选择酒店和房型后提交咨询意向，记录会出现在这里。</p>
+          <p class="mx-auto mt-2 max-w-md text-sm leading-relaxed text-gray-500">{{ t('hotel.ordersEmptyHint') }}</p>
           <router-link
             to="/hotels"
             class="mt-4 inline-flex min-h-11 items-center justify-center rounded-xl bg-tibet-red px-4 py-2 text-sm font-semibold text-tibet-yellow transition hover:bg-tibet-red/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tibet-gold/70 focus-visible:ring-offset-2"
@@ -59,7 +83,8 @@
             {{ t('hotel.bookNow') }}
           </router-link>
         </div>
-        <div v-else class="space-y-4" role="list" :aria-label="t('hotel.ordersTitle')">
+        <div v-else class="space-y-4">
+          <div class="space-y-4" role="list" :aria-label="t('hotel.ordersTitle')">
           <motion.div
             v-for="(order, index) in sortedOrders"
             :key="order.id"
@@ -85,6 +110,27 @@
               <p class="mt-1 inline-flex rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-500">{{ orderStatusLabel(order.status) }}</p>
             </div>
           </motion.div>
+          </div>
+
+          <div
+            v-if="hotelOrdersTotalPages > 1"
+            class="flex flex-wrap items-center justify-center gap-3 pt-2"
+            role="navigation"
+            :aria-label="t('hotel.ordersTitle')"
+          >
+            <span class="text-sm text-gray-500" role="status" aria-live="polite">
+              {{ hotelOrdersPage + 1 }} / {{ hotelOrdersTotalPages }}
+            </span>
+            <button
+              type="button"
+              class="min-h-11 rounded-xl border border-tibet-gold/25 bg-white px-5 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:cursor-wait disabled:opacity-50"
+              :disabled="loadingMoreOrders || !hasMoreHotelOrders"
+              :aria-busy="loadingMoreOrders"
+              @click="loadNextOrdersPage"
+            >
+              {{ loadingMoreOrders ? t('common.loading') : t('community.nextPage') }}
+            </button>
+          </div>
         </div>
       </motion.div>
     </section>
@@ -94,12 +140,15 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRoute, useRouter } from 'vue-router'
 import { motion } from 'motion-v'
 import { revealInitial, revealInView, revealTransition, cardInitial, cardInView, cardTransition, inViewOnce } from '../motion/presets'
 import api, { endpoints } from '../api'
+import { hasNextPage, mergeUniqueById, readPaginatedResponse, type PageMetadata, type PaginatedHttpResponse } from '../api/endpoints'
 import { clearHotelOrderClientStorage } from '../api/cache'
 import { applyHotelImageFallback, resolveHotelBookingImage } from '../data/hotelImages'
 import { safeClientErrorMessage } from '../utils/errorMonitoring'
+import { toFiniteAmount, toIntlLocale } from '../i18n/formatting'
 
 interface HotelOrder {
   id: string
@@ -127,34 +176,104 @@ interface HotelOrder {
   createdAt: string
 }
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
+const route = useRoute()
+const router = useRouter()
+const hotelOrdersPageSize = 20
 const orders = ref<HotelOrder[]>([])
+const hotelOrdersPageInfo = ref<PageMetadata>({
+  page: 0,
+  size: hotelOrdersPageSize,
+  totalElements: 0,
+  totalPages: 0
+})
 const loading = ref(false)
+const loadingMoreOrders = ref(false)
 const loadError = ref('')
+let hotelOrdersRequestSequence = 0
 
 const clearHotelOrderCache = clearHotelOrderClientStorage
+const isCurrentHotelOrdersRequest = (requestSequence: number) => requestSequence === hotelOrdersRequestSequence
 
-const loadOrders = async () => {
-  loading.value = true
+const hotelOrdersPage = computed(() => hotelOrdersPageInfo.value.page)
+const hotelOrdersTotalPages = computed(() => hotelOrdersPageInfo.value.totalPages)
+const hasMoreHotelOrders = computed(() => hasNextPage(hotelOrdersPageInfo.value))
+const showBookingConfirmation = computed(() => route.query.created === '1')
+
+const dismissBookingConfirmation = () => {
+  const { created: _created, ...query } = route.query
+  router.replace({ path: route.path, query })
+}
+
+const applyHotelOrdersPage = (response: PaginatedHttpResponse, append = false) => {
+  const page = readPaginatedResponse<HotelOrder>(response, {
+    page: append ? hotelOrdersPageInfo.value.page + 1 : 0,
+    size: hotelOrdersPageSize
+  })
+
+  orders.value = append ? mergeUniqueById(orders.value, page.content) : page.content
+  hotelOrdersPageInfo.value = {
+    page: page.page,
+    size: page.size || hotelOrdersPageSize,
+    totalElements: page.totalElements,
+    totalPages: page.totalPages
+  }
+}
+
+const loadOrders = async (page = 0, append = false) => {
+  const requestSequence = ++hotelOrdersRequestSequence
+  if (append) {
+    loading.value = false
+    loadingMoreOrders.value = true
+  } else {
+    loading.value = true
+    loadingMoreOrders.value = false
+  }
   loadError.value = ''
   try {
-    const response = await api.get(endpoints.hotelBookings.my)
+    const response = await api.get(endpoints.hotelBookings.my, {
+      params: { page, size: hotelOrdersPageSize }
+    })
     clearHotelOrderCache()
-    orders.value = Array.isArray(response.data?.content) ? response.data.content : (Array.isArray(response.data) ? response.data : [])
+    if (!isCurrentHotelOrdersRequest(requestSequence)) return
+    applyHotelOrdersPage(response, append)
   } catch (error) {
     clearHotelOrderCache()
-    orders.value = []
+    if (!isCurrentHotelOrdersRequest(requestSequence)) return
+    if (!append) {
+      orders.value = []
+      hotelOrdersPageInfo.value = {
+        page: 0,
+        size: hotelOrdersPageSize,
+        totalElements: 0,
+        totalPages: 0
+      }
+    }
     loadError.value = safeClientErrorMessage(error, t('hotel.bookingFailed'))
   } finally {
-    loading.value = false
+    if (!isCurrentHotelOrdersRequest(requestSequence)) return
+    if (append) {
+      loadingMoreOrders.value = false
+    } else {
+      loading.value = false
+    }
   }
+}
+
+const loadNextOrdersPage = async () => {
+  if (loading.value || loadingMoreOrders.value || !hasMoreHotelOrders.value) return
+  await loadOrders(hotelOrdersPageInfo.value.page + 1, true)
+}
+
+const reloadOrders = () => {
+  void loadOrders()
 }
 
 const displayHotelName = (order: HotelOrder) => order.hotel?.name || order.hotelName || '-'
 
 const formatCurrency = (value?: number | string | null) => {
-  const amount = Number(value || 0)
-  return amount.toLocaleString('zh-CN', { style: 'currency', currency: 'CNY', maximumFractionDigits: 0 })
+  const amount = toFiniteAmount(value)
+  return amount.toLocaleString(toIntlLocale(locale.value), { style: 'currency', currency: 'CNY', maximumFractionDigits: 0 })
 }
 
 const maskPhone = (phone: string) => {

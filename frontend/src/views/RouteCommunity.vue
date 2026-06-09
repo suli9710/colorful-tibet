@@ -116,8 +116,20 @@
           </button>
         </motion.div>
 
-        <div v-if="routeLoading" class="text-center py-12">
-          <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-tibet-gold mx-auto"></div>
+        <div v-if="routeLoading" class="text-center py-12" role="status" aria-live="polite" aria-busy="true">
+          <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-tibet-gold mx-auto" aria-hidden="true"></div>
+          <span class="sr-only">{{ text('community.loadingRoutes', '路线列表加载中') }}</span>
+        </div>
+
+        <div v-else-if="routeError" class="rounded-2xl border border-red-100 bg-red-50 px-5 py-6 text-center text-red-700" role="alert">
+          <p class="mb-4 font-medium">{{ routeError }}</p>
+          <button
+            type="button"
+            @click="loadRoutes"
+            class="min-h-11 rounded-xl bg-tibet-red px-5 py-2.5 text-sm font-semibold text-tibet-yellow transition-colors hover:bg-tibet-red/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-tibet-gold focus-visible:ring-offset-2"
+          >
+            {{ text('common.retry', '重试') }}
+          </button>
         </div>
 
         <div v-else-if="routes.length === 0" class="text-center py-12 text-gray-500">
@@ -251,8 +263,20 @@
           </button>
         </motion.div>
 
-        <div v-if="qaLoading" class="text-center py-12">
-          <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-tibet-red mx-auto"></div>
+        <div v-if="qaLoading" class="text-center py-12" role="status" aria-live="polite" aria-busy="true">
+          <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-tibet-red mx-auto" aria-hidden="true"></div>
+          <span class="sr-only">{{ text('community.loadingQuestions', '问答列表加载中') }}</span>
+        </div>
+
+        <div v-else-if="qaError" class="rounded-2xl border border-red-100 bg-red-50 px-5 py-6 text-center text-red-700" role="alert">
+          <p class="mb-4 font-medium">{{ qaError }}</p>
+          <button
+            type="button"
+            @click="loadQuestions"
+            class="min-h-11 rounded-xl bg-tibet-red px-5 py-2.5 text-sm font-semibold text-tibet-yellow transition-colors hover:bg-tibet-red/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-tibet-gold focus-visible:ring-offset-2"
+          >
+            {{ text('common.retry', '重试') }}
+          </button>
         </div>
 
         <div v-else-if="questions.length === 0" class="text-center py-12 text-gray-500">
@@ -297,7 +321,9 @@
                 <h3 class="text-lg font-bold text-gray-900 group-hover:text-tibet-red transition-colors duration-300 line-clamp-2 min-w-0 break-words mb-1">
                   {{ q.title }}
                 </h3>
-                <p class="text-sm text-gray-500 line-clamp-2 break-words">{{ q.content }}</p>
+                <p v-if="questionPreview(q)" class="text-sm text-gray-500 line-clamp-2 break-words">
+                  {{ questionPreview(q) }}
+                </p>
               </div>
             </div>
             <div class="flex flex-wrap items-center gap-x-4 gap-y-2 mt-4 pt-4 border-t border-tibet-gold/20 text-xs text-gray-400">
@@ -400,8 +426,8 @@ import MotionModal from '../components/motion/MotionModal.vue'
 import api, { endpoints } from '../api'
 import { useAuthGuard } from '../composables/useAuthGuard'
 import { showToast } from '../composables/useToast'
-import { readBrowserStorage } from '../utils/browserStorage'
 import { summarizeClientError } from '../utils/errorMonitoring'
+import { toIntlLocale } from '../i18n/formatting'
 import {
   cardExit,
   cardInitial,
@@ -414,9 +440,13 @@ import {
   softSpring
 } from '../motion/presets'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const router = useRouter()
 const { requireAuth } = useAuthGuard()
+const text = (key: string, fallback: string) => {
+  const message = t(key)
+  return message === key ? fallback : message
+}
 
 type CommunityTab = 'routes' | 'qa'
 
@@ -461,6 +491,7 @@ const handleTabKeydown = (event: KeyboardEvent) => {
 
 // ========== Route sharing state ==========
 const routeLoading = ref(true)
+const routeError = ref('')
 const routes = ref<any[]>([])
 const routePage = ref(0)
 const routeTotalPages = ref(0)
@@ -504,6 +535,7 @@ const routeNextPageLabel = computed(() => `${t('community.sharedRoutes')} ${t('c
 
 const loadRoutes = async () => {
   routeLoading.value = true
+  routeError.value = ''
   try {
     const params: any = { page: routePage.value, size: 9, sortField: 'createdAt' }
     if (routeFilters.days) { const d = parseInt(routeFilters.days); if (!isNaN(d)) params.days = d }
@@ -514,7 +546,8 @@ const loadRoutes = async () => {
     routeTotalPages.value = response.data.totalPages || 0
   } catch (error) {
     console.error('Failed to load routes:', summarizeClientError(error))
-    routes.value = []; routeTotalPages.value = 0
+    routeError.value = text('community.routesLoadFailed', '路线列表加载失败，请稍后重试。')
+    routeTotalPages.value = 0
   } finally {
     routeLoading.value = false
   }
@@ -526,6 +559,7 @@ const getRouteCardLabel = (route: any) => `${t('community.sharedRoutes')} ${rout
 
 // ========== Q&A state ==========
 const qaLoading = ref(true)
+const qaError = ref('')
 const questions = ref<any[]>([])
 const qaPage = ref(0)
 const qaTotalPages = ref(0)
@@ -567,6 +601,7 @@ const toggleTag = (tag: string) => {
 
 const loadQuestions = async () => {
   qaLoading.value = true
+  qaError.value = ''
   try {
     const params: any = { page: qaPage.value, size: 10, sort: qaFilters.sort }
     if (qaFilters.tag) params.tag = qaFilters.tag
@@ -575,7 +610,8 @@ const loadQuestions = async () => {
     qaTotalPages.value = response.data.totalPages || 0
   } catch (error) {
     console.error('Failed to load questions:', summarizeClientError(error))
-    questions.value = []; qaTotalPages.value = 0
+    qaError.value = text('community.questionsLoadFailed', '问答列表加载失败，请稍后重试。')
+    qaTotalPages.value = 0
   } finally {
     qaLoading.value = false
   }
@@ -608,10 +644,11 @@ const submitQuestion = async () => {
 const changeQaPage = (p: number) => { qaPage.value = p; loadQuestions(); window.scrollTo({ top: 0, behavior: 'smooth' }) }
 const viewQuestion = (id: number) => router.push(`/community/question/${id}`)
 const getQuestionCardLabel = (question: any) => `${t('community.travelQA')} ${question?.title || ''}`.trim()
+const questionPreview = (question: any) =>
+  typeof question?.excerpt === 'string' && question.excerpt.trim() ? question.excerpt.trim() : ''
 
 const formatDate = (dateStr: string) => {
-  const locale = readBrowserStorage('localStorage', 'locale', 'zh')
-  return new Date(dateStr).toLocaleDateString(locale === 'bo' ? 'bo-CN' : 'zh-CN')
+  return new Date(dateStr).toLocaleDateString(toIntlLocale(locale.value))
 }
 
 onMounted(() => { loadRoutes(); loadQuestions() })

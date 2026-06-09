@@ -12,7 +12,7 @@ export interface NormalizedPage<T> extends PageMetadata {
   content: T[]
 }
 
-interface PaginatedHttpResponse {
+export interface PaginatedHttpResponse {
   data?: unknown
   headers?: unknown
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import guideChatPanelSource from './GuideChatPanel.vue?raw'
 import imageUploadFieldSource from './ImageUploadField.vue?raw'
+import mobileStickyActionBarSource from './MobileStickyActionBar.vue?raw'
 import toastHostSource from './ToastHost.vue?raw'
 
 describe('feedback component UX safeguards', () => {
@@ -14,6 +15,8 @@ describe('feedback component UX safeguards', () => {
 
   it('keeps image upload failure, loading, retry, and disabled states accessible', () => {
     expect(imageUploadFieldSource).toContain('disabled?: boolean')
+    expect(imageUploadFieldSource).toContain('uploadEndpoint: string')
+    expect(imageUploadFieldSource).not.toContain("uploadEndpoint: '/admin/upload-image'")
     expect(imageUploadFieldSource).toContain('const retryUpload')
     expect(imageUploadFieldSource).toContain(':aria-busy="uploading"')
     expect(imageUploadFieldSource).toContain(':aria-disabled="isDisabled"')
@@ -35,5 +38,14 @@ describe('feedback component UX safeguards', () => {
     expect(guideChatPanelSource).toContain(':disabled="!canSend"')
     expect(guideChatPanelSource).toContain('e.isComposing')
     expect(guideChatPanelSource).toContain('msg.fallback || msg.networkFallback')
+  })
+
+  it('lets mobile sticky CTAs expose busy state and form descriptions', () => {
+    expect(mobileStickyActionBarSource).toContain('primaryBusy?: boolean')
+    expect(mobileStickyActionBarSource).toContain('primaryDescribedBy?: string')
+    expect(mobileStickyActionBarSource).toContain('secondaryDescribedBy?: string')
+    expect(mobileStickyActionBarSource).toContain(':aria-busy="primaryBusy"')
+    expect(mobileStickyActionBarSource).toContain(':aria-describedby="primaryDescribedBy || undefined"')
+    expect(mobileStickyActionBarSource).toContain(':aria-describedby="secondaryDescribedBy || undefined"')
   })
 })

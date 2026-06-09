@@ -41,7 +41,7 @@ public class CsrfCookieFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
-        String path = request.getServletPath();
+        String path = requestPath(request);
         if (!path.startsWith("/api/") || SAFE_METHODS.contains(request.getMethod())) {
             filterChain.doFilter(request, response);
             return;
@@ -125,6 +125,24 @@ public class CsrfCookieFilter extends OncePerRequestFilter {
         boolean defaultPort = ("http".equalsIgnoreCase(scheme) && port == 80)
                 || ("https".equalsIgnoreCase(scheme) && port == 443);
         return defaultPort ? scheme + "://" + host : scheme + "://" + host + ":" + port;
+    }
+
+    private String requestPath(HttpServletRequest request) {
+        String path = request.getServletPath();
+        if (StringUtils.hasText(path)) {
+            return path;
+        }
+
+        String requestUri = request.getRequestURI();
+        if (!StringUtils.hasText(requestUri)) {
+            return "";
+        }
+
+        String contextPath = request.getContextPath();
+        if (StringUtils.hasText(contextPath) && requestUri.startsWith(contextPath)) {
+            return requestUri.substring(contextPath.length());
+        }
+        return requestUri;
     }
 
     private void reject(HttpServletResponse response, String reason) throws IOException {

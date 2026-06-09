@@ -69,10 +69,10 @@
                 class="min-h-11 rounded-xl bg-tibet-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-tibet-blue/90 disabled:cursor-not-allowed disabled:opacity-55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tibet-blue focus-visible:ring-offset-2"
                 :disabled="routeResumeLoading"
                 :aria-busy="routeResumeLoading"
-                aria-label="恢复 AI 路线生成"
+                :aria-label="t('routePlanner.resumeAiGenerationAria')"
                 @click="resumePausedRouteJob"
               >
-                {{ routeResumeLoading ? '恢复中...' : '恢复生成' }}
+                {{ routeResumeLoading ? t('routePlanner.resumingGeneration') : t('routePlanner.resumeGeneration') }}
               </button>
               <button
                 v-if="errorMessage"
@@ -87,10 +87,10 @@
                 v-if="errorMessage"
                 type="button"
                 class="min-h-11 rounded-xl border border-rose-200 bg-white/75 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2"
-                aria-label="关闭路线规划错误提示"
+                :aria-label="t('routePlanner.dismissErrorAria')"
                 @click="dismissRouteError"
               >
-                我知道了
+                {{ t('routePlanner.dismissError') }}
               </button>
             </div>
             </div>
@@ -131,7 +131,7 @@
                   <label class="block text-sm font-semibold text-tibet-dark/80 mb-3">{{ t('routePlanner.plannedDays') }}</label>
                   <div class="flex items-stretch gap-0 rounded-2xl border border-tibet-gold/25 bg-white/70 overflow-hidden" role="group" :aria-label="t('routePlanner.plannedDays')">
                     <motion.button type="button" @click="adjustDays(-1)" :disabled="loading || form.days <= 1"
-                            aria-label="减少计划天数"
+                            :aria-label="t('routePlanner.decreaseDaysAria')"
                             aria-controls="route-planner-days-value"
                             :whileHover="{ backgroundColor: 'rgba(255, 255, 255, 0.82)' }"
                             :whileTap="{ scale: 0.94 }"
@@ -150,10 +150,10 @@
                         aria-live="polite"
                         :aria-label="daysValueLabel"
                       >{{ form.days }}</motion.span>
-                      <span class="text-[10px] uppercase tracking-[0.2em] text-tibet-brown/50 mt-1">Days</span>
+                      <span class="text-[10px] uppercase tracking-[0.2em] text-tibet-brown/50 mt-1">{{ t('routePlanner.daysCounterUnit') }}</span>
                     </div>
                     <motion.button type="button" @click="adjustDays(1)" :disabled="loading || form.days >= 30"
-                            aria-label="增加计划天数"
+                            :aria-label="t('routePlanner.increaseDaysAria')"
                             aria-controls="route-planner-days-value"
                             :whileHover="{ backgroundColor: 'rgba(255, 255, 255, 0.82)' }"
                             :whileTap="{ scale: 0.94 }"
@@ -249,7 +249,7 @@
                   <label class="block text-sm font-semibold text-tibet-dark/80 mb-3">{{ t('routePlanner.quickPresets') }}</label>
                   <div class="grid grid-cols-2 gap-2">
                     <motion.button type="button" v-for="preset in presets" :key="preset.label" @click="applyPreset(preset)" :disabled="loading"
-                            :aria-label="`套用${preset.label}预设，${preset.days}${t('routePlanner.daysUnit')}，${getBudgetShort(preset.budget)}`"
+                            :aria-label="getPresetAriaLabel(preset)"
                             :whileHover="{ y: -2, scale: 1.01 }"
                             :whileTap="{ scale: 0.98 }"
                             class="group flex min-h-12 flex-col items-start gap-0.5 rounded-xl border border-tibet-gold/20 bg-white/60 px-3.5 py-3 text-left transition-all hover:border-tibet-gold/40 hover:bg-amber-50/40 hover:shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">
@@ -281,7 +281,7 @@
                   </span>
                 </motion.button>
                 <p id="route-planner-form-hint" class="text-xs leading-relaxed text-tibet-brown/55">
-                  仅临时保留天数、预算和偏好，生成内容不会写入本地草稿。
+                  {{ t('routePlanner.formDraftHint') }}
                 </p>
               </form>
             </motion.div>
@@ -312,10 +312,10 @@
                   <button
                     type="button"
                     class="min-h-9 rounded-xl border border-sky-200 bg-white/80 px-3 py-1.5 text-xs font-semibold text-tibet-blue transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tibet-blue/70 focus-visible:ring-offset-2"
-                    aria-label="停止等待 AI 路线生成"
+                    :aria-label="t('routePlanner.pauseGenerationAria')"
                     @click="pauseRouteGeneration"
                   >
-                    停止等待
+                    {{ t('routePlanner.pauseWaiting') }}
                   </button>
                 </div>
                 <div class="h-1.5 rounded-full bg-tibet-gold/15 overflow-hidden">
@@ -332,7 +332,7 @@
                 </div>
                 <p class="mt-2 text-xs text-tibet-brown/60">{{ t('routePlanner.waitingTime') }}</p>
                 <p class="mt-1 text-xs leading-relaxed text-tibet-brown/55">
-                  可停止等待并保留当前片段，稍后从服务端状态恢复或重新生成。
+                  {{ t('routePlanner.pauseWaitingHint') }}
                 </p>
               </motion.div>
             </AnimatePresence>
@@ -348,8 +348,8 @@
                   <Sparkles class="h-4 w-4" />
                 </span>
                 <div>
-                  <h3 class="text-sm font-bold text-tibet-dark">当前方案</h3>
-                  <p class="text-xs text-tibet-brown/50">{{ result ? '已生成路线摘要' : '待生成路线参数' }}</p>
+                  <h3 class="text-sm font-bold text-tibet-dark">{{ t('routePlanner.currentPlan') }}</h3>
+                  <p class="text-xs text-tibet-brown/50">{{ result ? t('routePlanner.generatedRouteSummary') : t('routePlanner.pendingRouteParams') }}</p>
                 </div>
               </div>
 
@@ -486,7 +486,7 @@
                           class="inline-flex items-center gap-1.5 rounded-xl border border-tibet-blue/20 bg-white/80 px-3.5 py-2 text-xs font-medium text-tibet-blue transition-all hover:bg-sky-50">
                     <ChevronUp v-if="resultExpanded" class="h-4 w-4" />
                     <ChevronDown v-else class="h-4 w-4" />
-                    {{ resultExpanded ? '收起全文' : '展开全文' }}
+                    {{ resultToggleButtonLabel }}
                   </motion.button>
                   <motion.button @click="copyResult" :disabled="copying"
                           :aria-label="copying ? t('routePlanner.copying') : t('routePlanner.copyText')"
@@ -633,7 +633,7 @@
                             :key="day.day"
                             type="button"
                             @click="scrollToRouteDay(day.day)"
-                            :aria-label="`跳转到${day.day}：${day.title}`"
+                            :aria-label="getRouteDayAriaLabel(day)"
                             class="min-h-11 w-full rounded-xl border border-tibet-gold/10 bg-white/70 px-3 py-2 text-left transition hover:border-tibet-blue/25 hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tibet-blue/60"
                           >
                             <p class="text-[11px] font-bold text-tibet-blue">{{ day.day }}</p>
@@ -705,7 +705,7 @@
                           class="inline-flex items-center gap-1.5 rounded-xl border border-tibet-blue/20 bg-white/80 px-3.5 py-2 text-xs font-medium text-tibet-blue transition-all hover:bg-sky-50">
                     <ChevronUp v-if="resultExpanded" class="h-4 w-4" />
                     <ChevronDown v-else class="h-4 w-4" />
-                    {{ resultExpanded ? '收起全文' : '展开全文' }}
+                    {{ resultToggleButtonLabel }}
                   </motion.button>
                 </div>
                 <div class="relative">
@@ -791,9 +791,9 @@
                   <ReceiptText class="h-5 w-5" />
                 </span>
                 <div>
-                  <p class="text-sm font-bold text-tibet-dark">{{ bookableItinerary?.title || '正在生成可预订行程' }}</p>
+                  <p class="text-sm font-bold text-tibet-dark">{{ bookableItinerary?.title || t('routePlanner.bookableItineraryGeneratingTitle') }}</p>
                   <p class="text-xs text-tibet-brown/50">
-                    {{ bookableItinerary ? `${bookableItinerary.versionLabel} · ${bookableItinerary.days}天 · ${formatCurrency(itineraryQuote?.totalEstimatedCost || bookableItinerary.totalEstimatedCost)}` : '正在匹配景点、酒店、门票和预算' }}
+                    {{ bookableItinerarySubtitle }}
                   </p>
                 </div>
               </div>
@@ -803,7 +803,7 @@
                   class="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50/80 px-3 py-2 text-xs font-semibold text-emerald-700 transition-all hover:bg-emerald-100"
                 >
                   <ReceiptText class="h-3.5 w-3.5" />
-                  咨询记录
+                  {{ t('routePlanner.consultationRecords') }}
                 </router-link>
                 <motion.button
                   v-for="option in itineraryVersionOptions"
@@ -817,29 +817,29 @@
                   class="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-tibet-gold/25 bg-white/80 px-3 py-2 text-xs font-medium text-gray-600 transition-all hover:bg-amber-50 disabled:opacity-50"
                 >
                   <Shuffle class="h-3.5 w-3.5" />
-                  {{ itineraryVersionLoading === option.value ? '生成中' : option.label }}
+                  {{ itineraryVersionLoading === option.value ? t('routePlanner.itineraryVersionGenerating') : option.label }}
                 </motion.button>
               </div>
             </div>
 
             <div v-if="itineraryLoading" class="p-8 text-center text-tibet-brown/60" role="status" aria-live="polite" aria-busy="true">
               <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-tibet-gold mx-auto mb-3"></div>
-              <p class="text-sm font-medium">正在把 AI 灵感转成可报价行程</p>
+              <p class="text-sm font-medium">{{ t('routePlanner.bookableItineraryLoading') }}</p>
             </div>
 
             <div v-else-if="bookableItinerary" class="p-5 md:p-6 space-y-5">
               <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div class="rounded-2xl border border-tibet-gold/20 bg-white/70 px-4 py-3">
-                  <p class="text-xs text-tibet-brown/50">总预估</p>
-                  <p class="mt-1 text-xl font-bold text-tibet-dark">{{ formatCurrency(itineraryQuote?.totalEstimatedCost || bookableItinerary.totalEstimatedCost) }}</p>
+                  <p class="text-xs text-tibet-brown/50">{{ t('routePlanner.quoteTotalEstimated') }}</p>
+                  <p class="mt-1 text-xl font-bold text-tibet-dark">{{ formatCurrency(itineraryQuote?.totalEstimatedCost || bookableItinerary.totalEstimatedCost, itineraryQuote?.currency) }}</p>
                 </div>
                 <div class="rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3">
-                  <p class="text-xs text-emerald-700/70">第三方可订</p>
-                  <p class="mt-1 text-xl font-bold text-emerald-700">{{ formatCurrency(itineraryQuote?.bookableTotal) }}</p>
+                  <p class="text-xs text-emerald-700/70">{{ t('routePlanner.quoteBookable') }}</p>
+                  <p class="mt-1 text-xl font-bold text-emerald-700">{{ formatCurrency(itineraryQuote?.bookableTotal, itineraryQuote?.currency) }}</p>
                 </div>
                 <div class="rounded-2xl border border-sky-200 bg-sky-50/70 px-4 py-3">
-                  <p class="text-xs text-sky-700/70">交通餐饮预估</p>
-                  <p class="mt-1 text-xl font-bold text-sky-700">{{ formatCurrency(itineraryQuote?.informationalTotal) }}</p>
+                  <p class="text-xs text-sky-700/70">{{ t('routePlanner.quoteInformational') }}</p>
+                  <p class="mt-1 text-xl font-bold text-sky-700">{{ formatCurrency(itineraryQuote?.informationalTotal, itineraryQuote?.currency) }}</p>
                 </div>
               </div>
 
@@ -852,7 +852,7 @@
                   <div class="px-4 py-3 border-b border-tibet-gold/10 flex flex-wrap items-center justify-between gap-2">
                     <div>
                       <h3 class="text-sm font-bold text-tibet-dark">{{ day.title }}</h3>
-                      <p class="mt-0.5 text-xs text-tibet-brown/50">{{ day.travelDate }} · {{ day.region }}</p>
+                      <p class="mt-0.5 text-xs text-tibet-brown/50">{{ formatItineraryDayMeta(day) }}</p>
                     </div>
                     <span class="inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold" :class="riskClass(day.altitudeRisk)">
                       {{ riskLabel(day.altitudeRisk) }}
@@ -873,14 +873,14 @@
                           <div class="flex flex-wrap items-center gap-2">
                             <p class="text-sm font-semibold text-tibet-dark">{{ item.startTime }} · {{ item.title }}</p>
                             <span class="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-600">{{ itemTypeLabel(item.itemType) }}</span>
-                            <span v-if="item.bookingStatus === 'BOOKED'" class="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">已提交</span>
+                            <span v-if="item.bookingStatus === 'BOOKED'" class="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">{{ t('routePlanner.bookingSubmitted') }}</span>
                           </div>
                           <p class="mt-1 text-xs leading-relaxed text-tibet-brown/60 line-clamp-2">{{ item.description }}</p>
-                          <p v-if="item.alternatives" class="mt-1 text-[11px] text-tibet-blue/70">可替换：{{ item.alternatives }}</p>
+                          <p v-if="item.alternatives" class="mt-1 text-[11px] text-tibet-blue/70">{{ t('routePlanner.alternativesPrefix', { alternatives: item.alternatives }) }}</p>
                         </div>
                       </div>
                       <div class="flex shrink-0 items-center justify-between gap-3 md:justify-end">
-                        <span class="text-sm font-bold text-tibet-dark">{{ formatCurrency(item.estimatedCost) }}</span>
+                        <span class="text-sm font-bold text-tibet-dark">{{ formatCurrency(item.estimatedCost, itineraryQuote?.currency) }}</span>
                         <motion.button
                           v-if="isBookableItem(item)"
                           @click="bookItineraryItem(item)"
@@ -892,7 +892,7 @@
                           class="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-tibet-red px-3.5 py-2 text-xs font-semibold text-tibet-yellow shadow-md shadow-tibet-red/20 disabled:opacity-50"
                         >
                           <CalendarCheck class="h-3.5 w-3.5" />
-                          {{ itineraryBookingItemId === item.id ? '打开中' : '去第三方' }}
+                          {{ itineraryBookingItemId === item.id ? t('routePlanner.bookingOpening') : t('routePlanner.thirdPartyBooking') }}
                         </motion.button>
                       </div>
                     </div>
@@ -916,28 +916,28 @@
                   <Mountain class="h-5 w-5" />
                 </span>
                 <div>
-                  <p class="text-sm font-bold text-tibet-dark">西藏深度旅行包</p>
+                  <p class="text-sm font-bold text-tibet-dark">{{ t('routePlanner.travelKitTitle') }}</p>
                   <p class="text-xs text-tibet-brown/50">
-                    {{ tibetTravelKit ? `${tibetTravelKit.highlandAssessment.riskLabel} · 最高海拔 ${tibetTravelKit.highlandAssessment.maxAltitudeMeters}m · ${tibetTravelKit.offlinePackage.mapPins.length} 个离线点位` : '正在生成高原、礼仪、短语和提醒' }}
+                    {{ tibetTravelKitSubtitle }}
                   </p>
                 </div>
               </div>
               <motion.button
                 v-if="tibetTravelKit"
                 @click="downloadOfflinePackage"
-                aria-label="下载西藏深度旅行离线包"
+                :aria-label="t('routePlanner.travelKitDownloadAria')"
                 :whileHover="{ y: -1, scale: 1.02 }"
                 :whileTap="{ scale: 0.96 }"
                 class="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-emerald-200 bg-white/80 px-3.5 py-2 text-xs font-semibold text-emerald-700 transition-all hover:bg-emerald-50"
               >
                 <Download class="h-3.5 w-3.5" />
-                离线包
+                {{ t('routePlanner.offlinePackageShort') }}
               </motion.button>
             </div>
 
             <div v-if="tibetTravelKitLoading" class="p-8 text-center text-tibet-brown/60" role="status" aria-live="polite" aria-busy="true">
               <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-500 mx-auto mb-3"></div>
-              <p class="text-sm font-medium">正在生成西藏目的地服务</p>
+              <p class="text-sm font-medium">{{ t('routePlanner.travelKitLoading') }}</p>
             </div>
 
             <div v-else-if="tibetTravelKit" class="p-5 md:p-6 space-y-5">
@@ -945,7 +945,7 @@
                 <div class="rounded-2xl border px-4 py-3" :class="riskClass(tibetTravelKit.highlandAssessment.riskLevel)">
                   <div class="flex items-center gap-2">
                     <HeartPulse class="h-4 w-4" />
-                    <p class="text-xs font-semibold">高原适应</p>
+                    <p class="text-xs font-semibold">{{ t('routePlanner.highlandAdaptation') }}</p>
                   </div>
                   <p class="mt-2 text-2xl font-bold">{{ tibetTravelKit.highlandAssessment.riskScore }}</p>
                   <p class="mt-1 text-xs leading-relaxed">{{ tibetTravelKit.highlandAssessment.summary }}</p>
@@ -953,18 +953,18 @@
                 <div class="rounded-2xl border border-sky-200 bg-sky-50/70 px-4 py-3 text-sky-800">
                   <div class="flex items-center gap-2">
                     <MapPin class="h-4 w-4" />
-                    <p class="text-xs font-semibold">离线旅行包</p>
+                    <p class="text-xs font-semibold">{{ t('routePlanner.offlineTravelKit') }}</p>
                   </div>
-                  <p class="mt-2 text-2xl font-bold">{{ tibetTravelKit.offlinePackage.mapPins.length }}</p>
-                  <p class="mt-1 text-xs leading-relaxed">点位、紧急电话、凭证提示和离线清单已打包。</p>
+                  <p class="mt-2 text-2xl font-bold">{{ formatInteger(tibetTravelKit.offlinePackage.mapPins.length) }}</p>
+                  <p class="mt-1 text-xs leading-relaxed">{{ t('routePlanner.offlineTravelKitDesc') }}</p>
                 </div>
                 <div class="rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-emerald-800">
                   <div class="flex items-center gap-2">
                     <Leaf class="h-4 w-4" />
-                    <p class="text-xs font-semibold">可持续旅行</p>
+                    <p class="text-xs font-semibold">{{ t('routePlanner.sustainableTravel') }}</p>
                   </div>
-                  <p class="mt-2 text-2xl font-bold">{{ tibetTravelKit.sustainableOptions.length }}</p>
-                  <p class="mt-1 text-xs leading-relaxed">本地向导、顺路合并、生态零遗留建议。</p>
+                  <p class="mt-2 text-2xl font-bold">{{ formatInteger(tibetTravelKit.sustainableOptions.length) }}</p>
+                  <p class="mt-1 text-xs leading-relaxed">{{ t('routePlanner.sustainableTravelDesc') }}</p>
                 </div>
               </div>
 
@@ -972,7 +972,7 @@
                 <section class="rounded-2xl border border-tibet-gold/15 bg-white/75 p-4">
                   <div class="flex items-center gap-2 text-tibet-dark">
                     <HeartPulse class="h-4 w-4 text-rose-600" />
-                    <h3 class="text-sm font-bold">每日高原节奏</h3>
+                    <h3 class="text-sm font-bold">{{ t('routePlanner.dailyHighlandPace') }}</h3>
                   </div>
                   <div class="mt-3 space-y-3">
                     <div
@@ -981,7 +981,7 @@
                       class="rounded-xl border border-tibet-gold/10 bg-white/80 px-3 py-2"
                     >
                       <div class="flex items-center justify-between gap-2">
-                        <p class="text-xs font-semibold text-tibet-dark">D{{ advice.dayNumber }} · {{ advice.maxAltitudeMeters }}m</p>
+                        <p class="text-xs font-semibold text-tibet-dark">{{ t('routePlanner.dayAltitudeMeta', { day: advice.dayNumber, altitude: formatAltitudeMeters(advice.maxAltitudeMeters) }) }}</p>
                         <span class="rounded-full border px-2 py-0.5 text-[11px] font-semibold" :class="riskClass(advice.riskLevel)">{{ riskLabel(advice.riskLevel) }}</span>
                       </div>
                       <p class="mt-1 text-xs leading-relaxed text-tibet-brown/60">{{ advice.paceAdvice }}</p>
@@ -992,7 +992,7 @@
                 <section class="rounded-2xl border border-tibet-gold/15 bg-white/75 p-4">
                   <div class="flex items-center gap-2 text-tibet-dark">
                     <Bell class="h-4 w-4 text-amber-600" />
-                    <h3 class="text-sm font-bold">实时提醒</h3>
+                    <h3 class="text-sm font-bold">{{ t('routePlanner.realtimeAlerts') }}</h3>
                   </div>
                   <div class="mt-3 space-y-2">
                     <div
@@ -1013,13 +1013,13 @@
                 <section class="rounded-2xl border border-tibet-gold/15 bg-white/75 p-4">
                   <div class="flex items-center gap-2 text-tibet-dark">
                     <Landmark class="h-4 w-4 text-tibet-gold" />
-                    <h3 class="text-sm font-bold">文化礼仪助手</h3>
+                    <h3 class="text-sm font-bold">{{ t('routePlanner.culturalEtiquetteAssistant') }}</h3>
                   </div>
                   <div class="mt-3 space-y-3">
                     <div v-for="tip in tibetTravelKit.culturalTips.slice(0, 2)" :key="tip.scene" class="rounded-xl bg-amber-50/60 px-3 py-2">
                       <p class="text-xs font-semibold text-tibet-dark">{{ tip.title }}</p>
                       <p class="mt-1 text-xs leading-relaxed text-tibet-brown/60">{{ tip.doTips[0] }}</p>
-                      <p class="mt-1 text-[11px] text-rose-700/80">避免：{{ tip.avoidTips[0] }}</p>
+                      <p class="mt-1 text-[11px] text-rose-700/80">{{ t('routePlanner.avoidTip', { tip: tip.avoidTips[0] }) }}</p>
                     </div>
                   </div>
                 </section>
@@ -1027,7 +1027,7 @@
                 <section class="rounded-2xl border border-tibet-gold/15 bg-white/75 p-4">
                   <div class="flex items-center gap-2 text-tibet-dark">
                     <Languages class="h-4 w-4 text-sky-600" />
-                    <h3 class="text-sm font-bold">藏汉英导览短语</h3>
+                    <h3 class="text-sm font-bold">{{ t('routePlanner.phrasebookTitle') }}</h3>
                   </div>
                   <div class="mt-3 grid gap-2 sm:grid-cols-2">
                     <div v-for="phrase in tibetTravelKit.phrasebook.slice(0, 4)" :key="`${phrase.category}-${phrase.chinese}`" class="rounded-xl border border-sky-100 bg-sky-50/60 px-3 py-2">
@@ -1042,11 +1042,11 @@
               <section class="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4">
                 <div class="flex items-center gap-2 text-emerald-900">
                   <ShieldAlert class="h-4 w-4" />
-                  <h3 class="text-sm font-bold">离线和可持续清单</h3>
+                  <h3 class="text-sm font-bold">{{ t('routePlanner.offlineSustainableChecklist') }}</h3>
                 </div>
                 <div class="mt-3 grid gap-3 md:grid-cols-2">
                   <div>
-                    <p class="text-xs font-semibold text-emerald-900/80">离线准备</p>
+                    <p class="text-xs font-semibold text-emerald-900/80">{{ t('routePlanner.offlinePreparation') }}</p>
                     <ul class="mt-2 space-y-1">
                       <li v-for="item in tibetTravelKit.offlinePackage.offlineChecklist.slice(0, 4)" :key="item" class="text-xs leading-relaxed text-emerald-900/70">
                         {{ item }}
@@ -1054,7 +1054,7 @@
                     </ul>
                   </div>
                   <div>
-                    <p class="text-xs font-semibold text-emerald-900/80">低影响旅行</p>
+                    <p class="text-xs font-semibold text-emerald-900/80">{{ t('routePlanner.lowImpactTravel') }}</p>
                     <ul class="mt-2 space-y-1">
                       <li v-for="option in tibetTravelKit.sustainableOptions.slice(0, 3)" :key="option.title" class="text-xs leading-relaxed text-emerald-900/70">
                         {{ option.title }}：{{ option.localBenefit }}
@@ -1125,6 +1125,7 @@ import { useRouteGenerationStore } from '../stores/routeGeneration'
 import { readBrowserStorage, removeBrowserStorage, writeBrowserStorage } from '../utils/browserStorage'
 import { summarizeClientError } from '../utils/errorMonitoring'
 import { openExternalBooking } from '../utils/externalBooking'
+import { toFiniteAmount, toIntlLocale } from '../i18n/formatting'
 import {
   cardInitial,
   cardInView,
@@ -1136,7 +1137,7 @@ import {
   softSpring
 } from '../motion/presets'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const router = useRouter()
 const auth = useAuthStore()
 const generationStore = useRouteGenerationStore()
@@ -1341,17 +1342,24 @@ const preferenceOptions = computed(() => [
   { value: 'relaxation', label: t('routePlanner.preferenceOptions.relaxation'), desc: t('routePlanner.preferenceDesc.relaxation'), icon: '🌿' }
 ])
 
-const itineraryVersionOptions = [
-  { value: 'cheaper', label: '更省钱' },
-  { value: 'relaxed', label: '更轻松' },
-  { value: 'hidden', label: '更小众' },
-  { value: 'family', label: '老人小孩' }
-]
+const itineraryVersionOptions = computed(() => [
+  { value: 'cheaper', label: t('routePlanner.itineraryVersionOptions.cheaper') },
+  { value: 'relaxed', label: t('routePlanner.itineraryVersionOptions.relaxed') },
+  { value: 'hidden', label: t('routePlanner.itineraryVersionOptions.hidden') },
+  { value: 'family', label: t('routePlanner.itineraryVersionOptions.family') }
+])
+
+const getPresetAriaLabel = (preset: { label: string; days: number; budget: string; preference: string }) =>
+  t('routePlanner.quickPresetAria', {
+    label: preset.label,
+    days: t('routePlanner.daysValueCompact', { count: preset.days }),
+    budget: getBudgetShort(preset.budget)
+  })
 
 const getItineraryVersionAriaLabel = (option: { value: string; label: string }) =>
   itineraryVersionLoading.value === option.value
-    ? `正在生成${option.label}版本行程`
-    : `生成${option.label}版本行程`
+    ? t('routePlanner.itineraryVersionGeneratingAria', { label: option.label })
+    : t('routePlanner.itineraryVersionGenerateAria', { label: option.label })
 
 const getBudgetShort = (key: string) => {
   if (key === 'economy') return t('routePlanner.budgetShort.economy')
@@ -1360,16 +1368,36 @@ const getBudgetShort = (key: string) => {
   return key
 }
 
-const formatCurrency = (value?: number | string | null) => {
-  const amount = Number(value || 0)
-  return amount.toLocaleString('zh-CN', { style: 'currency', currency: 'CNY', maximumFractionDigits: 0 })
+const formatInteger = (value?: number | string | null) =>
+  new Intl.NumberFormat(toIntlLocale(locale.value), { maximumFractionDigits: 0 }).format(toFiniteAmount(value))
+
+const formatCurrency = (value?: number | string | null, currency?: string | null) =>
+  new Intl.NumberFormat(toIntlLocale(locale.value), {
+    style: 'currency',
+    currency: currency || 'CNY',
+    maximumFractionDigits: 0
+  }).format(toFiniteAmount(value))
+
+const formatDate = (value?: string | null) => {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return new Intl.DateTimeFormat(toIntlLocale(locale.value), {
+    month: 'numeric',
+    day: 'numeric'
+  }).format(date)
 }
 
+const formatAltitudeMeters = (value?: number | string | null) =>
+  t('routePlanner.altitudeMeters', { count: formatInteger(value) })
+
 const riskLabel = (risk?: string) => {
-  if (risk === 'EXTREME') return '极高风险'
-  if (risk === 'HIGH') return '高海拔'
-  if (risk === 'MEDIUM') return '中海拔'
-  return '低海拔'
+  const labelKeys: Record<string, string> = {
+    EXTREME: 'extreme',
+    HIGH: 'high',
+    MEDIUM: 'medium'
+  }
+  return t(`routePlanner.riskLabels.${labelKeys[risk || ''] || 'low'}`)
 }
 
 const riskClass = (risk?: string) => {
@@ -1386,21 +1414,22 @@ const alertClass = (level?: string) => {
 }
 
 const alertLabel = (level?: string) => {
-  if (level === 'HIGH') return '重要'
-  if (level === 'MEDIUM') return '提醒'
-  return '提示'
+  if (level === 'HIGH') return t('routePlanner.alertLabels.high')
+  if (level === 'MEDIUM') return t('routePlanner.alertLabels.medium')
+  return t('routePlanner.alertLabels.low')
 }
 
 const itemTypeLabel = (type: string) => {
-  const labels: Record<string, string> = {
-    SCENIC_SPOT: '景点',
-    HOTEL: '酒店',
-    TRANSPORT: '交通',
-    MEAL: '餐饮',
-    EXPERIENCE: '体验',
-    NOTE: '提示'
+  const labelKeys: Record<string, string> = {
+    SCENIC_SPOT: 'scenicSpot',
+    HOTEL: 'hotel',
+    TRANSPORT: 'transport',
+    MEAL: 'meal',
+    EXPERIENCE: 'experience',
+    NOTE: 'note'
   }
-  return labels[type] || type
+  const labelKey = labelKeys[type]
+  return labelKey ? t(`routePlanner.itemTypes.${labelKey}`) : type
 }
 
 const itemIcon = (type: string) => {
@@ -1415,8 +1444,8 @@ const isBookableItem = (item: ItineraryItem) =>
 
 const getExternalBookingAriaLabel = (item: ItineraryItem) =>
   itineraryBookingItemId.value === item.id
-    ? `正在打开${item.title}的第三方预订`
-    : `打开${item.title}的第三方预订`
+    ? t('routePlanner.externalBookingOpeningAria', { title: item.title })
+    : t('routePlanner.externalBookingOpenAria', { title: item.title })
 
 const loading = ref(false)
 const saving = ref(false)
@@ -1458,12 +1487,47 @@ const routeStatusRole = computed(() => errorMessage.value ? 'alert' : 'status')
 const routeStatusLive = computed(() => errorMessage.value ? 'assertive' : 'polite')
 const routeStatusTitle = computed(() => errorMessage.value ? t('routePlanner.generationFailed') : t('routePlanner.statusHint'))
 const routeStatusText = computed(() => errorMessage.value || statusMessage.value)
-const daysValueLabel = computed(() => `${t('routePlanner.plannedDays')}：${form.value.days}${t('routePlanner.daysUnit')}`)
-const routeGenerationProgressLabel = computed(() => `${routeGenerationStatusLabel.value}，${routeGenerationProgressPercent.value}%`)
-const resultToggleLabel = computed(() => resultExpanded.value ? '收起路线全文' : '展开路线全文')
+const daysValueLabel = computed(() => t('routePlanner.daysValueAria', { count: form.value.days }))
+const routeGenerationProgressLabel = computed(() => t('routePlanner.progressAria', {
+  label: routeGenerationStatusLabel.value,
+  percent: routeGenerationProgressPercent.value
+}))
+const resultToggleButtonLabel = computed(() =>
+  resultExpanded.value ? t('routePlanner.collapseFullText') : t('routePlanner.expandFullText')
+)
+const resultToggleLabel = computed(() =>
+  resultExpanded.value ? t('routePlanner.collapseRouteFullTextAria') : t('routePlanner.expandRouteFullTextAria')
+)
 const canResumePausedRouteJob = computed(() =>
   Boolean(pausedRouteJobId.value && !loading.value && !streaming.value && !activeRouteJobId.value)
 )
+
+const bookableItinerarySubtitle = computed(() => {
+  if (!bookableItinerary.value) return t('routePlanner.bookableItineraryGeneratingMeta')
+  return t('routePlanner.bookableItineraryMeta', {
+    version: bookableItinerary.value.versionLabel,
+    days: t('routePlanner.daysValueCompact', { count: bookableItinerary.value.days }),
+    price: formatCurrency(
+      itineraryQuote.value?.totalEstimatedCost || bookableItinerary.value.totalEstimatedCost,
+      itineraryQuote.value?.currency
+    )
+  })
+})
+
+const tibetTravelKitSubtitle = computed(() => {
+  if (!tibetTravelKit.value) return t('routePlanner.travelKitGeneratingMeta')
+  return t('routePlanner.travelKitMeta', {
+    risk: riskLabel(tibetTravelKit.value.highlandAssessment.riskLevel),
+    altitude: formatAltitudeMeters(tibetTravelKit.value.highlandAssessment.maxAltitudeMeters),
+    pins: formatInteger(tibetTravelKit.value.offlinePackage.mapPins.length)
+  })
+})
+
+const formatItineraryDayMeta = (day: ItineraryDay) =>
+  [formatDate(day.travelDate), day.region].filter(Boolean).join(t('routePlanner.metaSeparator'))
+
+const getRouteDayAriaLabel = (day: RouteSummarySection) =>
+  t('routePlanner.routeDayJumpAria', { day: day.day, title: day.title })
 
 const dismissRouteError = () => {
   errorMessage.value = ''
@@ -1498,6 +1562,15 @@ const safeRouteFailureMessage = (error: unknown) => {
   if (/abort|cancel/i.test(summary)) return t('routePlanner.generationCancelled')
   if (/timeout/i.test(summary)) return t('routePlanner.timeoutError')
   return t('routePlanner.generateFailed')
+}
+
+const responseStatus = (error: unknown) => {
+  if (typeof error !== 'object' || error === null || !('response' in error)) {
+    return null
+  }
+
+  const response = (error as { response?: { status?: unknown } }).response
+  return typeof response?.status === 'number' ? response.status : null
 }
 
 const stopFirstTokenProgress = () => {
@@ -1567,14 +1640,14 @@ const routeOverviewText = computed(() => {
 const routeResultMobileTitle = computed(() => {
   if (!result.value) return ''
   return t('routePlanner.routeTitle', {
-    days: form.value.days,
+    days: formatInteger(form.value.days),
     preference: getPreferenceText(form.value.preference)
   })
 })
 
 const routeResultMobileMeta = computed(() => {
   if (!result.value) return ''
-  return t('routePlanner.routeGenComplete', { chars: result.value.trim().length })
+  return t('routePlanner.routeGenComplete', { chars: formatInteger(result.value.trim().length) })
 })
 
 const routeHighlightItems = computed(() => {
@@ -1661,8 +1734,8 @@ const routeDaySections = computed<RouteSummarySection[]>(() => {
     sections.push({
       day: current.day,
       dayNumber,
-      title: current.title || '当日行程',
-      summary: summary || '查看完整路线了解当天细节。'
+      title: current.title || t('routePlanner.routeDayFallbackTitle'),
+      summary: summary || t('routePlanner.routeDayFallbackSummary')
     })
   }
 
@@ -1697,15 +1770,15 @@ const hiddenDayCount = computed(() => Math.max(routeDaySections.value.length - v
 const isLongRoute = computed(() => result.value.length >= 2600 || routeDaySections.value.length >= 6)
 const resultShouldCollapse = computed(() => result.value.length > 1200 || routeDaySections.value.length > 4)
 const resultStats = computed(() => [
-  { label: '天数', value: `${form.value.days} 天` },
-  { label: '预算', value: getBudgetShort(form.value.budget) },
-  { label: '偏好', value: getPreferenceText(form.value.preference) },
-  { label: '篇幅', value: `${charCount.value || result.value.length} 字` }
+  { label: t('routePlanner.statDays'), value: t('routePlanner.daysValueSpaced', { count: form.value.days }) },
+  { label: t('routePlanner.statBudget'), value: getBudgetShort(form.value.budget) },
+  { label: t('routePlanner.statPreference'), value: getPreferenceText(form.value.preference) },
+  { label: t('routePlanner.statLength'), value: t('routePlanner.charsValue', { count: formatInteger(charCount.value || result.value.length) }) }
 ])
 const plannerSnapshotStats = computed(() => [
-  { label: '天数', value: `${form.value.days}天` },
-  { label: '预算', value: getBudgetShort(form.value.budget) },
-  { label: '偏好', value: getPreferenceText(form.value.preference) }
+  { label: t('routePlanner.statDays'), value: t('routePlanner.daysValueCompact', { count: form.value.days }) },
+  { label: t('routePlanner.statBudget'), value: getBudgetShort(form.value.budget) },
+  { label: t('routePlanner.statPreference'), value: getPreferenceText(form.value.preference) }
 ])
 const scrollToRouteDay = (dayLabel: string) => {
   const root = routeResultReaderRef.value
@@ -1764,15 +1837,20 @@ const planningPulseItems = computed(() => {
     const highlightItems = routeHighlightItems.value.slice(0, 3)
 
     return [
-      dayCount > 0 ? `已整理 ${dayCount} 个每日安排节点。` : '路线正文已生成，可在右侧查看完整内容。',
+      dayCount > 0
+        ? t('routePlanner.planningPulseGeneratedDayNodes', { count: formatInteger(dayCount) })
+        : t('routePlanner.planningPulseGeneratedRouteReady'),
       ...highlightItems
     ].slice(0, 4)
   }
 
   return [
-    `${form.value.days}天行程，偏向${getPreferenceText(form.value.preference)}。`,
-    `预算档位为${getBudgetShort(form.value.budget)}，会优先匹配相应住宿与体验强度。`,
-    '生成后可继续查看可预订行程、报价与高原旅行包。'
+    t('routePlanner.planningPulseDaysPreference', {
+      days: t('routePlanner.daysValueCompact', { count: form.value.days }),
+      preference: getPreferenceText(form.value.preference)
+    }),
+    t('routePlanner.planningPulseBudget', { budget: getBudgetShort(form.value.budget) }),
+    t('routePlanner.planningPulseBookable')
   ]
 })
 
@@ -1798,7 +1876,7 @@ const {
     defaultForm,
     storageKey: routeDraftStorageKey,
     version: 2,
-    getRestoredStatusMessage: draft => t('routePlanner.routeGenComplete', { chars: draft.result.trim().length }),
+    getRestoredStatusMessage: draft => t('routePlanner.routeGenComplete', { chars: formatInteger(draft.result.trim().length) }),
     onRestoreResult: restoredResult => {
       charCount.value = restoredResult.length
       resultExpanded.value = false
@@ -1897,7 +1975,7 @@ const fetchTibetTravelKit = async (itineraryId: number) => {
   try {
     const { data } = await api.get(endpoints.tibetSpecialty.travelKit(itineraryId))
     tibetTravelKit.value = data
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to fetch Tibet travel kit:', summarizeClientError(error))
     tibetTravelKit.value = null
   } finally {
@@ -1940,9 +2018,11 @@ const generateBookableItinerary = async (versionType = 'default') => {
     bookableItinerary.value = response.data
     await fetchItineraryQuote(response.data.id)
     await fetchTibetTravelKit(response.data.id)
-    statusMessage.value = `已生成${response.data.versionLabel || '可预订'}行程，可查看报价并预订节点。`
+    statusMessage.value = t('routePlanner.bookableItineraryGeneratedStatus', {
+      version: response.data.versionLabel || t('routePlanner.bookableVersionFallback')
+    })
     errorMessage.value = ''
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to generate bookable itinerary:', summarizeClientError(error))
     errorMessage.value = t('routePlanner.generateFailed')
   } finally {
@@ -1985,8 +2065,8 @@ const applyAiRouteRecord = (record: AiRouteRecordResponse) => {
       streaming.value = false
       stopFirstTokenProgress()
       statusMessage.value = record.content?.trim()
-        ? `已停止等待，已保留当前 ${record.content.trim().length} 字内容；可恢复生成或重新生成。`
-        : '已停止等待，可恢复生成或重新生成。'
+        ? t('routePlanner.pausedWithSavedContent', { chars: formatInteger(record.content.trim().length) })
+        : t('routePlanner.pausedWithoutContent')
       errorMessage.value = ''
       persistRouteDraft({ jobId: '', completed: false })
       return true
@@ -1997,7 +2077,7 @@ const applyAiRouteRecord = (record: AiRouteRecordResponse) => {
     streaming.value = true
     errorMessage.value = ''
     statusMessage.value = t('routePlanner.aiGeneratingRoute', {
-      days: record.days,
+      days: formatInteger(record.days),
       pref: getPreferenceText(record.preference || form.value.preference)
     })
     if (!record.content?.trim()) {
@@ -2017,7 +2097,7 @@ const applyAiRouteRecord = (record: AiRouteRecordResponse) => {
 
   if (record.content?.trim()) {
     errorMessage.value = record.status === 'FAILED' ? t('routePlanner.generateFailed') : ''
-    statusMessage.value = t('routePlanner.routeGenComplete', { chars: record.content.trim().length })
+    statusMessage.value = t('routePlanner.routeGenComplete', { chars: formatInteger(record.content.trim().length) })
     persistRouteDraft({ jobId: '', completed: record.status === 'COMPLETED' })
     return true
   }
@@ -2070,7 +2150,7 @@ const finishRouteJob = async (jobId: string, content: string) => {
   loading.value = false
   activeRouteJobId.value = ''
   errorMessage.value = ''
-  statusMessage.value = t('routePlanner.routeGenComplete', { chars: finalContent.trim().length })
+  statusMessage.value = t('routePlanner.routeGenComplete', { chars: formatInteger(finalContent.trim().length) })
   generationStore.completeGeneration()
   persistRouteDraft({ jobId: '', completed: true })
   await generateBookableItinerary()
@@ -2112,7 +2192,7 @@ const applyRouteJobSnapshot = (snapshot: RouteGenerationJobSnapshot) => {
     streaming.value = true
     errorMessage.value = ''
     statusMessage.value = t('routePlanner.aiGeneratingRoute', {
-      days: snapshot.days,
+      days: formatInteger(snapshot.days),
       pref: getPreferenceText(form.value.preference)
     })
     persistRouteDraft({ jobId: snapshot.jobId, completed: false })
@@ -2143,8 +2223,8 @@ const pauseRouteGeneration = () => {
 
   const savedChars = result.value.trim().length
   statusMessage.value = savedChars > 0
-    ? `已停止等待，已保留当前 ${savedChars} 字内容；可恢复生成、复制当前片段或重新生成。`
-    : '已停止等待，可恢复生成或重新生成。服务端可能仍在处理本次请求。'
+    ? t('routePlanner.pausedWithSavedContentAndActions', { chars: formatInteger(savedChars) })
+    : t('routePlanner.pausedWithoutContentServerProcessing')
   persistRouteDraft({ jobId: '', completed: false })
 }
 
@@ -2188,7 +2268,7 @@ const resumePausedRouteJob = async () => {
   streaming.value = true
   activeRouteJobId.value = jobId
   errorMessage.value = ''
-  statusMessage.value = '正在恢复 AI 路线生成...'
+  statusMessage.value = t('routePlanner.resumeGenerationStarting')
   generationStore.startGeneration()
   if (!result.value.trim()) {
     startFirstTokenProgress()
@@ -2205,7 +2285,7 @@ const resumePausedRouteJob = async () => {
     if (snapshot.status === 'RUNNING') {
       await subscribeToRouteJob(snapshot.jobId)
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (requestId !== routeGenerationRequestId && !loading.value && !streaming.value) {
       rememberPausedRouteJob(jobId)
       return
@@ -2216,7 +2296,7 @@ const resumePausedRouteJob = async () => {
     streaming.value = false
     activeRouteJobId.value = ''
     errorMessage.value = safeRouteFailureMessage(error)
-    statusMessage.value = '恢复生成失败，请稍后重试。'
+    statusMessage.value = t('routePlanner.resumeGenerationFailed')
     generationStore.cancelGeneration()
     persistRouteDraft({ jobId: '', completed: false })
   } finally {
@@ -2240,14 +2320,14 @@ const resumeRouteJobFromDraft = async () => {
     if (snapshot.status === 'RUNNING') {
       await subscribeToRouteJob(snapshot.jobId)
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to resume route job:', summarizeClientError(error))
     if (result.value.trim()) {
       stopFirstTokenProgress()
       loading.value = false
       streaming.value = false
       activeRouteJobId.value = ''
-      statusMessage.value = t('routePlanner.routeGenComplete', { chars: result.value.trim().length })
+      statusMessage.value = t('routePlanner.routeGenComplete', { chars: formatInteger(result.value.trim().length) })
       errorMessage.value = ''
       generationStore.completeGeneration()
       persistRouteDraft({ jobId: '', completed: true })
@@ -2311,7 +2391,7 @@ const generateRoute = async () => {
     if (snapshot.status === 'RUNNING') {
       await subscribeToRouteJob(snapshot.jobId)
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (requestId !== routeGenerationRequestId && !loading.value && !streaming.value) {
       persistRouteDraft({ jobId: '', completed: false })
       return
@@ -2374,7 +2454,7 @@ const saveRoute = async () => {
     statusMessage.value = t('routePlanner.routeSavedPrivate')
     errorMessage.value = ''
     persistRouteDraft()
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to save AI route record:', summarizeClientError(error))
     errorMessage.value = t('routePlanner.saveFailed')
     persistRouteDraft()
@@ -2389,7 +2469,7 @@ const downloadRoute = () => {
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
-  link.download = t('routePlanner.downloadFilename', { days: form.value.days })
+  link.download = t('routePlanner.downloadFilename', { days: formatInteger(form.value.days) })
   document.body.appendChild(link)
   link.click()
   document.body.removeChild(link)
@@ -2401,22 +2481,24 @@ const getPreferenceText = (key: string) => {
 }
 
 const communityBudgetValue = (key: string) => {
-  const values: Record<string, string> = {
-    economy: '经济型',
-    comfort: '舒适型',
-    luxury: '豪华型'
+  const valueKeys: Record<string, string> = {
+    economy: 'economy',
+    comfort: 'comfort',
+    luxury: 'luxury'
   }
-  return values[key] || key
+  const valueKey = valueKeys[key]
+  return valueKey ? t(`routePlanner.communityBudget.${valueKey}`) : key
 }
 
 const communityPreferenceValue = (key: string) => {
-  const values: Record<string, string> = {
-    natural: '自然风光',
-    cultural: '人文历史',
-    photography: '深度摄影',
-    relaxation: '休闲度假'
+  const valueKeys: Record<string, string> = {
+    natural: 'natural',
+    cultural: 'cultural',
+    photography: 'photography',
+    relaxation: 'relaxation'
   }
-  return values[key] || key
+  const valueKey = valueKeys[key]
+  return valueKey ? t(`routePlanner.communityPreference.${valueKey}`) : key
 }
 
 const shareRoute = async () => {
@@ -2437,7 +2519,7 @@ const shareRoute = async () => {
 
   try {
     await api.post(endpoints.routes.share, {
-      title: t('routePlanner.routeTitle', { days: form.value.days, preference: getPreferenceText(form.value.preference) }),
+      title: t('routePlanner.routeTitle', { days: formatInteger(form.value.days), preference: getPreferenceText(form.value.preference) }),
       content: result.value,
       days: form.value.days,
       budget: communityBudgetValue(form.value.budget),
@@ -2445,9 +2527,9 @@ const shareRoute = async () => {
     })
     showToast(t('routePlanner.shareSuccess'), 'success')
     router.push('/community')
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Share failed:', summarizeClientError(error))
-    if (error.response && error.response.status === 401) {
+    if (responseStatus(error) === 401) {
       await requireAuth()
     } else {
       showToast(t('routePlanner.shareFailed'), 'error')
@@ -2466,10 +2548,10 @@ const bookItineraryItem = (item: ItineraryItem) => {
     name: item.hotelName || item.scenicSpotName || item.title
   })
   if (opened) {
-    statusMessage.value = '已打开第三方平台，请在有资质的平台确认预订或继续咨询。'
+    statusMessage.value = t('routePlanner.externalBookingOpened')
     errorMessage.value = ''
   } else {
-    errorMessage.value = '浏览器拦截了第三方平台窗口，请允许弹窗后重试。'
+    errorMessage.value = t('routePlanner.externalBookingBlocked')
   }
   window.setTimeout(() => {
     if (itineraryBookingItemId.value === item.id) {

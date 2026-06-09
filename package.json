@@ -8,6 +8,8 @@
     "check:frontend": "npm --prefix frontend run typecheck && npm --prefix frontend run test -- --run && npm --prefix frontend run build",
     "check:backend": "mvn -q -f backend/pom.xml -DskipTests compile && mvn -q -f backend/pom.xml test",
     "check:scrapler": "cd scrapler && python -m pytest -q",
+    "check:supply-chain-pins": "node scripts/check-supply-chain-pins.mjs",
+    "test:ops": "node --test scripts/check-supply-chain-pins.test.mjs scripts/resolve-docker-image-digests.test.mjs scripts/validate-workflow-yaml.test.mjs",
     "test": "npm --prefix frontend run test -- --run && npm run check:scrapler"
   },
   "repository": {

@@ -27,11 +27,10 @@ let nextUploadFieldId = 1
 
 const props = withDefaults(defineProps<{
   modelValue: string
-  uploadEndpoint?: string
+  uploadEndpoint: string
   placeholder?: string
   disabled?: boolean
 }>(), {
-  uploadEndpoint: '/admin/upload-image',
   placeholder: '',
   disabled: false
 })
@@ -208,6 +207,8 @@ const uploadFile = async (file: File, rememberForRetry = true) => {
           :src="modelValue"
           :alt="uploadLabel('previewAlt')"
           class="h-full w-full object-cover"
+          loading="lazy"
+          decoding="async"
           @error="imageError = true"
           @load="imageError = false"
         >

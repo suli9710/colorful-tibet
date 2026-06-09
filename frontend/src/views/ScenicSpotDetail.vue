@@ -106,7 +106,12 @@
 
             <!-- Comments Section -->
             <div class="bg-white rounded-3xl p-5 shadow-xl border border-tibet-gold/20 sm:p-8">
-              <h2 class="text-2xl font-bold text-tibet-dark mb-6 tibetan-font">{{ t('spotDetail.comments') }}</h2>
+              <h2 class="text-2xl font-bold text-tibet-dark mb-6 tibetan-font">
+                {{ t('spotDetail.comments') }}
+                <span v-if="commentsTotalElements > 0" class="text-sm font-normal text-gray-500">
+                  ({{ comments.length }}<template v-if="commentsTotalElements > comments.length"> / {{ commentsTotalElements }}</template>)
+                </span>
+              </h2>
               
               <!-- Comment Form -->
               <div v-if="user" class="mb-8 rounded-2xl bg-gray-50 p-4 sm:p-6">
@@ -273,6 +278,25 @@
                 <div v-if="comments.length === 0" class="text-center text-gray-400 py-8 tibetan-font">
                   {{ t('spotDetail.noComments') }}
                 </div>
+                <div
+                  v-if="commentsTotalPages > 1"
+                  class="mt-6 flex flex-wrap items-center justify-center gap-3"
+                  role="navigation"
+                  :aria-label="t('spotDetail.comments')"
+                >
+                  <span class="text-sm text-gray-500" role="status" aria-live="polite">
+                    {{ commentsPage + 1 }} / {{ commentsTotalPages }}
+                  </span>
+                  <button
+                    type="button"
+                    @click="loadNextCommentsPage"
+                    :disabled="commentsLoadingMore || !hasMoreComments"
+                    :aria-busy="commentsLoadingMore"
+                    class="min-h-11 rounded-xl border border-tibet-gold/25 bg-white px-5 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-wait disabled:opacity-50 tibetan-font"
+                  >
+                    {{ commentsLoadingMore ? t('common.loading') : t('community.nextPage') }}
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -420,6 +444,7 @@ import { useI18n } from 'vue-i18n'
 import { motion } from 'motion-v'
 import { motionEase, revealInitial, revealInView, inViewOnce } from '../motion/presets'
 import api, { endpoints } from '../api'
+import { hasNextPage, mergeUniqueById, readPaginatedResponse, type PageMetadata } from '../api/endpoints'
 import type { ScenicSpotCommentItem } from '../api'
 import MobileStickyActionBar from '../components/MobileStickyActionBar.vue'
 import { useAuthStore } from '../stores/auth'
@@ -428,6 +453,7 @@ import { createTextPopupContent } from '../utils/domText'
 import { useConfirm } from '../composables/useConfirm'
 import { useToast } from '../composables/useToast'
 import { summarizeClientError } from '../utils/errorMonitoring'
+import { toIntlLocale } from '../i18n/formatting'
 import type * as Leaflet from 'leaflet'
 import { Minus, Plus } from 'lucide-vue-next'
 
@@ -770,6 +796,14 @@ const handleBooking = async () => {
 
 const user = computed(() => auth.user)
 const comments = ref<ScenicSpotCommentItem[]>([])
+const scenicSpotCommentsPageSize = 20
+const commentsPageInfo = ref<PageMetadata>({
+  page: 0,
+  size: scenicSpotCommentsPageSize,
+  totalElements: 0,
+  totalPages: 0
+})
+const commentsLoadingMore = ref(false)
 const submittingComment = ref(false)
 const commentForm = ref({
   content: '',
@@ -783,44 +817,60 @@ const uploadingCommentImage = ref(false)
 const commentsLoading = ref(false)
 const commentsError = ref('')
 const commentImageFileName = computed(() => commentImageFile.value?.name || '')
-const likedStatusBatchSize = 6
+const commentsPage = computed(() => commentsPageInfo.value.page)
+const commentsTotalPages = computed(() => commentsPageInfo.value.totalPages)
+const commentsTotalElements = computed(() => commentsPageInfo.value.totalElements)
+const hasMoreComments = computed(() => hasNextPage(commentsPageInfo.value))
 
-const hydrateCommentLikedStatuses = async (commentList: ScenicSpotCommentItem[]) => {
-  for (let index = 0; index < commentList.length; index += likedStatusBatchSize) {
-    const batch = commentList.slice(index, index + likedStatusBatchSize)
-    const results = await Promise.allSettled(
-      batch.map(async comment => {
-        const likedResponse = await api.get(endpoints.comments.liked(comment.id))
-        comment.liked = Boolean(likedResponse.data?.liked)
-      })
-    )
+const applyCommentsPage = (response: { data?: unknown; headers?: unknown }, append = false) => {
+  const page = readPaginatedResponse<ScenicSpotCommentItem>(response, {
+    page: append ? commentsPageInfo.value.page + 1 : 0,
+    size: scenicSpotCommentsPageSize
+  })
+  const pageComments = page.content.map(comment => ({
+    ...comment,
+    liked: Boolean(comment.liked)
+  }))
 
-    results.forEach((result, resultIndex) => {
-      if (result.status === 'rejected') {
-        const comment = batch[resultIndex]
-        console.error('Failed to check liked status:', summarizeClientError(result.reason))
-        comment.liked = false
-      }
-    })
+  comments.value = append ? mergeUniqueById(comments.value, pageComments) : pageComments
+  commentsPageInfo.value = {
+    page: page.page,
+    size: page.size || scenicSpotCommentsPageSize,
+    totalElements: page.totalElements,
+    totalPages: page.totalPages
   }
+}
+
+const fetchCommentsPage = async (page = 0, append = false) => {
+  const response = await api.get(endpoints.comments.list(Number(route.params.id)), {
+    params: { page, size: scenicSpotCommentsPageSize }
+  })
+  applyCommentsPage(response, append)
 }
 
 const fetchComments = async () => {
   commentsLoading.value = true
   commentsError.value = ''
   try {
-    const response = await api.get(endpoints.comments.list(Number(route.params.id)))
-    comments.value = response.data?.content || response.data || []
-    
-    // 如果用户已登录，检查每条评论的点赞状态
-    if (user.value) {
-      await hydrateCommentLikedStatuses(comments.value)
-    }
+    await fetchCommentsPage(0)
   } catch (error) {
     console.error('Failed to fetch comments:', summarizeClientError(error))
     commentsError.value = t('spotDetail.commentsLoadFailed')
   } finally {
     commentsLoading.value = false
+  }
+}
+
+const loadNextCommentsPage = async () => {
+  if (commentsLoadingMore.value || !hasMoreComments.value) return
+  commentsLoadingMore.value = true
+  try {
+    await fetchCommentsPage(commentsPageInfo.value.page + 1, true)
+  } catch (error) {
+    console.error('Failed to load more scenic spot comments:', summarizeClientError(error))
+    showToast(t('spotDetail.commentsLoadFailed'), 'error')
+  } finally {
+    commentsLoadingMore.value = false
   }
 }
 
@@ -944,6 +994,12 @@ const deleteComment = async (comment: ScenicSpotCommentItem) => {
   try {
     await api.delete(endpoints.comments.delete(comment.id))
     comments.value = comments.value.filter(item => item.id !== comment.id)
+    const totalElements = Math.max(0, commentsPageInfo.value.totalElements - 1)
+    commentsPageInfo.value = {
+      ...commentsPageInfo.value,
+      totalElements,
+      totalPages: commentsPageInfo.value.size > 0 ? Math.ceil(totalElements / commentsPageInfo.value.size) : 0
+    }
   } catch (error) {
     console.error('Failed to delete comment:', summarizeClientError(error))
     showToast(t('spotDetail.deleteCommentFailed'), 'error')
@@ -1003,7 +1059,7 @@ const getGradientClass = (spot: any) => {
 
 const formatDate = (dateStr: string) => {
   if (!dateStr) return ''
-  return new Date(dateStr).toLocaleString('zh-CN')
+  return new Date(dateStr).toLocaleString(toIntlLocale(locale.value))
 }
 
 // 监听语言变化，重新获取数据

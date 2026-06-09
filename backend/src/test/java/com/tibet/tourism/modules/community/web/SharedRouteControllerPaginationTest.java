@@ -16,8 +16,9 @@ import com.tibet.tourism.common.security.JwtAuthSupport;
 import com.tibet.tourism.modules.community.application.SharedRouteService;
 import com.tibet.tourism.modules.community.domain.RouteComment;
 import com.tibet.tourism.modules.community.domain.SharedRoute;
+import com.tibet.tourism.modules.community.web.dto.PublicUserResponse;
+import com.tibet.tourism.modules.community.web.dto.SharedRouteSummaryResponse;
 import com.tibet.tourism.modules.user.domain.User;
-import com.tibet.tourism.modules.user.infra.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -42,8 +43,6 @@ class SharedRouteControllerPaginationTest {
     @Mock
     private SharedRouteService routeService;
     @Mock
-    private UserRepository userRepository;
-    @Mock
     private JwtAuthSupport jwtAuthSupport;
     @Mock
     private HttpServletRequest request;
@@ -57,7 +56,6 @@ class SharedRouteControllerPaginationTest {
     void setUp() {
         controller = new SharedRouteController();
         ReflectionTestUtils.setField(controller, "routeService", routeService);
-        ReflectionTestUtils.setField(controller, "userRepository", userRepository);
         ReflectionTestUtils.setField(controller, "jwtAuthSupport", jwtAuthSupport);
     }
 
@@ -90,18 +88,16 @@ class SharedRouteControllerPaginationTest {
     @Test
     void myRoutesUseDefaultPageSizeAndReturnSummaryWithoutFullContent() throws Exception {
         User user = user();
-        SharedRoute route = sharedRoute(user);
         when(jwtAuthSupport.resolveCurrentUserId(request)).thenReturn(user.getId());
-        when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
-        when(routeService.getRoutesByAuthor(eq(user), any(Pageable.class))).thenAnswer(invocation -> {
+        when(routeService.getRoutesByAuthor(eq(user.getId()), any(Pageable.class))).thenAnswer(invocation -> {
             Pageable pageable = invocation.getArgument(1, Pageable.class);
-            return new PageImpl<>(List.of(route), pageable, 1);
+            return new PageImpl<>(List.of(summary(true)), pageable, 1);
         });
 
         ResponseEntity<?> response = controller.getMyRoutes(request, -1, 0);
 
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
-        verify(routeService).getRoutesByAuthor(eq(user), pageableCaptor.capture());
+        verify(routeService).getRoutesByAuthor(eq(user.getId()), pageableCaptor.capture());
         Pageable pageable = pageableCaptor.getValue();
         assertThat(pageable.getPageNumber()).isZero();
         assertThat(pageable.getPageSize()).isEqualTo(20);
@@ -124,12 +120,10 @@ class SharedRouteControllerPaginationTest {
 
     @Test
     void sharedRoutesReturnSummaryWithoutFullContent() throws Exception {
-        User user = user();
-        SharedRoute route = sharedRoute(user);
         when(jwtAuthSupport.resolveOptionalCurrentUser(request)).thenReturn(Optional.empty());
-        when(routeService.getRoutes(isNull(), isNull(), isNull(), any(Pageable.class))).thenAnswer(invocation -> {
+        when(routeService.getRoutes(isNull(), isNull(), isNull(), any(Pageable.class), isNull())).thenAnswer(invocation -> {
             Pageable pageable = invocation.getArgument(3, Pageable.class);
-            return new PageImpl<>(List.of(route), pageable, 1);
+            return new PageImpl<>(List.of(summary(false)), pageable, 1);
         });
 
         ResponseEntity<?> response = controller.getSharedRoutes(null, null, null, 0, 20, "createdAt", request);
@@ -186,21 +180,25 @@ class SharedRouteControllerPaginationTest {
         return comment;
     }
 
-    private static SharedRoute sharedRoute(User author) {
-        SharedRoute route = new SharedRoute();
-        route.setId(100L);
-        route.setAuthor(author);
-        route.setTitle("Lhasa route");
-        route.setContent("full route content that belongs on detail only");
-        route.setDays(3);
-        route.setBudget("comfort");
-        route.setPreference("natural");
-        route.setViewCount(10);
-        route.setLikeCount(2);
-        route.setCommentCount(1);
-        route.setCreatedAt(LocalDateTime.parse("2026-01-02T03:04:05"));
-        route.setUpdatedAt(LocalDateTime.parse("2026-01-03T03:04:05"));
-        return route;
+    private static SharedRouteSummaryResponse summary(boolean owner) {
+        return new SharedRouteSummaryResponse(
+                100L,
+                new PublicUserResponse("Traveler", null, owner),
+                "Lhasa route",
+                3,
+                "comfort",
+                "natural",
+                SharedRoute.SourceType.USER,
+                null,
+                null,
+                null,
+                null,
+                null,
+                10,
+                2,
+                1,
+                LocalDateTime.parse("2026-01-02T03:04:05"),
+                LocalDateTime.parse("2026-01-03T03:04:05"));
     }
 
     private static User user() {

@@ -7,6 +7,7 @@ public record TravelQuestionSummaryResponse(
         Long id,
         PublicUserResponse author,
         String title,
+        String excerpt,
         String tags,
         Integer viewCount,
         Integer answerCount,
@@ -27,6 +28,7 @@ public record TravelQuestionSummaryResponse(
                 question.getId(),
                 PublicUserResponse.fromEntity(question.getAuthor(), currentUserId),
                 question.getTitle(),
+                excerpt(question.getContent()),
                 question.getTags(),
                 question.getViewCount(),
                 question.getAnswerCount(),
@@ -34,5 +36,16 @@ public record TravelQuestionSummaryResponse(
                 question.getIsResolved(),
                 question.getCreatedAt(),
                 question.getUpdatedAt());
+    }
+
+    private static String excerpt(String content) {
+        if (content == null) {
+            return null;
+        }
+        String normalized = content.replaceAll("\\s+", " ").trim();
+        if (normalized.length() <= 160) {
+            return normalized;
+        }
+        return normalized.substring(0, 157) + "...";
     }
 }

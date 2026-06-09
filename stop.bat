@@ -39,11 +39,6 @@ if not exist "%PROJECT_DIR%\docker-compose.yml" (
     exit /b 1
 )
 
-call :select_wsl_distro || (
-    call :wait_before_exit
-    exit /b 1
-)
-
 call :convert_project_path || (
     call :wait_before_exit
     exit /b 1
@@ -54,17 +49,31 @@ call :quote_wsl_project_path || (
     exit /b 1
 )
 
+if "%DRY_RUN%"=="1" (
+    if defined COLORFUL_TIBET_WSL_DISTRO (
+        set "WSL_DISTRO=!COLORFUL_TIBET_WSL_DISTRO!"
+    ) else (
+        set "WSL_DISTRO=!PREFERRED_WSL_DISTRO!"
+    )
+    echo Project directory: !PROJECT_DIR!
+    echo WSL distribution: !WSL_DISTRO! ^(not started during dry run^)
+    echo WSL project path: !WSL_PROJECT_DIR!
+    echo.
+    echo Dry run only. Command that would be executed:
+    echo wsl.exe -d "!WSL_DISTRO!" --user root -- bash -lc "cd !WSL_PROJECT_DIR_BASH! && docker compose -f docker-compose.yml down"
+    call :wait_before_exit
+    exit /b 0
+)
+
+call :select_wsl_distro || (
+    call :wait_before_exit
+    exit /b 1
+)
+
 echo Project directory: %PROJECT_DIR%
 echo WSL distribution: %WSL_DISTRO%
 echo WSL project path: %WSL_PROJECT_DIR%
 echo.
-
-if "%DRY_RUN%"=="1" (
-    echo Dry run only. Command that would be executed:
-    echo wsl.exe -d "%WSL_DISTRO%" --user root -- bash -lc "cd %WSL_PROJECT_DIR_BASH% && docker compose -f docker-compose.yml down"
-    call :wait_before_exit
-    exit /b 0
-)
 
 echo Stopping Docker Compose services...
 wsl.exe -d "%WSL_DISTRO%" --user root -- bash -lc "cd %WSL_PROJECT_DIR_BASH% && docker compose -f docker-compose.yml down"

@@ -237,7 +237,7 @@
             <div v-if="showPopularSpots" id="admin-popular-spots-content" class="divide-y divide-stone-100">
               <div v-for="(spot, index) in sortedPopularSpots" :key="spot.id" class="px-6 py-4 flex items-center hover:bg-stone-50 transition-colors">
                 <span class="text-lg font-bold text-stone-300 w-8">{{ index + 1 }}</span>
-                <img :src="spot.imageUrl" class="w-10 h-10 rounded-lg object-cover mr-4" alt="">
+                <img :src="spot.imageUrl || ''" class="w-10 h-10 rounded-lg object-cover mr-4" alt="">
                 <div class="flex-1 min-w-0">
                   <p class="text-sm font-medium text-stone-800 truncate">{{ spot.name }}</p>
                   <p class="text-xs text-stone-500 mb-2">{{ spot.location }}</p>
@@ -352,7 +352,7 @@
                    @keydown.space="activateKeyboardPanel($event, () => openEditModal(spot))">
                 <!-- Thumbnail -->
                 <div class="relative h-40 overflow-hidden bg-stone-100">
-                  <img v-if="spot.imageUrl" :src="spot.imageUrl" :alt="spot.name"
+                  <img v-if="spot.imageUrl" :src="textOrEmpty(spot.imageUrl)" :alt="textOrEmpty(spot.name)"
                        class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                        @error="($event.target as HTMLImageElement).style.display='none'" />
                   <div v-if="!spot.imageUrl" class="w-full h-full flex items-center justify-center bg-gradient-to-br from-emerald-400 to-teal-600">
@@ -388,7 +388,7 @@
                       <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>
                       {{ spot.city }}
                     </span>
-                    <span v-if="spot.visitCount > 0">· 👁 {{ spot.visitCount }}</span>
+                    <span v-if="(spot.visitCount || 0) > 0">· 👁 {{ spot.visitCount }}</span>
                   </div>
                   <p v-if="spot.description" class="text-xs text-stone-500 line-clamp-2 leading-relaxed">{{ spot.description }}</p>
                   <div class="mt-3 pt-3 border-t border-stone-100 flex items-center justify-between">
@@ -564,7 +564,7 @@
             <div v-for="news in newsList" :key="news.id" class="px-4 py-4 transition-colors hover:bg-stone-50 sm:px-6">
               <div class="flex flex-col gap-4 sm:flex-row sm:items-start">
                 <div class="h-40 w-full flex-shrink-0 overflow-hidden rounded-lg bg-gray-200 sm:h-24 sm:w-24">
-                  <img v-if="news.imageUrl" :src="news.imageUrl" :alt="news.title" class="w-full h-full object-cover">
+                  <img v-if="news.imageUrl" :src="textOrEmpty(news.imageUrl)" :alt="textOrEmpty(news.title)" class="w-full h-full object-cover">
                   <div v-else class="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-500 to-purple-600 text-white text-2xl font-bold">
                     {{ news.title?.charAt(0) || 'N' }}
                   </div>
@@ -630,7 +630,7 @@
           <div v-if="showCarousels" id="admin-carousels-content" class="p-6">
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <div v-for="c in carousels" :key="c.id" class="border rounded-lg overflow-hidden">
-                <img :src="c.imageUrl" class="w-full h-32 object-cover">
+                <img :src="textOrEmpty(c.imageUrl)" class="w-full h-32 object-cover">
                 <div class="p-3">
                   <h4 class="font-bold text-sm">{{ c.title }}</h4>
                   <p class="text-xs text-stone-500">{{ c.subtitle }}</p>
@@ -769,7 +769,7 @@
               >
                 <!-- Thumbnail -->
                 <div class="w-24 h-24 shrink-0 rounded-lg overflow-hidden bg-stone-100">
-                  <img v-if="h.imageUrl && !failedHotelImages[h.id]" :src="h.imageUrl" :alt="h.name"
+                  <img v-if="h.imageUrl && !failedHotelImages[h.id]" :src="textOrEmpty(h.imageUrl)" :alt="textOrEmpty(h.name)"
                        class="w-full h-full object-cover"
                        @error="failedHotelImages[h.id] = true" />
                   <div v-if="!h.imageUrl || failedHotelImages[h.id]" class="w-full h-full flex items-center justify-center text-stone-300">
@@ -1038,7 +1038,7 @@
         <div class="mb-6">
           <label class="block text-sm font-medium text-stone-700 mb-2">{{ t('admin.currentCover') }}</label>
           <div class="relative h-44 bg-gray-200 rounded-lg overflow-hidden mb-4 sm:h-64">
-            <img v-if="editingSpot.imageUrl" :src="editingSpot.imageUrl" :alt="editingSpot.name" class="w-full h-full object-cover">
+            <img v-if="editingSpot.imageUrl" :src="textOrEmpty(editingSpot.imageUrl)" :alt="textOrEmpty(editingSpot.name)" class="w-full h-full object-cover">
             <div v-else class="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-500 to-purple-600 text-white text-6xl font-bold">
               {{ editingSpot.name?.charAt(0) }}
             </div>
@@ -1091,6 +1091,7 @@
 
 <script setup lang="ts">
 import { defineAsyncComponent, ref, computed, onMounted, onUnmounted } from 'vue'
+import { isAxiosError } from 'axios'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import AdminCommunityPanel from '../components/AdminCommunityPanel.vue'
@@ -1108,9 +1109,9 @@ interface Stats {
   userCount: number
   orderCount: number
   totalRevenue: number
-  recentBookings: any[]
-  recentHotelBookings: any[]
-  popularSpots: any[]
+  recentBookings: AdminRecentOrder[]
+  recentHotelBookings: AdminRecentOrder[]
+  popularSpots: AdminSpot[]
   spotCount?: number
   newsCount?: number
   monthlyBookingTrend?: Array<{ month: string; orderCount: number; revenue: number }>
@@ -1119,6 +1120,22 @@ interface Stats {
   spotCategories?: Array<{ name: string; value: number }>
   visitorCityDistribution?: Array<{ name: string; value: number }>
   updatedAt?: string
+}
+
+interface AdminRecentOrder {
+  id: number | string
+  spot?: {
+    id?: number
+    name?: string | null
+  } | null
+  hotel?: {
+    id?: number
+    name?: string | null
+  } | null
+  totalPrice?: number | string | null
+  status: string
+  createdAt?: string | null
+  _type?: 'scenic' | 'hotel'
 }
 
 interface HotelOrder {
@@ -1143,6 +1160,103 @@ interface HotelOrder {
   createdAt?: string | null
 }
 
+interface AdminSpot {
+  id: number
+  name?: string | null
+  city?: string | null
+  location?: string | null
+  imageUrl?: string | null
+  ticketPrice?: number | string | null
+  visitCount?: number | null
+  description?: string | null
+}
+
+interface AdminNewsItem {
+  id: number
+  title?: string | null
+  content?: string | null
+  category?: string | null
+  imageUrl?: string | null
+  viewCount?: number | null
+  createdAt?: string | null
+}
+
+interface AdminCarouselItem {
+  id: number
+  title?: string | null
+  subtitle?: string | null
+  tag?: string | null
+  imageUrl?: string | null
+  linkUrl?: string | null
+  sortOrder?: number | null
+  active?: boolean | null
+}
+
+interface AdminRouteItem {
+  id: number
+  title?: string | null
+  name?: string | null
+  sourceType?: string | null
+  author?: {
+    username?: string | null
+    nickname?: string | null
+  } | null
+  days?: number | string | null
+  budget?: string | null
+  preference?: string | null
+  price?: number | string | null
+  difficulty?: string | null
+  content?: string | null
+  description?: string | null
+  temperature?: string | null
+  geography?: string | null
+  viewCount?: number | null
+  likeCount?: number | null
+  commentCount?: number | null
+}
+
+interface AdminHotelItem {
+  id: number
+  name?: string | null
+  location?: string | null
+  phone?: string | null
+  priceRange?: string | null
+  rating?: number | string | null
+  imageUrl?: string | null
+  facilities?: string | null
+}
+
+interface AdminRoomType {
+  id: number
+  name?: string | null
+  price?: number | string | null
+  capacity?: number | string | null
+  amenities?: string | null
+}
+
+interface PriceBatchJob {
+  jobId?: string | null
+  status?: 'RUNNING' | 'COMPLETED' | 'FAILED' | string
+  total?: number | null
+  processed?: number | null
+  success?: number | null
+  failed?: number | null
+  skipped?: number | null
+  currentSpot?: string | null
+  errorMessage?: string | null
+}
+
+interface SpotPriceFetchResponse {
+  success?: boolean
+  priceInfo?: {
+    basePrice?: number | string | null
+    peakSeasonPrice?: number | string | null
+  } | null
+}
+
+type SpotUpdatePayload = Partial<Pick<AdminSpot, 'imageUrl' | 'description' | 'ticketPrice'>>
+type NewsPayload = Pick<Required<AdminNewsItem>, 'title' | 'content' | 'category'> & Pick<AdminNewsItem, 'imageUrl' | 'viewCount'>
+
 const { t, locale, te } = useI18n()
 const router = useRouter()
 const auth = useAuthStore()
@@ -1152,6 +1266,19 @@ const AdminAnalyticsPanel = defineAsyncComponent(() => import('../components/Adm
 
 const confirmDanger = (message: string) => showConfirm({ message, tone: 'danger' })
 const apiErrorMessage = (error: unknown, fallback: string) => safeClientErrorMessage(error, fallback)
+const apiErrorStatus = (error: unknown) => isAxiosError(error) ? error.response?.status : undefined
+const isNetworkClientError = (error: unknown) => isAxiosError(error) && Boolean(error.request)
+const textOrEmpty = (value?: string | null) => value ?? ''
+const numberOrNull = (value: unknown) => {
+  if (value === null || value === undefined || value === '') return null
+  const numericValue = Number(value)
+  return Number.isFinite(numericValue) ? numericValue : null
+}
+const numberOrDefault = (value: unknown, fallback: number) => numberOrNull(value) ?? fallback
+const reportAdminListLoadFailure = (resource: string, error: unknown) => {
+  console.error(`Failed to fetch ${resource}:`, summarizeClientError(error))
+  showToast(apiErrorMessage(error, '列表加载失败，请稍后重试'), 'error')
+}
 const activateKeyboardPanel = (event: KeyboardEvent, action: () => void | Promise<void>) => {
   if (event.target !== event.currentTarget) return
   event.preventDefault()
@@ -1178,9 +1305,9 @@ const fetchSecurityPosture = async () => {
   loadingSecurityPosture.value = true
   securityPostureError.value = ''
   try {
-    const response = await api.get(endpoints.admin.securityPosture)
+    const response = await api.get<SecurityPostureResponse>(endpoints.admin.securityPosture)
     securityPosture.value = response.data
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to fetch security posture:', summarizeClientError(error))
     securityPostureError.value = safeClientErrorMessage(error, t('admin.securityPosture.loadFailed'))
   } finally {
@@ -1202,12 +1329,12 @@ const fetchStats = async () => {
     }
 
     analyticsError.value = ''
-    const response = await api.get(endpoints.admin.stats)
+    const response = await api.get<Stats>(endpoints.admin.stats)
     stats.value = response.data
     analyticsData.value = response.data
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to fetch admin stats:', summarizeClientError(error))
-    const status = error.response?.status
+    const status = apiErrorStatus(error)
     if (status === 401) {
       auth.logout()
       clearTokenCache()
@@ -1227,12 +1354,12 @@ const fetchStats = async () => {
 
 const activeDateLocale = computed(() => locale.value === 'bo' ? 'bo-CN' : 'zh-CN')
 
-const formatDate = (dateStr: string) => {
+const formatDate = (dateStr?: string | null) => {
   if (!dateStr) return '-'
   return new Date(dateStr).toLocaleDateString(activeDateLocale.value)
 }
 
-const formatDateTime = (dateStr: string) => {
+const formatDateTime = (dateStr?: string | null) => {
   if (!dateStr) return '-'
   const date = new Date(dateStr)
   return date.toLocaleString(activeDateLocale.value, {
@@ -1318,37 +1445,38 @@ const formatHotelOrderCurrency = (value: unknown) => {
   return t('common.priceCny', { price })
 }
 
-const routeSourceLabel = (route: any) => {
+const routeSourceLabel = (route: AdminRouteItem) => {
   return route?.sourceType === 'OFFICIAL' ? t('admin.officialRoute') : t('admin.userSharedRoute')
 }
 
-const routeAuthorLabel = (route: any) => {
+const routeAuthorLabel = (route: AdminRouteItem) => {
   if (route?.sourceType === 'OFFICIAL' && !route?.author?.username) {
     return t('admin.officialAuthor')
   }
   return route?.author?.nickname || route?.author?.username || t('common.unknown')
 }
 
-const routePreview = (route: any) => {
+const routePreview = (route: AdminRouteItem) => {
   const content = route?.content || route?.description || ''
   const normalized = content.replace(/\s+/g, ' ').trim()
   return normalized.length > 90 ? `${normalized.slice(0, 90)}...` : (normalized || '-')
 }
 
-const routePriceLabel = (route: any) => {
+const routePriceLabel = (route: AdminRouteItem) => {
   if (route?.price === null || route?.price === undefined || route?.price === '') {
     return '-'
   }
   return `¥${route.price}`
 }
 
-const routeDifficultyLabel = (difficulty: string) => {
+const routeDifficultyLabel = (difficulty?: string | null) => {
   const labels: Record<string, string> = {
     EASY: t('admin.easy'),
     MEDIUM: t('admin.medium'),
     HARD: t('admin.hard')
   }
-  return labels[difficulty] || difficulty || '-'
+  if (!difficulty) return '-'
+  return labels[difficulty] || difficulty
 }
 
 const getRoleLabel = (role: string) => {
@@ -1357,10 +1485,10 @@ const getRoleLabel = (role: string) => {
 
 // 合并景点门票订单和酒店预订，按时间倒序
 const recentOrders = computed(() => {
-  const scenic = (stats.value.recentBookings || []).map((b: any) => ({ ...b, _type: 'scenic' }))
-  const hotel = (stats.value.recentHotelBookings || []).map((h: any) => ({ ...h, _type: 'hotel' }))
+  const scenic = (stats.value.recentBookings || []).map((booking): AdminRecentOrder => ({ ...booking, _type: 'scenic' }))
+  const hotel = (stats.value.recentHotelBookings || []).map((booking): AdminRecentOrder => ({ ...booking, _type: 'hotel' }))
   return [...scenic, ...hotel]
-    .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .sort((a, b) => new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime())
     .slice(0, 10)
 })
 
@@ -1369,7 +1497,7 @@ const sortedPopularSpots = computed(() => {
   if (!stats.value.popularSpots || stats.value.popularSpots.length === 0) {
     return []
   }
-  return [...stats.value.popularSpots].sort((a: any, b: any) => {
+  return [...stats.value.popularSpots].sort((a, b) => {
     const countA = a.visitCount || 0
     const countB = b.visitCount || 0
     return countB - countA // 降序排序
@@ -1377,27 +1505,27 @@ const sortedPopularSpots = computed(() => {
 })
 
 // 计算点击量百分比（相对于最高点击量）
-const getClickCountPercentage = (spot: any) => {
+const getClickCountPercentage = (spot: AdminSpot) => {
   if (!sortedPopularSpots.value || sortedPopularSpots.value.length === 0) {
     return 0
   }
-  const maxCount = Math.max(...sortedPopularSpots.value.map((s: any) => s.visitCount || 0))
+  const maxCount = Math.max(...sortedPopularSpots.value.map((s) => s.visitCount || 0))
   if (maxCount === 0) return 0
   const currentCount = spot.visitCount || 0
   return Math.round((currentCount / maxCount) * 100)
 }
 
 const users = ref<AdminUserSummary[]>([])
-const spots = ref<any[]>([])
+const spots = ref<AdminSpot[]>([])
 const loadingSpots = ref(false)
 const fetchingPriceId = ref<number | null>(null)
 const batchFetching = ref(false)
-const priceBatchJob = ref<any | null>(null)
+const priceBatchJob = ref<PriceBatchJob | null>(null)
 const spotsError = ref('')
 const showSpots = ref(false)
 const showAllSpots = ref(false)
 const showEditModal = ref(false)
-const editingSpot = ref<any>({})
+const editingSpot = ref<Partial<AdminSpot>>({})
 const newImageUrl = ref('')
 const newDescription = ref('')
 const newTicketPrice = ref<number | null>(null)
@@ -1405,11 +1533,11 @@ const updating = ref(false)
 const originalBodyOverflow = ref<string | null>(null)
 
 // News management
-const newsList = ref<any[]>([])
+const newsList = ref<AdminNewsItem[]>([])
 const loadingNews = ref(false)
 const showAllNews = ref(false) // 默认折叠
 const showNewsModal = ref(false)
-const editingNews = ref<any>({})
+const editingNews = ref<Partial<AdminNewsItem>>({})
 const newsForm = ref({
   title: '',
   content: '',
@@ -1437,8 +1565,9 @@ const displayedSpots = computed(() => {
 const priceBatchProgressPercent = computed(() => {
   const job = priceBatchJob.value
   if (!job) return 0
-  if (job.total <= 0) return job.status === 'COMPLETED' ? 100 : 0
-  return Math.min(100, Math.round(((job.processed || 0) / job.total) * 100))
+  const total = job.total || 0
+  if (total <= 0) return job.status === 'COMPLETED' ? 100 : 0
+  return Math.min(100, Math.round(((job.processed || 0) / total) * 100))
 })
 
 const priceBatchStatusText = computed(() => {
@@ -1451,23 +1580,19 @@ const priceBatchStatusText = computed(() => {
 })
 
 const adminPageParams = { page: 0, size: 100 }
-const toList = (value: any) => {
-  if (Array.isArray(value)) return value
-  if (Array.isArray(value?.content)) return value.content
+const toList = <T>(value: unknown): T[] => {
+  if (Array.isArray(value)) return value as T[]
+  if (value && typeof value === 'object' && Array.isArray((value as { content?: unknown }).content)) {
+    return (value as { content: T[] }).content
+  }
   return []
 }
 
 const fetchUsers = async () => {
   try {
-    const response = await api.get(endpoints.admin.users, { params: adminPageParams })
-    const userData = toList(response.data)
-    if (Array.isArray(userData)) {
-      users.value = userData as AdminUserSummary[]
-    } else {
-      console.error('Unexpected users response shape')
-      users.value = []
-    }
-  } catch (error: any) {
+    const response = await api.get<unknown>(endpoints.admin.users, { params: adminPageParams })
+    users.value = toList<AdminUserSummary>(response.data)
+  } catch (error: unknown) {
     console.error('Failed to fetch users:', summarizeClientError(error))
     users.value = []
   }
@@ -1477,28 +1602,22 @@ const fetchSpots = async () => {
   loadingSpots.value = true
   spotsError.value = ''
   try {
-    const response = await api.get(endpoints.admin.spots, { params: adminPageParams })
+    const response = await api.get<unknown>(endpoints.admin.spots, { params: adminPageParams })
     
-    const spotsData = toList(response.data)
-    if (Array.isArray(spotsData)) {
-      spots.value = spotsData
-    } else {
-      console.error('Unexpected spots response shape')
-      spotsError.value = t('admin.malformedResponse', { type: typeof response.data })
-      spots.value = []
-    }
-  } catch (error: any) {
+    spots.value = toList<AdminSpot>(response.data)
+  } catch (error: unknown) {
     console.error('Failed to fetch spots:', summarizeClientError(error))
     
-    if (error.response) {
-      if (error.response.status === 401) {
+    const status = apiErrorStatus(error)
+    if (status) {
+      if (status === 401) {
         spotsError.value = t('admin.unauthorizedAdmin')
-      } else if (error.response.status === 403) {
+      } else if (status === 403) {
         spotsError.value = t('admin.forbiddenAdmin')
       } else {
-        spotsError.value = safeClientErrorMessage(error, t('admin.serverError', { status: error.response.status }))
+        spotsError.value = safeClientErrorMessage(error, t('admin.serverError', { status }))
       }
-    } else if (error.request) {
+    } else if (isNetworkClientError(error)) {
       spotsError.value = t('admin.connectionFailed')
     } else {
       spotsError.value = safeClientErrorMessage(error, t('admin.unknownError'))
@@ -1509,11 +1628,11 @@ const fetchSpots = async () => {
   }
 }
 
-const openEditModal = (spot: any) => {
+const openEditModal = (spot: AdminSpot) => {
   editingSpot.value = { ...spot }
   newImageUrl.value = spot.imageUrl || ''
   newDescription.value = spot.description || ''
-  newTicketPrice.value = spot.ticketPrice ?? null
+  newTicketPrice.value = numberOrNull(spot.ticketPrice)
   showEditModal.value = true
 
   // 锁定主页面滚动
@@ -1542,7 +1661,7 @@ const closeEditModal = () => {
 const updateSpotImage = async () => {
   updating.value = true
   try {
-    const payload: any = {}
+    const payload: SpotUpdatePayload = {}
     if (newImageUrl.value) payload.imageUrl = newImageUrl.value
     if (newDescription.value) payload.description = newDescription.value
     if (newTicketPrice.value !== null && !Number.isNaN(newTicketPrice.value)) {
@@ -1554,8 +1673,15 @@ const updateSpotImage = async () => {
       updating.value = false
       return
     }
+
+    const spotId = editingSpot.value.id
+    if (spotId == null) {
+      showToast(t('admin.updateFailed'), 'error')
+      updating.value = false
+      return
+    }
     
-    await api.put(endpoints.admin.updateSpot(editingSpot.value.id), payload)
+    await api.put(endpoints.admin.updateSpot(spotId), payload)
     showToast(t('admin.spotUpdateSuccess'), 'success')
     await fetchSpots()
     closeEditModal()
@@ -1568,10 +1694,10 @@ const updateSpotImage = async () => {
 }
 
 // 单独抓取某个景点价格
-const fetchSpotPrice = async (spot: any) => {
+const fetchSpotPrice = async (spot: AdminSpot) => {
   fetchingPriceId.value = spot.id
   try {
-    const response = await api.get(endpoints.prices.fetch(spot.id))
+    const response = await api.get<SpotPriceFetchResponse>(endpoints.prices.fetch(spot.id))
     const data = response.data
     if (data.success && data.priceInfo) {
       showToast(t('admin.priceFetched', { name: spot.name, price: data.priceInfo.basePrice || data.priceInfo.peakSeasonPrice || 'N/A' }), 'success')
@@ -1579,7 +1705,7 @@ const fetchSpotPrice = async (spot: any) => {
     } else {
       showToast(t('admin.priceFetchFailed', { name: spot.name }), 'error')
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to fetch price:', summarizeClientError(error))
     showToast(t('admin.priceFetchFailed', { name: spot.name }), 'error')
   } finally {
@@ -1593,13 +1719,18 @@ const batchFetchPrices = async () => {
   batchFetching.value = true
   priceBatchJob.value = null
   try {
-    const response = await api.post(endpoints.prices.batchUpdateJob + '?force=true')
-    priceBatchJob.value = response.data
+    const response: { data: PriceBatchJob } = await api.post<PriceBatchJob>(endpoints.prices.batchUpdateJob + '?force=true')
+    let currentJob: PriceBatchJob | null = response.data
+    priceBatchJob.value = currentJob
 
-    while (priceBatchJob.value?.jobId && priceBatchJob.value.status === 'RUNNING') {
+    while (currentJob?.jobId && currentJob.status === 'RUNNING') {
       await new Promise(resolve => window.setTimeout(resolve, 1200))
-      const statusResponse = await api.get(endpoints.prices.batchUpdateJobStatus(priceBatchJob.value.jobId))
-      priceBatchJob.value = statusResponse.data
+      const jobId: string = currentJob.jobId
+      const statusResponse: { data: PriceBatchJob } = await api.get<PriceBatchJob>(
+        endpoints.prices.batchUpdateJobStatus(jobId)
+      )
+      currentJob = statusResponse.data
+      priceBatchJob.value = currentJob
     }
 
     if (priceBatchJob.value?.status === 'FAILED') {
@@ -1611,7 +1742,7 @@ const batchFetchPrices = async () => {
       failed: priceBatchJob.value?.failed || 0
     }), 'success')
     await fetchSpots()
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to batch fetch prices:', summarizeClientError(error))
     showToast(t('admin.batchFetchFailed'), 'error')
   } finally {
@@ -1639,7 +1770,7 @@ const deleteUser = async (user: AdminUserSummary) => {
     await api.delete(endpoints.admin.deleteUser(user.id))
     showToast(t('admin.userDeleted', { name: user.username }), 'success')
     await fetchUsers()
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to delete user:', summarizeClientError(error))
     showToast(apiErrorMessage(error, t('admin.deleteFailed')), 'error')
   }
@@ -1652,7 +1783,7 @@ const unlockUser = async (user: AdminUserSummary) => {
     await api.post(endpoints.admin.unlockUser(user.id))
     showToast(t('admin.unlockSuccess', { name: user.username }), 'success')
     await fetchUsers()
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to unlock user:', summarizeClientError(error))
     showToast(apiErrorMessage(error, t('admin.operationFailed')), 'error')
   }
@@ -1669,9 +1800,9 @@ const showUsers = ref(false)
 const fetchHotelOrders = async () => {
   loadingHotelOrders.value = true
   try {
-    const response = await api.get(endpoints.hotelBookings.all, { params: adminPageParams })
-    hotelOrders.value = toList(response.data) as HotelOrder[]
-  } catch (error: any) {
+    const response = await api.get<unknown>(endpoints.hotelBookings.all, { params: adminPageParams })
+    hotelOrders.value = toList<HotelOrder>(response.data)
+  } catch (error: unknown) {
     console.error('Failed to fetch hotel orders:', summarizeClientError(error))
     hotelOrders.value = []
   } finally {
@@ -1720,28 +1851,23 @@ const fetchNews = async () => {
       return
     }
     
-    const response = await api.get(endpoints.admin.news, { params: adminPageParams })
+    const response = await api.get<unknown>(endpoints.admin.news, { params: adminPageParams })
     
-    const newsData = toList(response.data)
-    if (Array.isArray(newsData)) {
-      newsList.value = newsData
-    } else {
-      console.error('Unexpected news response shape')
-      newsList.value = []
-    }
-  } catch (error: any) {
+    newsList.value = toList<AdminNewsItem>(response.data)
+  } catch (error: unknown) {
     console.error('Failed to fetch news:', summarizeClientError(error))
     
-    if (error.response) {
-      if (error.response.status === 401) {
+    const status = apiErrorStatus(error)
+    if (status) {
+      if (status === 401) {
         showToast(t('admin.unauthorizedAdmin'), 'warning')
-      } else if (error.response.status === 403) {
+      } else if (status === 403) {
         showToast(t('admin.forbiddenAdmin'), 'warning')
       } else {
-        const errorMsg = safeClientErrorMessage(error, t('admin.serverError', { status: error.response.status }))
+        const errorMsg = safeClientErrorMessage(error, t('admin.serverError', { status }))
         showToast(t('admin.fetchNewsFailed', { message: errorMsg }), 'error')
       }
-    } else if (error.request) {
+    } else if (isNetworkClientError(error)) {
       showToast(t('admin.connectionFailed'), 'error')
     } else {
       showToast(t('admin.fetchNewsFailed', { message: safeClientErrorMessage(error, t('admin.unknownError')) }), 'error')
@@ -1770,7 +1896,7 @@ const openCreateNewsModal = () => {
   }
 }
 
-const openEditNewsModal = (news: any) => {
+const openEditNewsModal = (news: AdminNewsItem) => {
   editingNews.value = { ...news }
   newsForm.value = {
     title: news.title || '',
@@ -1812,7 +1938,7 @@ const saveNews = async () => {
 
   updatingNews.value = true
   try {
-    const payload: any = {
+    const payload: NewsPayload = {
       title: newsForm.value.title,
       content: newsForm.value.content,
       category: newsForm.value.category
@@ -1858,22 +1984,23 @@ const deleteNewsItem = async (id: number) => {
   }
 }
 
-const getCategoryLabel = (category: string) => {
+const getCategoryLabel = (category?: string | null) => {
   const labels: Record<string, string> = {
     POLICY: t('admin.categoryPolicy'),
     EVENT: t('admin.categoryEvent'),
     NOTICE: t('admin.categoryNotice')
   }
+  if (!category) return ''
   return labels[category] || category
 }
 
-const getCategoryClass = (category: string) => {
+const getCategoryClass = (category?: string | null) => {
   const classes: Record<string, string> = {
     POLICY: 'bg-blue-100 text-blue-800',
     EVENT: 'bg-green-100 text-green-800',
     NOTICE: 'bg-yellow-100 text-yellow-800'
   }
-  return classes[category] || 'bg-gray-100 text-gray-800'
+  return category ? classes[category] || 'bg-gray-100 text-gray-800' : 'bg-gray-100 text-gray-800'
 }
 
 // The backend owns admin account action policy; the UI only renders it.
@@ -1881,17 +2008,20 @@ const canChangeUserRole = (user: AdminUserSummary) => Boolean(user.roleMutable) 
 const canDeleteUser = (user: AdminUserSummary) => Boolean(user.deletable)
 
 // Carousel management
-const carousels = ref<any[]>([])
+const carousels = ref<AdminCarouselItem[]>([])
 const showCarousels = ref(false)
 const showCarouselModal = ref(false)
-const editingCarousel = ref<any>({})
+const editingCarousel = ref<Partial<AdminCarouselItem>>({})
 const carouselForm = ref({ title: '', subtitle: '', tag: '', imageUrl: '', linkUrl: '', sortOrder: 0, active: true })
 
 const fetchCarousels = async () => {
   try {
-    const res = await api.get(endpoints.carousels.adminList)
-    carousels.value = Array.isArray(res.data) ? res.data : []
-  } catch (e) { carousels.value = [] }
+    const res = await api.get<unknown>(endpoints.carousels.adminList)
+    carousels.value = toList<AdminCarouselItem>(res.data)
+  } catch (e) {
+    carousels.value = []
+    reportAdminListLoadFailure('admin carousels', e)
+  }
 }
 
 const openCreateCarouselModal = () => {
@@ -1900,7 +2030,7 @@ const openCreateCarouselModal = () => {
   showCarouselModal.value = true
 }
 
-const openEditCarouselModal = (c: any) => {
+const openEditCarouselModal = (c: AdminCarouselItem) => {
   editingCarousel.value = { ...c }
   carouselForm.value = { title: c.title || '', subtitle: c.subtitle || '', tag: c.tag || '', imageUrl: c.imageUrl || '', linkUrl: c.linkUrl || '', sortOrder: c.sortOrder || 0, active: c.active !== false }
   showCarouselModal.value = true
@@ -1931,10 +2061,10 @@ const deleteCarousel = async (id: number) => {
 }
 
 // Route management
-const adminRoutes = ref<any[]>([])
+const adminRoutes = ref<AdminRouteItem[]>([])
 const showRoutes = ref(false)
 const showRouteModal = ref(false)
-const editingRoute = ref<any>({})
+const editingRoute = ref<Partial<AdminRouteItem>>({})
 const routeForm = ref({
   title: '',
   days: 1,
@@ -1962,9 +2092,12 @@ const adminPreferenceOptions = computed(() => [
 
 const fetchAdminRoutes = async () => {
   try {
-    const res = await api.get(endpoints.adminRoutes.list, { params: adminPageParams })
-    adminRoutes.value = toList(res.data)
-  } catch (e) { adminRoutes.value = [] }
+    const res = await api.get<unknown>(endpoints.adminRoutes.list, { params: adminPageParams })
+    adminRoutes.value = toList<AdminRouteItem>(res.data)
+  } catch (e) {
+    adminRoutes.value = []
+    reportAdminListLoadFailure('admin routes', e)
+  }
 }
 
 const openCreateRouteModal = () => {
@@ -1983,14 +2116,14 @@ const openCreateRouteModal = () => {
   showRouteModal.value = true
 }
 
-const openEditRouteModal = (r: any) => {
+const openEditRouteModal = (r: AdminRouteItem) => {
   editingRoute.value = { ...r }
   routeForm.value = {
     title: r.title || r.name || '',
-    days: r.days || 1,
+    days: numberOrDefault(r.days, 1),
     budget: r.budget || '',
     preference: r.preference || '',
-    price: r.price ?? null,
+    price: numberOrNull(r.price),
     difficulty: r.difficulty || '',
     content: r.content || r.description || '',
     temperature: r.temperature || '',
@@ -2034,19 +2167,23 @@ const deleteRoute = async (id: number) => {
 }
 
 // Hotel management
-const adminHotels = ref<any[]>([])
+const adminHotels = ref<AdminHotelItem[]>([])
 const showHotels = ref(false)
 const showHotelModal = ref(false)
-const editingHotel = ref<any>({})
+const editingHotel = ref<Partial<AdminHotelItem>>({})
 const hotelForm = ref({ name: '', location: '', phone: '', priceRange: '', rating: 0, imageUrl: '', facilities: '' })
 const failedHotelImages = ref<Record<number, boolean>>({})
 
 const fetchAdminHotels = async () => {
   try {
-    const res = await api.get(endpoints.adminHotels.list, { params: adminPageParams })
-    adminHotels.value = toList(res.data)
+    const res = await api.get<unknown>(endpoints.adminHotels.list, { params: adminPageParams })
+    adminHotels.value = toList<AdminHotelItem>(res.data)
     failedHotelImages.value = {}
-  } catch (e) { adminHotels.value = [] }
+  } catch (e) {
+    adminHotels.value = []
+    failedHotelImages.value = {}
+    reportAdminListLoadFailure('admin hotels', e)
+  }
 }
 
 const openCreateHotelModal = () => {
@@ -2055,9 +2192,9 @@ const openCreateHotelModal = () => {
   showHotelModal.value = true
 }
 
-const openEditHotelModal = (h: any) => {
+const openEditHotelModal = (h: AdminHotelItem) => {
   editingHotel.value = { ...h }
-  hotelForm.value = { name: h.name || '', location: h.location || '', phone: h.phone || '', priceRange: h.priceRange || '', rating: h.rating || 0, imageUrl: h.imageUrl || '', facilities: h.facilities || '' }
+  hotelForm.value = { name: h.name || '', location: h.location || '', phone: h.phone || '', priceRange: h.priceRange || '', rating: numberOrDefault(h.rating, 0), imageUrl: h.imageUrl || '', facilities: h.facilities || '' }
   showHotelModal.value = true
 }
 
@@ -2087,11 +2224,11 @@ const deleteHotel = async (id: number) => {
 
 // Room type management (inline in expanded cards)
 const expandedHotelId = ref<number | null>(null)
-const expandedRoomTypes = ref<any[]>([])
+const expandedRoomTypes = ref<AdminRoomType[]>([])
 const loadingRoomTypes = ref(false)
 const roomTypeForm = ref({ name: '', price: 0, capacity: 2, amenities: '' })
 
-const toggleHotelExpand = async (hotel: any) => {
+const toggleHotelExpand = async (hotel: AdminHotelItem) => {
   if (expandedHotelId.value === hotel.id) {
     expandedHotelId.value = null
     expandedRoomTypes.value = []
@@ -2099,9 +2236,12 @@ const toggleHotelExpand = async (hotel: any) => {
     expandedHotelId.value = hotel.id
     loadingRoomTypes.value = true
     try {
-      const res = await api.get(endpoints.adminHotels.roomTypes(hotel.id))
-      expandedRoomTypes.value = Array.isArray(res.data) ? res.data : []
-    } catch (e) { expandedRoomTypes.value = [] }
+      const res = await api.get<unknown>(endpoints.adminHotels.roomTypes(hotel.id))
+      expandedRoomTypes.value = toList<AdminRoomType>(res.data)
+    } catch (e) {
+      expandedRoomTypes.value = []
+      reportAdminListLoadFailure('admin room types', e)
+    }
     loadingRoomTypes.value = false
   }
 }
@@ -2111,8 +2251,8 @@ const addRoomTypeInline = async (hotelId: number) => {
   try {
     await api.post(endpoints.adminHotels.roomTypes(hotelId), roomTypeForm.value)
     roomTypeForm.value = { name: '', price: 0, capacity: 2, amenities: '' }
-    const res = await api.get(endpoints.adminHotels.roomTypes(hotelId))
-    expandedRoomTypes.value = Array.isArray(res.data) ? res.data : []
+    const res = await api.get<unknown>(endpoints.adminHotels.roomTypes(hotelId))
+    expandedRoomTypes.value = toList<AdminRoomType>(res.data)
   } catch (e) { showToast(t('admin.addFailed'), 'error') }
 }
 
@@ -2120,8 +2260,8 @@ const deleteRoomTypeInline = async (roomTypeId: number, hotelId: number) => {
   if (!(await confirmDanger(t('admin.confirmDeleteRoomType')))) return
   try {
     await api.delete(endpoints.adminHotels.deleteRoomType(roomTypeId))
-    const res = await api.get(endpoints.adminHotels.roomTypes(hotelId))
-    expandedRoomTypes.value = Array.isArray(res.data) ? res.data : []
+    const res = await api.get<unknown>(endpoints.adminHotels.roomTypes(hotelId))
+    expandedRoomTypes.value = toList<AdminRoomType>(res.data)
   } catch (e) { showToast(t('admin.deleteFailed'), 'error') }
 }
 

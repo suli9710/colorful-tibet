@@ -779,6 +779,15 @@ public class DataSeeder implements CommandLineRunner {
             logger.info("历史记录已足够: {} 条", existingCount);
             return;
         }
+        long availablePairs = (long) users.size() * (long) spots.size();
+        if (availablePairs <= 0) {
+            logger.info("没有可用的用户/景点组合，跳过访问历史生成");
+            return;
+        }
+        if (toGenerate > availablePairs) {
+            logger.info("访问历史目标超过唯一用户/景点组合数，将生成数量从 {} 调整为 {}", toGenerate, availablePairs);
+            toGenerate = (int) availablePairs;
+        }
 
         logger.info("当前历史记录: {} 条，需生成: {} 条", existingCount, toGenerate);
 
@@ -803,9 +812,13 @@ public class DataSeeder implements CommandLineRunner {
         }
 
         List<UserVisitHistory> batch = new ArrayList<>(200);
+        Set<String> generatedPairs = new HashSet<>(toGenerate * 2);
         int generated = 0;
+        int attempts = 0;
+        int maxAttempts = Math.max(1000, toGenerate * 50);
 
-        while (generated < toGenerate) {
+        while (generated < toGenerate && attempts < maxAttempts) {
+            attempts++;
             // 随机挑选用户
             User user = users.get(rand.nextInt(users.size()));
             String city = user.getCity();
@@ -825,43 +838,11 @@ public class DataSeeder implements CommandLineRunner {
             }
 
             ScenicSpot spot = spots.get(Math.min(spotIdx, spots.size() - 1));
-
-            // 评分分布：4-5分60%，3分25%，1-2分15%
-            double ratingRoll = rand.nextDouble();
-            int rating;
-            if (ratingRoll < 0.35) rating = 5;
-            else if (ratingRoll < 0.60) rating = 4;
-            else if (ratingRoll < 0.85) rating = 3;
-            else if (ratingRoll < 0.95) rating = 2;
-            else rating = 1;
-
-            // 点击数和停留时间与评分正相关
-            int clickCount = rating >= 4 ? rand.nextInt(8) + 3
-                    : rating == 3 ? rand.nextInt(5) + 2
-                    : rand.nextInt(3) + 1;
-            int dwellSeconds = rating >= 4 ? rand.nextInt(300) + 60
-                    : rating == 3 ? rand.nextInt(150) + 30
-                    : rand.nextInt(60) + 10;
-
-            // 访问时间在过去365天内
-            int daysAgo = rand.nextInt(365);
-            // 旺季(5-10月)概率更高
-            int monthRoll = rand.nextInt(12) + 1;
-            if (monthRoll >= 5 && monthRoll <= 10 && rand.nextDouble() < 0.7) {
-                daysAgo = rand.nextInt(180);
+            if (!generatedPairs.add(historyPairKey(user, spot))) {
+                continue;
             }
 
-            int actualDays = Math.min(daysAgo, 365);
-
-            UserVisitHistory h = new UserVisitHistory();
-            h.setUser(user);
-            h.setSpot(spot);
-            h.setRating(rating);
-            h.setClickCount(clickCount);
-            h.setDwellSeconds(dwellSeconds);
-            h.setVisitDate(now.minusDays(actualDays).minusHours(rand.nextInt(24)).minusMinutes(rand.nextInt(60)));
-
-            batch.add(h);
+            batch.add(createSeedHistoryRecord(user, spot, rand, now));
             generated++;
 
             if (batch.size() >= 200) {
@@ -872,10 +853,73 @@ public class DataSeeder implements CommandLineRunner {
                 }
             }
         }
+
+        if (generated < toGenerate) {
+            for (User user : users) {
+                for (ScenicSpot spot : spots) {
+                    if (generated >= toGenerate) break;
+                    if (!generatedPairs.add(historyPairKey(user, spot))) {
+                        continue;
+                    }
+                    batch.add(createSeedHistoryRecord(user, spot, rand, now));
+                    generated++;
+                    if (batch.size() >= 200) {
+                        historyRepository.saveAll(batch);
+                        batch.clear();
+                        if (generated % 400 == 0) {
+                            logger.info("  已生成 {} 条记录...", generated);
+                        }
+                    }
+                }
+                if (generated >= toGenerate) break;
+            }
+        }
         if (!batch.isEmpty()) {
             historyRepository.saveAll(batch);
         }
         logger.info("用户访问历史数据生成完成，总计: {} 条", historyRepository.count());
+    }
+
+    private UserVisitHistory createSeedHistoryRecord(User user, ScenicSpot spot, Random rand, LocalDateTime now) {
+        // 评分分布：4-5分60%，3分25%，1-2分15%
+        double ratingRoll = rand.nextDouble();
+        int rating;
+        if (ratingRoll < 0.35) rating = 5;
+        else if (ratingRoll < 0.60) rating = 4;
+        else if (ratingRoll < 0.85) rating = 3;
+        else if (ratingRoll < 0.95) rating = 2;
+        else rating = 1;
+
+        // 点击数和停留时间与评分正相关
+        int clickCount = rating >= 4 ? rand.nextInt(8) + 3
+                : rating == 3 ? rand.nextInt(5) + 2
+                : rand.nextInt(3) + 1;
+        int dwellSeconds = rating >= 4 ? rand.nextInt(300) + 60
+                : rating == 3 ? rand.nextInt(150) + 30
+                : rand.nextInt(60) + 10;
+
+        // 访问时间在过去365天内
+        int daysAgo = rand.nextInt(365);
+        // 旺季(5-10月)概率更高
+        int monthRoll = rand.nextInt(12) + 1;
+        if (monthRoll >= 5 && monthRoll <= 10 && rand.nextDouble() < 0.7) {
+            daysAgo = rand.nextInt(180);
+        }
+
+        int actualDays = Math.min(daysAgo, 365);
+
+        UserVisitHistory history = new UserVisitHistory();
+        history.setUser(user);
+        history.setSpot(spot);
+        history.setRating(rating);
+        history.setClickCount(clickCount);
+        history.setDwellSeconds(dwellSeconds);
+        history.setVisitDate(now.minusDays(actualDays).minusHours(rand.nextInt(24)).minusMinutes(rand.nextInt(60)));
+        return history;
+    }
+
+    private String historyPairKey(User user, ScenicSpot spot) {
+        return user.getId() + ":" + spot.getId();
     }
 
     private int pickWeightedSpotIndex(Random rand, int hotCount, int midCount, int totalCount,

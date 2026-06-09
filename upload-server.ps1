@@ -189,6 +189,64 @@ for cert_file in fullchain.pem privkey.pem chain.pem; do
   fi
 done
 
+get_env_value() {
+  local name="$1"
+  grep -E "^${name}=" "$PROJECT_DIR/.env" | tail -n 1 | cut -d= -f2- || true
+}
+
+is_placeholder_secret() {
+  printf '%s' "$1" | grep -Eiq 'change-me|changeme|replace-with|placeholder'
+}
+
+require_real_secret() {
+  local name="$1"
+  local value
+  value=$(get_env_value "$name")
+  if [ -z "$value" ]; then
+    echo "Refusing deployment: $name must be configured for production." >&2
+    exit 1
+  fi
+  if is_placeholder_secret "$value"; then
+    echo "Refusing deployment: $name must not contain placeholder values." >&2
+    exit 1
+  fi
+}
+
+reject_placeholder_secret_if_present() {
+  local name="$1"
+  local value
+  value=$(get_env_value "$name")
+  if [ -n "$value" ] && is_placeholder_secret "$value"; then
+    echo "Refusing deployment: $name must not contain placeholder values." >&2
+    exit 1
+  fi
+}
+
+for secret_name in DB_PASSWORD MYSQL_ROOT_PASSWORD REDIS_PASSWORD GRAFANA_ADMIN_PASSWORD; do
+  require_real_secret "$secret_name"
+done
+reject_placeholder_secret_if_present MYSQL_PASSWORD
+
+NGINX_REDIRECT_HOST_VALUE=$(get_env_value NGINX_REDIRECT_HOST)
+NGINX_REDIRECT_HOST_PATTERN='^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$'
+if ! printf '%s' "$NGINX_REDIRECT_HOST_VALUE" | grep -Eq "$NGINX_REDIRECT_HOST_PATTERN"; then
+  echo "Refusing deployment: NGINX_REDIRECT_HOST must be a single canonical host without scheme, path, port, comma, whitespace, or control characters." >&2
+  exit 1
+fi
+
+TRUST_PROXY_HEADERS_VALUE=$(get_env_value TRUST_PROXY_HEADERS | tr '[:upper:]' '[:lower:]')
+TRUSTED_PROXY_CIDRS_VALUE=$(get_env_value TRUSTED_PROXY_CIDRS | tr -d '[:space:]')
+if [ "$TRUST_PROXY_HEADERS_VALUE" = "true" ]; then
+  if [ -z "$TRUSTED_PROXY_CIDRS_VALUE" ]; then
+    echo "Refusing deployment: TRUSTED_PROXY_CIDRS must be explicit when TRUST_PROXY_HEADERS=true." >&2
+    exit 1
+  fi
+  if printf '%s' "$TRUSTED_PROXY_CIDRS_VALUE" | tr ',' '\n' | grep -Exq '0\.0\.0\.0/0|::/0|10\.0\.0\.0/8|172\.16\.0\.0/12|192\.168\.0\.0/16'; then
+    echo "Refusing deployment: TRUSTED_PROXY_CIDRS must not trust broad private ranges." >&2
+    exit 1
+  fi
+fi
+
 if ! grep -Eq '^(DOUBAO_API_KEY|ARK_API_KEY)=[^[:space:]]+' "$PROJECT_DIR/.env"; then
   echo "WARNING: DOUBAO_API_KEY/ARK_API_KEY is empty; AI route generation will use local fallback routes." >&2
 fi

@@ -10,6 +10,7 @@ import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -24,12 +25,14 @@ import com.tibet.tourism.modules.hotel.infra.RoomTypeRepository;
 import com.tibet.tourism.modules.hotel.web.dto.HotelBookingRequest;
 import com.tibet.tourism.modules.order.application.OrderCenterService;
 import com.tibet.tourism.modules.user.domain.User;
+import com.tibet.tourism.modules.user.infra.UserRepository;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -39,6 +42,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 @ExtendWith(MockitoExtension.class)
 class HotelBookingServiceTest {
@@ -47,10 +53,13 @@ class HotelBookingServiceTest {
     @Mock private HotelRepository hotelRepository;
     @Mock private RoomTypeRepository roomTypeRepository;
     @Mock private OrderCenterService orderCenterService;
+    @Mock private HotelBookingPiiAuditService piiAuditService;
+    @Mock private HotelBookingPiiAccessGuard piiAccessGuard;
 
     private HotelBookingService hotelBookingService;
     private User user;
     private User admin;
+    private Authentication adminPiiAuthentication;
 
     @BeforeEach
     void setUp() {
@@ -58,7 +67,9 @@ class HotelBookingServiceTest {
                 hotelBookingRepository,
                 hotelRepository,
                 roomTypeRepository,
-                orderCenterService);
+                orderCenterService,
+                piiAuditService,
+                piiAccessGuard);
 
         user = new User();
         user.setId(1L);
@@ -67,7 +78,10 @@ class HotelBookingServiceTest {
 
         admin = new User();
         admin.setId(2L);
+        admin.setUsername("admin");
         admin.setRole(User.Role.ADMIN);
+        adminPiiAuthentication = authentication(
+                "admin", "ROLE_ADMIN", HotelBookingPiiAccessGuard.PII_READ_AUTHORITY);
     }
 
     @Test
@@ -160,6 +174,28 @@ class HotelBookingServiceTest {
     }
 
     @Test
+    void stalePendingBookingExpiryContinuesPastFirstBatch() {
+        List<HotelBooking> firstBatch = IntStream.range(0, 100)
+                .mapToObj(index -> booking(1000L + index, user, HotelBooking.Status.PENDING))
+                .toList();
+        HotelBooking secondBatchBooking = booking(2000L, user, HotelBooking.Status.PENDING);
+        PageRequest batchPage = PageRequest.of(0, 100);
+        when(hotelBookingRepository.findStalePendingBookings(
+                eq(HotelBooking.Status.PENDING), any(LocalDateTime.class), eq(batchPage)))
+                .thenReturn(firstBatch, List.of(secondBatchBooking));
+
+        hotelBookingService.expireStalePendingBookings();
+
+        assertEquals(HotelBooking.Status.CANCELLED, firstBatch.get(0).getStatus());
+        assertEquals(HotelBooking.Status.CANCELLED, secondBatchBooking.getStatus());
+        verify(hotelBookingRepository, times(2)).findStalePendingBookings(
+                eq(HotelBooking.Status.PENDING), any(LocalDateTime.class), eq(batchPage));
+        verify(hotelBookingRepository, times(101)).save(any(HotelBooking.class));
+        verify(orderCenterService, times(101)).cancelLegacyMirror(
+                eq(null), eq("LEGACY_HOTEL_BOOKING"), any(), anyString());
+    }
+
+    @Test
     void adminStatusCancelMirrorsIntoUnifiedOrderCenter() {
         HotelBooking booking = booking(99L, user, HotelBooking.Status.CONFIRMED);
         when(hotelBookingRepository.findById(99L)).thenReturn(Optional.of(booking));
@@ -221,12 +257,47 @@ class HotelBookingServiceTest {
     @Test
     void revealBookingPiiReturnsFullGuestNameAndPhoneForAdmin() {
         HotelBooking booking = bookingWithPii(99L, user);
+        when(piiAccessGuard.requireReveal(adminPiiAuthentication, 99L)).thenReturn(admin);
         when(hotelBookingRepository.findById(99L)).thenReturn(Optional.of(booking));
 
-        var response = hotelBookingService.revealBookingPii(admin, 99L);
+        var response = hotelBookingService.revealBookingPii(adminPiiAuthentication, 99L);
 
         assertEquals("Alice Zhang", response.guestName());
         assertEquals("13800138000", response.phone());
+        verify(piiAuditService).recordRevealAllowed(admin, booking);
+    }
+
+    @Test
+    void internalRevealWithoutPiiAuthorityDoesNotReturnFullPii() {
+        Authentication adminWithoutPiiAuthority = authentication("admin", "ROLE_ADMIN");
+        UserRepository userRepository = org.mockito.Mockito.mock(UserRepository.class);
+        HotelBookingPiiAccessGuard realGuard = new HotelBookingPiiAccessGuard(userRepository, piiAuditService);
+        HotelBookingService guardedService = new HotelBookingService(
+                hotelBookingRepository,
+                hotelRepository,
+                roomTypeRepository,
+                orderCenterService,
+                piiAuditService,
+                realGuard);
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(admin));
+
+        SecurityException error = assertThrows(
+                SecurityException.class,
+                () -> guardedService.revealBookingPii(adminWithoutPiiAuthority, 99L));
+
+        assertEquals("Hotel booking PII read authority required", error.getMessage());
+        verify(piiAuditService).recordRevealRejected(admin, 99L, "missing_authority");
+        verify(hotelBookingRepository, never()).findById(99L);
+    }
+
+    @Test
+    void adminRevealBookingPiiAuditsMissingBookingWithoutLeakingExistenceToNonAdmins() {
+        when(piiAccessGuard.requireReveal(adminPiiAuthentication, 99L)).thenReturn(admin);
+        when(hotelBookingRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThrows(NoSuchElementException.class, () -> hotelBookingService.revealBookingPii(adminPiiAuthentication, 99L));
+
+        verify(piiAuditService).recordRevealRejected(admin, 99L, "not_found");
     }
 
     @Test
@@ -343,5 +414,14 @@ class HotelBookingServiceTest {
         request.setCheckInDate(LocalDate.now().plusDays(10));
         request.setCheckOutDate(LocalDate.now().plusDays(12));
         return request;
+    }
+
+    private Authentication authentication(String username, String... authorities) {
+        List<SimpleGrantedAuthority> grantedAuthorities = java.util.Arrays.stream(authorities)
+                .map(SimpleGrantedAuthority::new)
+                .toList();
+        org.springframework.security.core.userdetails.User principal =
+                new org.springframework.security.core.userdetails.User(username, "password", grantedAuthorities);
+        return new UsernamePasswordAuthenticationToken(principal, null, grantedAuthorities);
     }
 }

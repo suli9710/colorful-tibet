@@ -43,6 +43,8 @@ class AiRouteServiceTest {
         assertFalse(response.getContent().contains("AI服务暂时不可用"));
         assertTrue(response.getContent().contains("基准路线"));
         assertTrue(response.getContent().contains("## 每日行程"));
+        assertTrue(response.getContent().contains("## 安全与执行校验"));
+        assertTrue(response.getContent().contains("医疗免责声明"));
     }
 
     @Test
@@ -224,10 +226,104 @@ class AiRouteServiceTest {
         );
 
         assertNotNull(normalized);
-        assertFalse(normalized.contains("基准路线"));
+        assertFalse(normalized.contains("以下为结合经典线路、海拔节奏和预算约束生成的基准路线"));
         assertEquals(1, countOccurrences(normalized, "# 林芝寻踪：4天光影路线"));
         assertEquals(1, countOccurrences(normalized, "### 第1天："));
         assertEquals(1, countOccurrences(normalized, "### 第4天："));
+        assertEquals(1, countOccurrences(normalized, "## 安全与执行校验"));
+        assertTrue(normalized.contains("每天为4-8条可执行安排"));
+    }
+
+    @Test
+    void replacesExistingSafetySectionWithStructuredGuardrail() {
+        AiRouteService service = new AiRouteService(
+                WebClient.builder(),
+                "https://ark.cn-beijing.volces.com/api/v3/responses",
+                "test-api-key",
+                "ep-20260516173036-4dpgm",
+                30,
+                "",
+                30
+        );
+        String routeWithLooseSafety = completeChineseRoute(3).replace(
+                "## 进藏必读",
+                "## 安全与执行校验\n- 自由发挥，身体不适就休息。\n\n## 进藏必读"
+        );
+
+        String normalized = ReflectionTestUtils.invokeMethod(
+                service,
+                "normalizeMarkdownRoute",
+                routeWithLooseSafety,
+                3,
+                "豪华型",
+                "自然风光",
+                "zh"
+        );
+
+        assertNotNull(normalized);
+        assertEquals(1, countOccurrences(normalized, "## 安全与执行校验"));
+        assertFalse(normalized.contains("自由发挥"));
+        assertTrue(normalized.contains("路线完整性"));
+        assertTrue(normalized.contains("医疗免责声明"));
+    }
+
+    @Test
+    void fallsBackWhenDayOneStartsWithHighAltitudeDestination() {
+        AiRouteService service = new AiRouteService(
+                WebClient.builder(),
+                "https://ark.cn-beijing.volces.com/api/v3/responses",
+                "test-api-key",
+                "ep-20260516173036-4dpgm",
+                30,
+                "",
+                30
+        );
+        String unsafe = completeChineseRoute(3).replace(
+                "### 第1天：拉萨 — 林芝方向体验",
+                "### 第1天：羊卓雍措 — 高海拔冲刺"
+        );
+
+        String normalized = ReflectionTestUtils.invokeMethod(
+                service,
+                "normalizeMarkdownRoute",
+                unsafe,
+                3,
+                "豪华型",
+                "自然风光",
+                "zh"
+        );
+
+        assertNotNull(normalized);
+        assertTrue(normalized.contains("基准路线"));
+        assertTrue(normalized.contains("第1天：拉萨"));
+        assertTrue(normalized.contains("## 安全与执行校验"));
+    }
+
+    @Test
+    void fallsBackWhenDailyItemCountIsNotExecutable() {
+        AiRouteService service = new AiRouteService(
+                WebClient.builder(),
+                "https://ark.cn-beijing.volces.com/api/v3/responses",
+                "test-api-key",
+                "ep-20260516173036-4dpgm",
+                30,
+                "",
+                30
+        );
+
+        String normalized = ReflectionTestUtils.invokeMethod(
+                service,
+                "normalizeMarkdownRoute",
+                sparseDailyRoute(3),
+                3,
+                "豪华型",
+                "自然风光",
+                "zh"
+        );
+
+        assertNotNull(normalized);
+        assertTrue(normalized.contains("基准路线"));
+        assertTrue(normalized.contains("每日项目过少/过多"));
     }
 
     @Test
@@ -350,6 +446,29 @@ class AiRouteServiceTest {
         builder.append("- 按豪华型标准，交通、住宿餐饮、门票体验合计人均约8000-12000元。\n\n");
         builder.append("## 进藏必读\n");
         builder.append("- 第一天不要洗澡和奔跑，注意高原反应、边防证、穿衣防晒、通讯现金和尊重风俗。\n");
+        return builder.toString();
+    }
+
+    private static String sparseDailyRoute(int days) {
+        StringBuilder builder = new StringBuilder();
+        builder.append("# 西藏轻量路线\n\n");
+        builder.append("## 路线概览\n");
+        builder.append("这是一条包含预算、住宿、车程和贴心提示的路线，先在拉萨适应。\n\n");
+        builder.append("## 行程亮点\n");
+        builder.append("- 拉萨慢适应\n");
+        builder.append("- 林芝自然风光\n");
+        builder.append("- 藏地文化体验\n\n");
+        builder.append("## 每日行程\n\n");
+        for (int day = 1; day <= days; day++) {
+            builder.append("### 第").append(day).append("天：拉萨 — 林芝方向体验\n");
+            builder.append("- **上午**：拉萨低强度适应，慢走补水。\n");
+            builder.append("- **下午**：顺路安排真实景点，控制体力。\n");
+            builder.append("- **晚上/住宿**：入住供氧酒店，预算清楚。\n\n");
+        }
+        builder.append("## 预算预估\n");
+        builder.append("- 交通、住宿餐饮、门票体验合计人均约8000-12000元。\n\n");
+        builder.append("## 进藏必读\n");
+        builder.append("- 注意高原反应、边防证、穿衣防晒、通讯现金和尊重风俗。\n");
         return builder.toString();
     }
 

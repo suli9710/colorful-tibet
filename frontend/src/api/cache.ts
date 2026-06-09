@@ -1,4 +1,4 @@
-import type { AxiosInstance, AxiosResponse } from 'axios'
+import type { AxiosRequestConfig, AxiosResponse } from 'axios'
 import { apiBaseURL } from '../utils/apiOrigin'
 
 export const DEFAULT_TIMEOUT_MS = 15000
@@ -184,7 +184,15 @@ function isPrivateGetUrl(url: string): boolean {
     || PRIVATE_GET_PATH_MARKERS.some(marker => requestUrl.includes(marker) || requestPath.includes(marker))
 }
 
-function shouldUseGetCache(url: string, config: any = {}) {
+type CacheableGetConfig = AxiosRequestConfig & {
+  skipGetCache?: boolean
+}
+type CacheableGet = (url: string, config?: CacheableGetConfig) => Promise<AxiosResponse>
+interface GetCacheClient {
+  get: CacheableGet
+}
+
+function shouldUseGetCache(url: string, config: CacheableGetConfig = {}) {
   if (config.skipGetCache) return false
   return !isPrivateGetUrl(url)
 }
@@ -198,7 +206,7 @@ function stableStringify(value: unknown): string {
     .join(',')}}`
 }
 
-function getRequestKey(url: string, config: any = {}) {
+function getRequestKey(url: string, config: CacheableGetConfig = {}) {
   return stableStringify({
     baseURL: config.baseURL || apiBaseURL,
     url,
@@ -216,7 +224,7 @@ function isCacheableGetResponse(response: AxiosResponse): boolean {
   }
 }
 
-export function withSpecialTimeout(url: string, config: any = {}) {
+export function withSpecialTimeout(url: string, config: CacheableGetConfig = {}) {
   const nextConfig = { ...config }
   const requestUrl = String(url || '')
   const isUpload = nextConfig.data instanceof FormData
@@ -239,9 +247,9 @@ export function withSpecialTimeout(url: string, config: any = {}) {
   return nextConfig
 }
 
-export function installGetCache(api: AxiosInstance) {
+export function installGetCache(api: GetCacheClient) {
   const rawGet = api.get.bind(api)
-  api.get = ((url: string, config?: any) => {
+  api.get = ((url: string, config?: CacheableGetConfig) => {
     const nextConfig = withSpecialTimeout(url, config)
     if (!shouldUseGetCache(url, nextConfig)) {
       return rawGet(url, nextConfig)
@@ -274,7 +282,7 @@ export function installGetCache(api: AxiosInstance) {
 
     pendingGets.set(key, request)
     return request
-  }) as typeof api.get
+  })
 }
 
 if (typeof window !== 'undefined') {

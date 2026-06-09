@@ -30,6 +30,9 @@ public class ProductionSafetyValidator {
     private final boolean registrationRecaptchaRequired;
     private final String recaptchaSiteKey;
     private final String recaptchaSecretKey;
+    private final String piiKeys;
+    private final String piiActiveKid;
+    private final String superAdminTotpSecret;
 
     public ProductionSafetyValidator(
             Environment environment,
@@ -40,7 +43,10 @@ public class ProductionSafetyValidator {
             @Value("${app.security.antibot.recaptcha.enabled:false}") boolean recaptchaEnabled,
             @Value("${app.security.registration-recaptcha-required:false}") boolean registrationRecaptchaRequired,
             @Value("${app.security.antibot.recaptcha.site-key:}") String recaptchaSiteKey,
-            @Value("${app.security.antibot.recaptcha.secret-key:}") String recaptchaSecretKey) {
+            @Value("${app.security.antibot.recaptcha.secret-key:}") String recaptchaSecretKey,
+            @Value("${app.security.pii-keys:${PII_KEYS:}}") String piiKeys,
+            @Value("${app.security.pii-active-kid:${PII_ACTIVE_KID:}}") String piiActiveKid,
+            @Value("${app.security.super-admin-totp-secret:}") String superAdminTotpSecret) {
         this.environment = environment;
         this.cookieSecure = cookieSecure;
         this.requireStrongSecrets = requireStrongSecrets;
@@ -50,6 +56,9 @@ public class ProductionSafetyValidator {
         this.registrationRecaptchaRequired = registrationRecaptchaRequired;
         this.recaptchaSiteKey = recaptchaSiteKey;
         this.recaptchaSecretKey = recaptchaSecretKey;
+        this.piiKeys = piiKeys;
+        this.piiActiveKid = piiActiveKid;
+        this.superAdminTotpSecret = superAdminTotpSecret;
     }
 
     @PostConstruct
@@ -63,7 +72,10 @@ public class ProductionSafetyValidator {
                 recaptchaEnabled,
                 registrationRecaptchaRequired,
                 recaptchaSiteKey,
-                recaptchaSecretKey);
+                recaptchaSecretKey,
+                piiKeys,
+                piiActiveKid,
+                superAdminTotpSecret);
     }
 
     static void validate(
@@ -75,7 +87,10 @@ public class ProductionSafetyValidator {
             boolean recaptchaEnabled,
             boolean registrationRecaptchaRequired,
             String recaptchaSiteKey,
-            String recaptchaSecretKey) {
+            String recaptchaSecretKey,
+            String piiKeys,
+            String piiActiveKid,
+            String superAdminTotpSecret) {
         if (productionSafetyRequired) {
             if (!cookieSecure) {
                 throw new IllegalStateException("Production deployment requires app.security.cookie-secure=true");
@@ -88,7 +103,7 @@ public class ProductionSafetyValidator {
                 throw new IllegalStateException(
                         "Production deployment requires app.payments.mock-callback-enabled=false");
             }
-            if (!StringUtils.hasText(scraplingApiKey)) {
+            if (isBlankOrPlaceholder(scraplingApiKey)) {
                 throw new IllegalStateException("Production deployment requires scrapling.service.api-key");
             }
             if (!recaptchaEnabled) {
@@ -107,6 +122,19 @@ public class ProductionSafetyValidator {
                 throw new IllegalStateException(
                         "Production deployment requires app.security.antibot.recaptcha.secret-key");
             }
+            if (isBlankOrPlaceholder(piiKeys)) {
+                throw new IllegalStateException("Production deployment requires app.security.pii-keys");
+            }
+            if (isBlankOrPlaceholder(piiActiveKid)) {
+                throw new IllegalStateException("Production deployment requires app.security.pii-active-kid");
+            }
+            if (!piiKeysContainActiveKid(piiKeys, piiActiveKid)) {
+                throw new IllegalStateException(
+                        "Production deployment requires app.security.pii-active-kid to match app.security.pii-keys");
+            }
+            if (isBlankOrPlaceholder(superAdminTotpSecret)) {
+                throw new IllegalStateException("Production deployment requires app.security.super-admin-totp-secret");
+            }
         }
     }
 
@@ -121,7 +149,19 @@ public class ProductionSafetyValidator {
                 || normalizedValue.startsWith("change-me");
     }
 
-    private static boolean isProductionSafetyRequired(Environment environment) {
+    private static boolean piiKeysContainActiveKid(String piiKeys, String piiActiveKid) {
+        String normalizedActiveKid = piiActiveKid == null ? "" : piiActiveKid.trim();
+        if (!StringUtils.hasText(normalizedActiveKid)) {
+            return false;
+        }
+        return Arrays.stream(piiKeys.split(","))
+                .map(String::trim)
+                .filter(StringUtils::hasText)
+                .map(entry -> entry.indexOf(':') > 0 ? entry.substring(0, entry.indexOf(':')).trim() : "")
+                .anyMatch(normalizedActiveKid::equals);
+    }
+
+    static boolean isProductionSafetyRequired(Environment environment) {
         return environment != null
                 && (isProdProfileActive(environment)
                         || hasProductionEnvironmentValue(environment)
@@ -130,7 +170,8 @@ public class ProductionSafetyValidator {
 
     private static boolean isProdProfileActive(Environment environment) {
         return environment != null
-                && Arrays.stream(environment.getActiveProfiles()).anyMatch("prod"::equalsIgnoreCase);
+                && Arrays.stream(environment.getActiveProfiles())
+                        .anyMatch(ProductionSafetyValidator::isProductionValue);
     }
 
     private static boolean hasProductionEnvironmentValue(Environment environment) {

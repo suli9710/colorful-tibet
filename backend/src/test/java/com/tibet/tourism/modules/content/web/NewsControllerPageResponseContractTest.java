@@ -1,6 +1,7 @@
 package com.tibet.tourism.modules.content.web;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -52,7 +53,7 @@ class NewsControllerPageResponseContractTest {
 
     @Test
     void newsListReturnsStablePageEnvelope() throws Exception {
-        when(newsService.getAllNews(any(Pageable.class)))
+        when(newsService.getNews(isNull(), isNull(), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(news()), PageRequest.of(1, 2), 5));
 
         ResultActions result = mockMvc.perform(get("/api/news?page=1&size=2"))
@@ -62,6 +63,16 @@ class NewsControllerPageResponseContractTest {
                 .andExpect(jsonPath("$.content[0].title").value("Travel notice"));
 
         expectStablePageEnvelope(result, 1, 2, 5, 3);
+    }
+
+    @Test
+    void newsListForwardsServerSideFilters() throws Exception {
+        when(newsService.getNews(any(News.Category.class), any(String.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(news()), PageRequest.of(0, 20), 1));
+
+        mockMvc.perform(get("/api/news?category=notice&keyword=Road"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].category").value("NOTICE"));
     }
 
     private static void expectStablePageEnvelope(

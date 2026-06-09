@@ -107,6 +107,27 @@ Day 1: Lhasa
     expect(clean).not.toContain('src="?preview=1"')
   })
 
+  it('keeps rich text images accessible and lazy-loaded after sanitizing', () => {
+    const clean = sanitizeHtml(`
+      <img src="/uploads/comment/no-alt.jpg">
+      <img src="/uploads/comment/eager.jpg" alt="hero" loading="eager">
+      <img src="/uploads/comment/bad-loading.jpg" alt="bad loading" loading="auto" decoding="sync">
+    `)
+    const root = document.createElement('div')
+    root.innerHTML = clean
+    const images = Array.from(root.querySelectorAll('img'))
+
+    expect(images).toHaveLength(3)
+    expect(images[0]?.getAttribute('alt')).toBe('')
+    expect(images[0]?.getAttribute('loading')).toBe('lazy')
+    expect(images[0]?.getAttribute('decoding')).toBe('async')
+    expect(images[1]?.getAttribute('alt')).toBe('hero')
+    expect(images[1]?.getAttribute('loading')).toBe('eager')
+    expect(images[1]?.getAttribute('decoding')).toBe('async')
+    expect(images[2]?.getAttribute('loading')).toBe('lazy')
+    expect(images[2]?.getAttribute('decoding')).toBe('async')
+  })
+
   it('removes remote Markdown images while preserving local upload Markdown images', () => {
     const clean = renderMarkdownToSafeHtml(`
 ![remote tracker](https://tracker.example/pixel.png)
@@ -137,5 +158,33 @@ Day 1: Lhasa
     expect(clean.toLowerCase()).not.toContain('data:image/svg')
     expect(clean).toContain('encoded bad link')
     expect(clean).toContain('data bad link')
+  })
+
+  it('blocks mixed rich text XSS payloads while keeping safe link and image policies', () => {
+    const clean = sanitizeHtml(`
+      <math><mtext><table><mglyph><style><!--</style><img title="--><img src=x onerror=alert(1)>"></mglyph></table></mtext></math>
+      <svg><a xlink:href="javascript:alert(2)">svg link</a></svg>
+      <a href="JaVaScRiPt:alert(3)" target="_blank">case protocol</a>
+      <a href="https://example.com/docs" rel="opener">docs</a>
+      <img src="/uploads/comment/potala.jpg" alt="Potala" loading="interactive" onload="alert(4)">
+    `)
+    const root = document.createElement('div')
+    root.innerHTML = clean
+    const links = Array.from(root.querySelectorAll('a'))
+    const images = Array.from(root.querySelectorAll('img'))
+
+    expect(clean.toLowerCase()).not.toContain('<svg')
+    expect(clean.toLowerCase()).not.toContain('<math')
+    expect(clean.toLowerCase()).not.toContain('<style')
+    expect(clean.toLowerCase()).not.toContain('javascript:')
+    expect(clean).not.toContain('onerror')
+    expect(clean).not.toContain('onload')
+    expect(links.some(link => link.textContent === 'case protocol' && link.hasAttribute('href'))).toBe(false)
+    expect(links.find(link => link.textContent === 'docs')?.getAttribute('target')).toBe('_blank')
+    expect(links.find(link => link.textContent === 'docs')?.getAttribute('rel')).toBe('noopener noreferrer')
+    expect(images).toHaveLength(1)
+    expect(images[0]?.getAttribute('src')).toBe('/uploads/comment/potala.jpg')
+    expect(images[0]?.getAttribute('loading')).toBe('lazy')
+    expect(images[0]?.getAttribute('decoding')).toBe('async')
   })
 })

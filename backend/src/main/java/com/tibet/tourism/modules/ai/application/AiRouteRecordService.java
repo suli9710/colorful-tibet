@@ -34,6 +34,7 @@ public class AiRouteRecordService {
     private static final int ERROR_MAX_LENGTH = 500;
     private static final int DEFAULT_SAVED_ROUTES_PAGE_SIZE = 20;
     private static final int MAX_SAVED_ROUTES_PAGE_SIZE = 50;
+    private static final int STALE_RUNNING_RECOVERY_BATCH_SIZE = 100;
     private static final String STALE_RUNNING_ERROR =
             "AI route generation did not finish before the recovery window expired";
     private static final Pattern MARKDOWN_TITLE_PATTERN = Pattern.compile("(?m)^\\s*#\\s+(.+?)\\s*$");
@@ -146,23 +147,32 @@ public class AiRouteRecordService {
     public int failStaleRunningRecords(Duration staleTtl) {
         Duration effectiveTtl = staleTtl == null || staleTtl.isNegative() ? Duration.ZERO : staleTtl;
         LocalDateTime cutoff = LocalDateTime.now().minus(effectiveTtl);
-        List<AiRouteRecord> staleRecords = routeRecordRepository
-                .findByStatusAndUpdatedAtBeforeOrderByUpdatedAtAsc(AiRouteRecord.Status.RUNNING, cutoff);
-        if (staleRecords.isEmpty()) {
-            return 0;
+        Pageable batchPage = PageRequest.of(0, STALE_RUNNING_RECOVERY_BATCH_SIZE);
+        int recovered = 0;
+        while (true) {
+            List<AiRouteRecord> staleRecords = routeRecordRepository.findStaleRunningRecordsForRecovery(
+                    AiRouteRecord.Status.RUNNING, cutoff, batchPage);
+            if (staleRecords.isEmpty()) {
+                break;
+            }
+            for (AiRouteRecord record : staleRecords) {
+                record.setStatus(AiRouteRecord.Status.FAILED);
+                record.setErrorMessage(STALE_RUNNING_ERROR);
+                record.setTitle(hasContent(record.getContent())
+                        ? extractTitle(record.getContent(), record.getDays())
+                        : AiRouteRecord.defaultTitle(record.getDays()));
+            }
+            routeRecordRepository.saveAll(staleRecords);
+            recovered += staleRecords.size();
+            if (staleRecords.size() < STALE_RUNNING_RECOVERY_BATCH_SIZE) {
+                break;
+            }
         }
-
-        for (AiRouteRecord record : staleRecords) {
-            record.setStatus(AiRouteRecord.Status.FAILED);
-            record.setErrorMessage(STALE_RUNNING_ERROR);
-            record.setTitle(hasContent(record.getContent())
-                    ? extractTitle(record.getContent(), record.getDays())
-                    : AiRouteRecord.defaultTitle(record.getDays()));
+        if (recovered > 0) {
+            log.warn("Marked {} stale AI route RUNNING records as FAILED during startup recovery; cutoff={}",
+                    recovered, cutoff);
         }
-        routeRecordRepository.saveAll(staleRecords);
-        log.warn("Marked {} stale AI route RUNNING records as FAILED during startup recovery; cutoff={}",
-                staleRecords.size(), cutoff);
-        return staleRecords.size();
+        return recovered;
     }
 
     @Transactional

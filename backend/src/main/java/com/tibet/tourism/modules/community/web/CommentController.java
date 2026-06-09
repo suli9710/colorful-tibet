@@ -5,7 +5,6 @@ import com.tibet.tourism.common.security.JwtAuthSupport;
 import com.tibet.tourism.common.security.SensitiveLogSanitizer;
 import com.tibet.tourism.common.validation.InputSanitizer;
 import com.tibet.tourism.modules.community.domain.Comment;
-import com.tibet.tourism.modules.community.domain.CommentLike;
 import com.tibet.tourism.modules.community.infra.CommentLikeRepository;
 import com.tibet.tourism.modules.community.infra.CommentRepository;
 import com.tibet.tourism.modules.community.web.dto.AddCommentRequest;
@@ -16,13 +15,15 @@ import com.tibet.tourism.modules.upload.application.FileStorageService;
 import com.tibet.tourism.modules.user.domain.User;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import java.util.HashSet;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -69,8 +70,19 @@ public class CommentController {
         Long currentUserId = jwtAuthSupport.resolveOptionalCurrentUser(request)
                 .map(User::getId)
                 .orElse(null);
-        Page<CommentDTO> comments = commentRepository.findBySpotIdOrderByCreatedAtDesc(spotId, safePageable)
-                .map(comment -> CommentDTO.fromEntity(comment, currentUserId));
+        Page<Comment> commentPage = commentRepository.findBySpotIdOrderByCreatedAtDesc(spotId, safePageable);
+        List<Long> commentIds = commentPage.getContent().stream()
+                .map(Comment::getId)
+                .filter(Objects::nonNull)
+                .toList();
+        Set<Long> likedCommentIds = currentUserId == null || commentIds.isEmpty()
+                ? Set.of()
+                : new HashSet<>(commentLikeRepository.findLikedCommentIds(currentUserId, commentIds));
+        Page<CommentDTO> comments = commentPage.map(comment -> {
+            CommentDTO dto = CommentDTO.fromEntity(comment, currentUserId);
+            dto.setLiked(likedCommentIds.contains(comment.getId()));
+            return dto;
+        });
         return PageResponse.from(comments);
     }
 
@@ -103,7 +115,7 @@ public class CommentController {
         User user = jwtAuthSupport.resolveCurrentUser(request);
         long userId = user.getId();
 
-        Comment comment = commentRepository.findById(commentId)
+        commentRepository.findById(commentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
         
         boolean exists = commentLikeRepository.existsByUserIdAndCommentId(userId, commentId);
@@ -118,14 +130,9 @@ public class CommentController {
             liked = false;
         } else {
             // 添加点赞
-            CommentLike like = new CommentLike();
-            like.setUser(user);
-            like.setComment(comment);
-            try {
-                commentLikeRepository.saveAndFlush(like);
+            int inserted = commentLikeRepository.insertIgnore(userId, commentId);
+            if (inserted > 0) {
                 commentRepository.incrementLikeCount(commentId);
-            } catch (DataIntegrityViolationException duplicate) {
-                // Concurrent duplicate like; the unique row already represents the desired state.
             }
             liked = true;
         }

@@ -17,6 +17,7 @@ import com.tibet.tourism.modules.spot.web.dto.ScenicSpotResponse;
 import com.tibet.tourism.modules.user.domain.User;
 import com.tibet.tourism.modules.user.domain.UserVisitHistory;
 import com.tibet.tourism.modules.user.infra.UserVisitHistoryRepository;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
@@ -24,6 +25,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class RecommendationService {
@@ -127,6 +129,17 @@ public class RecommendationService {
 
     public void invalidateUserCache(Long userId) {
         cacheService.invalidateUserCache(userId);
+    }
+
+    @Transactional
+    public void recordSpotView(User user, ScenicSpot spot) {
+        if (user == null || spot == null || user.getId() == null || spot.getId() == null) {
+            return;
+        }
+
+        LocalDateTime visitDate = LocalDateTime.now();
+        historyRepository.upsertSpotView(user.getId(), spot.getId(), visitDate);
+        invalidateUserCache(user.getId());
     }
 
     // --- pipeline orchestration ---

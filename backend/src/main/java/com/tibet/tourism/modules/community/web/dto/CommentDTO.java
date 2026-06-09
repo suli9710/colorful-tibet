@@ -8,9 +8,11 @@ public class CommentDTO {
     private Integer rating;
     private String imageUrl;
     private Integer likeCount;
+    private boolean liked;
     private boolean owner;
     private String nickname;
     private String avatar;
+    private ParentSpotResponse spot;
     private LocalDateTime createdAt;
 
     public Long getId() { return id; }
@@ -23,12 +25,16 @@ public class CommentDTO {
     public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
     public Integer getLikeCount() { return likeCount; }
     public void setLikeCount(Integer likeCount) { this.likeCount = likeCount; }
+    public boolean isLiked() { return liked; }
+    public void setLiked(boolean liked) { this.liked = liked; }
     public boolean isOwner() { return owner; }
     public void setOwner(boolean owner) { this.owner = owner; }
     public String getNickname() { return nickname; }
     public void setNickname(String nickname) { this.nickname = nickname; }
     public String getAvatar() { return avatar; }
     public void setAvatar(String avatar) { this.avatar = avatar; }
+    public ParentSpotResponse getSpot() { return spot; }
+    public void setSpot(ParentSpotResponse spot) { this.spot = spot; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 
@@ -51,6 +57,11 @@ public class CommentDTO {
             dto.setNickname(publicUser.nickname());
             dto.setAvatar(publicUser.avatar());
         }
+        if (comment.getSpot() != null) {
+            dto.setSpot(new ParentSpotResponse(comment.getSpot().getId(), comment.getSpot().getName()));
+        }
         return dto;
     }
+
+    public record ParentSpotResponse(Long id, String name) {}
 }

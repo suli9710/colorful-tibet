@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen tibet-page-shell py-16 sm:py-24" :aria-busy="loading">
+  <div class="min-h-screen tibet-page-shell py-16 sm:py-24" :aria-busy="loading || loadingMoreSpots">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <!-- Header -->
       <motion.div
@@ -15,7 +15,11 @@
         </p>
         <div
           v-if="!loading && !errorMessage && spots.length"
+          id="spots-result-summary"
           class="mt-5 inline-flex max-w-full items-center rounded-full border border-tibet-gold/20 bg-white/65 px-4 py-2 text-sm font-medium text-tibet-brown/75 shadow-sm backdrop-blur tibetan-font"
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
         >
           {{ resultSummaryText }}
         </div>
@@ -42,21 +46,24 @@
                   v-model="searchKeyword"
                   type="search"
                   class="min-h-11 w-full rounded-2xl border border-tibet-gold/20 bg-white/80 py-3 pl-10 pr-12 text-sm text-tibet-dark outline-none transition placeholder:text-tibet-brown/35 focus:border-tibet-gold/60 focus:ring-2 focus:ring-tibet-gold/25 tibetan-font"
-                  :placeholder="t('spots.searchPlaceholder', '搜索景点、地区或标签')"
-                  :aria-label="t('spots.searchPlaceholder', '搜索景点、地区或标签')"
+                  :placeholder="t('spots.searchPlaceholder')"
+                  :aria-label="t('spots.searchPlaceholder')"
+                  :aria-describedby="spotsSearchDescribedBy"
+                  @keydown.esc.prevent="clearSearch"
                 >
                 <button
                   v-if="searchKeyword"
                   type="button"
                   class="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-tibet-brown/45 transition hover:bg-tibet-gold/10 hover:text-tibet-dark focus:outline-none focus:ring-2 focus:ring-tibet-gold/60"
-                  :aria-label="t('heritage.clearSearch', '清除')"
-                  @click="searchKeyword = ''"
+                  :aria-label="t('spots.clearSearch')"
+                  @click="clearSearch"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                     <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
                   </svg>
                 </button>
               </div>
+              <p id="spots-search-help" class="sr-only">{{ t('spots.searchHelp') }}</p>
             </form>
 
             <div class="-mx-3 overflow-x-auto px-3 pb-1 sm:mx-0 sm:px-0 sm:pb-0">
@@ -202,11 +209,22 @@
           >
             {{ t('spots.showAll') }}
           </button>
+          <button
+            v-if="hasMoreSpots"
+            type="button"
+            @click="loadNextSpotsPage"
+            :disabled="loadingMoreSpots"
+            :aria-busy="loadingMoreSpots"
+            class="mt-3 min-h-11 rounded-full border border-tibet-gold/25 bg-white px-6 py-2 text-tibet-dark transition-colors hover:bg-tibet-gold/10 disabled:cursor-wait disabled:opacity-60 sm:ml-3 sm:mt-0 tibetan-font"
+          >
+            {{ loadingMoreSpots ? t('common.loading') : t('community.nextPage') }}
+          </button>
         </div>
       </div>
 
       <!-- Spots Grid -->
-      <div v-else class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3 lg:gap-8">
+      <div v-else class="space-y-6">
+        <div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3 lg:gap-8">
         <AnimatePresence mode="popLayout">
         <motion.div
              v-for="(spot, index) in filteredSpots"
@@ -298,6 +316,36 @@
           </div>
         </motion.div>
         </AnimatePresence>
+        </div>
+
+        <div
+          v-if="spotsTotalPages > 1"
+          class="flex flex-wrap items-center justify-center gap-3"
+          role="navigation"
+          :aria-label="t('spots.paginationLabel')"
+        >
+          <span class="text-sm text-tibet-brown/60" role="status" aria-live="polite">
+            {{ spotsPage + 1 }} / {{ spotsTotalPages }}
+          </span>
+          <button
+            type="button"
+            @click="loadNextSpotsPage"
+            :disabled="loadingMoreSpots || !hasMoreSpots"
+            :aria-busy="loadingMoreSpots"
+            class="inline-flex min-h-11 items-center justify-center rounded-full border border-tibet-gold/25 bg-white px-6 py-2.5 text-sm font-semibold text-tibet-dark transition hover:bg-tibet-gold/10 disabled:cursor-wait disabled:opacity-60 tibetan-font"
+          >
+            {{ loadingMoreSpots ? t('common.loading') : t('community.nextPage') }}
+          </button>
+        </div>
+
+        <p
+          v-if="loadMoreErrorMessage"
+          class="mx-auto max-w-2xl rounded-2xl border border-tibet-red/20 bg-white px-4 py-3 text-center text-sm text-tibet-red shadow-sm tibetan-font"
+          role="alert"
+          aria-live="assertive"
+        >
+          {{ loadMoreErrorMessage }}
+        </p>
       </div>
     </div>
   </div>
@@ -309,6 +357,8 @@ import { AnimatePresence, motion } from 'motion-v'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import api, { endpoints } from '../api'
+import { hasNextPage, mergeUniqueById, readPaginatedResponse, type PageMetadata } from '../api/endpoints'
+import { toIntlLocale } from '../i18n/formatting'
 import { safeClientErrorMessage, summarizeClientError } from '../utils/errorMonitoring'
 import {
   cardExit,
@@ -348,12 +398,23 @@ interface ScenicSpot {
 
 type CategoryFilter = 'ALL' | SpotCategory
 
+const spotsPageSize = 20
 const spots = ref<ScenicSpot[]>([])
+const spotsPageInfo = ref<PageMetadata>({
+  page: 0,
+  size: spotsPageSize,
+  totalElements: 0,
+  totalPages: 0
+})
 const loading = ref(true)
+const loadingMoreSpots = ref(false)
 const errorMessage = ref('')
+const loadMoreErrorMessage = ref('')
 const selectedCategory = ref<CategoryFilter>('ALL')
 const searchKeyword = ref('')
 const failedSpotImages = ref<Record<string, boolean>>({})
+let spotsRequestSequence = 0
+let activeSpotsLoadMoreRequest = 0
 
 const categoryCounts = computed<Record<CategoryFilter, number>>(() => ({
   ALL: spots.value.length,
@@ -372,38 +433,121 @@ const selectedCategoryLabel = computed(() => (
 ))
 
 const normalizedSearchKeyword = computed(() => searchKeyword.value.trim().toLocaleLowerCase())
+const spotsPage = computed(() => spotsPageInfo.value.page)
+const spotsTotalPages = computed(() => spotsPageInfo.value.totalPages)
+const hasMoreSpots = computed(() => hasNextPage(spotsPageInfo.value))
 
 const resultSummaryText = computed(() => {
   const base = t('spots.resultSummary', { count: filteredSpots.value.length, category: selectedCategoryLabel.value })
   return normalizedSearchKeyword.value
-    ? `${base} · "${searchKeyword.value.trim()}"`
+    ? t('spots.resultSummaryWithKeyword', { base, keyword: searchKeyword.value.trim() })
     : base
 })
 
+const spotsSearchDescribedBy = computed(() => (
+  !loading.value && !errorMessage.value && spots.value.length
+    ? 'spots-search-help spots-result-summary'
+    : 'spots-search-help'
+))
+
 const noResultsMessage = computed(() => (
   normalizedSearchKeyword.value
-    ? t('spots.noSearchMessage', '没有找到匹配搜索条件的景点，请尝试更换关键词或查看全部景点。')
+    ? t('spots.noSearchMessage')
     : t('spots.noCategoryMessage')
 ))
 
-const fetchSpots = async () => {
-  try {
+const resetSpotsPageInfo = () => {
+  spotsPageInfo.value = {
+    page: 0,
+    size: spotsPageSize,
+    totalElements: 0,
+    totalPages: 0
+  }
+}
+
+const applySpotsPage = (response: any, append = false) => {
+  const page = readPaginatedResponse<ScenicSpot>(response, {
+    page: append ? spotsPageInfo.value.page + 1 : 0,
+    size: spotsPageSize
+  })
+
+  spots.value = append ? mergeUniqueById(spots.value, page.content) : page.content
+  spotsPageInfo.value = {
+    page: page.page,
+    size: page.size || spotsPageSize,
+    totalElements: page.totalElements,
+    totalPages: page.totalPages
+  }
+}
+
+const buildSpotsRequest = (page: number) => {
+  const keyword = normalizedSearchKeyword.value
+  const params: Record<string, string | number> = { page, size: spotsPageSize }
+
+  if (keyword) {
+    params.keyword = keyword
+    if (selectedCategory.value !== 'ALL') {
+      params.category = selectedCategory.value
+    }
+    return { endpoint: endpoints.spots.search, params }
+  }
+
+  if (selectedCategory.value !== 'ALL') {
+    params.category = selectedCategory.value
+  }
+
+  return { endpoint: endpoints.spots.list, params }
+}
+
+const fetchSpots = async (page = 0, append = false) => {
+  const requestSequence = ++spotsRequestSequence
+  if (append) {
+    loadingMoreSpots.value = true
+    activeSpotsLoadMoreRequest = requestSequence
+  } else {
     loading.value = true
-    errorMessage.value = ''
-    const response = await api.get(endpoints.spots.list)
-    const payload = response.data?.content || response.data || []
-    spots.value = Array.isArray(payload) ? payload : []
+    loadingMoreSpots.value = false
+    activeSpotsLoadMoreRequest = 0
+  }
+  errorMessage.value = ''
+  loadMoreErrorMessage.value = ''
+
+  try {
+    const { endpoint, params } = buildSpotsRequest(page)
+    const response = await api.get(endpoint, { params })
+    if (requestSequence !== spotsRequestSequence) return
+    applySpotsPage(response, append)
 
     if (!spots.value || spots.value.length === 0) {
       console.warn('后端返回了空数据')
     }
   } catch (error) {
+    if (requestSequence !== spotsRequestSequence) return
     console.error('Failed to fetch scenic spots:', summarizeClientError(error))
-    spots.value = []
-    errorMessage.value = safeClientErrorMessage(error, t('toast.pageLoadFailed'))
+    if (append) {
+      loadMoreErrorMessage.value = safeClientErrorMessage(error, t('toast.pageLoadFailed'))
+    } else {
+      spots.value = []
+      resetSpotsPageInfo()
+      errorMessage.value = safeClientErrorMessage(error, t('toast.pageLoadFailed'))
+    }
   } finally {
-    loading.value = false
+    if (append) {
+      if (activeSpotsLoadMoreRequest === requestSequence) {
+        loadingMoreSpots.value = false
+        activeSpotsLoadMoreRequest = 0
+      }
+    } else {
+      if (requestSequence === spotsRequestSequence) {
+        loading.value = false
+      }
+    }
   }
+}
+
+const loadNextSpotsPage = async () => {
+  if (loading.value || loadingMoreSpots.value || !hasMoreSpots.value) return
+  await fetchSpots(spotsPageInfo.value.page + 1, true)
 }
 
 const filteredSpots = computed(() => {
@@ -431,6 +575,10 @@ const filteredSpots = computed(() => {
 
 const resetFilters = () => {
   selectedCategory.value = 'ALL'
+  clearSearch()
+}
+
+const clearSearch = () => {
   searchKeyword.value = ''
 }
 
@@ -477,7 +625,7 @@ const formatRating = (rating: ScenicSpot['rating']) => {
 const formatVisitCount = (visitCount: ScenicSpot['visitCount']) => {
   const value = formatNumber(visitCount)
   if (value == null) return ''
-  return t('spots.visitCountValue', { count: value.toLocaleString() })
+  return t('spots.visitCountValue', { count: value.toLocaleString(toIntlLocale(locale.value)) })
 }
 
 const spotHighlights = (spot: ScenicSpot) => [
@@ -502,7 +650,7 @@ const getGradientClass = (spot: ScenicSpot) => {
 }
 
 // 监听语言变化，重新获取数据
-watch(locale, () => {
+watch([locale, selectedCategory, normalizedSearchKeyword], () => {
   fetchSpots()
 })
 

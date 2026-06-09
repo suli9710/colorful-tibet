@@ -38,7 +38,7 @@ const SANITIZE_CONFIG: Config = {
     'tr',
     'ul'
   ],
-  ALLOWED_ATTR: ['align', 'alt', 'height', 'href', 'loading', 'rel', 'src', 'target', 'title', 'width'],
+  ALLOWED_ATTR: ['align', 'alt', 'decoding', 'height', 'href', 'loading', 'rel', 'src', 'target', 'title', 'width'],
   ALLOWED_URI_REGEXP: SAFE_LINK_HREF_REGEXP,
   FORBID_TAGS: ['svg', 'math', 'style', 'form', 'iframe', 'object', 'embed', 'script'],
   RETURN_TRUSTED_TYPE: false,
@@ -96,6 +96,14 @@ if (typeof DOMPurify.addHook === 'function') {
         return
       }
       element.setAttribute('src', source)
+      if (!element.hasAttribute('alt')) {
+        element.setAttribute('alt', '')
+      }
+      const loading = element.getAttribute('loading')?.trim().toLowerCase()
+      if (loading !== 'eager' && loading !== 'lazy') {
+        element.setAttribute('loading', 'lazy')
+      }
+      element.setAttribute('decoding', 'async')
     }
 
     element.removeAttribute('rel')

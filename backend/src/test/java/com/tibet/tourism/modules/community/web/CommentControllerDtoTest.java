@@ -3,6 +3,8 @@ package com.tibet.tourism.modules.community.web;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
@@ -80,6 +82,7 @@ class CommentControllerDtoTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].id").value(10))
                 .andExpect(jsonPath("$.content[0].owner").value(false))
+                .andExpect(jsonPath("$.content[0].liked").value(false))
                 .andExpect(jsonPath("$.content[0].nickname").value("Public Nickname"))
                 .andExpect(jsonPath("$.content[0].avatar").value("/avatars/u7.png"))
                 .andExpect(jsonPath("$.content[0].userId").doesNotExist())
@@ -91,6 +94,8 @@ class CommentControllerDtoTest {
                 .andExpect(jsonPath("$.content[0].allowedLoginFingerprintHash").doesNotExist())
                 .andExpect(content().string(not(containsString("\"userId\""))))
                 .andExpect(content().string(not(containsString("\"user_id\""))));
+
+        verify(commentLikeRepository, never()).findLikedCommentIds(any(), any());
     }
 
     @Test
@@ -101,10 +106,12 @@ class CommentControllerDtoTest {
         when(jwtAuthSupport.resolveOptionalCurrentUser(any())).thenReturn(Optional.of(user));
         when(commentRepository.findBySpotIdOrderByCreatedAtDesc(any(Long.class), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(comment)));
+        when(commentLikeRepository.findLikedCommentIds(7L, List.of(10L))).thenReturn(List.of(10L));
 
         mockMvc.perform(get("/api/comments/spot/5"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].owner").value(true))
+                .andExpect(jsonPath("$.content[0].liked").value(true))
                 .andExpect(jsonPath("$.content[0].nickname").value("Public Nickname"))
                 .andExpect(jsonPath("$.content[0].avatar").value("/avatars/u7.png"))
                 .andExpect(jsonPath("$.content[0].userId").doesNotExist())
@@ -112,6 +119,29 @@ class CommentControllerDtoTest {
                 .andExpect(jsonPath("$.content[0].user").doesNotExist())
                 .andExpect(content().string(not(containsString("\"userId\""))))
                 .andExpect(content().string(not(containsString("\"user_id\""))));
+
+        verify(commentLikeRepository).findLikedCommentIds(7L, List.of(10L));
+    }
+
+    @Test
+    void spotCommentsBatchLikedStateForAuthenticatedUser() throws Exception {
+        User user = publicUser();
+        Comment likedComment = comment(user);
+        Comment unlikedComment = comment(user);
+        unlikedComment.setId(11L);
+        unlikedComment.setContent("Other view");
+
+        when(jwtAuthSupport.resolveOptionalCurrentUser(any())).thenReturn(Optional.of(user));
+        when(commentRepository.findBySpotIdOrderByCreatedAtDesc(any(Long.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(likedComment, unlikedComment)));
+        when(commentLikeRepository.findLikedCommentIds(7L, List.of(10L, 11L))).thenReturn(List.of(10L));
+
+        mockMvc.perform(get("/api/comments/spot/5"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].liked").value(true))
+                .andExpect(jsonPath("$.content[1].liked").value(false));
+
+        verify(commentLikeRepository).findLikedCommentIds(7L, List.of(10L, 11L));
     }
 
     @Test
@@ -122,12 +152,14 @@ class CommentControllerDtoTest {
         when(jwtAuthSupport.resolveOptionalCurrentUser(any())).thenReturn(Optional.of(user));
         when(commentRepository.findBySpotIdOrderByCreatedAtDesc(any(Long.class), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(comment), PageRequest.of(1, 2), 5));
+        when(commentLikeRepository.findLikedCommentIds(7L, List.of(10L))).thenReturn(List.of());
 
         mockMvc.perform(get("/api/comments/spot/5?page=1&size=2"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content").isArray())
                 .andExpect(jsonPath("$.content[0].id").value(10))
                 .andExpect(jsonPath("$.content[0].owner").value(true))
+                .andExpect(jsonPath("$.content[0].liked").value(false))
                 .andExpect(jsonPath("$.page").value(1))
                 .andExpect(jsonPath("$.size").value(2))
                 .andExpect(jsonPath("$.totalElements").value(5))

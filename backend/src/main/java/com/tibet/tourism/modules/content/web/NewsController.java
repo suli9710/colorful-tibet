@@ -26,11 +26,26 @@ public class NewsController {
     @GetMapping
     public PageResponse<NewsDTO> getAllNews(
             @RequestParam(required = false, defaultValue = "zh") String locale,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String keyword,
             @PageableDefault(size = 20) Pageable pageable) {
         Pageable safePageable = InputSanitizer.sanitizePageable(
                 pageable, ALLOWED_NEWS_SORT_FIELDS, DEFAULT_NEWS_SORT, 20, 100);
-        Page<NewsDTO> newsPage = newsService.getAllNews(safePageable)
+        News.Category safeCategory = parseCategory(category);
+        String safeKeyword = InputSanitizer.optionalPlainText(keyword, 100, "keyword");
+        Page<NewsDTO> newsPage = newsService.getNews(safeCategory, safeKeyword, safePageable)
                 .map(news -> NewsDTO.fromEntity(news, locale));
         return PageResponse.from(newsPage);
+    }
+
+    private News.Category parseCategory(String category) {
+        if (category == null || category.isBlank() || "ALL".equalsIgnoreCase(category)) {
+            return null;
+        }
+        try {
+            return News.Category.valueOf(category.trim().toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            throw new IllegalArgumentException("category不合法");
+        }
     }
 }

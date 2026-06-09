@@ -15,7 +15,6 @@ import com.tibet.tourism.modules.community.web.dto.ShareRouteRequest;
 import com.tibet.tourism.modules.community.web.dto.SharedRouteResponse;
 import com.tibet.tourism.modules.community.web.dto.SharedRouteSummaryResponse;
 import com.tibet.tourism.modules.user.domain.User;
-import com.tibet.tourism.modules.user.infra.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -52,9 +51,6 @@ public class SharedRouteController {
 
     @Autowired
     private SharedRouteService routeService;
-
-    @Autowired
-    private UserRepository userRepository;
 
     @Autowired
     private JwtAuthSupport jwtAuthSupport;
@@ -131,8 +127,7 @@ public class SharedRouteController {
         Pageable pageable = boundedPageable(page, size, stableDescendingSort(safeSortField));
         
         Long currentUserId = getOptionalCurrentUserId(request);
-        Page<SharedRouteSummaryResponse> routes = routeService.getRoutes(days, budget, preference, pageable)
-                .map(route -> SharedRouteSummaryResponse.fromEntity(route, currentUserId));
+        Page<SharedRouteSummaryResponse> routes = routeService.getRoutes(days, budget, preference, pageable, currentUserId);
         return pagedEnvelope(routes);
     }
 
@@ -256,11 +251,9 @@ public class SharedRouteController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         try {
-            User user = userRepository.findById(getCurrentUserId(request))
-                    .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+            Long userId = getCurrentUserId(request);
             Pageable pageable = boundedPageable(page, size, stableDescendingSort("createdAt"));
-            Page<SharedRouteSummaryResponse> routes = routeService.getRoutesByAuthor(user, pageable)
-                    .map(route -> SharedRouteSummaryResponse.fromEntity(route, user.getId()));
+            Page<SharedRouteSummaryResponse> routes = routeService.getRoutesByAuthor(userId, pageable);
             return pagedContent(routes);
         } catch (Exception e) {
             return safeBadRequest(e);

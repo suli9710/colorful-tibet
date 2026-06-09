@@ -30,6 +30,55 @@ export interface AiRouteRecordResponse {
   updatedAt: string
 }
 
+export interface PublicUserResponse {
+  nickname?: string | null
+  avatar?: string | null
+  owner: boolean
+}
+
+export type SharedRouteSourceType = 'USER' | 'OFFICIAL'
+
+export interface SharedRouteResponse {
+  id: number
+  author?: PublicUserResponse | null
+  title: string
+  content: string
+  days: number
+  budget?: string | null
+  preference?: string | null
+  sourceType: SharedRouteSourceType
+  sourceRouteId?: number | null
+  price?: number | null
+  difficulty?: string | null
+  temperature?: string | null
+  geography?: string | null
+  viewCount: number
+  likeCount: number
+  commentCount: number
+  createdAt: string
+  updatedAt?: string | null
+}
+
+export interface RouteCommentResponse {
+  id: number
+  user?: PublicUserResponse | null
+  route?: {
+    id: number
+    title: string
+  } | null
+  content: string
+  createdAt: string
+}
+
+export interface RouteLikeStatusResponse {
+  liked?: boolean
+}
+
+export interface RouteLikeMutationResponse {
+  liked?: boolean
+  likeCount?: number | string | null
+}
+
 export interface HeritageItem {
   id: number
   name: string

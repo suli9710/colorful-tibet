@@ -9,10 +9,11 @@ import static org.mockito.Mockito.when;
 
 import com.tibet.tourism.modules.community.domain.TravelAnswer;
 import com.tibet.tourism.modules.community.domain.TravelQuestion;
-import com.tibet.tourism.modules.community.domain.QuestionLike;
 import com.tibet.tourism.modules.community.infra.QuestionLikeRepository;
 import com.tibet.tourism.modules.community.infra.TravelAnswerRepository;
 import com.tibet.tourism.modules.community.infra.TravelQuestionRepository;
+import com.tibet.tourism.modules.community.infra.TravelQuestionSummaryRow;
+import com.tibet.tourism.modules.community.web.dto.TravelQuestionSummaryResponse;
 import com.tibet.tourism.modules.user.domain.User;
 import com.tibet.tourism.modules.user.infra.UserRepository;
 import java.time.LocalDateTime;
@@ -24,7 +25,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -86,13 +86,45 @@ class TravelQAServiceTest {
     }
 
     @Test
+    void getQuestionSummariesUsesProjectionRowsWithoutHydratingQuestionContent() {
+        Pageable pageable = Pageable.ofSize(10);
+        TravelQuestionSummaryRow row = new TravelQuestionSummaryRow(
+                200L,
+                7L,
+                "guide",
+                "Guide Nickname",
+                "/avatar.png",
+                "How to prepare?",
+                "Bring warm clothes...",
+                "altitude",
+                20,
+                1,
+                3,
+                false,
+                LocalDateTime.parse("2026-01-02T03:04:05"),
+                LocalDateTime.parse("2026-01-03T03:04:05"));
+        when(questionRepository.findSummaries("altitude", false, pageable))
+                .thenReturn(new PageImpl<>(List.of(row), pageable, 1));
+
+        Page<TravelQuestionSummaryResponse> result =
+                service.getQuestionSummaries("altitude", "unsolved", pageable, 7L);
+
+        assertThat(result.getContent()).hasSize(1);
+        TravelQuestionSummaryResponse summary = result.getContent().get(0);
+        assertThat(summary.id()).isEqualTo(200L);
+        assertThat(summary.excerpt()).isEqualTo("Bring warm clothes...");
+        assertThat(summary.author().owner()).isTrue();
+        verify(questionRepository).findSummaries("altitude", false, pageable);
+        verify(questionRepository, never()).findAll(any(org.springframework.data.jpa.domain.Specification.class), any(Pageable.class));
+    }
+
+    @Test
     void likeQuestionReturnsUpdatedCountWithoutIncrementingViews() {
         User user = user();
         TravelQuestion question = question();
         when(questionRepository.findById(200L)).thenReturn(Optional.of(question));
         when(userRepository.findById(7L)).thenReturn(Optional.of(user));
-        when(likeRepository.existsByQuestionAndUser(question, user)).thenReturn(false);
-        when(likeRepository.saveAndFlush(any(QuestionLike.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(likeRepository.insertIgnore(200L, 7L)).thenReturn(1);
         when(questionRepository.findLikeCountById(200L)).thenReturn(Optional.of(4));
 
         TravelQAService.LikeResult result = service.likeQuestion(200L, 7L);
@@ -109,9 +141,7 @@ class TravelQAServiceTest {
         TravelQuestion question = question();
         when(questionRepository.findById(200L)).thenReturn(Optional.of(question));
         when(userRepository.findById(7L)).thenReturn(Optional.of(user));
-        when(likeRepository.existsByQuestionAndUser(question, user)).thenReturn(false);
-        when(likeRepository.saveAndFlush(any(QuestionLike.class)))
-                .thenThrow(new DataIntegrityViolationException("duplicate question like"));
+        when(likeRepository.insertIgnore(200L, 7L)).thenReturn(0);
         when(questionRepository.findLikeCountById(200L)).thenReturn(Optional.of(3));
 
         TravelQAService.LikeResult result = service.likeQuestion(200L, 7L);

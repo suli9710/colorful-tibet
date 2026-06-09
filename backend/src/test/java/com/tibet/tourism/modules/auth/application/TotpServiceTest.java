@@ -40,6 +40,13 @@ class TotpServiceTest {
     }
 
     @Test
+    void rejectsPublishedPlaceholderSecretEvenWhenItLooksLikeBase32() {
+        assertThatThrownBy(() -> totpService.validateSecret("replace-with-base32-totp-secret"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("development placeholder");
+    }
+
+    @Test
     void rejectsNonNumericCode() {
         assertThat(totpService.isValidCode(RFC_6238_SHA1_SECRET, "abcdef")).isFalse();
     }

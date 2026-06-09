@@ -9,6 +9,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 @Repository
@@ -27,8 +29,15 @@ public interface AiRouteRecordRepository extends JpaRepository<AiRouteRecord, Lo
 
     Optional<AiRouteRecord> findFirstByUserIdAndJobIdOrderByUpdatedAtDesc(Long userId, String jobId);
 
-    List<AiRouteRecord> findByStatusAndUpdatedAtBeforeOrderByUpdatedAtAsc(
-            AiRouteRecord.Status status, LocalDateTime updatedBefore);
+    @Query("""
+            SELECT r FROM AiRouteRecord r
+            WHERE r.status = :status
+              AND r.updatedAt < :updatedBefore
+            ORDER BY r.updatedAt ASC, r.id ASC
+            """)
+    List<AiRouteRecord> findStaleRunningRecordsForRecovery(@Param("status") AiRouteRecord.Status status,
+                                                            @Param("updatedBefore") LocalDateTime updatedBefore,
+                                                            Pageable pageable);
 
     void deleteByUserId(Long userId);
 

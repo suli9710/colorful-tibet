@@ -15,9 +15,10 @@ describe('endpoint registry guardrails', () => {
     expect(authStoreSource).not.toMatch(/fetch\(\s*`[^`]*\/auth\/me/)
     expect(authStoreSource).not.toMatch(/['"`]\/auth\/me['"`]/)
 
-    expect(scenicSpotDetailSource).toContain('endpoints.comments.liked(comment.id)')
+    expect(scenicSpotDetailSource).toContain('endpoints.comments.list(Number(route.params.id))')
     expect(scenicSpotDetailSource).toContain('endpoints.comments.like(comment.id)')
     expect(scenicSpotDetailSource).not.toContain('`/comments/${comment.id}/liked`')
     expect(scenicSpotDetailSource).not.toContain('`/comments/${comment.id}/like`')
+    expect(scenicSpotDetailSource).not.toContain('endpoints.comments.liked(comment.id)')
   })
 })

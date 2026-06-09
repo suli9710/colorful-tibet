@@ -1,9 +1,30 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import favoritesSource from './Favorites.vue?raw'
 import hotelBookingSource from './HotelBooking.vue?raw'
 import hotelOrdersSource from './HotelOrders.vue?raw'
 import orderCenterSource from './OrderCenter.vue?raw'
 import scenicSpotsSource from './ScenicSpots.vue?raw'
+
+interface LocaleMessages {
+  spots: {
+    searchPlaceholder: string
+    searchHelp: string
+    clearSearch: string
+    resultSummaryWithKeyword: string
+    paginationLabel: string
+    noSearchMessage: string
+  }
+}
+
+const supportedLocaleMessages = [
+  readLocaleMessages('../i18n/locales/zh.json'),
+  readLocaleMessages('../i18n/locales/bo.json')
+]
+
+function readLocaleMessages(relativePath: string): LocaleMessages {
+  return JSON.parse(readFileSync(new URL(relativePath, import.meta.url), 'utf8')) as LocaleMessages
+}
 
 describe('feedback view state safeguards', () => {
   it('keeps favorites load failures visible, safe, and actionable', () => {
@@ -19,9 +40,9 @@ describe('feedback view state safeguards', () => {
   it('keeps order center failures and empty filters actionable without raw backend details', () => {
     expect(orderCenterSource).toContain('safeClientErrorMessage')
     expect(orderCenterSource).toContain('role="alert"')
-    expect(orderCenterSource).toContain('重新加载')
+    expect(orderCenterSource).toContain("t('common.reload')")
     expect(orderCenterSource).toContain('const resetFilters')
-    expect(orderCenterSource).toContain('清除筛选')
+    expect(orderCenterSource).toContain("t('orderCenter.clearFilters')")
     expect(orderCenterSource).not.toMatch(/\b\w+\.response\??\.\s*data\??\.\s*(?:error|message)\b/)
     expect(orderCenterSource).not.toMatch(/\b\w+\.message\b/)
   })
@@ -51,11 +72,31 @@ describe('feedback view state safeguards', () => {
     expect(scenicSpotsSource).toContain('aria-live="assertive"')
     expect(scenicSpotsSource).toContain('role="status"')
     expect(scenicSpotsSource).toContain('aria-busy="true"')
+    expect(scenicSpotsSource).toContain('id="spots-result-summary"')
+    expect(scenicSpotsSource).toContain('aria-atomic="true"')
+    expect(scenicSpotsSource).toContain(':aria-describedby="spotsSearchDescribedBy"')
+    expect(scenicSpotsSource).toContain('@keydown.esc.prevent="clearSearch"')
     expect(scenicSpotsSource).toContain("t('spots.retryLoad')")
     expect(scenicSpotsSource).toContain("t('spots.reload')")
+    expect(scenicSpotsSource).toContain("t('spots.resultSummaryWithKeyword'")
+    expect(scenicSpotsSource).toContain("t('spots.noSearchMessage')")
+    expect(scenicSpotsSource).not.toContain("t('spots.searchPlaceholder',")
+    expect(scenicSpotsSource).not.toContain("t('spots.noSearchMessage',")
+    expect(scenicSpotsSource).not.toContain("t('community.nextPage',")
     expect(scenicSpotsSource).not.toMatch(/\b\w+\.response\??\.\s*data\??\.\s*(?:error|message)\b/)
     expect(scenicSpotsSource).not.toMatch(/\b\w+\.response\??\.\s*status\b/)
     expect(scenicSpotsSource).not.toMatch(/\b\w+\.message\b/)
+  })
+
+  it('keeps scenic spot search feedback copy covered in supported locales', () => {
+    for (const messages of supportedLocaleMessages) {
+      expect(messages.spots.searchPlaceholder).toBeTruthy()
+      expect(messages.spots.searchHelp).toBeTruthy()
+      expect(messages.spots.clearSearch).toBeTruthy()
+      expect(messages.spots.resultSummaryWithKeyword).toContain('{keyword}')
+      expect(messages.spots.paginationLabel).toBeTruthy()
+      expect(messages.spots.noSearchMessage).toBeTruthy()
+    }
   })
 
   it('keeps scenic spot cards as one keyboard link surface without nested buttons', () => {

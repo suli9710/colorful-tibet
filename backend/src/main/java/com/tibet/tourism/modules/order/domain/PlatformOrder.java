@@ -10,6 +10,7 @@ import java.util.List;
 @Entity
 @Table(name = "orders", indexes = {
         @Index(name = "idx_orders_user_created", columnList = "user_id, created_at"),
+        @Index(name = "idx_orders_user_hidden_created", columnList = "user_id, user_hidden_at, created_at"),
         @Index(name = "idx_orders_status_created", columnList = "status, created_at"),
         @Index(name = "idx_orders_order_no", columnList = "order_no", unique = true),
         @Index(name = "idx_orders_source", columnList = "source_type, source_reference_id")
@@ -98,6 +99,9 @@ public class PlatformOrder {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    @Column(name = "user_hidden_at")
+    private LocalDateTime userHiddenAt;
+
     @Version
     @Column(name = "version")
     private Long version = 0L;
@@ -122,7 +126,7 @@ public class PlatformOrder {
     @OrderBy("requestedAt ASC")
     private List<Invoice> invoices = new ArrayList<>();
 
-    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "order", cascade = {CascadeType.PERSIST, CascadeType.MERGE})
     @OrderBy("createdAt ASC")
     private List<OrderAuditLog> auditLogs = new ArrayList<>();
 
@@ -239,6 +243,9 @@ public class PlatformOrder {
 
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+
+    public LocalDateTime getUserHiddenAt() { return userHiddenAt; }
+    public void setUserHiddenAt(LocalDateTime userHiddenAt) { this.userHiddenAt = userHiddenAt; }
 
     public List<OrderItem> getItems() { return items; }
     public void setItems(List<OrderItem> items) { this.items = items; }

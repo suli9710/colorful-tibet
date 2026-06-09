@@ -3,10 +3,12 @@ import com.tibet.tourism.modules.user.domain.UserVisitHistory;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -17,6 +19,7 @@ public interface UserVisitHistoryRepository extends JpaRepository<UserVisitHisto
     List<UserVisitHistory> findBySpotId(Long spotId);
     List<UserVisitHistory> findBySpotIdIn(List<Long> spotIds);
     List<UserVisitHistory> findByUserIdIn(List<Long> userIds);
+    Optional<UserVisitHistory> findTopByUserIdAndSpotIdOrderByVisitDateDescIdDesc(Long userId, Long spotId);
 
     default List<UserVisitHistory> findRecentByUserId(Long userId) {
         return findRecentByUserId(userId, DEFAULT_RECOMMENDATION_HISTORY_LIMIT);
@@ -69,6 +72,31 @@ public interface UserVisitHistoryRepository extends JpaRepository<UserVisitHisto
 
     @Query("SELECT h.spot.id, COUNT(h) FROM UserVisitHistory h WHERE h.spot.id IN :spotIds GROUP BY h.spot.id")
     List<Object[]> countBySpotIds(@Param("spotIds") List<Long> spotIds);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            UPDATE UserVisitHistory h
+            SET h.clickCount = COALESCE(h.clickCount, 0) + 1,
+                h.visitDate = :visitDate
+            WHERE h.user.id = :userId AND h.spot.id = :spotId
+            """)
+    int incrementSpotView(
+            @Param("userId") Long userId,
+            @Param("spotId") Long spotId,
+            @Param("visitDate") java.time.LocalDateTime visitDate);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(value = """
+            INSERT INTO user_visit_history (user_id, spot_id, click_count, visit_date)
+            VALUES (:userId, :spotId, 1, :visitDate)
+            ON DUPLICATE KEY UPDATE
+                click_count = COALESCE(click_count, 0) + 1,
+                visit_date = VALUES(visit_date)
+            """, nativeQuery = true)
+    int upsertSpotView(
+            @Param("userId") Long userId,
+            @Param("spotId") Long spotId,
+            @Param("visitDate") java.time.LocalDateTime visitDate);
 
     // 根据用户ID删除访问历史
     void deleteByUserId(Long userId);

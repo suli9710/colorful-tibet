@@ -2,6 +2,82 @@
 # 使用方法: docker-compose -f docker-compose.prod.yml up -d
 
 services:
+  production-preflight:
+    image: alpine:3.21@sha256:48b0309ca019d89d40f670aa1bc06e426dc0931948452e8491e3d65087abc07d
+    container_name: colorful-tibet-production-preflight
+    network_mode: none
+    environment:
+      - DB_PASSWORD=${DB_PASSWORD:?DB_PASSWORD is required in production}
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required in production}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:?REDIS_PASSWORD is required in production}
+      - GRAFANA_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD is required in production}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-}
+      - TRUST_PROXY_HEADERS=${TRUST_PROXY_HEADERS:-false}
+      - TRUSTED_PROXY_CIDRS=${TRUSTED_PROXY_CIDRS:-}
+      - NGINX_REDIRECT_HOST=${NGINX_REDIRECT_HOST:?NGINX_REDIRECT_HOST is required in production}
+      - SUPER_ADMIN_TOTP_SECRET=${SUPER_ADMIN_TOTP_SECRET:?SUPER_ADMIN_TOTP_SECRET is required in production}
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        is_placeholder() {
+          printf '%s' "$$1" | grep -Eiq 'change-me|changeme|replace-with|placeholder'
+        }
+
+        require_real_secret() {
+          name="$$1"
+          value="$$2"
+          if [ -z "$$value" ]; then
+            echo "Refusing production compose: $$name must be configured." >&2
+            exit 1
+          fi
+          if is_placeholder "$$value"; then
+            echo "Refusing production compose: $$name must not contain placeholder values." >&2
+            exit 1
+          fi
+        }
+
+        reject_placeholder_if_set() {
+          name="$$1"
+          value="$$2"
+          if [ -n "$$value" ] && is_placeholder "$$value"; then
+            echo "Refusing production compose: $$name must not contain placeholder values." >&2
+            exit 1
+          fi
+        }
+
+        require_real_secret DB_PASSWORD "$$DB_PASSWORD"
+        require_real_secret MYSQL_ROOT_PASSWORD "$$MYSQL_ROOT_PASSWORD"
+        require_real_secret REDIS_PASSWORD "$$REDIS_PASSWORD"
+        require_real_secret GRAFANA_ADMIN_PASSWORD "$$GRAFANA_ADMIN_PASSWORD"
+        require_real_secret SUPER_ADMIN_TOTP_SECRET "$$SUPER_ADMIN_TOTP_SECRET"
+        reject_placeholder_if_set MYSQL_PASSWORD "$$MYSQL_PASSWORD"
+
+        redirect_host_pattern='^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$$'
+        if ! printf '%s' "$$NGINX_REDIRECT_HOST" | grep -Eq "$$redirect_host_pattern"; then
+          echo "Refusing production compose: NGINX_REDIRECT_HOST must be a single canonical host without scheme, path, port, comma, whitespace, or control characters." >&2
+          exit 1
+        fi
+
+        proxy_headers="$$(printf '%s' "$$TRUST_PROXY_HEADERS" | tr '[:upper:]' '[:lower:]')"
+        trusted_cidrs="$$(printf '%s' "$$TRUSTED_PROXY_CIDRS" | tr -d '[:space:]')"
+        if [ "$$proxy_headers" = "true" ]; then
+          if [ -z "$$trusted_cidrs" ]; then
+            echo "Refusing production compose: TRUSTED_PROXY_CIDRS must be explicit when TRUST_PROXY_HEADERS=true." >&2
+            exit 1
+          fi
+          if printf '%s' "$$trusted_cidrs" | tr ',' '\n' | grep -Exq '0\.0\.0\.0/0|::/0|10\.0\.0\.0/8|172\.16\.0\.0/12|192\.168\.0\.0/16'; then
+            echo "Refusing production compose: TRUSTED_PROXY_CIDRS must not trust broad private ranges." >&2
+            exit 1
+          fi
+        fi
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    restart: "no"
+
   backend:
     build:
       context: ./backend
@@ -43,8 +119,8 @@ services:
       - SEED_CONTENT_ENABLED=${SEED_CONTENT_ENABLED:-false}
       - COOKIE_SECURE=${COOKIE_SECURE:-true}
       - SERVER_FORWARD_HEADERS_STRATEGY=${SERVER_FORWARD_HEADERS_STRATEGY:-framework}
-      - TRUST_PROXY_HEADERS=${TRUST_PROXY_HEADERS:-true}
-      - TRUSTED_PROXY_CIDRS=${TRUSTED_PROXY_CIDRS:-172.16.0.0/12,10.0.0.0/8,127.0.0.1/32}
+      - TRUST_PROXY_HEADERS=${TRUST_PROXY_HEADERS:-false}
+      - TRUSTED_PROXY_CIDRS=${TRUSTED_PROXY_CIDRS:-}
       - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS}
       - SUPER_ADMIN_USERNAME=${SUPER_ADMIN_USERNAME:?SUPER_ADMIN_USERNAME is required in production}
       - SUPER_ADMIN_TOTP_SECRET=${SUPER_ADMIN_TOTP_SECRET:?SUPER_ADMIN_TOTP_SECRET is required in production}
@@ -103,6 +179,8 @@ services:
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,size=128m,mode=1777
     depends_on:
+      production-preflight:
+        condition: service_completed_successfully
       mysql:
         condition: service_healthy
       redis:
@@ -125,7 +203,7 @@ services:
       - tibet-network
 
   redis:
-    image: redis:7-alpine
+    image: redis:7-alpine@sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99
     container_name: colorful-tibet-redis
     entrypoint:
       - /bin/sh
@@ -143,6 +221,9 @@ services:
       - REDIS_PASSWORD=${REDIS_PASSWORD:?REDIS_PASSWORD is required in production}
     volumes:
       - redis_data:/data
+    depends_on:
+      production-preflight:
+        condition: service_completed_successfully
     restart: unless-stopped
     networks:
       - tibet-network
@@ -158,7 +239,7 @@ services:
           memory: 512M
 
   mysql:
-    image: mysql:8.4
+    image: mysql:8.4@sha256:c36050afdca850f23cef85703f84c7531a5ae155a11b5ee1c60acb09937c4084
     container_name: colorful-tibet-mysql
     environment:
       - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required in production}
@@ -167,6 +248,9 @@ services:
       - MYSQL_PASSWORD=${DB_PASSWORD:?DB_PASSWORD is required in production}
     volumes:
       - mysql_data:/var/lib/mysql
+    depends_on:
+      production-preflight:
+        condition: service_completed_successfully
     restart: unless-stopped
     networks:
       - tibet-network
@@ -206,6 +290,16 @@ services:
       - SCRAPLING_ALLOW_UNAUTHENTICATED=${SCRAPLING_ALLOW_UNAUTHENTICATED:-false}
       - SCRAPLING_MAX_CONCURRENCY=${SCRAPLING_MAX_CONCURRENCY:-2}
       - SCRAPLING_ALLOW_REQUEST_MODE_OVERRIDE=${SCRAPLING_ALLOW_REQUEST_MODE_OVERRIDE:-false}
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=256m,mode=1777
+    depends_on:
+      production-preflight:
+        condition: service_completed_successfully
     restart: unless-stopped
     networks:
       - tibet-network
@@ -234,6 +328,7 @@ services:
         - VITE_AMAP_SECURITY_CODE=${VITE_AMAP_SECURITY_CODE:?VITE_AMAP_SECURITY_CODE is required for production map features}
     environment:
       - NGINX_SERVER_NAME=${NGINX_SERVER_NAME:?NGINX_SERVER_NAME is required in production}
+      - NGINX_REDIRECT_HOST=${NGINX_REDIRECT_HOST:?NGINX_REDIRECT_HOST is required in production}
       - NGINX_CERT_DOMAIN=${NGINX_CERT_DOMAIN:?NGINX_CERT_DOMAIN is required in production}
     container_name: colorful-tibet-frontend
     ports:
@@ -272,7 +367,7 @@ services:
       - tibet-network
 
   prometheus:
-    image: prom/prometheus:v2.55.1
+    image: prom/prometheus:v2.55.1@sha256:2659f4c2ebb718e7695cb9b25ffa7d6be64db013daba13e05c875451cf51b0d3
     container_name: colorful-tibet-prometheus
     command:
       - --config.file=/etc/prometheus/prometheus.yml
@@ -296,7 +391,7 @@ services:
       - tibet-network
 
   alertmanager:
-    image: prom/alertmanager:v0.27.0
+    image: prom/alertmanager:v0.27.0@sha256:e13b6ed5cb929eeaee733479dce55e10eb3bc2e9c4586c705a4e8da41e5eacf5
     container_name: colorful-tibet-alertmanager
     entrypoint:
       - /bin/sh
@@ -334,7 +429,7 @@ services:
       - tibet-network
 
   grafana:
-    image: grafana/grafana:11.4.0
+    image: grafana/grafana:11.4.0@sha256:d8ea37798ccc41061a62ab080f2676dda6bf7815558499f901bdb0f533a456fb
     container_name: colorful-tibet-grafana
     environment:
       - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
@@ -346,7 +441,10 @@ services:
       - grafana_data:/var/lib/grafana
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
     depends_on:
-      - prometheus
+      production-preflight:
+        condition: service_completed_successfully
+      prometheus:
+        condition: service_started
     restart: unless-stopped
     deploy:
       resources:
@@ -357,7 +455,7 @@ services:
       - tibet-network
 
   zipkin:
-    image: openzipkin/zipkin:3.4
+    image: openzipkin/zipkin:3.4@sha256:c2830e93d95de43f0d10e00a3784a9ee101cdf4909370196c8802514fd7f1954
     container_name: colorful-tibet-zipkin
     ports:
       - "127.0.0.1:9411:9411"

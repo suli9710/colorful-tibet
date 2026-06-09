@@ -1,4 +1,5 @@
 package com.tibet.tourism.modules.order.web;
+import com.tibet.tourism.common.api.PageResponse;
 import com.tibet.tourism.common.security.antibot.BehaviorData;
 import com.tibet.tourism.common.security.antibot.RiskAssessmentService;
 import com.tibet.tourism.common.security.antibot.RiskResult;
@@ -14,7 +15,6 @@ import com.tibet.tourism.modules.order.web.dto.RefundReviewRequest;
 import com.tibet.tourism.modules.user.domain.User;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
-import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import org.springframework.data.domain.Page;
@@ -199,12 +199,12 @@ public class OrderCenterController {
         }
     }
 
-    private <T> ResponseEntity<List<T>> pagedContent(Page<T> page) {
+    private <T> ResponseEntity<PageResponse<T>> pagedContent(Page<T> page) {
         return ResponseEntity.ok()
                 .header("X-Page", String.valueOf(page.getNumber()))
                 .header("X-Size", String.valueOf(page.getSize()))
                 .header("X-Total-Elements", String.valueOf(page.getTotalElements()))
                 .header("X-Total-Pages", String.valueOf(page.getTotalPages()))
-                .body(page.getContent());
+                .body(PageResponse.from(page));
     }
 }
