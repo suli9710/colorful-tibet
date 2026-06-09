@@ -202,6 +202,7 @@ docker compose down
 | `REDIS_HOST` / `REDIS_PORT` / `REDIS_PASSWORD` | Redis 配置 |
 | `JWT_SECRET` | JWT 签名密钥，生产必须 64 字符以上 |
 | `CSRF_SIGNING_SECRET` | CSRF Cookie 签名密钥 |
+| `CACHE_KEY_HMAC_SECRET` | 缓存键标签 HMAC 密钥，生产必须独立于 JWT/CSRF 密钥 |
 | `PII_KEYS` / `PII_ACTIVE_KID` | 敏感信息加密密钥集合与当前 key id |
 | `ADMIN_ENCRYPTION_KEY` | 管理端敏感配置加密密钥 |
 | `SUPER_ADMIN_USERNAME` / `SUPER_ADMIN_TOTP_SECRET` | 超级管理员账号与 TOTP 二次认证密钥 |

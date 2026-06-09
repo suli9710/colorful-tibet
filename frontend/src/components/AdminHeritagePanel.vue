@@ -19,7 +19,10 @@
         </div>
         <h3 class="text-lg font-bold text-stone-800">
           {{ text('admin.heritageManagement', '非遗管理') }}
-          <span class="text-sm font-normal text-stone-400">({{ filteredItems.length }}{{ text('common.items', '项') }})</span>
+          <span class="text-sm font-normal text-stone-400">
+            <template v-if="itemError && filteredItems.length === 0">{{ text('admin.listUnavailable', '列表不可用') }}</template>
+            <template v-else>({{ filteredItems.length }}{{ text('common.items', '项') }})</template>
+          </span>
         </h3>
       </div>
       <div class="grid w-full grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center lg:w-auto">
@@ -54,7 +57,32 @@
       <p>{{ text('admin.loadingHeritage', '正在加载非遗项目') }}</p>
     </div>
 
+    <div v-else-if="itemError && !showHeritage" class="border-t border-red-100 bg-red-50 px-6 py-4" role="alert">
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <p class="text-sm font-medium text-red-700">{{ itemError }}</p>
+        <button
+          class="inline-flex min-h-10 items-center justify-center rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+          :disabled="loading"
+          @click="fetchItems"
+        >
+          {{ loading ? text('common.loading', '加载中') : text('admin.retryHeritageItems', '重试非遗项目') }}
+        </button>
+      </div>
+    </div>
+
     <div v-else-if="showHeritage" id="admin-heritage-panel-content" class="divide-y divide-stone-200">
+      <div v-if="itemError" class="border-b border-red-100 bg-red-50 px-6 py-4" role="alert">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p class="text-sm font-medium text-red-700">{{ itemError }}</p>
+          <button
+            class="inline-flex min-h-10 items-center justify-center rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+            :disabled="loading"
+            @click="fetchItems"
+          >
+            {{ loading ? text('common.loading', '加载中') : text('admin.retryHeritageItems', '重试非遗项目') }}
+          </button>
+        </div>
+      </div>
       <div v-for="item in filteredItems" :key="item.id" class="px-4 py-4 transition-colors hover:bg-stone-50 sm:px-6">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start">
           <div class="h-36 w-full flex-shrink-0 overflow-hidden rounded-lg bg-stone-100 lg:h-24 lg:w-28">
@@ -393,6 +421,8 @@ const cleanPayload = <T extends Record<string, unknown>>(form: T) => {
 
 const items = ref<HeritageItem[]>([])
 const loading = ref(false)
+const itemError = ref('')
+const itemsRequestId = ref(0)
 const showHeritage = ref(false)
 const keyword = ref('')
 
@@ -405,6 +435,7 @@ const expandedItemId = ref<number | null>(null)
 const inheritors = ref<HeritageInheritorItem[]>([])
 const events = ref<HeritageEventItem[]>([])
 const relationsLoading = ref(false)
+const relationsRequestId = ref(0)
 
 const editingInheritorId = ref<number | null>(null)
 const inheritorForm = ref<InheritorForm>(emptyInheritorForm())
@@ -437,15 +468,22 @@ const toggleHeritagePanelFromKeyboard = (event: KeyboardEvent) => {
 }
 
 const fetchItems = async () => {
+  const requestId = itemsRequestId.value + 1
+  itemsRequestId.value = requestId
   loading.value = true
+  itemError.value = ''
   try {
     const response = await api.get<AdminListResponse<HeritageItem>>(endpoints.adminHeritage.list, { params: adminPageParams })
+    if (requestId !== itemsRequestId.value) return
     items.value = toList<HeritageItem>(response.data)
   } catch (error) {
+    if (requestId !== itemsRequestId.value) return
     console.error('Failed to fetch heritage items:', summarizeClientError(error))
-    items.value = []
+    itemError.value = text('admin.heritageItemsLoadFailed', '非遗项目加载失败，请稍后重试')
   } finally {
-    loading.value = false
+    if (requestId === itemsRequestId.value) {
+      loading.value = false
+    }
   }
 }
 
@@ -521,9 +559,11 @@ const deleteItem = async (item: HeritageItem) => {
 
 const toggleRelations = async (item: HeritageItem) => {
   if (expandedItemId.value === item.id) {
+    relationsRequestId.value += 1
     expandedItemId.value = null
     inheritors.value = []
     events.value = []
+    relationsLoading.value = false
     return
   }
   expandedItemId.value = item.id
@@ -532,21 +572,31 @@ const toggleRelations = async (item: HeritageItem) => {
   await loadRelations(item.id)
 }
 
+const isCurrentRelationsRequest = (requestId: number, itemId: number) => {
+  return relationsRequestId.value === requestId && expandedItemId.value === itemId
+}
+
 const loadRelations = async (itemId: number) => {
+  const requestId = relationsRequestId.value + 1
+  relationsRequestId.value = requestId
   relationsLoading.value = true
   try {
     const [inheritorResponse, eventResponse] = await Promise.all([
       api.get(endpoints.adminHeritage.inheritors(itemId)),
       api.get(endpoints.adminHeritage.events(itemId))
     ])
+    if (!isCurrentRelationsRequest(requestId, itemId)) return
     inheritors.value = Array.isArray(inheritorResponse.data) ? inheritorResponse.data : []
     events.value = Array.isArray(eventResponse.data) ? eventResponse.data : []
   } catch (error) {
+    if (!isCurrentRelationsRequest(requestId, itemId)) return
     console.error('Failed to fetch heritage relations:', summarizeClientError(error))
     inheritors.value = []
     events.value = []
   } finally {
-    relationsLoading.value = false
+    if (isCurrentRelationsRequest(requestId, itemId)) {
+      relationsLoading.value = false
+    }
   }
 }
 

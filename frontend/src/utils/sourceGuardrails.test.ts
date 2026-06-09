@@ -31,6 +31,12 @@ const dynamicLeafletOwnerFiles = [
   '../views/Heritage.vue',
   '../views/ScenicSpotDetail.vue'
 ] as const
+const userVisibleDataDisplayFiles = [
+  '../data/hotelImages.ts',
+  '../data/hotelTranslations.ts',
+  '../views/CreateRoute.vue',
+  '../views/Favorites.vue'
+] as const
 const sourceModules = import.meta.glob('../**/*.{js,jsx,ts,tsx,vue}', {
   eager: true,
   query: '?raw',
@@ -185,6 +191,14 @@ describe('frontend source guardrails', () => {
     }
   })
 
+  it('keeps user-visible route and hotel display files off broad production any', () => {
+    for (const filePath of userVisibleDataDisplayFiles) {
+      const source = getSourceModule(filePath)
+
+      expect(source, filePath).not.toMatch(/\bany\b/)
+    }
+  })
+
   it('keeps admin hotel orders off internal user summaries', () => {
     const adminDashboardSource = getSourceModule('../views/AdminDashboard.vue')
     const hotelOrderTemplate = getSourceSection(
@@ -229,7 +243,7 @@ describe('frontend source guardrails', () => {
     expect(adminDashboardSource).toContain('safeClientErrorMessage(error, fallback)')
     expect(adminDashboardSource).toContain('summarizeClientError(error)')
     for (const resource of ['admin carousels', 'admin routes', 'admin hotels', 'admin room types']) {
-      expect(adminDashboardSource).toContain(`reportAdminListLoadFailure('${resource}', e)`)
+      expect(adminDashboardSource).toContain(`reportAdminListLoadFailure('${resource}', e,`)
     }
   })
 
@@ -363,6 +377,20 @@ describe('frontend source guardrails', () => {
       expect(source, filePath).toContain("import('leaflet')")
       expect(source, filePath).toContain("import('leaflet/dist/leaflet.css')")
     }
+  })
+
+  it('keeps third-party scripts and booking links fail-closed on trusted origins', () => {
+    const amapSource = getSourceModule('./amap.ts')
+    const recaptchaSource = getSourceModule('./recaptcha.ts')
+    const externalBookingSource = getSourceModule('./externalBooking.ts')
+
+    expect(amapSource).toContain('isTrustedAmapScript(existingScript)')
+    expect(amapSource).toContain('url.origin === AMAP_SCRIPT_ORIGIN')
+    expect(recaptchaSource).toContain('isTrustedRecaptchaScript(existingScript, mode, siteKey)')
+    expect(recaptchaSource).toContain('TRUSTED_RECAPTCHA_SCRIPT_ORIGINS.has(url.origin)')
+    expect(externalBookingSource).toContain('allowedHostSuffixes')
+    expect(externalBookingSource).toContain('hostnameMatchesSuffix')
+    expect(externalBookingSource).toContain('VITE_EXTERNAL_BOOKING_ALLOWED_HOSTS')
   })
 })
 

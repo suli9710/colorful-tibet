@@ -240,14 +240,27 @@ const hotelTranslations: Record<number, Partial<HotelItem>> = {
   }
 }
 
-const translateArray = (items: string[], dictionary: Record<string, string>) =>
-  items.map(item => dictionary[item] || item)
+const toStringList = (items: unknown): string[] =>
+  Array.isArray(items)
+    ? items.filter((item): item is string => typeof item === 'string')
+    : []
+
+const translateArray = (items: unknown, dictionary: Record<string, string>) =>
+  toStringList(items).map(item => dictionary[item] || item)
 
 const translateRoomDesc = (desc: string) =>
   desc
     .split(' · ')
     .map(part => roomDescFragments[part] || part)
     .join(' · ')
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null
+
+const readString = (record: Record<string, unknown>, key: string) => {
+  const value = record[key]
+  return typeof value === 'string' ? value : undefined
+}
 
 export const normalizeHotelLocale = (locale: string): LocaleCode => locale === 'bo' ? 'bo' : 'zh'
 
@@ -265,13 +278,17 @@ export const localizeHotelRoom = (room: HotelRoom, locale: string): HotelRoom =>
   }
 }
 
-export const localizeApiRoom = (room: any, locale: string) => {
-  if (normalizeHotelLocale(locale) !== 'bo') return room
+export const localizeApiRoom = <T extends object | null | undefined>(room: T, locale: string): T => {
+  if (!isRecord(room) || normalizeHotelLocale(locale) !== 'bo') return room
+
+  const name = readString(room, 'name')
+  const amenities = readString(room, 'amenities')
+
   return {
     ...room,
-    name: roomNameLabels[room.name] || room.name,
-    amenities: room.amenities ? translateRoomDesc(room.amenities) : room.amenities
-  }
+    ...(name ? { name: roomNameLabels[name] || name } : {}),
+    ...(amenities ? { amenities: translateRoomDesc(amenities) } : {})
+  } as T
 }
 
 export const localizeHotel = <T extends LocalizableHotel | null | undefined>(hotel: T, locale: string): T => {
@@ -282,9 +299,11 @@ export const localizeHotel = <T extends LocalizableHotel | null | undefined>(hot
     ...translation,
     region: hotel.region ? localizeRegion(hotel.region, locale) : hotel.region,
     city: hotel.city ? localizeRegion(hotel.city, locale) : hotel.city,
-    tags: translateArray(hotel.tags || [], tagLabels),
-    amenities: translateArray(hotel.amenities || [], amenityLabels),
-    rooms: (hotel.rooms || []).map((room: HotelRoom) => localizeHotelRoom(room, locale))
+    tags: translateArray(hotel.tags, tagLabels),
+    amenities: translateArray(hotel.amenities, amenityLabels),
+    rooms: Array.isArray(hotel.rooms)
+      ? hotel.rooms.map((room: HotelRoom) => localizeHotelRoom(room, locale))
+      : []
   } as T
 }
 

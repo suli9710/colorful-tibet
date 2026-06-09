@@ -1,12 +1,11 @@
 package com.tibet.tourism.modules.ai.application;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
+import com.tibet.tourism.common.security.CacheKeyHasher;
+import com.tibet.tourism.common.security.ProductionSafetyValidator;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.HexFormat;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -14,6 +13,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -23,9 +23,13 @@ public class GuideChatUsageService {
     private static final Logger log = LoggerFactory.getLogger(GuideChatUsageService.class);
     private static final String DAILY_KEY_PREFIX = "ai:guide:daily:";
     private static final String WINDOW_KEY_PREFIX = "ai:guide:window:";
+    private static final String ANONYMOUS_CLIENT_KEY_NAMESPACE = "guide-chat-anon-client";
+    private static final String AUTHENTICATED_CLIENT_KEY_NAMESPACE = "guide-chat-auth-client";
     private static final int MAX_TRACKED_CLIENTS = 10_000;
 
     private final StringRedisTemplate redisTemplate;
+    private final CacheKeyHasher cacheKeyHasher;
+    private final boolean productionSafetyRequired;
     private final Map<String, UsageBucket> fallbackUsage = new ConcurrentHashMap<>();
 
     @Value("${app.security.guide-chat.anonymous-enabled:${GUIDE_CHAT_ANONYMOUS_ENABLED:true}}")
@@ -46,8 +50,18 @@ public class GuideChatUsageService {
     @Value("${app.security.guide-chat.window-seconds:${app.security.ai-guide.window-seconds:${AI_GUIDE_WINDOW_SECONDS:600}}}")
     private int windowSeconds;
 
-    public GuideChatUsageService(ObjectProvider<StringRedisTemplate> redisTemplateProvider) {
-        this.redisTemplate = redisTemplateProvider.getIfAvailable();
+    public GuideChatUsageService(ObjectProvider<StringRedisTemplate> redisTemplateProvider,
+                                 CacheKeyHasher cacheKeyHasher,
+                                 Environment environment) {
+        this.redisTemplate = redisTemplateProvider == null ? null : redisTemplateProvider.getIfAvailable();
+        this.cacheKeyHasher = cacheKeyHasher == null
+                ? new CacheKeyHasher("local-guide-chat-cache-key-hmac-secret")
+                : cacheKeyHasher;
+        this.productionSafetyRequired = ProductionSafetyValidator.isProductionSafetyRequired(environment);
+    }
+
+    GuideChatUsageService(ObjectProvider<StringRedisTemplate> redisTemplateProvider) {
+        this(redisTemplateProvider, new CacheKeyHasher("local-guide-chat-cache-key-hmac-secret"), null);
     }
 
     public Decision tryAcquire(String clientKey) {
@@ -60,7 +74,7 @@ public class GuideChatUsageService {
             return Decision.blocked("anonymous-disabled", 0, 3600);
         }
 
-        String identity = safeClient.redisScope() + ":" + shortHash(safeClient.key());
+        String identity = clientLabel(safeClient);
         String dateKey = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE);
 
         if (redisTemplate != null) {
@@ -70,10 +84,19 @@ public class GuideChatUsageService {
                     return redisDecision;
                 }
             } catch (Exception e) {
+                if (productionSafetyRequired) {
+                    log.warn("Redis guide chat usage check failed in production; blocking guide chat: {}",
+                            AiLogPrivacy.exceptionSummary(e));
+                    return usageBackendUnavailable();
+                }
                 log.warn("Redis guide chat usage check failed, using in-memory fallback: {}", AiLogPrivacy.exceptionSummary(e));
             }
         }
 
+        if (productionSafetyRequired) {
+            log.warn("Redis guide chat usage backend is missing in production; blocking guide chat");
+            return usageBackendUnavailable();
+        }
         return tryAcquireInMemory(identity, dateKey, safeClient.authenticated(), recaptchaVerified);
     }
 
@@ -192,14 +215,15 @@ public class GuideChatUsageService {
         return Math.max(60, (int) ((tomorrow - now + 999) / 1000));
     }
 
-    private String shortHash(String value) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hashed = digest.digest((value == null ? "" : value).getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(hashed, 0, 12);
-        } catch (Exception e) {
-            return "unknown";
-        }
+    private String clientLabel(ClientIdentity client) {
+        String namespace = client.authenticated()
+                ? AUTHENTICATED_CLIENT_KEY_NAMESPACE
+                : ANONYMOUS_CLIENT_KEY_NAMESPACE;
+        return cacheKeyHasher.cacheKey(namespace, client.key());
+    }
+
+    private Decision usageBackendUnavailable() {
+        return Decision.blocked("usage-backend-unavailable", 0, Math.max(60, windowSeconds));
     }
 
     public record ClientIdentity(boolean authenticated, String key) {
@@ -211,21 +235,18 @@ public class GuideChatUsageService {
             return new ClientIdentity(true, userId == null ? "unknown" : userId.toString());
         }
 
-        String redisScope() {
-            return authenticated ? "user" : "anon";
-        }
     }
 
     public record Decision(boolean allowed, boolean challengeRequired, String reason, int remaining, int retryAfterSeconds) {
-        static Decision allowed(int remaining, int retryAfterSeconds) {
+        public static Decision allowed(int remaining, int retryAfterSeconds) {
             return new Decision(true, false, "", remaining, retryAfterSeconds);
         }
 
-        static Decision blocked(String reason, int remaining, int retryAfterSeconds) {
+        public static Decision blocked(String reason, int remaining, int retryAfterSeconds) {
             return new Decision(false, false, reason, remaining, Math.max(1, retryAfterSeconds));
         }
 
-        static Decision challenge(String reason, int retryAfterSeconds) {
+        public static Decision challenge(String reason, int retryAfterSeconds) {
             return new Decision(false, true, reason, 0, Math.max(1, retryAfterSeconds));
         }
     }

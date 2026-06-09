@@ -13,10 +13,8 @@ rule_files:
 
 scrape_configs:
   - job_name: colorful-tibet-backend
-    # NOTE: /actuator/prometheus is gated behind ROLE_ADMIN unless
-    # PUBLIC_METRICS_ENABLED=true. docker-compose.prod.yml defaults it to FALSE
-    # (secure default), so this scrape returns 401/403 until metrics exposure is
-    # explicitly enabled behind a trusted/isolated network or auth proxy/mTLS.
+    # Production compose keeps PUBLIC_METRICS_ENABLED=false by default.
+    # Configure an authenticated or allowlisted scrape path before relying on this job.
     metrics_path: /actuator/prometheus
     static_configs:
       - targets:

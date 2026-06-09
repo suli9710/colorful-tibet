@@ -63,11 +63,17 @@ public class AdminSecurityPostureService {
     @Value("${app.security.rate-limit.redis-enabled:true}")
     private boolean rateLimitRedisEnabled;
 
+    @Value("${app.security.rate-limit.redis-fail-closed:false}")
+    private boolean rateLimitRedisFailClosed;
+
     @Value("${app.security.brute-force.enabled:true}")
     private boolean bruteForceEnabled;
 
     @Value("${app.security.brute-force.redis-enabled:true}")
     private boolean bruteForceRedisEnabled;
+
+    @Value("${app.security.brute-force.redis-fail-closed:false}")
+    private boolean bruteForceRedisFailClosed;
 
     @Value("${app.payments.mock-callback-secret:}")
     private String paymentCallbackSecret;
@@ -149,8 +155,10 @@ public class AdminSecurityPostureService {
         SecurityPostureResponse.ProtectionSnapshot protectionSnapshot = new SecurityPostureResponse.ProtectionSnapshot();
         protectionSnapshot.setRateLimitEnabled(rateLimitEnabled);
         protectionSnapshot.setRateLimitRedisEnabled(rateLimitRedisEnabled);
+        protectionSnapshot.setRateLimitRedisFailClosed(rateLimitRedisFailClosed);
         protectionSnapshot.setBruteForceEnabled(bruteForceEnabled);
         protectionSnapshot.setBruteForceRedisEnabled(bruteForceRedisEnabled);
+        protectionSnapshot.setBruteForceRedisFailClosed(bruteForceRedisFailClosed);
         protectionSnapshot.setAntibotEnabled(antibotProperties != null && antibotProperties.isEnabled());
         protectionSnapshot.setRecaptchaConfigured(isRecaptchaConfigured());
         response.setProtections(protectionSnapshot);
@@ -183,6 +191,16 @@ public class AdminSecurityPostureService {
                 isCsrfConfigured() ? "CSRF signing configured" : "CSRF signing secret missing");
         addFinding(findings, "RATE_LIMITING", rateLimitEnabled ? "PASS" : "WARN",
                 rateLimitEnabled ? "Rate limiting enabled" : "Rate limiting disabled");
+        addFinding(findings, "RATE_LIMIT_REDIS_FAIL_CLOSED",
+                rateLimitRedisEnabled && rateLimitRedisFailClosed ? "PASS" : "WARN",
+                rateLimitRedisEnabled && rateLimitRedisFailClosed
+                        ? "Rate limiting fails closed when Redis is unavailable"
+                        : "Rate limiting can fall back when Redis is unavailable");
+        addFinding(findings, "BRUTE_FORCE_REDIS_FAIL_CLOSED",
+                bruteForceRedisEnabled && bruteForceRedisFailClosed ? "PASS" : "WARN",
+                bruteForceRedisEnabled && bruteForceRedisFailClosed
+                        ? "Brute-force protection fails closed when Redis is unavailable"
+                        : "Brute-force protection can fall back when Redis is unavailable");
         addFinding(findings, "PII_KEYS", hasText(piiKeys) && hasText(piiActiveKid) ? "PASS" : "WARN",
                 hasText(piiKeys) && hasText(piiActiveKid) ? "PII encryption configured" : "PII encryption incomplete");
         addFinding(findings, "PAYMENT_CALLBACK",

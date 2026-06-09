@@ -11,13 +11,20 @@
         <p class="text-base text-stone-600 sm:text-lg">{{ favoriteLabel('subtitle') }}</p>
       </motion.div>
 
-      <div v-if="loading" role="status" aria-live="polite" class="flex h-64 items-center justify-center">
+      <div
+        v-if="loading"
+        role="status"
+        aria-busy="true"
+        aria-live="polite"
+        :aria-label="favoriteLabel('loading')"
+        class="flex h-64 items-center justify-center"
+      >
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
-        <span class="sr-only">{{ t('common.loading') }}</span>
+        <span class="sr-only">{{ favoriteLabel('loading') }}</span>
       </div>
 
-      <div v-else-if="errorMessage" role="alert" class="rounded-2xl border border-rose-200 bg-rose-50 px-6 py-10 text-center">
-        <p class="text-base font-semibold text-rose-800">收藏列表加载失败</p>
+      <div v-else-if="errorMessage" role="alert" aria-live="assertive" class="rounded-2xl border border-rose-200 bg-rose-50 px-6 py-10 text-center">
+        <p class="text-base font-semibold text-rose-800">{{ favoriteLabel('loadErrorTitle') }}</p>
         <p class="mx-auto mt-2 max-w-md text-sm leading-6 text-rose-700">{{ errorMessage }}</p>
         <button
           type="button"
@@ -25,7 +32,7 @@
           :disabled="loading"
           @click="fetchFavorites(currentPage)"
         >
-          重新加载
+          {{ favoriteLabel('retryLoad') }}
         </button>
       </div>
 
@@ -50,15 +57,11 @@
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0 flex-1">
               <h3 class="text-lg font-bold text-stone-800">{{ fav.route?.name || favoriteLabel('unknownRoute') }}</h3>
-              <p class="break-words text-sm text-stone-500 mt-1">{{ fav.route?.description?.substring(0, 100) }}...</p>
+              <p v-if="favoriteRouteDescription(fav.route)" class="break-words text-sm text-stone-500 mt-1">{{ favoriteRouteDescription(fav.route) }}</p>
               <div class="flex flex-wrap items-center gap-2 mt-3 text-sm text-stone-600 sm:gap-4">
-                <span>{{ t('admin.daysValue', { count: fav.route?.days || 0 }) }}</span>
-                <span class="text-red-600 font-semibold">¥{{ fav.route?.price }}</span>
-                <span :class="{
-                  'bg-green-100 text-green-800': fav.route?.difficulty === 'EASY',
-                  'bg-yellow-100 text-yellow-800': fav.route?.difficulty === 'MEDIUM',
-                  'bg-red-100 text-red-800': fav.route?.difficulty === 'HARD'
-                }" class="px-2 py-0.5 rounded text-xs">{{ fav.route?.difficulty }}</span>
+                <span v-if="fav.route?.days">{{ t('admin.daysValue', { count: fav.route.days }) }}</span>
+                <span v-if="fav.route && fav.route.price !== null" class="text-red-600 font-semibold">¥{{ fav.route.price }}</span>
+                <span v-if="fav.route?.difficulty" :class="favoriteDifficultyClass(fav.route.difficulty)" class="px-2 py-0.5 rounded text-xs">{{ fav.route.difficulty }}</span>
                 <span v-if="fav.route?.temperature" class="text-xs">{{ fav.route.temperature }}</span>
               </div>
             </div>
@@ -79,10 +82,17 @@
         </motion.div>
       </div>
 
-      <div v-if="totalPages > 1" class="flex justify-center mt-8 gap-2 overflow-x-auto pb-1">
+      <div
+        v-if="!loading && !errorMessage && totalPages > 1"
+        role="navigation"
+        :aria-label="favoriteLabel('paginationLabel')"
+        class="flex justify-center mt-8 gap-2 overflow-x-auto pb-1"
+      >
         <button v-for="page in totalPages" :key="page" type="button" @click="fetchFavorites(page - 1)"
+          :aria-current="currentPage === page - 1 ? 'page' : undefined"
+          :disabled="loading || currentPage === page - 1"
           :class="currentPage === page - 1 ? 'bg-red-600 text-white' : 'bg-white text-stone-600 hover:bg-stone-100'"
-          class="px-4 py-2 rounded-lg border transition-colors">{{ page }}</button>
+          class="px-4 py-2 rounded-lg border transition-colors disabled:cursor-not-allowed disabled:opacity-70">{{ page }}</button>
       </div>
     </div>
   </div>
@@ -105,33 +115,150 @@ const favoriteFallbacks = {
   goExplore: '去规划路线',
   unknownRoute: '未命名路线',
   remove: '取消收藏',
-  operationFailed: '操作失败，请稍后重试'
+  operationFailed: '操作失败，请稍后重试',
+  loading: '正在加载收藏路线',
+  loadErrorTitle: '收藏列表加载失败',
+  loadFailed: '收藏列表加载失败，请稍后重试',
+  retryLoad: '重新加载',
+  paginationLabel: '收藏路线分页'
 } as const
 const favoriteLabel = (key: keyof typeof favoriteFallbacks) => {
   const i18nKey = `favorites.${key}`
   const translated = t(i18nKey)
   return translated === i18nKey ? favoriteFallbacks[key] : translated
 }
-const favorites = ref<any[]>([])
+
+interface FavoriteRoute {
+  id: number
+  name: string
+  description: string
+  days: number | null
+  price: number | null
+  difficulty: string
+  temperature: string
+}
+
+interface FavoriteItem {
+  id: number | string
+  route: FavoriteRoute | null
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null
+
+const readString = (record: Record<string, unknown>, key: string) => {
+  const value = record[key]
+  if (typeof value === 'string') return value.trim()
+  return ''
+}
+
+const readFiniteNumber = (record: Record<string, unknown>, key: string) => {
+  const value = record[key]
+  if (typeof value !== 'number' && typeof value !== 'string') return null
+
+  const numberValue = Number(value)
+  return Number.isFinite(numberValue) ? numberValue : null
+}
+
+const readPositiveInteger = (record: Record<string, unknown>, key: string) => {
+  const value = readFiniteNumber(record, key)
+  if (value === null) return null
+
+  const integerValue = Math.trunc(value)
+  return integerValue > 0 ? integerValue : null
+}
+
+const normalizeFavoriteRoute = (value: unknown): FavoriteRoute | null => {
+  if (!isRecord(value)) return null
+
+  const id = readPositiveInteger(value, 'id')
+  if (!id) return null
+
+  const days = readPositiveInteger(value, 'days')
+  const priceValue = readFiniteNumber(value, 'price')
+  const price = priceValue !== null && priceValue >= 0 ? priceValue : null
+
+  return {
+    id,
+    name: readString(value, 'name'),
+    description: readString(value, 'description'),
+    days,
+    price,
+    difficulty: readString(value, 'difficulty'),
+    temperature: readString(value, 'temperature')
+  }
+}
+
+const normalizeFavoriteItem = (value: unknown, index: number): FavoriteItem | null => {
+  if (!isRecord(value)) return null
+
+  const route = normalizeFavoriteRoute(value.route)
+  const id = readPositiveInteger(value, 'id') ?? route?.id ?? `favorite-${index}`
+
+  return { id, route }
+}
+
+const normalizeFavorites = (value: unknown): FavoriteItem[] => {
+  const items = isRecord(value) && Array.isArray(value.content)
+    ? value.content
+    : Array.isArray(value)
+      ? value
+      : []
+
+  return items
+    .map(normalizeFavoriteItem)
+    .filter((favorite): favorite is FavoriteItem => favorite !== null)
+}
+
+const normalizeTotalPages = (value: unknown) => {
+  if (!isRecord(value)) return 1
+
+  const totalPageCount = readPositiveInteger(value, 'totalPages')
+  return totalPageCount ?? 1
+}
+
+const favoriteRouteDescription = (route: FavoriteRoute | null) => {
+  const description = route?.description.trim()
+  if (!description) return ''
+
+  return description.length > 100 ? `${description.substring(0, 100)}...` : description
+}
+
+const favoriteDifficultyClass = (difficulty: string) => ({
+  'bg-green-100 text-green-800': difficulty === 'EASY',
+  'bg-yellow-100 text-yellow-800': difficulty === 'MEDIUM',
+  'bg-red-100 text-red-800': difficulty === 'HARD'
+})
+
+const favorites = ref<FavoriteItem[]>([])
 const loading = ref(true)
 const currentPage = ref(0)
 const totalPages = ref(1)
 const errorMessage = ref('')
+let latestFavoritesRequestId = 0
 
 const fetchFavorites = async (page = 0) => {
+  const requestId = latestFavoritesRequestId + 1
+  latestFavoritesRequestId = requestId
   loading.value = true
   errorMessage.value = ''
   try {
-    const response = await api.get(endpoints.favorites.list, { params: { page, size: 20 } })
-    favorites.value = response.data?.content || (Array.isArray(response.data) ? response.data : [])
-    totalPages.value = response.data?.totalPages || 1
+    const response = await api.get<unknown>(endpoints.favorites.list, { params: { page, size: 20 } })
+    if (requestId !== latestFavoritesRequestId) return
+
+    favorites.value = normalizeFavorites(response.data)
+    totalPages.value = normalizeTotalPages(response.data)
     currentPage.value = page
   } catch (e) {
+    if (requestId !== latestFavoritesRequestId) return
+
     console.error('Failed to fetch favorites:', summarizeClientError(e))
-    errorMessage.value = safeClientErrorMessage(e, '收藏列表加载失败，请稍后重试')
+    errorMessage.value = safeClientErrorMessage(e, favoriteLabel('loadFailed'))
     favorites.value = []
   } finally {
-    loading.value = false
+    if (requestId === latestFavoritesRequestId) {
+      loading.value = false
+    }
   }
 }
 

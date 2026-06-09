@@ -65,8 +65,10 @@ class AdminSecurityPostureServiceTest {
         ReflectionTestUtils.setField(service, "superAdminTotpSecret", "totp-secret");
         ReflectionTestUtils.setField(service, "rateLimitEnabled", true);
         ReflectionTestUtils.setField(service, "rateLimitRedisEnabled", true);
+        ReflectionTestUtils.setField(service, "rateLimitRedisFailClosed", true);
         ReflectionTestUtils.setField(service, "bruteForceEnabled", true);
         ReflectionTestUtils.setField(service, "bruteForceRedisEnabled", true);
+        ReflectionTestUtils.setField(service, "bruteForceRedisFailClosed", true);
         ReflectionTestUtils.setField(service, "paymentCallbackSecret", "payment-secret");
         ReflectionTestUtils.setField(service, "jwtSecret", "jwt-secret-value-that-is-long-enough-for-tests-1234567890abcdef");
         ReflectionTestUtils.setField(service, "jwtIssuer", "colorful-tibet");
@@ -88,9 +90,11 @@ class AdminSecurityPostureServiceTest {
         assertThat(response.getExposure().isActuatorHealthPublic()).isTrue();
         assertThat(response.getAuthentication().isJwtConfigured()).isTrue();
         assertThat(response.getProtections().isRateLimitEnabled()).isTrue();
+        assertThat(response.getProtections().isRateLimitRedisFailClosed()).isTrue();
+        assertThat(response.getProtections().isBruteForceRedisFailClosed()).isTrue();
         assertThat(response.getDataProtection().isPiiKeysConfigured()).isTrue();
         assertThat(response.getDependencies().getScrapling()).isEqualTo("UP");
         assertThat(response.getFindings()).extracting(SecurityPostureResponse.Finding::getId)
-                .contains("PUBLIC_DOCS_ENABLED", "JWT_CONFIGURED");
+                .contains("PUBLIC_DOCS_ENABLED", "JWT_CONFIGURED", "RATE_LIMIT_REDIS_FAIL_CLOSED");
     }
 }

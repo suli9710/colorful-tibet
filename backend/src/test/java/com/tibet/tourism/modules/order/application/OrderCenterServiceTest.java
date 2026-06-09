@@ -242,6 +242,10 @@ class OrderCenterServiceTest {
                 .when(order).getVouchers();
         lenient().doThrow(new AssertionError("List summaries must not load invoices"))
                 .when(order).getInvoices();
+        lenient().doThrow(new AssertionError("List summaries must not load customer name"))
+                .when(order).getCustomerName();
+        lenient().doThrow(new AssertionError("List summaries must not load customer phone"))
+                .when(order).getCustomerPhone();
         when(orderRepository.findVisibleByUserId(eq(1L), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(order), PageRequest.of(0, 20), 1));
 

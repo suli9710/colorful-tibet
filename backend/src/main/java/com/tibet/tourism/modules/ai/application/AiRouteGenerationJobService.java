@@ -1,7 +1,10 @@
 package com.tibet.tourism.modules.ai.application;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.tibet.tourism.common.security.CacheKeyHasher;
+import com.tibet.tourism.common.security.ProductionSafetyValidator;
 import com.tibet.tourism.modules.ai.domain.AiRouteRecord;
 import com.tibet.tourism.modules.ai.web.dto.AiRouteGenerateRequest;
 import com.tibet.tourism.modules.user.domain.User;
@@ -27,6 +30,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
+import org.springframework.core.env.Environment;
 import org.springframework.data.domain.Range;
 import org.springframework.data.redis.connection.Limit;
 import org.springframework.data.redis.connection.stream.MapRecord;
@@ -50,6 +54,7 @@ public class AiRouteGenerationJobService {
     private static final String START_LOCK_PREFIX = "ai:route-job:start:";
     private static final String PENDING_START_PREFIX = "ai:route-job:pending:";
     private static final String EVENT_STREAM_PREFIX = "ai:route-job:events:";
+    private static final String PENDING_USER_CACHE_NAMESPACE = "ai-route-job-user";
     private static final String EVENT_FIELD_TYPE = "type";
     private static final String EVENT_FIELD_JSON = "event";
     private static final String STREAM_START_OFFSET = "0-0";
@@ -69,6 +74,8 @@ public class AiRouteGenerationJobService {
     private final Executor taskExecutor;
     private final ObjectMapper objectMapper;
     private final StringRedisTemplate redisTemplate;
+    private final CacheKeyHasher cacheKeyHasher;
+    private final boolean productionSafetyRequired;
     private final Map<String, RouteJob> jobs = new ConcurrentHashMap<>();
     private final Map<String, String> activeJobByCacheKey = new ConcurrentHashMap<>();
 
@@ -96,13 +103,19 @@ public class AiRouteGenerationJobService {
                                        AiRouteRecordService aiRouteRecordService,
                                        @Qualifier("aiGenerationExecutor") Executor taskExecutor,
                                        ObjectMapper objectMapper,
-                                       ObjectProvider<StringRedisTemplate> redisTemplateProvider) {
+                                       ObjectProvider<StringRedisTemplate> redisTemplateProvider,
+                                       CacheKeyHasher cacheKeyHasher,
+                                       Environment environment) {
         this.aiRouteService = aiRouteService;
         this.aiQuotaService = aiQuotaService;
         this.aiRouteRecordService = aiRouteRecordService;
         this.taskExecutor = taskExecutor;
         this.objectMapper = objectMapper;
         this.redisTemplate = redisTemplateProvider == null ? null : redisTemplateProvider.getIfAvailable();
+        this.cacheKeyHasher = cacheKeyHasher == null
+                ? new CacheKeyHasher("local-cache-key-hmac-secret")
+                : cacheKeyHasher;
+        this.productionSafetyRequired = ProductionSafetyValidator.isProductionSafetyRequired(environment);
     }
 
     AiRouteGenerationJobService(AiRouteService aiRouteService,
@@ -110,7 +123,18 @@ public class AiRouteGenerationJobService {
                                 AiRouteRecordService aiRouteRecordService,
                                 Executor taskExecutor,
                                 ObjectMapper objectMapper) {
-        this(aiRouteService, aiQuotaService, aiRouteRecordService, taskExecutor, objectMapper, null);
+        this(aiRouteService, aiQuotaService, aiRouteRecordService, taskExecutor, objectMapper, null,
+                new CacheKeyHasher("local-cache-key-hmac-secret"), null);
+    }
+
+    AiRouteGenerationJobService(AiRouteService aiRouteService,
+                                AiQuotaService aiQuotaService,
+                                AiRouteRecordService aiRouteRecordService,
+                                Executor taskExecutor,
+                                ObjectMapper objectMapper,
+                                ObjectProvider<StringRedisTemplate> redisTemplateProvider) {
+        this(aiRouteService, aiQuotaService, aiRouteRecordService, taskExecutor, objectMapper, redisTemplateProvider,
+                new CacheKeyHasher("local-cache-key-hmac-secret"), null);
     }
 
     public AiRouteJobSnapshot startJob(AiRouteGenerateRequest request, User currentUser, String locale) {
@@ -160,7 +184,7 @@ public class AiRouteGenerationJobService {
         RouteJob job = null;
         try {
             if (startLock != null) {
-                writePendingDistributedJobStart(candidateJobId, userId, cacheKey, days, budget, preference, safeLocale);
+                writePendingDistributedJobStart(candidateJobId, userId, days, budget, preference, safeLocale);
             }
 
             synchronized (activeJobByCacheKey) {
@@ -279,6 +303,9 @@ public class AiRouteGenerationJobService {
 
     private StartLockAttempt acquireDistributedStartLock(String cacheKey, String candidateJobId) {
         if (redisTemplate == null) {
+            if (productionSafetyRequired) {
+                throw new IllegalStateException("Production AI route generation requires Redis start lock");
+            }
             return StartLockAttempt.unavailable();
         }
 
@@ -291,6 +318,11 @@ public class AiRouteGenerationJobService {
             }
             return StartLockAttempt.held(readLockOwner(lockKey));
         } catch (RuntimeException e) {
+            if (productionSafetyRequired) {
+                log.warn("Redis AI route start lock unavailable in production; refusing duplicate-prone start: {}",
+                        AiLogPrivacy.exceptionSummary(e));
+                throw new IllegalStateException("Production AI route generation requires Redis start lock", e);
+            }
             log.warn("Redis AI route start lock unavailable, using local fallback: {}",
                     AiLogPrivacy.exceptionSummary(e));
             return StartLockAttempt.unavailable();
@@ -332,11 +364,11 @@ public class AiRouteGenerationJobService {
         log.info("Returning pending AI route job snapshot for distributed lock owner: jobId={}, user={}",
                 ownerJobId, AiLogPrivacy.userRef(currentUser == null ? userId : currentUser.getId()));
         PendingJobStart pendingStart = readPendingDistributedJobStart(ownerJobId)
-                .filter(pending -> pending.userId() == userId)
-                .orElse(new PendingJobStart(userId, cacheKey, days, budget, preference, locale));
+                .filter(pending -> pendingUserCacheKey(userId).equals(pending.userKey()))
+                .orElse(new PendingJobStart(pendingUserCacheKey(userId), days, budget, preference, locale));
         RouteJob pendingJob = RouteJob.detachedRunning(
                 ownerJobId,
-                pendingStart.userId(),
+                userId,
                 pendingStart.days(),
                 pendingStart.budget(),
                 pendingStart.preference(),
@@ -505,10 +537,10 @@ public class AiRouteGenerationJobService {
         return aiRouteRecordService.findJobRecord(currentUser.getId(), jobId)
                 .map(record -> recordBackedJob(record, currentUser.getId()))
                 .or(() -> readPendingDistributedJobStart(jobId)
-                        .filter(pending -> pending.userId() == currentUser.getId().longValue())
+                        .filter(pending -> pendingUserCacheKey(currentUser.getId()).equals(pending.userKey()))
                         .map(pending -> RouteJob.detachedRunning(
                                 jobId,
-                                pending.userId(),
+                                currentUser.getId(),
                                 pending.days(),
                                 pending.budget(),
                                 pending.preference(),
@@ -537,13 +569,14 @@ public class AiRouteGenerationJobService {
         return job;
     }
 
-    private void writePendingDistributedJobStart(String jobId, long userId, String cacheKey, int days,
+    private void writePendingDistributedJobStart(String jobId, long userId, int days,
                                                  String budget, String preference, String locale) {
         if (redisTemplate == null || !StringUtils.hasText(jobId)) {
             return;
         }
         try {
-            PendingJobStart pendingStart = new PendingJobStart(userId, cacheKey, days, budget, preference, locale);
+            PendingJobStart pendingStart = new PendingJobStart(
+                    pendingUserCacheKey(userId), days, budget, preference, locale);
             redisTemplate.opsForValue().set(
                     pendingStartKey(jobId),
                     objectMapper.writeValueAsString(pendingStart),
@@ -585,6 +618,10 @@ public class AiRouteGenerationJobService {
 
     private String pendingStartKey(String jobId) {
         return PENDING_START_PREFIX + jobId;
+    }
+
+    private String pendingUserCacheKey(long userId) {
+        return cacheKeyHasher.cacheKey(PENDING_USER_CACHE_NAMESPACE, userId);
     }
 
     private static RouteJobStatus toJobStatus(AiRouteRecord.Status status) {
@@ -977,8 +1014,8 @@ public class AiRouteGenerationJobService {
     private record RedisJobEvent(String id, String type, String json) {
     }
 
-    private record PendingJobStart(long userId, String cacheKey, int days, String budget, String preference,
-                                   String locale) {
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private record PendingJobStart(String userKey, int days, String budget, String preference, String locale) {
     }
 
     private static final class RouteJob {

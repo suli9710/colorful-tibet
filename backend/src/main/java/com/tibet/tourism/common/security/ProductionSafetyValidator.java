@@ -20,6 +20,7 @@ public class ProductionSafetyValidator {
             "FLY_APP_NAME",
             "WEBSITE_HOSTNAME",
             "KUBERNETES_SERVICE_HOST");
+    private static final int MIN_CACHE_KEY_HMAC_SECRET_LENGTH = 64;
 
     private final Environment environment;
     private final boolean cookieSecure;
@@ -33,6 +34,13 @@ public class ProductionSafetyValidator {
     private final String piiKeys;
     private final String piiActiveKid;
     private final String superAdminTotpSecret;
+    private final String cacheKeyHmacSecret;
+    private final boolean rateLimitEnabled;
+    private final boolean rateLimitRedisEnabled;
+    private final boolean rateLimitRedisFailClosed;
+    private final boolean bruteForceEnabled;
+    private final boolean bruteForceRedisEnabled;
+    private final boolean bruteForceRedisFailClosed;
 
     public ProductionSafetyValidator(
             Environment environment,
@@ -46,7 +54,14 @@ public class ProductionSafetyValidator {
             @Value("${app.security.antibot.recaptcha.secret-key:}") String recaptchaSecretKey,
             @Value("${app.security.pii-keys:${PII_KEYS:}}") String piiKeys,
             @Value("${app.security.pii-active-kid:${PII_ACTIVE_KID:}}") String piiActiveKid,
-            @Value("${app.security.super-admin-totp-secret:}") String superAdminTotpSecret) {
+            @Value("${app.security.super-admin-totp-secret:}") String superAdminTotpSecret,
+            @Value("${app.security.cache-key-hmac-secret:${CACHE_KEY_HMAC_SECRET:}}") String cacheKeyHmacSecret,
+            @Value("${app.security.rate-limit.enabled:true}") boolean rateLimitEnabled,
+            @Value("${app.security.rate-limit.redis-enabled:true}") boolean rateLimitRedisEnabled,
+            @Value("${app.security.rate-limit.redis-fail-closed:false}") boolean rateLimitRedisFailClosed,
+            @Value("${app.security.brute-force.enabled:true}") boolean bruteForceEnabled,
+            @Value("${app.security.brute-force.redis-enabled:true}") boolean bruteForceRedisEnabled,
+            @Value("${app.security.brute-force.redis-fail-closed:false}") boolean bruteForceRedisFailClosed) {
         this.environment = environment;
         this.cookieSecure = cookieSecure;
         this.requireStrongSecrets = requireStrongSecrets;
@@ -59,6 +74,13 @@ public class ProductionSafetyValidator {
         this.piiKeys = piiKeys;
         this.piiActiveKid = piiActiveKid;
         this.superAdminTotpSecret = superAdminTotpSecret;
+        this.cacheKeyHmacSecret = cacheKeyHmacSecret;
+        this.rateLimitEnabled = rateLimitEnabled;
+        this.rateLimitRedisEnabled = rateLimitRedisEnabled;
+        this.rateLimitRedisFailClosed = rateLimitRedisFailClosed;
+        this.bruteForceEnabled = bruteForceEnabled;
+        this.bruteForceRedisEnabled = bruteForceRedisEnabled;
+        this.bruteForceRedisFailClosed = bruteForceRedisFailClosed;
     }
 
     @PostConstruct
@@ -75,7 +97,14 @@ public class ProductionSafetyValidator {
                 recaptchaSecretKey,
                 piiKeys,
                 piiActiveKid,
-                superAdminTotpSecret);
+                superAdminTotpSecret,
+                cacheKeyHmacSecret,
+                rateLimitEnabled,
+                rateLimitRedisEnabled,
+                rateLimitRedisFailClosed,
+                bruteForceEnabled,
+                bruteForceRedisEnabled,
+                bruteForceRedisFailClosed);
     }
 
     static void validate(
@@ -90,7 +119,14 @@ public class ProductionSafetyValidator {
             String recaptchaSecretKey,
             String piiKeys,
             String piiActiveKid,
-            String superAdminTotpSecret) {
+            String superAdminTotpSecret,
+            String cacheKeyHmacSecret,
+            boolean rateLimitEnabled,
+            boolean rateLimitRedisEnabled,
+            boolean rateLimitRedisFailClosed,
+            boolean bruteForceEnabled,
+            boolean bruteForceRedisEnabled,
+            boolean bruteForceRedisFailClosed) {
         if (productionSafetyRequired) {
             if (!cookieSecure) {
                 throw new IllegalStateException("Production deployment requires app.security.cookie-secure=true");
@@ -135,6 +171,34 @@ public class ProductionSafetyValidator {
             if (isBlankOrPlaceholder(superAdminTotpSecret)) {
                 throw new IllegalStateException("Production deployment requires app.security.super-admin-totp-secret");
             }
+            if (isBlankOrPlaceholder(cacheKeyHmacSecret)) {
+                throw new IllegalStateException("Production deployment requires app.security.cache-key-hmac-secret");
+            }
+            if (cacheKeyHmacSecret.trim().length() < MIN_CACHE_KEY_HMAC_SECRET_LENGTH) {
+                throw new IllegalStateException("Production cache key HMAC secret must be at least "
+                        + MIN_CACHE_KEY_HMAC_SECRET_LENGTH + " characters");
+            }
+            if (!rateLimitEnabled) {
+                throw new IllegalStateException("Production deployment requires app.security.rate-limit.enabled=true");
+            }
+            if (!rateLimitRedisEnabled) {
+                throw new IllegalStateException("Production deployment requires app.security.rate-limit.redis-enabled=true");
+            }
+            if (!rateLimitRedisFailClosed) {
+                throw new IllegalStateException(
+                        "Production deployment requires app.security.rate-limit.redis-fail-closed=true");
+            }
+            if (!bruteForceEnabled) {
+                throw new IllegalStateException("Production deployment requires app.security.brute-force.enabled=true");
+            }
+            if (!bruteForceRedisEnabled) {
+                throw new IllegalStateException(
+                        "Production deployment requires app.security.brute-force.redis-enabled=true");
+            }
+            if (!bruteForceRedisFailClosed) {
+                throw new IllegalStateException(
+                        "Production deployment requires app.security.brute-force.redis-fail-closed=true");
+            }
         }
     }
 
@@ -161,7 +225,7 @@ public class ProductionSafetyValidator {
                 .anyMatch(normalizedActiveKid::equals);
     }
 
-    static boolean isProductionSafetyRequired(Environment environment) {
+    public static boolean isProductionSafetyRequired(Environment environment) {
         return environment != null
                 && (isProdProfileActive(environment)
                         || hasProductionEnvironmentValue(environment)

@@ -13,8 +13,6 @@ public record OrderSummaryResponse(
         BigDecimal totalAmount,
         BigDecimal discountAmount,
         BigDecimal payableAmount,
-        String customerName,
-        String customerPhone,
         String sourceType,
         Long sourceReferenceId,
         LocalDateTime lockedUntil,

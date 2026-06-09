@@ -71,13 +71,15 @@ describe('ops configuration guardrails', () => {
     const uploadServer = readRepoFile('upload-server.ps1')
 
     expect(prodCompose).toContain('production-preflight:')
-    for (const variableName of ['DB_PASSWORD', 'MYSQL_ROOT_PASSWORD', 'REDIS_PASSWORD', 'GRAFANA_ADMIN_PASSWORD']) {
+    for (const variableName of ['DB_PASSWORD', 'MYSQL_ROOT_PASSWORD', 'REDIS_PASSWORD', 'GRAFANA_ADMIN_PASSWORD', 'CACHE_KEY_HMAC_SECRET']) {
       expect(prodCompose, variableName).toContain(`require_real_secret ${variableName}`)
     }
+    expect(prodCompose).toContain('CACHE_KEY_HMAC_SECRET must be at least 64 characters')
     expect(prodCompose).toContain('reject_placeholder_if_set MYSQL_PASSWORD')
     expect(prodCompose).toContain('NGINX_REDIRECT_HOST must be a single canonical host without scheme, path, port, comma, whitespace, or control characters')
     expect(uploadServer).toContain('NGINX_REDIRECT_HOST must be a single canonical host without scheme, path, port, comma, whitespace, or control characters')
-    expect(uploadServer).toContain('for secret_name in DB_PASSWORD MYSQL_ROOT_PASSWORD REDIS_PASSWORD GRAFANA_ADMIN_PASSWORD; do')
+    expect(uploadServer).toContain('for secret_name in DB_PASSWORD MYSQL_ROOT_PASSWORD REDIS_PASSWORD GRAFANA_ADMIN_PASSWORD CACHE_KEY_HMAC_SECRET; do')
+    expect(uploadServer).toContain('CACHE_KEY_HMAC_SECRET must be at least 64 characters')
     expect(uploadServer).toContain('TRUSTED_PROXY_CIDRS must not trust broad private ranges')
   })
 
@@ -158,7 +160,9 @@ describe('ops configuration guardrails', () => {
     expect(ci).not.toContain('go install github.com/rhysd/actionlint')
     expect(ci).not.toContain('python -m pip install --upgrade pip')
     expect(ci).not.toContain('python -m pip install yamllint')
+    expect(packageJson).toContain('--test-concurrency=1')
     expect(packageJson).toContain('scripts/check-supply-chain-pins.test.mjs scripts/resolve-docker-image-digests.test.mjs scripts/validate-workflow-yaml.test.mjs')
+    expect(packageJson).toContain('scripts/deploy-preflight.test.mjs')
     expect(ci).toContain('node scripts/check-supply-chain-pins.mjs')
     expect(supplyChainGate).toContain('GitHub Actions must use full commit SHAs before production release.')
     expect(supplyChainGate).toContain('Dockerfile base images must include sha256 digests before production release.')

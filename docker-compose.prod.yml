@@ -14,6 +14,7 @@ services:
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required in production}
       - ADMIN_ENCRYPTION_KEY=${ADMIN_ENCRYPTION_KEY:?ADMIN_ENCRYPTION_KEY is required in production}
       - CSRF_SIGNING_SECRET=${CSRF_SIGNING_SECRET:?CSRF_SIGNING_SECRET is required in production}
+      - CACHE_KEY_HMAC_SECRET=${CACHE_KEY_HMAC_SECRET:?CACHE_KEY_HMAC_SECRET is required in production}
       - PII_KEYS=${PII_KEYS:?PII_KEYS is required in production}
       - PII_ACTIVE_KID=${PII_ACTIVE_KID:?PII_ACTIVE_KID is required in production}
       - SCRAPLING_API_KEY=${SCRAPLING_API_KEY:?SCRAPLING_API_KEY is required in production}
@@ -24,6 +25,17 @@ services:
       - TRUSTED_PROXY_CIDRS=${TRUSTED_PROXY_CIDRS:-}
       - NGINX_REDIRECT_HOST=${NGINX_REDIRECT_HOST:?NGINX_REDIRECT_HOST is required in production}
       - SUPER_ADMIN_TOTP_SECRET=${SUPER_ADMIN_TOTP_SECRET:?SUPER_ADMIN_TOTP_SECRET is required in production}
+      - REQUIRE_STRONG_SECRETS=${REQUIRE_STRONG_SECRETS:-true}
+      - COOKIE_SECURE=${COOKIE_SECURE:-true}
+      - PAYMENT_MOCK_CALLBACK_ENABLED=${PAYMENT_MOCK_CALLBACK_ENABLED:-false}
+      - PUBLIC_METRICS_ENABLED=${PUBLIC_METRICS_ENABLED:-false}
+      - RATE_LIMIT_REDIS_ENABLED=${RATE_LIMIT_REDIS_ENABLED:-true}
+      - RATE_LIMIT_REDIS_FAIL_CLOSED=${RATE_LIMIT_REDIS_FAIL_CLOSED:-true}
+      - BRUTE_FORCE_REDIS_ENABLED=${BRUTE_FORCE_REDIS_ENABLED:-true}
+      - BRUTE_FORCE_REDIS_FAIL_CLOSED=${BRUTE_FORCE_REDIS_FAIL_CLOSED:-true}
+      - DB_SSL_MODE=${DB_SSL_MODE:-REQUIRED}
+      - DB_ALLOW_PUBLIC_KEY_RETRIEVAL=${DB_ALLOW_PUBLIC_KEY_RETRIEVAL:-false}
+      - SCRAPLING_ALLOW_UNAUTHENTICATED=${SCRAPLING_ALLOW_UNAUTHENTICATED:-false}
     command:
       - /bin/sh
       - -ec
@@ -54,10 +66,21 @@ services:
           fi
         }
 
+        require_exact() {
+          name="$$1"
+          value="$$2"
+          expected="$$3"
+          if [ "$$value" != "$$expected" ]; then
+            echo "Refusing production compose: $$name must be $$expected, got '$$value'." >&2
+            exit 1
+          fi
+        }
+
         require_real_secret DB_PASSWORD "$$DB_PASSWORD"
         require_real_secret MYSQL_ROOT_PASSWORD "$$MYSQL_ROOT_PASSWORD"
         require_real_secret REDIS_PASSWORD "$$REDIS_PASSWORD"
         require_real_secret GRAFANA_ADMIN_PASSWORD "$$GRAFANA_ADMIN_PASSWORD"
+        require_real_secret CACHE_KEY_HMAC_SECRET "$$CACHE_KEY_HMAC_SECRET"
         require_real_secret SUPER_ADMIN_TOTP_SECRET "$$SUPER_ADMIN_TOTP_SECRET"
         require_real_secret JWT_SECRET "$$JWT_SECRET"
         require_real_secret ADMIN_ENCRYPTION_KEY "$$ADMIN_ENCRYPTION_KEY"
@@ -68,6 +91,25 @@ services:
         reject_placeholder_if_set MYSQL_PASSWORD "$$MYSQL_PASSWORD"
         reject_placeholder_if_set PII_ENCRYPTION_KEY "$$PII_ENCRYPTION_KEY"
         reject_placeholder_if_set PAYMENT_CALLBACK_SECRET "$$PAYMENT_CALLBACK_SECRET"
+        if [ "$${#CACHE_KEY_HMAC_SECRET}" -lt 64 ]; then
+          echo "Refusing production compose: CACHE_KEY_HMAC_SECRET must be at least 64 characters." >&2
+          exit 1
+        fi
+
+        require_exact REQUIRE_STRONG_SECRETS "$$REQUIRE_STRONG_SECRETS" true
+        require_exact COOKIE_SECURE "$$COOKIE_SECURE" true
+        require_exact PAYMENT_MOCK_CALLBACK_ENABLED "$$PAYMENT_MOCK_CALLBACK_ENABLED" false
+        require_exact PUBLIC_METRICS_ENABLED "$$PUBLIC_METRICS_ENABLED" false
+        require_exact RATE_LIMIT_REDIS_ENABLED "$$RATE_LIMIT_REDIS_ENABLED" true
+        require_exact RATE_LIMIT_REDIS_FAIL_CLOSED "$$RATE_LIMIT_REDIS_FAIL_CLOSED" true
+        require_exact BRUTE_FORCE_REDIS_ENABLED "$$BRUTE_FORCE_REDIS_ENABLED" true
+        require_exact BRUTE_FORCE_REDIS_FAIL_CLOSED "$$BRUTE_FORCE_REDIS_FAIL_CLOSED" true
+        require_exact DB_ALLOW_PUBLIC_KEY_RETRIEVAL "$$DB_ALLOW_PUBLIC_KEY_RETRIEVAL" false
+        require_exact SCRAPLING_ALLOW_UNAUTHENTICATED "$$SCRAPLING_ALLOW_UNAUTHENTICATED" false
+        if [ "$$DB_SSL_MODE" != "REQUIRED" ] && [ "$$DB_SSL_MODE" != "VERIFY_IDENTITY" ]; then
+          echo "Refusing production compose: DB_SSL_MODE must be REQUIRED or VERIFY_IDENTITY, got '$$DB_SSL_MODE'." >&2
+          exit 1
+        fi
 
         redirect_host_pattern='^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$$'
         if ! printf '%s' "$$NGINX_REDIRECT_HOST" | grep -Eq "$$redirect_host_pattern"; then
@@ -121,6 +163,7 @@ services:
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required in production}
       - ADMIN_ENCRYPTION_KEY=${ADMIN_ENCRYPTION_KEY:?ADMIN_ENCRYPTION_KEY is required in production}
       - CSRF_SIGNING_SECRET=${CSRF_SIGNING_SECRET:?CSRF_SIGNING_SECRET is required in production}
+      - CACHE_KEY_HMAC_SECRET=${CACHE_KEY_HMAC_SECRET:?CACHE_KEY_HMAC_SECRET is required in production}
       - PII_KEYS=${PII_KEYS:?PII_KEYS is required in production}
       - PII_ACTIVE_KID=${PII_ACTIVE_KID:?PII_ACTIVE_KID is required in production}
       - PII_ENCRYPTION_KEY=${PII_ENCRYPTION_KEY:-}
@@ -138,6 +181,10 @@ services:
       - SERVER_FORWARD_HEADERS_STRATEGY=${SERVER_FORWARD_HEADERS_STRATEGY:-framework}
       - TRUST_PROXY_HEADERS=${TRUST_PROXY_HEADERS:-false}
       - TRUSTED_PROXY_CIDRS=${TRUSTED_PROXY_CIDRS:-}
+      - RATE_LIMIT_REDIS_ENABLED=${RATE_LIMIT_REDIS_ENABLED:-true}
+      - RATE_LIMIT_REDIS_FAIL_CLOSED=${RATE_LIMIT_REDIS_FAIL_CLOSED:-true}
+      - BRUTE_FORCE_REDIS_ENABLED=${BRUTE_FORCE_REDIS_ENABLED:-true}
+      - BRUTE_FORCE_REDIS_FAIL_CLOSED=${BRUTE_FORCE_REDIS_FAIL_CLOSED:-true}
       - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS}
       - SUPER_ADMIN_USERNAME=${SUPER_ADMIN_USERNAME:?SUPER_ADMIN_USERNAME is required in production}
       - SUPER_ADMIN_TOTP_SECRET=${SUPER_ADMIN_TOTP_SECRET:?SUPER_ADMIN_TOTP_SECRET is required in production}

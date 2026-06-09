@@ -69,8 +69,12 @@ class OrderCenterControllerPageResponseContractTest {
                 .doesNotContain("\"pageable\"")
                 .doesNotContain("\"sort\"")
                 .doesNotContain("\"number\"")
+                .doesNotContain("\"customerName\"")
+                .doesNotContain("\"customerPhone\"")
                 .doesNotContain("\"customerNote\"")
                 .doesNotContain("\"paymentTransactions\"")
+                .doesNotContain("T***r")
+                .doesNotContain("139****0000")
                 .doesNotContain("\"raw-phone\"");
     }
 
@@ -85,8 +89,6 @@ class OrderCenterControllerPageResponseContractTest {
                 new BigDecimal("880.00"),
                 BigDecimal.ZERO,
                 new BigDecimal("880.00"),
-                "T***r",
-                "139****0000",
                 "LEGACY_HOTEL_BOOKING",
                 100L,
                 null,

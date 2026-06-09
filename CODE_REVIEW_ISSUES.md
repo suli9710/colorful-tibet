@@ -1,12 +1,16 @@
 # Code Review Issues
 
 Last updated: 2026-06-09
-Last reviewed: 2026-06-09 14:16:08 +08:00
+Last reviewed: 2026-06-09 18:15:00 +08:00
 
 This file tracks issues re-checked against the current worktree. Items marked fixed have code and tests in this worktree; residual items remain candidates for the next 10-minute review cycle.
 
 ## Verification Snapshot
 
+- Product-hardening multi-agent cycle on 2026-06-09 18:15 +08:00: 4 development agents and 1 review agent completed; the parallel testing agent was started but did not return before local full validation completed. Closed CT-FE-056, CT-FE-057, CT-BE-040, CT-BE-041, CT-OPS-030, and CT-OPS-031 in the current worktree. RouteCommunity filters now reset pagination and ignore stale route/Q&A responses; Admin hotel-order status changes now expose accessible row-level busy/error/rollback behavior; guide-chat usage keys use HMAC labels and production usage accounting fails closed when Redis is unavailable; production rate limiting and brute-force protection now require Redis and fail closed for sensitive paths when Redis is missing or unavailable; production Nginx rejects unmatched HTTPS hosts and validates rendered host variables; and production metrics default to non-public with preflight/static ops tests guarding the setting. Validation passed focused frontend suites for RouteCommunity and AdminDashboard hotel orders, focused backend security coverage, `npm run test:ops` (30 tests), full `npm run check` (backend compile/test, frontend typecheck plus 49 files / 304 tests plus production build, Scrapler 16 tests), and `git diff --check` with only LF-to-CRLF working-copy warnings.
+- Product-hardening follow-up on 2026-06-09 17:18 +08:00: local follow-up closed the review agent's remaining high/medium findings plus stale test drift. `CACHE_KEY_HMAC_SECRET` is now an independent production-required secret with placeholder and length validation across backend, compose, upload, preflight, docs, and guardrails. Recommendation/AI Redis values no longer store raw similar-user/user identifiers. AI route quota and pending-start controls fail closed in production when Redis is unavailable. `QuestionDetail.vue` separates detail and answer failures, retries them independently, reloads on route-param changes, and ignores stale detail/answer/like-status responses. `UserProfile.vue` no longer reports a successful password change as failed by reloading stale session-gated profile details. AdminDashboard's remaining spot/news/carousel/route/hotel loaders preserve rows on transient failures and ignore stale refreshes. Validation passed focused frontend stale/UX coverage (4 files / 42 tests), `sourceGuardrails.test.ts` (19 tests), `opsConfigGuardrails.test.ts` (9 tests), focused backend AI/privacy/production-safety coverage, full `mvn -q -f backend/pom.xml test`, full `npm run check` (backend compile/test, frontend typecheck plus 49 files / 301 tests plus production build, Scrapler 16 tests), and `git diff --check` with only LF-to-CRLF working-copy warnings.
+- Product-hardening multi-agent cycle on 2026-06-09 16:16 +08:00: 4 development agents, 1 testing agent, and 1 review agent completed. Closed CT-SEC-PII-002, CT-FE-050, and CT-FE-051, and also addressed review follow-ups for AI route/quota Redis key privacy plus AdminDashboard/AdminHeritage stale-response gaps. Redis/cache keys for IP geolocation, recommendation profiles, AI quota, and AI route cache/locks now use keyed HMAC labels instead of raw IP, user ID, or preference tuples. AdminDashboard user and hotel-order lists now preserve rows on failures, expose retryable error states, and ignore stale refresh responses. RouteCommunity route/question lists and AdminHeritagePanel relation/top-level item lists now ignore stale success/failure responses. UserProfile forced-password-change UX now has mounted DOM coverage. Validation passed focused backend privacy/AI coverage, focused frontend UX/stale suites (6 files / 76 tests), `npm run test:ops` (18 tests), full `npm run check` (backend compile/test, frontend typecheck plus 48 files / 287 tests plus production build, Scrapler 16 tests), and final `git diff --check` with only LF-to-CRLF warnings.
+- Product-hardening multi-agent cycle on 2026-06-09 15:30 +08:00: 4 development agents, 1 testing agent, and 1 review agent completed. Closed CT-FE-048, CT-FE-049, CT-BE-038, and CT-OPS-028 in the current worktree. `Favorites.vue` now guards stale pagination responses and exposes accessible localized failure/retry states; third-party AMap/reCAPTCHA script reuse and external booking links now fail closed against untrusted origins/hosts; `/api/orders/my` summary rows no longer return contact PII; and the deploy preflight test is included in the root ops gate. Review found no high-confidence High issues and added CT-SEC-PII-002, CT-FE-050, and CT-FE-051 as current Medium residuals. Validation passed focused frontend security/UX suites (6 files / 42 tests), `npm run test:ops` (18 tests), focused order Maven coverage, full `npm run check` (backend compile/test, frontend typecheck plus 47 files / 275 tests plus production build, Scrapler 16 tests), and final `git diff --check` with only LF-to-CRLF warnings.
 - Review follow-up on 2026-06-09 13:40 +08:00: the追加 review agent's high and medium findings are fixed. `PiiLegacyCiphertextStartupGuard` now runs under the same production-intent predicate as `ProductionSafetyValidator` instead of only under `@Profile("prod")`, with regression coverage for `APP_ENV=production` under a local Spring profile. Docker digest evidence validation now rejects bare records arrays and requires the resolver object schema with metadata. Validation passed `mvn -q -f backend/pom.xml '-Dtest=PiiLegacyCiphertextStartupGuardTest,ProductionSafetyValidatorTest' test`, `npm run test:ops` (15 tests), `npm run check:supply-chain-pins`, full `npm run check` (backend 1493 tests, frontend 42 files / 230 tests plus build, Scrapler 16 tests), and `git diff --check` with LF-to-CRLF warnings only. The earlier sandbox-only `@TempDir` AccessDenied failure was disproved by the successful non-sandbox full check.
 - Supply-chain pin closure on 2026-06-09 04:54 +08:00: CT-OPS-008 is fixed in the current worktree. Dockerfile bases, Compose service images, and CI workflow Prometheus images are pinned with Docker Hub registry `sha256` digests, and `docker-digest-evidence.json` records source-matched resolver evidence for every required image reference. Validation passed `npm run check:supply-chain-pins`, `npm run test:ops`, `docker compose --env-file .env.example -f docker-compose.yml config --quiet`, and `docker compose --env-file .env.example -f docker-compose.prod.yml config --quiet`; Docker emitted only the non-failing local `C:\Users\Suli\.docker\config.json` access warning during compose parsing.
 - Production-readiness multi-agent closure on 2026-06-09 00:50 +08:00: 4 development agents, 1 testing agent, and 1 review agent completed. Local follow-up removed the remaining targeted `RouteDetail.vue` / `RoutePlanner.vue` / `HotelBooking.vue` broad `any` usage, moved the remaining RoutePlanner and HotelBooking user-facing copy/formatting into i18n/locale-aware formatting, hardened `NGINX_REDIRECT_HOST` preflight to reject non-host values, and closed the AI cross-instance start-lock/readable-record short window with Redis pending metadata plus retryable detached SSE behavior. Validation passed `mvn -q -f backend/pom.xml test`, `npm --prefix frontend run check` (42 files / 221 tests / production build), `python -m pytest -q scrapler` (16 tests), workflow YAML parsing, both compose config checks with `.env.example`, `npm run test:ops`, focused ops/i18n/route-hotel Vitest coverage, and `git diff --check` with LF-to-CRLF warnings only. `npm run check:supply-chain-pins` intentionally fails closed until trusted external action SHAs, image digests, and pip hashes are supplied.
@@ -49,6 +53,12 @@ This file tracks issues re-checked against the current worktree. Items marked fi
 
 ## Fixed This Cycle
 
+- CT-FE-056: `RouteCommunity` now resets route/question pagination when filters, tags, or sort change after browsing later pages, and ignores stale route/Q&A responses.
+- CT-FE-057: Admin hotel-order status changes now have accessible labels, row-level pending state, failure messages, and visible rollback to the original status on API failure.
+- CT-BE-040: Guide-chat usage accounting now uses HMAC labels for quota identity keys and fails closed in production when the Redis usage backend is missing or unavailable.
+- CT-BE-041: Production rate limiting and login brute-force protection now require Redis and fail closed for sensitive paths when Redis is missing or unavailable instead of silently using per-instance memory fallback.
+- CT-OPS-030: Production Nginx now fails closed for unmatched HTTPS Host/SNI and validates runtime host interpolation values before rendering templates.
+- CT-OPS-031: Production metrics now default to non-public, with deploy preflight and static ops tests rejecting anonymous metrics and Redis protection fallback defaults.
 - CT-SEC-001: Authenticated `/api/guide/chat` now requires signed double-submit XSRF when an `AUTH_TOKEN` cookie is present. Anonymous public POST behavior remains allowed with browser metadata checks.
 - CT-SEC-002: Controller authorization matrix now discovers real module `@RestController` classes automatically and covers previously omitted controllers.
 - CT-SEC-003: CSRF trusted origins no longer accept wildcard patterns that CORS rejects when credentials are enabled.
@@ -70,7 +80,7 @@ This file tracks issues re-checked against the current worktree. Items marked fi
 - CT-FE-008: AMap and reCAPTCHA dynamic loaders now apply shared third-party script security attributes, including CSP nonce, optional SRI, and `crossOrigin`, with env/meta/runtime nonce support covered by focused tests.
 - CT-FE-010: AI route stream/job APIs now use `endpoints.routes.generateStream`, `generateJob`, `generateJobDetail(jobId)`, and `generateJobStream(jobId)` from the endpoint registry; `frontend/src/api/stream.test.ts` covers the generated fetch URLs.
 - CT-OPS-001: Vite dev proxy target now derives from remote `VITE_API_BASE_URL`/`VITE_DEV_PROXY_TARGET` through `resolveDevProxyTarget`, so `frontend/start-remote.bat` no longer silently falls back to local `localhost:8080` for `/api` during remote debugging.
-- CT-OPS-002: Production Compose now defaults `PUBLIC_METRICS_ENABLED=true` for the bundled internal Prometheus scrape, with docs/comments requiring trusted backend/monitoring networks or an explicit protected metrics path when disabled.
+- CT-OPS-002: Production Compose now keeps `PUBLIC_METRICS_ENABLED=false` by default; bundled Prometheus requires an authenticated, allowlisted, or otherwise protected scrape path before anonymous metrics are enabled.
 - CT-OPS-003: Production Compose no longer exposes Redis/MySQL credentials through the old long-lived `redis-server --requirepass`, `redis-cli -a`, or `mysqladmin -p...` command arguments; Redis now boots from a restricted temporary config file with an escaped `requirepass`, Redis healthcheck uses `REDISCLI_AUTH`, and local/production MySQL healthchecks use a temporary `--defaults-extra-file`.
 - CT-OPS-005: `stop.bat` now uses Windows `>nul`, derives the project path from `%~dp0`, detects/overrides the WSL distribution, and supports `--dry-run`.
 - CT-OPS-009: Production Compose now requires `SUPER_ADMIN_USERNAME` during compose interpolation, so missing super-admin configuration fails during preflight instead of later at backend startup.
@@ -166,16 +176,169 @@ This file tracks issues re-checked against the current worktree. Items marked fi
 - CT-OPS-008: Supply-chain release inputs are fully pinned in the current worktree. GitHub Actions use full SHAs, Scrapler requirements are exact and hash-locked, Dockerfile/Compose/workflow image references include `@sha256:` digests, and `docker-digest-evidence.json` records the Docker Registry API evidence checked by `scripts/check-supply-chain-pins.mjs`.
 - CT-SEC-PII-001: PII legacy/startup guard now uses the same production-intent predicate as `ProductionSafetyValidator`, so `APP_ENV=production`, cloud/Kubernetes signals, and production profiles all trigger the PII plaintext/legacy ciphertext scan.
 - CT-OPS-027: Docker digest evidence validation now rejects bare record arrays and requires resolver metadata (`schemaVersion`, `generatedAt`, `verifier`, `lookupSource`, `targetPlatforms`) before release evidence can pass.
+- CT-OPS-029: `CACHE_KEY_HMAC_SECRET` is independent from JWT material, required in production, rejected when blank/placeholder/short, and covered by backend validator, compose/upload/preflight scripts, docs, and ops guardrails.
+- CT-SEC-PII-003: Recommendation similarity cache values and AI pending-start Redis metadata now store opaque HMAC labels instead of raw similar-user IDs, user IDs, or cache-key identifiers.
+- CT-BE-039: Production AI quota and route-start controls now fail closed when Redis is missing or failing, preventing quota bypass or unlocked job starts during infrastructure outages.
+- CT-FE-053: AdminDashboard spot, news, carousel, route, and hotel loaders now preserve existing rows on refresh failure, show retryable error states, and ignore stale responses.
+- CT-FE-054: `QuestionDetail` now separates detail and answer load failures, keeps valid details visible when answers fail, reloads on route id changes, and guards stale detail/answer/like-status responses.
+- CT-FE-055: Password-change success no longer triggers a stale profile-details reload that can turn a successful change into a false failure toast.
 
 ## Open / Residual Issues
 
-### CT-FE-046 - Open - Profile list failures still need explicit error UX
-
-- Status: Open follow-up after CT-FE-045 closed the stale-response and pagination-race risks.
-- Risk: `UserProfile.vue` still treats some non-auth list failures as empty data after logging to the console. Users can read a transient bookings, hotel bookings, or comments failure as "no records" instead of an error. The page now guards stale responses and disables load-more during authoritative refreshes, but it does not yet provide per-list localized `role="alert"` failure states or retry controls.
-- Desired closure: add independent error state for scenic bookings, hotel bookings, and comments; keep 401 handling aligned with the auth redirect flow; show localized accessible error copy instead of silently falling into empty states; add mounted DOM coverage for failed latest requests and stale failed requests.
+No open residual issues are currently tracked after the 2026-06-09 17:18 product-hardening follow-up.
 
 ## Recently Closed Issues
+
+### CT-OPS-031 - Closed - Production metrics and Redis protection defaults are fail-closed
+
+- Status: Closed in the current worktree after ops/static tests and full validation passed.
+- Implementation: `docker-compose.prod.yml` and `.env.example` now default `PUBLIC_METRICS_ENABLED=false`, and production compose explicitly defaults `RATE_LIMIT_REDIS_FAIL_CLOSED=true` plus `BRUTE_FORCE_REDIS_FAIL_CLOSED=true`. `scripts/deploy-preflight.ps1` rejects anonymous metrics and Redis protection fallback settings before release.
+- Coverage: `deploy-preflight.test.mjs` covers negative release preflight runs for anonymous metrics and brute-force fallback; `production-security-defaults.test.mjs` asserts compose/env/prometheus defaults.
+- Evidence: `npm run test:ops` passed with 30 tests. Full `npm run check` and `git diff --check` passed.
+
+### CT-OPS-030 - Closed - Production Nginx rejects unmatched HTTPS hosts
+
+- Status: Closed in the current worktree after ops validation passed.
+- Implementation: `frontend/nginx.conf` now includes an HTTPS `default_server` that returns `444` for unmatched Host/SNI before the app server, and `frontend/Dockerfile` validates `NGINX_SERVER_NAME`, `NGINX_REDIRECT_HOST`, and `NGINX_CERT_DOMAIN` before rendering templates.
+- Coverage: `nginx-security-config.test.mjs` asserts unmatched HTTP/HTTPS fail-closed behavior and runtime host validation. `deploy-preflight.test.mjs` validates production host values in actual PowerShell preflight runs.
+- Evidence: `npm run test:ops` passed with 30 tests. Full `npm run check` and `git diff --check` passed.
+
+### CT-BE-041 - Closed - Production rate limiting and brute-force protection fail closed on Redis outage
+
+- Status: Closed in the current worktree after focused backend security coverage and full validation passed.
+- Implementation: `RequestRateLimitFilter` now returns a generic 503 for sensitive routes when Redis is missing or unavailable under `app.security.rate-limit.redis-fail-closed=true`, while default read paths can still use local fallback. `LoginAttemptService` returns a short backend-unavailable throttle decision instead of resetting to per-instance counters when Redis is missing or unavailable under `app.security.brute-force.redis-fail-closed=true`. `ProductionSafetyValidator` rejects production deployments that disable Redis-backed rate limiting/brute-force protection or their fail-closed modes.
+- Coverage: `RequestRateLimitFilterTest`, `LoginAttemptServiceTest`, `ProductionSafetyValidatorTest`, and `AdminSecurityPostureServiceTest` cover Redis failure/missing-backend behavior, production startup rejection, and admin security posture visibility.
+- Evidence: `mvn -q -f backend/pom.xml "-Dtest=RequestRateLimitFilterTest,LoginAttemptServiceTest,ProductionSafetyValidatorTest,AdminSecurityPostureServiceTest" test` passed. Full `npm run check` passed.
+
+### CT-BE-040 - Closed - Guide-chat usage accounting is opaque and production fail-closed
+
+- Status: Closed in the current worktree after focused backend validation and full validation passed.
+- Implementation: `GuideChatUsageService` now uses `CacheKeyHasher` HMAC labels for usage identity keys and rejects usage checks in production when Redis is absent or unavailable instead of falling back to local counters.
+- Coverage: `GuideChatUsageServiceTest` covers production Redis outage denial and verifies Redis/memory keys do not contain raw user identifiers.
+- Evidence: Full `npm run check` passed, including backend compile/test.
+
+### CT-FE-057 - Closed - Admin hotel-order status updates show rollback/error state
+
+- Status: Closed in the current worktree after focused frontend coverage and full validation passed.
+- Implementation: `AdminDashboard.vue` labels the hotel-order status selector, disables it while a status update is pending, shows row-level failure text when the update fails, and rolls the visible status back to the original value.
+- Coverage: `AdminDashboardHotelOrders.test.ts` covers the status update pending/error/rollback path along with existing admin stale/failure behavior.
+- Evidence: `npm --prefix frontend run test -- --run src/views/AdminDashboardHotelOrders.test.ts` passed with 16 tests. Full `npm run check` passed with 49 frontend files / 304 tests.
+
+### CT-FE-056 - Closed - RouteCommunity filter changes reset pagination and ignore stale responses
+
+- Status: Closed in the current worktree after focused frontend coverage and full validation passed.
+- Implementation: `RouteCommunity.vue` resets route filters and Q&A tag/sort changes back to page 0 after users browse later pages, and request IDs prevent older route/question responses from overwriting newer state.
+- Coverage: `communityPagination.test.ts` covers filter/tag/sort page reset and stale route/Q&A response suppression.
+- Evidence: `npm --prefix frontend run test -- --run src/views/communityPagination.test.ts` passed with 24 tests. Full `npm run check` passed with 49 frontend files / 304 tests.
+
+### CT-FE-055 - Closed - Password-change success cannot be overwritten by stale profile reloads
+
+- Status: Closed in the current worktree after DOM coverage and full validation passed.
+- Implementation: `UserProfile.vue` no longer calls `loadProfileDetails()` after a successful password change, so stale/expired session state cannot convert the success path into an error toast.
+- Coverage: `UserProfileDomBehavior.test.ts` asserts forced password-change success clears the auth flag, removes the query, closes the modal, does not reload profile details, and does not show the failure toast. Existing comments stale-response tests now trigger refresh through comment actions instead of password changes.
+- Evidence: focused frontend stale/UX coverage passed with 4 files / 42 tests. Full `npm run check` passed.
+
+### CT-FE-054 - Closed - QuestionDetail handles route changes and partial load failures safely
+
+- Status: Closed in the current worktree after focused DOM/a11y validation and full validation passed.
+- Implementation: `QuestionDetail.vue` now separates question-detail and answers loading/failure state, preserves a loaded question when answers fail, keeps 404 as a true not-found state, watches `route.params.id`, and guards question, answer, and like-status requests with latest-request tokens.
+- Coverage: `QuestionDetailDomBehavior.test.ts` covers retryable transient detail failures, answer-only failures with retry, 404 not-found behavior, and stale route-param response suppression. `questionDetailA11y.test.ts` remains green.
+- Evidence: focused frontend stale/UX coverage passed with 4 files / 42 tests. Full `npm run check` passed.
+
+### CT-FE-053 - Closed - AdminDashboard remaining admin lists preserve data on refresh failures
+
+- Status: Closed in the current worktree after focused dashboard validation and full validation passed.
+- Implementation: `AdminDashboard.vue` applies row-preserving loading/error/request-id handling to spot, news, carousel, route, and hotel loaders, matching the previously fixed user and hotel-order behavior.
+- Coverage: `AdminDashboardHotelOrders.test.ts` now covers the expanded admin stale/failure behavior and passed with 15 tests.
+- Evidence: focused frontend stale/UX coverage passed with 4 files / 42 tests. Full `npm run check` passed.
+
+### CT-BE-039 - Closed - Production AI quota/start controls fail closed on Redis outage
+
+- Status: Closed in the current worktree after focused backend validation and full backend validation passed.
+- Implementation: `AiQuotaService` and `AiRouteGenerationJobService` now use the shared production-intent predicate and deny quota/start-lock operations in production when Redis is unavailable instead of falling back open.
+- Coverage: `AiQuotaServiceTest` and `AiRouteGenerationJobServiceTest` cover production Redis outage denial/start failure paths.
+- Evidence: focused backend AI/privacy/production-safety coverage passed. Full `mvn -q -f backend/pom.xml test` and full `npm run check` passed.
+
+### CT-SEC-PII-003 - Closed - Redis values minimize user-identifying metadata
+
+- Status: Closed in the current worktree after focused privacy validation and full validation passed.
+- Implementation: Recommendation similarity cache values now store HMAC-labelled similar-user tokens, and AI pending-start metadata stores opaque `userKey` labels instead of raw user IDs or raw cache identifiers.
+- Coverage: `RecommendationCacheServiceTest` and `AiRouteGenerationJobServiceTest` assert opaque Redis values while preserving cache/job behavior.
+- Evidence: focused backend AI/privacy/production-safety coverage passed. Full `npm run check` passed.
+
+### CT-OPS-029 - Closed - Cache-key HMAC secret is an independent production secret
+
+- Status: Closed in the current worktree after backend, ops, and full validation passed.
+- Implementation: `CacheKeyHasher` no longer falls back to JWT secret material outside local defaults. `ProductionSafetyValidator`, production compose, deployment upload/preflight scripts, env examples, and docs now require `CACHE_KEY_HMAC_SECRET` in production and reject blank, placeholder, or short values.
+- Coverage: `CacheKeyHasherTest`, `ProductionSafetyValidatorTest`, `scripts/deploy-preflight.test.mjs`, and frontend ops guardrails cover the independent secret and 64-character minimum.
+- Evidence: `opsConfigGuardrails.test.ts` passed with 9 tests, focused backend production-safety coverage passed, and full `npm run check` passed.
+
+### CT-FE-051 - Closed - Route/community relation panels ignore stale responses
+
+- Status: Closed in the current worktree after implementation, focused stale-response coverage, and full validation passed.
+- Implementation: `RouteCommunity.vue` now guards route and question list loads with latest-request tokens, so older success/failure/finally paths cannot overwrite newer filter/page state or prematurely clear loading. `AdminHeritagePanel.vue` now guards relation loads by selected item plus latest request, and its top-level heritage item list preserves rows on failures, exposes retryable errors, and ignores stale refresh responses.
+- Coverage: `communityPagination.test.ts` covers out-of-order route and question responses. `AdminHeritagePanel.relations.test.ts` covers stale relation success/failure, same-item reopen races, top-level heritage item refresh failures, and stale item-list responses.
+- Evidence: `npm --prefix frontend run test -- --run src/views/AdminDashboardHotelOrders.test.ts src/components/AdminHeritagePanel.relations.test.ts src/views/communityPagination.test.ts src/views/UserProfileDomBehavior.test.ts src/api/cache.test.ts src/utils/sourceGuardrails.test.ts` passed with 6 files / 76 tests. Full `npm run check` passed.
+
+### CT-FE-050 - Closed - AdminDashboard list failures no longer masquerade as empty data
+
+- Status: Closed in the current worktree after DOM coverage and full validation passed.
+- Implementation: `AdminDashboard.vue` now gives user and hotel-order lists independent loading/error state, visible retry actions, row-preserving transient-failure behavior, and latest-request guards for refresh races. Failed refreshes no longer clear existing rows into "0" or empty-table copy, and stale successes/failures cannot overwrite newer list state.
+- Coverage: `AdminDashboardHotelOrders.test.ts` covers preserved hotel-order/user rows on refresh failure, retry recovery, stale hotel-order failures after newer success, and stale user responses after newer success.
+- Evidence: `npm --prefix frontend run test -- --run src/views/AdminDashboardHotelOrders.test.ts` passed with 5 tests, and the focused 6-file / 76-test frontend suite plus full `npm run check` passed.
+
+### CT-SEC-PII-002 - Closed - Redis/cache keys no longer expose raw user or IP identifiers
+
+- Status: Closed in the current worktree after focused backend privacy coverage and full validation passed.
+- Implementation: `CacheKeyHasher` provides keyed HMAC labels for cache keys. `IpLocationService` now uses HMAC labels for Spring cache keys, `RecommendationCacheService` uses HMAC user labels for Redis and local fallback cache keys, and `AiQuotaService` uses HMAC labels for daily quota keys plus route cache/start-lock keys instead of raw user IDs or route preference tuples.
+- Coverage: `IpLocationServiceCacheKeyPrivacyTest`, `RecommendationCacheServiceTest`, and `AiQuotaServiceTest` assert cache/Redis/fallback keys do not contain literal IPs, user IDs, or route preferences while preserving hit/invalidate/cache behavior. `AiRouteGenerationJobServiceTest` remains green against the opaque cache-key contract.
+- Evidence: `mvn -q -f backend/pom.xml '-Dtest=AiQuotaServiceTest,AiRouteGenerationJobServiceTest,IpLocationServiceCacheKeyPrivacyTest,RecommendationCacheServiceTest,CacheConfigSecurityTest' '-DfailIfNoSpecifiedTests=false' test` passed. Full `npm run check` passed.
+
+### CT-FE-052 - Closed - Forced password-change profile flow has mounted DOM coverage
+
+- Status: Closed in the current worktree after focused DOM validation passed.
+- Implementation: Added mounted `UserProfileDomBehavior.test.ts` coverage for `mustChangePassword` / `?changePassword=1` opening the password modal before profile details load, successful password change clearing the auth store flag, removing the query with `router.replace('/profile')`, closing the modal, and then loading profile details.
+- Evidence: `npm --prefix frontend run test -- --run src/views/UserProfileDomBehavior.test.ts` passed with 18 tests, and full `npm run check` passed.
+
+### CT-OPS-028 - Closed - Deploy preflight coverage is included in the root ops gate
+
+- Status: Closed in the current worktree after ops validation passed.
+- Implementation: `package.json` now runs `scripts/deploy-preflight.test.mjs` as part of `npm run test:ops` with serial `--test-concurrency=1` execution, and `opsConfigGuardrails.test.ts` asserts the deploy preflight test cannot be silently removed from the ops gate.
+- Evidence: `npm run test:ops` passed with 18 tests. The focused frontend security/ops suite passed with 42 tests, and full `npm run check` passed.
+
+### CT-BE-038 - Closed - Order summary rows no longer expose contact PII
+
+- Status: Closed in the current worktree after focused and full backend validation passed.
+- Implementation: `OrderSummaryResponse` removed `customerName` and `customerPhone`, and `OrderCenterService` no longer maps masked contact fields into `/api/orders/my` summary rows. Detail responses still keep the existing masked contact fields for explicit detail views.
+- Evidence: `mvn -q -f backend/pom.xml '-Dtest=OrderCenterServiceTest,OrderCenterControllerPageResponseContractTest' '-Dmaven.compiler.useIncrementalCompilation=false' test` passed. Full `npm run check` passed.
+
+### CT-FE-049 - Closed - Favorites pagination ignores stale responses and keeps failure states explicit
+
+- Status: Closed in the current worktree after DOM coverage and frontend validation passed.
+- Implementation: `Favorites.vue` now tracks the latest favorites request before writing list/error/loading state, hides pagination while loading or showing errors, exposes `aria-busy`, assertive error alerts, localized retry/loading/pagination labels, and prevents stale page responses from overwriting the latest page.
+- Coverage: `FavoritesDomBehavior.test.ts` covers localized labels, out-of-order pagination responses, and failed page loads that do not masquerade as an empty favorites list.
+- Evidence: `npm --prefix frontend run test -- --run src/views/FavoritesDomBehavior.test.ts src/views/feedbackStates.test.ts` passed as part of the focused 6-file / 42-test suite. Full `npm run check` passed with 47 frontend test files / 275 tests plus production build.
+
+### CT-FE-048 - Closed - Third-party scripts and external booking links now fail closed
+
+- Status: Closed in the current worktree after focused security coverage and full frontend validation passed.
+- Implementation: `amap.ts` verifies an existing loader script is `https://webapi.amap.com/maps` before reuse and resets the loader after failures. `recaptcha.ts` verifies existing scripts use trusted Google/reCAPTCHA origins, the fixed `/recaptcha/api.js` path, and the expected `render` parameter. `externalBooking.ts` now accepts direct booking URLs only when they are HTTPS, credential-free, and match built-in OTA host suffixes or explicit `VITE_EXTERNAL_BOOKING_ALLOWED_HOSTS`, otherwise it falls back to safe OTA search.
+- Coverage: `amap.test.ts`, `recaptcha.test.ts`, `externalBooking.test.ts`, and `sourceGuardrails.test.ts` cover untrusted script/link rejection and allowlisted direct supplier URLs.
+- Evidence: the focused frontend security/UX suite passed with 6 files / 42 tests. Full `npm run check` passed with frontend typecheck, 47 test files / 275 tests, and production build.
+
+### CT-FE-047 - Closed - Profile route-list failures no longer masquerade as empty lists
+
+- Status: Closed in the current worktree after implementation, DOM coverage, full frontend validation, and backend regression validation passed.
+- Implementation: `UserProfile.vue` now gives the routes tab independent localized failure state, guarded refresh/append request tokens, accessible `role="alert"` retry UX, and append-specific retry intent. Latest non-401 refresh failures keep existing route rows/page metadata, stale route failures are ignored after newer wins, append failures keep visible rows while retrying the failed next page, and 401 route failures enter the existing auth-pending flow without showing retryable list errors or empty states.
+- Coverage: `UserProfileDomBehavior.test.ts` covers latest route refresh failure plus retry recovery, stale failed route refresh ignored after newer route data wins, append failure preserving existing rows and retrying page 1, and 401 route failure avoiding retryable error/empty-state rendering.
+- Evidence: `npm --prefix frontend run test -- --run src/views/UserProfileDomBehavior.test.ts` passed with 17 tests. `npm --prefix frontend run test -- --run src/views/communityPagination.test.ts src/views/UserProfileDomBehavior.test.ts` passed with 37 tests. `npm --prefix frontend run typecheck` passed. `npm --prefix frontend run check` passed with 46 test files, 265 tests, and a production build. `mvn -q test` passed in `backend`. `git diff --check -- frontend/src/views/UserProfile.vue frontend/src/views/UserProfileDomBehavior.test.ts frontend/src/i18n/locales/zh.json frontend/src/i18n/locales/bo.json CODE_REVIEW_ISSUES.md` passed with only existing CRLF conversion warnings.
+
+### CT-FE-046 - Closed - Profile booking/comment failures no longer masquerade as empty lists
+
+- Status: Closed in the current worktree after implementation, DOM coverage, and focused frontend validation passed.
+- Implementation: `UserProfile.vue` now gives scenic bookings, hotel bookings, and comments independent localized failure state, accessible `role="alert"` blocks, and retry buttons. Latest non-401 refresh failures no longer clear data or pagination into empty states; stale failed requests remain guarded by the existing request tokens; append failures use append-specific copy and retry the failed next-page intent instead of silently refreshing page 0. 401 list failures mark the auth flow as pending so ordinary empty/error states are not rendered while the API interceptor handles session expiry.
+- Coverage: `UserProfileDomBehavior.test.ts` covers latest scenic/hotel/comments failures with retry, latest scenic append failure retrying page 1, stale scenic refresh failure, stale hotel/comments append failures, non-misleading empty states, and a 401 booking failure that does not render a retryable list error or empty state.
+- Evidence: `npm --prefix frontend run test -- --run src/views/UserProfileDomBehavior.test.ts` passed with 13 tests. `npm --prefix frontend run test -- --run src/views/communityPagination.test.ts src/views/UserProfileDomBehavior.test.ts` passed with 33 tests. `npm --prefix frontend run typecheck` passed. `npm --prefix frontend run check` passed with 46 test files, 261 tests, and a production build. `mvn -q test` passed in `backend`. `git diff --check -- frontend/src/views/UserProfile.vue frontend/src/views/UserProfileDomBehavior.test.ts frontend/src/i18n/locales/zh.json frontend/src/i18n/locales/bo.json CODE_REVIEW_ISSUES.md` passed with only existing CRLF conversion warnings.
 
 ### CT-FE-045 - Closed - Profile/account stale-response regression is guarded
 

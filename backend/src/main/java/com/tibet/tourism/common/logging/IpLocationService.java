@@ -43,7 +43,7 @@ public class IpLocationService {
         return trustedProxyIpResolver.resolveClientIp(request);
     }
 
-    @Cacheable(value = "ipLocationCache", key = "#ipAddress", unless = "#result == '未知' || #result == '本地网络'")
+    @Cacheable(value = "ipLocationCache", key = "@cacheKeyHasher.cacheKey('ip-location', #ipAddress)", unless = "#result == '未知' || #result == '本地网络'")
     public String getCityByIp(String ipAddress) {
         if (ipAddress == null || ipAddress.isEmpty()) {
             return "未知";

@@ -177,6 +177,7 @@ import { ref, onMounted, computed } from 'vue'
 import { AnimatePresence, motion } from 'motion-v'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { isAxiosError } from 'axios'
 import api, { endpoints } from '../api'
 import MotionBlock from '../components/motion/MotionBlock.vue'
 import { motionEase } from '../motion/presets'
@@ -226,9 +227,9 @@ const submitRoute = async () => {
     })
     showToast(t('createRoute.publishSuccess'), 'success')
     router.push('/community')
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to share route:', summarizeClientError(error))
-    if (error.response && error.response.status === 401) {
+    if (isAxiosError(error) && error.response?.status === 401) {
       showToast(t('createRoute.loginExpired'), 'warning')
       router.push({ path: '/login', query: { redirect: router.currentRoute.value.fullPath } })
     } else {

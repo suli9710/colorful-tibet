@@ -29,6 +29,16 @@ describe('AMap script loader', () => {
 
     await expect(loaded).resolves.toBe(amapWindow.AMap)
   })
+
+  it('rejects an existing loader script from an untrusted origin', async () => {
+    installDom('<script data-amap-loader="colorful-tibet" src="https://evil.example/maps?v=2.0&key=amap-key"></script>')
+    vi.stubEnv('VITE_AMAP_KEY', 'amap-key')
+
+    const { loadAmap } = await import('./amap')
+
+    await expect(loadAmap()).rejects.toThrow('Refusing to load untrusted AMap script.')
+    expect(document.querySelectorAll('script[data-amap-loader="colorful-tibet"]')).toHaveLength(1)
+  })
 })
 
 function installDom(head = '') {

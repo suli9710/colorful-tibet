@@ -1,4 +1,6 @@
 package com.tibet.tourism.modules.ai.application;
+import com.tibet.tourism.common.security.CacheKeyHasher;
+import com.tibet.tourism.common.security.ProductionSafetyValidator;
 import java.time.Duration;
 import java.time.format.DateTimeFormatter;
 import java.time.LocalDate;
@@ -9,6 +11,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.core.env.Environment;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
@@ -19,6 +22,8 @@ public class AiQuotaService {
     private static final Logger log = LoggerFactory.getLogger(AiQuotaService.class);
     private static final String QUOTA_KEY_PREFIX = "ai:quota:daily:";
     private static final String CACHE_KEY_PREFIX = "ai:cache:route:";
+    private static final String USER_QUOTA_KEY_NAMESPACE = "ai-quota-user";
+    private static final String ROUTE_CACHE_KEY_NAMESPACE = "ai-route";
     private static final long QUOTA_TTL_SECONDS = Duration.ofHours(25).toSeconds();
     private static final DefaultRedisScript<List> CONSUME_QUOTA_SCRIPT = new DefaultRedisScript<>("""
             local current = tonumber(redis.call('GET', KEYS[1]) or '0')
@@ -35,6 +40,8 @@ public class AiQuotaService {
             """, List.class);
 
     private final StringRedisTemplate redisTemplate;
+    private final CacheKeyHasher cacheKeyHasher;
+    private final boolean productionSafetyRequired;
 
     @Value("${app.security.ai-quota.daily-limit:${AI_DAILY_QUOTA_PER_USER:20}}")
     private int dailyLimit;
@@ -42,16 +49,20 @@ public class AiQuotaService {
     @Value("${app.security.ai-quota.cache-ttl-seconds:${AI_CACHE_TTL_SECONDS:300}}")
     private int cacheTtlSeconds;
 
-    @Value("${app.security.ai-quota.fail-closed-on-redis-outage:"
-            + "${app.security.rate-limit.fail-closed-on-redis-outage:false}}")
-    private boolean failClosedOnRedisOutage;
-
     private final ConcurrentHashMap<String, AtomicInteger> fallbackQuota = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, CacheEntry> fallbackCache = new ConcurrentHashMap<>();
     private volatile String fallbackDateKey = "";
 
-    public AiQuotaService(ObjectProvider<StringRedisTemplate> redisTemplateProvider) {
+    public AiQuotaService(ObjectProvider<StringRedisTemplate> redisTemplateProvider,
+                          CacheKeyHasher cacheKeyHasher,
+                          Environment environment) {
         this.redisTemplate = redisTemplateProvider.getIfAvailable();
+        this.cacheKeyHasher = cacheKeyHasher;
+        this.productionSafetyRequired = ProductionSafetyValidator.isProductionSafetyRequired(environment);
+    }
+
+    AiQuotaService(ObjectProvider<StringRedisTemplate> redisTemplateProvider, CacheKeyHasher cacheKeyHasher) {
+        this(redisTemplateProvider, cacheKeyHasher, null);
     }
 
     public record QuotaConsumptionResult(boolean allowed, int remaining) {}
@@ -65,7 +76,7 @@ public class AiQuotaService {
         }
 
         String dateKey = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE);
-        String key = QUOTA_KEY_PREFIX + dateKey + ":" + userId;
+        String key = quotaKey(dateKey, userId);
 
         if (redisTemplate != null) {
             try {
@@ -79,14 +90,18 @@ public class AiQuotaService {
                 mirrorFallbackQuota(dateKey, userId, used);
                 return decision;
             } catch (Exception e) {
-                if (failClosedOnRedisOutage) {
-                    log.warn("Redis quota consume failed; denying request (fail-closed): {}",
+                if (productionSafetyRequired) {
+                    log.warn("Redis quota consume failed in production; refusing AI route generation: {}",
                             AiLogPrivacy.exceptionSummary(e));
                     return new QuotaConsumptionResult(false, 0);
                 }
                 log.warn("Redis quota consume failed, using in-memory fallback: {}", AiLogPrivacy.exceptionSummary(e));
                 return tryConsumeFallbackQuota(dateKey, userId);
             }
+        }
+        if (productionSafetyRequired) {
+            log.warn("Redis quota backend is missing in production; refusing AI route generation");
+            return new QuotaConsumptionResult(false, 0);
         }
         return tryConsumeFallbackQuota(dateKey, userId);
     }
@@ -96,7 +111,7 @@ public class AiQuotaService {
             return false;
         }
         String dateKey = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE);
-        String key = QUOTA_KEY_PREFIX + dateKey + ":" + userId;
+        String key = quotaKey(dateKey, userId);
 
         if (redisTemplate != null) {
             try {
@@ -104,9 +119,18 @@ public class AiQuotaService {
                 int count = parseInt(val);
                 return count >= dailyLimit;
             } catch (Exception e) {
+                if (productionSafetyRequired) {
+                    log.warn("Redis quota check failed in production; treating quota as exceeded: {}",
+                            AiLogPrivacy.exceptionSummary(e));
+                    return true;
+                }
                 log.warn("Redis quota check failed, using in-memory fallback: {}", AiLogPrivacy.exceptionSummary(e));
                 return isFallbackQuotaExceeded(dateKey, userId);
             }
+        }
+        if (productionSafetyRequired) {
+            log.warn("Redis quota backend is missing in production; treating quota as exceeded");
+            return true;
         }
         return isFallbackQuotaExceeded(dateKey, userId);
     }
@@ -120,7 +144,7 @@ public class AiQuotaService {
             return dailyLimit;
         }
         String dateKey = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE);
-        String key = QUOTA_KEY_PREFIX + dateKey + ":" + userId;
+        String key = quotaKey(dateKey, userId);
 
         int used = 0;
         if (redisTemplate != null) {
@@ -128,10 +152,19 @@ public class AiQuotaService {
                 String val = redisTemplate.opsForValue().get(key);
                 used = parseInt(val);
             } catch (Exception e) {
+                if (productionSafetyRequired) {
+                    log.warn("Redis quota remaining check failed in production; returning zero remaining: {}",
+                            AiLogPrivacy.exceptionSummary(e));
+                    return 0;
+                }
                 log.warn("Redis quota remaining check failed, using in-memory fallback: {}", AiLogPrivacy.exceptionSummary(e));
                 used = getFallbackQuotaCount(dateKey, userId);
             }
         } else {
+            if (productionSafetyRequired) {
+                log.warn("Redis quota backend is missing in production; returning zero remaining");
+                return 0;
+            }
             used = getFallbackQuotaCount(dateKey, userId);
         }
         return Math.max(0, dailyLimit - used);
@@ -171,7 +204,17 @@ public class AiQuotaService {
     }
 
     public String buildCacheKey(Long userId, int days, String budget, String preference, String locale) {
-        return userId + ":" + days + ":" + normalize(budget) + ":" + normalize(preference) + ":" + normalize(locale);
+        String routeFingerprint = String.join(":",
+                String.valueOf(userId),
+                String.valueOf(days),
+                normalize(budget),
+                normalize(preference),
+                normalize(locale));
+        return cacheKeyHasher.cacheKey(ROUTE_CACHE_KEY_NAMESPACE, routeFingerprint);
+    }
+
+    private String quotaKey(String dateKey, Long userId) {
+        return QUOTA_KEY_PREFIX + dateKey + ":" + cacheKeyHasher.cacheKey(USER_QUOTA_KEY_NAMESPACE, userId);
     }
 
     private static int parseInt(Object val) {
@@ -217,13 +260,13 @@ public class AiQuotaService {
 
     private int getFallbackQuotaCount(String dateKey, Long userId) {
         resetFallbackIfNewDay(dateKey);
-        AtomicInteger counter = fallbackQuota.computeIfAbsent(userId.toString(), k -> new AtomicInteger(0));
+        AtomicInteger counter = fallbackQuota.computeIfAbsent(quotaKey(dateKey, userId), k -> new AtomicInteger(0));
         return counter.get();
     }
 
     private QuotaConsumptionResult tryConsumeFallbackQuota(String dateKey, Long userId) {
         resetFallbackIfNewDay(dateKey);
-        AtomicInteger counter = fallbackQuota.computeIfAbsent(userId.toString(), k -> new AtomicInteger(0));
+        AtomicInteger counter = fallbackQuota.computeIfAbsent(quotaKey(dateKey, userId), k -> new AtomicInteger(0));
         while (true) {
             int current = counter.get();
             if (current >= dailyLimit) {
@@ -238,7 +281,7 @@ public class AiQuotaService {
 
     private void mirrorFallbackQuota(String dateKey, Long userId, int usedCount) {
         resetFallbackIfNewDay(dateKey);
-        fallbackQuota.computeIfAbsent(userId.toString(), k -> new AtomicInteger(0))
+        fallbackQuota.computeIfAbsent(quotaKey(dateKey, userId), k -> new AtomicInteger(0))
                 .updateAndGet(current -> Math.max(current, usedCount));
     }
 

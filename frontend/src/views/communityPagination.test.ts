@@ -579,6 +579,17 @@ const paginatedArray = <T,>(content: T[], page: number, size: number, totalEleme
   }
 })
 
+const createDeferred = <T = unknown>() => {
+  let resolve!: (value: T) => void
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve
+    reject = promiseReject
+  })
+
+  return { promise, resolve, reject }
+}
+
 const clickByText = (root: ParentNode, text: string) => {
   const button = Array.from(root.querySelectorAll('button')).find(candidate =>
     candidate.textContent?.includes(text)
@@ -595,6 +606,13 @@ const setInputValue = async (root: ParentNode, selector: string, value: string) 
   input!.value = value
   input!.dispatchEvent(new Event('input', { bubbles: true }))
   await settleVue()
+}
+
+const setSelectValue = async (select: HTMLSelectElement | null, value: string, turns = 10) => {
+  expect(select).toBeTruthy()
+  select!.value = value
+  select!.dispatchEvent(new Event('change', { bubbles: true }))
+  await settleVue(turns)
 }
 
 const pageParamCalls = (url: string) =>
@@ -749,6 +767,282 @@ describe('community detail pagination', () => {
 
     expect(root.textContent).toContain('Recovered question')
     expect(root.textContent).not.toContain('问答列表加载失败，请稍后重试。')
+  })
+
+  it('keeps only the latest shared route request state after out-of-order responses', async () => {
+    const initialRoutes = createDeferred()
+    const filteredRoutes = createDeferred()
+    const staleRouteFailure = createDeferred()
+    const newestRoutes = createDeferred()
+
+    const routeResponse = (title: string) => ({
+      data: {
+        content: [
+          {
+            budget: 'budget',
+            commentCount: 0,
+            createdAt: '2026-06-08T00:00:00Z',
+            days: 3,
+            id: title.length,
+            likeCount: 0,
+            preference: 'preference',
+            title,
+            viewCount: 1
+          }
+        ],
+        totalPages: 1
+      }
+    })
+
+    testState.apiGet.mockImplementation((url: string, config?: any) => {
+      if (url === '/routes/shared') {
+        const days = Number(config?.params?.days ?? 0)
+        if (days === 3) return filteredRoutes.promise
+        if (days === 5) return staleRouteFailure.promise
+        if (days === 7) return newestRoutes.promise
+        return initialRoutes.promise
+      }
+      if (url === '/community/questions') {
+        return Promise.resolve({ data: { content: [], totalPages: 0 } })
+      }
+
+      return Promise.reject(new Error(`Unexpected GET ${url}`))
+    })
+
+    const root = await mountView(RouteCommunity)
+    const routeDaysSelect = root.querySelector<HTMLSelectElement>('#community-panel-routes select')
+
+    await setSelectValue(routeDaysSelect, '3', 2)
+    initialRoutes.resolve(routeResponse('Stale route'))
+    await settleVue()
+
+    expect(root.textContent).not.toContain('Stale route')
+    expect(root.textContent).toContain('路线列表加载中')
+    expect(root.textContent).not.toContain('路线列表加载失败，请稍后重试。')
+
+    filteredRoutes.resolve(routeResponse('Fresh route'))
+    await settleVue()
+
+    expect(root.textContent).toContain('Fresh route')
+    expect(root.textContent).not.toContain('Stale route')
+    expect(root.textContent).not.toContain('路线列表加载中')
+
+    await setSelectValue(routeDaysSelect, '5', 2)
+    await setSelectValue(routeDaysSelect, '7', 2)
+    staleRouteFailure.reject(new Error('stale route failure'))
+    await settleVue()
+
+    expect(root.textContent).not.toContain('路线列表加载失败，请稍后重试。')
+    expect(root.textContent).toContain('路线列表加载中')
+
+    newestRoutes.resolve(routeResponse('Newest route'))
+    await settleVue()
+
+    expect(root.textContent).toContain('Newest route')
+    expect(root.textContent).not.toContain('Fresh route')
+    expect(root.textContent).not.toContain('路线列表加载中')
+  })
+
+  it('resets shared route filters to the first page after browsing later pages', async () => {
+    const routeResponse = (title: string, totalPages = 3) => ({
+      data: {
+        content: [
+          {
+            budget: '经济型',
+            commentCount: 0,
+            createdAt: '2026-06-08T00:00:00Z',
+            days: 3,
+            id: title.length,
+            likeCount: 0,
+            preference: '自然风光',
+            title,
+            viewCount: 1
+          }
+        ],
+        totalPages
+      }
+    })
+
+    testState.apiGet.mockImplementation((url: string, config?: any) => {
+      if (url === '/routes/shared') {
+        const days = Number(config?.params?.days ?? 0)
+        const page = Number(config?.params?.page ?? 0)
+
+        if (days === 5) {
+          return Promise.resolve(routeResponse(page === 0 ? 'Filtered first page route' : 'Wrong filtered page route', 1))
+        }
+
+        return Promise.resolve(routeResponse(page === 1 ? 'Second page route' : 'First page route', 3))
+      }
+      if (url === '/community/questions') {
+        return Promise.resolve({ data: { content: [], totalPages: 0 } })
+      }
+
+      return Promise.reject(new Error(`Unexpected GET ${url}`))
+    })
+
+    const root = await mountView(RouteCommunity)
+    const routePanel = root.querySelector<HTMLElement>('#community-panel-routes')
+    const routeNextButton = Array.from(routePanel?.querySelectorAll<HTMLButtonElement>('button') ?? [])
+      .find(button => button.textContent?.includes('下一页'))
+
+    expect(root.textContent).toContain('First page route')
+    expect(routeNextButton).toBeTruthy()
+
+    routeNextButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await settleVue()
+
+    expect(root.textContent).toContain('Second page route')
+    expect(root.textContent).toContain('2 / 3')
+
+    await setSelectValue(routePanel?.querySelector<HTMLSelectElement>('select') ?? null, '5')
+
+    const filteredCalls = pageParamCalls('/routes/shared').filter(params => params?.days === 5)
+    expect(filteredCalls).toContainEqual({ days: 5, page: 0, size: 9, sortField: 'createdAt' })
+    expect(filteredCalls.some(params => params?.page === 1)).toBe(false)
+    expect(root.textContent).toContain('Filtered first page route')
+    expect(root.textContent).not.toContain('Wrong filtered page route')
+    expect(root.textContent).not.toContain('Second page route')
+  })
+
+  it('keeps only the latest Q&A request state after out-of-order responses', async () => {
+    const initialQuestions = createDeferred()
+    const sortedQuestions = createDeferred()
+    const staleQuestionFailure = createDeferred()
+    const newestQuestions = createDeferred()
+    let latestQuestionRequests = 0
+
+    const questionResponse = (title: string) => ({
+      data: {
+        content: [
+          {
+            answerCount: 0,
+            content: title,
+            createdAt: '2026-06-08T00:00:00Z',
+            id: title.length,
+            isResolved: false,
+            likeCount: 0,
+            tags: '',
+            title,
+            viewCount: 1
+          }
+        ],
+        totalPages: 1
+      }
+    })
+
+    testState.apiGet.mockImplementation((url: string, config?: any) => {
+      if (url === '/routes/shared') {
+        return Promise.resolve({ data: { content: [], totalPages: 0 } })
+      }
+      if (url === '/community/questions') {
+        const sort = String(config?.params?.sort ?? 'latest')
+        if (sort === 'hot') return sortedQuestions.promise
+        if (sort === 'unsolved') return staleQuestionFailure.promise
+        latestQuestionRequests += 1
+        return latestQuestionRequests === 1 ? initialQuestions.promise : newestQuestions.promise
+      }
+
+      return Promise.reject(new Error(`Unexpected GET ${url}`))
+    })
+
+    const root = await mountView(RouteCommunity)
+    const qaSortSelect = root.querySelector<HTMLSelectElement>('#community-panel-qa select')
+
+    await setSelectValue(qaSortSelect, 'hot', 2)
+    initialQuestions.resolve(questionResponse('Stale question'))
+    await settleVue()
+
+    expect(root.textContent).not.toContain('Stale question')
+    expect(root.textContent).toContain('问答列表加载中')
+    expect(root.textContent).not.toContain('问答列表加载失败，请稍后重试。')
+
+    sortedQuestions.resolve(questionResponse('Fresh question'))
+    await settleVue()
+
+    expect(root.textContent).toContain('Fresh question')
+    expect(root.textContent).not.toContain('Stale question')
+    expect(root.textContent).not.toContain('问答列表加载中')
+
+    await setSelectValue(qaSortSelect, 'unsolved', 2)
+    await setSelectValue(qaSortSelect, 'latest', 2)
+    staleQuestionFailure.reject(new Error('stale question failure'))
+    await settleVue()
+
+    expect(root.textContent).not.toContain('问答列表加载失败，请稍后重试。')
+    expect(root.textContent).toContain('问答列表加载中')
+
+    newestQuestions.resolve(questionResponse('Newest question'))
+    await settleVue()
+
+    expect(root.textContent).toContain('Newest question')
+    expect(root.textContent).not.toContain('Fresh question')
+    expect(root.textContent).not.toContain('问答列表加载中')
+  })
+
+  it('resets Q&A sort changes to the first page after browsing later pages', async () => {
+    const questionResponse = (title: string, totalPages = 3) => ({
+      data: {
+        content: [
+          {
+            answerCount: 0,
+            content: title,
+            createdAt: '2026-06-08T00:00:00Z',
+            id: title.length,
+            isResolved: false,
+            likeCount: 0,
+            tags: '',
+            title,
+            viewCount: 1
+          }
+        ],
+        totalPages
+      }
+    })
+
+    testState.apiGet.mockImplementation((url: string, config?: any) => {
+      if (url === '/routes/shared') {
+        return Promise.resolve({ data: { content: [], totalPages: 0 } })
+      }
+      if (url === '/community/questions') {
+        const page = Number(config?.params?.page ?? 0)
+        const sort = String(config?.params?.sort ?? 'latest')
+
+        if (sort === 'hot') {
+          return Promise.resolve(questionResponse(page === 0 ? 'Hot first page question' : 'Wrong hot page question', 1))
+        }
+
+        return Promise.resolve(questionResponse(page === 1 ? 'Second page question' : 'First page question', 3))
+      }
+
+      return Promise.reject(new Error(`Unexpected GET ${url}`))
+    })
+
+    const root = await mountView(RouteCommunity)
+    clickByText(root, '旅行问答')
+    await settleVue()
+
+    const qaPanel = root.querySelector<HTMLElement>('#community-panel-qa')
+    const qaNextButton = Array.from(qaPanel?.querySelectorAll<HTMLButtonElement>('button') ?? [])
+      .find(button => button.textContent?.includes('下一页'))
+
+    expect(root.textContent).toContain('First page question')
+    expect(qaNextButton).toBeTruthy()
+
+    qaNextButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await settleVue()
+
+    expect(root.textContent).toContain('Second page question')
+    expect(root.textContent).toContain('2 / 3')
+
+    await setSelectValue(qaPanel?.querySelector<HTMLSelectElement>('select') ?? null, 'hot')
+
+    const sortedCalls = pageParamCalls('/community/questions').filter(params => params?.sort === 'hot')
+    expect(sortedCalls).toContainEqual({ page: 0, size: 10, sort: 'hot' })
+    expect(sortedCalls.some(params => params?.page === 1)).toBe(false)
+    expect(root.textContent).toContain('Hot first page question')
+    expect(root.textContent).not.toContain('Wrong hot page question')
+    expect(root.textContent).not.toContain('Second page question')
   })
 
   it('loads additional news pages and resets search to the first page', async () => {

@@ -12,6 +12,8 @@ class ProductionSafetyValidatorTest {
     private static final String PII_KEYS =
             "kid-prod:MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=";
     private static final String PII_ACTIVE_KID = "kid-prod";
+    private static final String CACHE_KEY_HMAC_SECRET =
+            "cache-key-hmac-secret-that-is-long-enough-for-prod-2026-abcdefghi";
 
     @Test
     void prodProfileRejectsInsecureCookies() {
@@ -140,11 +142,146 @@ class ProductionSafetyValidatorTest {
                 "secret-key",
                 PII_KEYS,
                 PII_ACTIVE_KID,
-                "replace-with-base32-totp-secret");
+                "replace-with-base32-totp-secret",
+                CACHE_KEY_HMAC_SECRET,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true);
 
         assertThatThrownBy(validator::validateProductionSafety)
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("app.security.super-admin-totp-secret");
+    }
+
+    @Test
+    void prodProfileRejectsPlaceholderCacheKeyHmacSecret() {
+        ProductionSafetyValidator validator = new ProductionSafetyValidator(
+                productionEnvironment(),
+                true,
+                true,
+                false,
+                "scrapling-key",
+                true,
+                true,
+                "site-key",
+                "secret-key",
+                PII_KEYS,
+                PII_ACTIVE_KID,
+                "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ",
+                "replace-with-cache-key-hmac-secret",
+                true,
+                true,
+                true,
+                true,
+                true,
+                true);
+
+        assertThatThrownBy(validator::validateProductionSafety)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("app.security.cache-key-hmac-secret");
+    }
+
+    @Test
+    void prodProfileRejectsShortCacheKeyHmacSecret() {
+        ProductionSafetyValidator validator = new ProductionSafetyValidator(
+                productionEnvironment(),
+                true,
+                true,
+                false,
+                "scrapling-key",
+                true,
+                true,
+                "site-key",
+                "secret-key",
+                PII_KEYS,
+                PII_ACTIVE_KID,
+                "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ",
+                "short-cache-key-secret",
+                true,
+                true,
+                true,
+                true,
+                true,
+                true);
+
+        assertThatThrownBy(validator::validateProductionSafety)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Production cache key HMAC secret must be at least 64 characters");
+    }
+
+    @Test
+    void prodProfileRejectsDisabledRateLimitRedis() {
+        ProductionSafetyValidator validator = validator(
+                productionEnvironment(),
+                true,
+                true,
+                false,
+                "scrapling-key",
+                true,
+                true,
+                "site-key",
+                "secret-key",
+                true,
+                false,
+                true,
+                true,
+                true,
+                true);
+
+        assertThatThrownBy(validator::validateProductionSafety)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("app.security.rate-limit.redis-enabled=true");
+    }
+
+    @Test
+    void prodProfileRejectsRateLimitRedisFallback() {
+        ProductionSafetyValidator validator = validator(
+                productionEnvironment(),
+                true,
+                true,
+                false,
+                "scrapling-key",
+                true,
+                true,
+                "site-key",
+                "secret-key",
+                true,
+                true,
+                false,
+                true,
+                true,
+                true);
+
+        assertThatThrownBy(validator::validateProductionSafety)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("app.security.rate-limit.redis-fail-closed=true");
+    }
+
+    @Test
+    void prodProfileRejectsBruteForceRedisFallback() {
+        ProductionSafetyValidator validator = validator(
+                productionEnvironment(),
+                true,
+                true,
+                false,
+                "scrapling-key",
+                true,
+                true,
+                "site-key",
+                "secret-key",
+                true,
+                true,
+                true,
+                true,
+                true,
+                false);
+
+        assertThatThrownBy(validator::validateProductionSafety)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("app.security.brute-force.redis-fail-closed=true");
     }
 
     @Test
@@ -161,7 +298,14 @@ class ProductionSafetyValidatorTest {
                 "secret-key",
                 "",
                 PII_ACTIVE_KID,
-                "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ");
+                "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ",
+                CACHE_KEY_HMAC_SECRET,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true);
 
         assertThatThrownBy(validator::validateProductionSafety)
                 .isInstanceOf(IllegalStateException.class)
@@ -182,7 +326,14 @@ class ProductionSafetyValidatorTest {
                 "secret-key",
                 PII_KEYS,
                 "kid-missing",
-                "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ");
+                "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ",
+                CACHE_KEY_HMAC_SECRET,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true);
 
         assertThatThrownBy(validator::validateProductionSafety)
                 .isInstanceOf(IllegalStateException.class)
@@ -332,7 +483,14 @@ class ProductionSafetyValidatorTest {
                 "secret-key",
                 PII_KEYS,
                 PII_ACTIVE_KID,
-                "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ");
+                "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ",
+                CACHE_KEY_HMAC_SECRET,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true);
     }
 
     private ProductionSafetyValidator validator(
@@ -357,6 +515,51 @@ class ProductionSafetyValidatorTest {
                 recaptchaSecretKey,
                 PII_KEYS,
                 PII_ACTIVE_KID,
-                "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ");
+                "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ",
+                CACHE_KEY_HMAC_SECRET,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true);
+    }
+
+    private ProductionSafetyValidator validator(
+            MockEnvironment environment,
+            boolean cookieSecure,
+            boolean requireStrongSecrets,
+            boolean mockCallbackEnabled,
+            String scraplingApiKey,
+            boolean recaptchaEnabled,
+            boolean registrationRecaptchaRequired,
+            String recaptchaSiteKey,
+            String recaptchaSecretKey,
+            boolean rateLimitEnabled,
+            boolean rateLimitRedisEnabled,
+            boolean rateLimitRedisFailClosed,
+            boolean bruteForceEnabled,
+            boolean bruteForceRedisEnabled,
+            boolean bruteForceRedisFailClosed) {
+        return new ProductionSafetyValidator(
+                environment,
+                cookieSecure,
+                requireStrongSecrets,
+                mockCallbackEnabled,
+                scraplingApiKey,
+                recaptchaEnabled,
+                registrationRecaptchaRequired,
+                recaptchaSiteKey,
+                recaptchaSecretKey,
+                PII_KEYS,
+                PII_ACTIVE_KID,
+                "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ",
+                CACHE_KEY_HMAC_SECRET,
+                rateLimitEnabled,
+                rateLimitRedisEnabled,
+                rateLimitRedisFailClosed,
+                bruteForceEnabled,
+                bruteForceRedisEnabled,
+                bruteForceRedisFailClosed);
     }
 }

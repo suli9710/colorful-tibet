@@ -36,13 +36,14 @@ public class UserBasedCFStrategy implements ScoringStrategy {
                 .filter(history -> !history.getUser().getId().equals(userId))
                 .collect(Collectors.groupingBy(history -> history.getUser().getId()));
 
-        Map<Long, Double> cachedSimilarities = cacheService.getSimilarity(userId);
+        Map<String, Double> cachedSimilarities = cacheService.getSimilarity(userId);
 
         Map<Long, Double> userSimilarityMap = overlapHistoryByUser.entrySet().parallelStream()
                 .map(entry -> {
                     Long otherUserId = entry.getKey();
-                    if (cachedSimilarities != null && cachedSimilarities.containsKey(otherUserId)) {
-                        return Map.entry(otherUserId, cachedSimilarities.get(otherUserId));
+                    String otherUserCacheKey = cacheService.similarUserCacheKey(otherUserId);
+                    if (cachedSimilarities != null && cachedSimilarities.containsKey(otherUserCacheKey)) {
+                        return Map.entry(otherUserId, cachedSimilarities.get(otherUserCacheKey));
                     }
                     double similarity = calculateCombinedSimilarity(visitHistory, entry.getValue());
                     if (similarity < config.getMinSimilarity()) return null;

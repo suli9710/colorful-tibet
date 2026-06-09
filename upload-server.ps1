@@ -222,10 +222,15 @@ reject_placeholder_secret_if_present() {
   fi
 }
 
-for secret_name in DB_PASSWORD MYSQL_ROOT_PASSWORD REDIS_PASSWORD GRAFANA_ADMIN_PASSWORD; do
+for secret_name in DB_PASSWORD MYSQL_ROOT_PASSWORD REDIS_PASSWORD GRAFANA_ADMIN_PASSWORD CACHE_KEY_HMAC_SECRET; do
   require_real_secret "$secret_name"
 done
 reject_placeholder_secret_if_present MYSQL_PASSWORD
+CACHE_KEY_HMAC_SECRET_VALUE=$(get_env_value CACHE_KEY_HMAC_SECRET)
+if [ "${#CACHE_KEY_HMAC_SECRET_VALUE}" -lt 64 ]; then
+  echo "Refusing deployment: CACHE_KEY_HMAC_SECRET must be at least 64 characters." >&2
+  exit 1
+fi
 
 NGINX_REDIRECT_HOST_VALUE=$(get_env_value NGINX_REDIRECT_HOST)
 NGINX_REDIRECT_HOST_PATTERN='^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$'

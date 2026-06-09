@@ -304,6 +304,28 @@ describe('HotelOrders DOM behavior', () => {
     expect(renderedText).not.toContain('13812345678')
   })
 
+  it('keeps visible hotel orders when a refresh fails after data was loaded', async () => {
+    testState.apiGet
+      .mockResolvedValueOnce(hotelOrdersPage([hotelOrderFixture]))
+      .mockRejectedValueOnce(new Error('refresh failed'))
+
+    const root = await mountHotelOrders()
+    expect(root.textContent).toContain('Lhasa Summit Hotel')
+
+    window.dispatchEvent(new Event('hotel-orders-updated'))
+    await settleVue()
+
+    const alert = root.querySelector<HTMLElement>('[role="alert"]')
+    const retryButton = Array.from(root.querySelectorAll<HTMLButtonElement>('button'))
+      .find(button => button.textContent?.includes('Reload'))
+
+    expect(alert).not.toBeNull()
+    expect(alert?.textContent).toContain('Hotel orders failed to load')
+    expect(retryButton).toBeTruthy()
+    expect(root.textContent).toContain('Lhasa Summit Hotel')
+    expect(root.textContent).not.toContain('No hotel orders')
+  })
+
   it('ignores stale refresh responses that return after a newer hotel order load', async () => {
     const firstLoad = deferred<ReturnType<typeof hotelOrdersPage>>()
     const secondLoad = deferred<ReturnType<typeof hotelOrdersPage>>()

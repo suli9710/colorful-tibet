@@ -17,6 +17,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.tibet.tourism.common.security.CacheKeyHasher;
 import com.tibet.tourism.modules.ai.domain.AiRouteRecord;
 import com.tibet.tourism.modules.ai.web.dto.AiRouteGenerateRequest;
 import com.tibet.tourism.modules.user.domain.User;
@@ -52,6 +53,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.StreamOperations;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.data.redis.core.script.RedisScript;
+import org.springframework.mock.env.MockEnvironment;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyEmitter;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -378,8 +380,7 @@ class AiRouteGenerationJobServiceTest {
         when(redis.valueOperations().get("ai:route-job:start:cache-key")).thenReturn("job-205");
         when(redis.valueOperations().get("ai:route-job:pending:job-205"))
                 .thenReturn(objectMapper.writeValueAsString(Map.of(
-                        "userId", 7L,
-                        "cacheKey", "cache-key",
+                        "userKey", testPendingUserKey(7L),
                         "days", 5,
                         "budget", "comfort",
                         "preference", "natural",
@@ -403,6 +404,66 @@ class AiRouteGenerationJobServiceTest {
                         && payload.contains("\"retryable\":true")
                         && payload.contains("running-record-not-ready")));
         verify(aiQuotaService, never()).tryConsumeQuota(7L);
+    }
+
+    @Test
+    void distributedPendingStartMetadataDoesNotStoreRawUserIdOrRouteCacheKey() {
+        Executor directExecutor = Runnable::run;
+        RedisFixture redis = redisFixture();
+        AiRouteGenerationJobService service = new AiRouteGenerationJobService(
+                aiRouteService,
+                aiQuotaService,
+                aiRouteRecordService,
+                directExecutor,
+                objectMapper(),
+                provider(redis.template())
+        );
+
+        User user = new User();
+        user.setId(1234567890123456789L);
+        AiRouteGenerateRequest request = new AiRouteGenerateRequest();
+        request.setDays(5);
+        request.setBudget("comfort");
+        request.setPreference("natural");
+        String rawCacheKey = "raw-route-cache-key-for-user-1234567890123456789";
+
+        when(aiQuotaService.buildCacheKey(user.getId(), 5, "comfort", "natural", "zh")).thenReturn(rawCacheKey);
+        when(aiQuotaService.getCachedRoute(rawCacheKey)).thenReturn(null);
+        when(redis.valueOperations().setIfAbsent(
+                eq("ai:route-job:start:" + rawCacheKey), anyString(), any(Duration.class)))
+                .thenReturn(true);
+        when(aiQuotaService.tryConsumeQuota(user.getId())).thenReturn(new AiQuotaService.QuotaConsumptionResult(true, 19));
+        when(aiRouteRecordService.createRunningRecord(eq(user), any(), eq(5), eq("comfort"), eq("natural"), eq("zh")))
+                .thenReturn(record(206L));
+        when(aiRouteRecordService.recordCompletedRoute(
+                eq(user), any(), eq(5), eq("comfort"), eq("natural"), eq("zh"), eq("# Fresh route")))
+                .thenReturn(record(206L));
+
+        doAnswer(invocation -> {
+            AiRouteService.RouteStreamListener listener = invocation.getArgument(5);
+            listener.onDone("# Fresh route");
+            return "# Fresh route";
+        }).when(aiRouteService).streamRouteToListener(
+                eq(5),
+                eq("comfort"),
+                eq("natural"),
+                eq(user),
+                eq("zh"),
+                any(AiRouteService.RouteStreamListener.class));
+
+        AiRouteJobSnapshot snapshot = service.startJob(request, user, "zh");
+
+        assertEquals("COMPLETED", snapshot.status());
+        ArgumentCaptor<String> pendingJson = ArgumentCaptor.forClass(String.class);
+        verify(redis.valueOperations()).set(
+                eq("ai:route-job:pending:" + snapshot.jobId()),
+                pendingJson.capture(),
+                any(Duration.class));
+        assertTrue(pendingJson.getValue().contains("\"userKey\":\"ai-route-job-user#"));
+        assertFalse(pendingJson.getValue().contains("\"userId\""));
+        assertFalse(pendingJson.getValue().contains("\"cacheKey\""));
+        assertFalse(pendingJson.getValue().contains(user.getId().toString()));
+        assertFalse(pendingJson.getValue().contains(rawCacheKey));
     }
 
     @Test
@@ -507,6 +568,42 @@ class AiRouteGenerationJobServiceTest {
         assertEquals("COMPLETED", snapshot.status());
         assertEquals("# Fallback route", snapshot.content());
         verify(aiQuotaService).tryConsumeQuota(7L);
+    }
+
+    @Test
+    void productionRedisStartLockFailureFailsClosedBeforeQuotaConsumption() {
+        Executor directExecutor = Runnable::run;
+        StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
+        AiRouteGenerationJobService service = new AiRouteGenerationJobService(
+                aiRouteService,
+                aiQuotaService,
+                aiRouteRecordService,
+                directExecutor,
+                new ObjectMapper(),
+                provider(redisTemplate),
+                new CacheKeyHasher("test-cache-key-hmac-secret"),
+                productionEnvironment()
+        );
+
+        User user = new User();
+        user.setId(7L);
+        AiRouteGenerateRequest request = new AiRouteGenerateRequest();
+        request.setDays(5);
+        request.setBudget("comfort");
+        request.setPreference("natural");
+
+        when(aiQuotaService.buildCacheKey(7L, 5, "comfort", "natural", "zh")).thenReturn("cache-key");
+        when(aiQuotaService.getCachedRoute("cache-key")).thenReturn(null);
+        when(redisTemplate.opsForValue()).thenThrow(new RuntimeException("redis down"));
+
+        IllegalStateException error = assertThrows(
+                IllegalStateException.class,
+                () -> service.startJob(request, user, "zh"));
+
+        assertTrue(error.getMessage().contains("Redis start lock"));
+        verify(aiQuotaService, never()).tryConsumeQuota(7L);
+        verify(aiRouteRecordService, never())
+                .createRunningRecord(eq(user), any(), eq(5), eq("comfort"), eq("natural"), eq("zh"));
     }
 
     @Test
@@ -850,6 +947,11 @@ class AiRouteGenerationJobServiceTest {
         return new ObjectMapper().findAndRegisterModules();
     }
 
+    private static String testPendingUserKey(Long userId) {
+        return new CacheKeyHasher("local-cache-key-hmac-secret")
+                .cacheKey("ai-route-job-user", userId);
+    }
+
     @SuppressWarnings({"unchecked", "rawtypes"})
     private static RedisFixture redisFixture() {
         StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
@@ -897,6 +999,12 @@ class AiRouteGenerationJobServiceTest {
                 return stream();
             }
         };
+    }
+
+    private static MockEnvironment productionEnvironment() {
+        MockEnvironment environment = new MockEnvironment();
+        environment.setActiveProfiles("prod");
+        return environment;
     }
 
     private record RedisFixture(

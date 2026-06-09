@@ -5,17 +5,24 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.tibet.tourism.common.security.CacheKeyHasher;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.mock.env.MockEnvironment;
 import org.springframework.test.util.ReflectionTestUtils;
 
 class GuideChatUsageServiceTest {
+
+    private static final CacheKeyHasher CACHE_KEY_HASHER = new CacheKeyHasher("test-cache-key-hmac-secret");
 
     @Test
     void inMemoryWindowLimitBlocksBurstForSameClient() {
@@ -108,8 +115,69 @@ class GuideChatUsageServiceTest {
         verify(redis.valueOps()).decrement(anyString());
     }
 
+    @Test
+    void productionRedisMissingFailsClosed() {
+        GuideChatUsageService service = newService(null, productionEnvironment(), 10, 5, 60);
+
+        GuideChatUsageService.Decision decision =
+                service.tryAcquire(GuideChatUsageService.ClientIdentity.authenticated(123456789L), false);
+
+        assertThat(decision.allowed()).isFalse();
+        assertThat(decision.challengeRequired()).isFalse();
+        assertThat(decision.reason()).isEqualTo("usage-backend-unavailable");
+        assertThat(decision.retryAfterSeconds()).isGreaterThanOrEqualTo(60);
+    }
+
+    @Test
+    void productionRedisFailureFailsClosed() {
+        RedisFixture redis = redisFixture();
+        GuideChatUsageService service = newService(redis.template(), productionEnvironment(), 10, 5, 60);
+        when(redis.valueOps().get(anyString())).thenThrow(new RuntimeException("redis unavailable"));
+
+        GuideChatUsageService.Decision decision =
+                service.tryAcquire(GuideChatUsageService.ClientIdentity.authenticated(123456789L), false);
+
+        assertThat(decision.allowed()).isFalse();
+        assertThat(decision.reason()).isEqualTo("usage-backend-unavailable");
+        verify(redis.valueOps(), never()).increment(anyString());
+    }
+
+    @Test
+    void redisUsageKeysUseOpaqueClientLabels() {
+        RedisFixture redis = redisFixture();
+        GuideChatUsageService service = newService(redis.template(), 10, 5, 60);
+        when(redis.valueOps().get(anyString())).thenReturn("0", "0");
+        when(redis.template().getExpire(anyString(), eq(TimeUnit.SECONDS))).thenReturn(60L);
+        when(redis.valueOps().increment(anyString())).thenReturn(1L, 1L);
+
+        GuideChatUsageService.Decision decision =
+                service.tryAcquire(GuideChatUsageService.ClientIdentity.authenticated(123456789L), false);
+
+        assertThat(decision.allowed()).isTrue();
+        ArgumentCaptor<String> keyCaptor = ArgumentCaptor.forClass(String.class);
+        verify(redis.valueOps(), times(2)).increment(keyCaptor.capture());
+        assertThat(keyCaptor.getAllValues()).allSatisfy(key -> assertThat(key)
+                .contains("guide-chat-auth-client#")
+                .doesNotContain("123456789"));
+    }
+
+    @Test
+    void inMemoryFallbackUsageKeysUseOpaqueClientLabels() {
+        GuideChatUsageService service = newService(10, 5, 60);
+
+        service.tryAcquire(GuideChatUsageService.ClientIdentity.authenticated(123456789L), false);
+
+        @SuppressWarnings("unchecked")
+        Map<String, ?> fallbackUsage = (Map<String, ?>) ReflectionTestUtils.getField(service, "fallbackUsage");
+
+        assertThat(fallbackUsage).isNotNull();
+        assertThat(fallbackUsage.keySet()).allSatisfy(key -> assertThat(key)
+                .contains("guide-chat-auth-client#")
+                .doesNotContain("123456789"));
+    }
+
     private GuideChatUsageService newService(int dailyLimit, int windowLimit, int windowSeconds) {
-        GuideChatUsageService service = new GuideChatUsageService(nullRedisProvider());
+        GuideChatUsageService service = new GuideChatUsageService(nullRedisProvider(), CACHE_KEY_HASHER, null);
         configureLimits(service, dailyLimit, windowLimit, windowSeconds);
         return service;
     }
@@ -119,7 +187,19 @@ class GuideChatUsageServiceTest {
             int dailyLimit,
             int windowLimit,
             int windowSeconds) {
-        GuideChatUsageService service = new GuideChatUsageService(redisProvider(redisTemplate));
+        return newService(redisTemplate, null, dailyLimit, windowLimit, windowSeconds);
+    }
+
+    private GuideChatUsageService newService(
+            StringRedisTemplate redisTemplate,
+            MockEnvironment environment,
+            int dailyLimit,
+            int windowLimit,
+            int windowSeconds) {
+        GuideChatUsageService service = new GuideChatUsageService(
+                redisProvider(redisTemplate),
+                CACHE_KEY_HASHER,
+                environment);
         configureLimits(service, dailyLimit, windowLimit, windowSeconds);
         return service;
     }
@@ -172,5 +252,11 @@ class GuideChatUsageServiceTest {
     private record RedisFixture(
             StringRedisTemplate template,
             ValueOperations<String, String> valueOps) {
+    }
+
+    private MockEnvironment productionEnvironment() {
+        MockEnvironment environment = new MockEnvironment();
+        environment.setActiveProfiles("prod");
+        return environment;
     }
 }

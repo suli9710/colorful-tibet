@@ -82,6 +82,11 @@ function Test-Placeholder {
     return $Value -match '(?i)(replace-with|change-me|changeme|placeholder|example\.com|local-dev|local-)'
 }
 
+function Test-DnsHostName {
+    param([string] $Value)
+    return $Value -match '^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$'
+}
+
 function Require-Exact {
     param(
         [hashtable] $EnvValues,
@@ -108,6 +113,51 @@ function Require-RealValue {
     }
     if (Test-Placeholder $value) {
         Add-Issue "$Name still looks like a placeholder: '$value'."
+    }
+}
+
+function Require-SingleHost {
+    param(
+        [hashtable] $EnvValues,
+        [string] $Name
+    )
+
+    $value = Get-EnvValue $EnvValues $Name
+    if ([string]::IsNullOrWhiteSpace($value)) {
+        Add-Issue "$Name must be set for $Stage."
+        return
+    }
+    if (Test-Placeholder $value) {
+        Add-Issue "$Name still looks like a placeholder: '$value'."
+    }
+    if ($value -match '\s' -or -not (Test-DnsHostName $value)) {
+        Add-Issue "$Name must be a single DNS host without scheme, path, port, comma, whitespace, or control characters."
+    }
+}
+
+function Require-ServerNameList {
+    param(
+        [hashtable] $EnvValues,
+        [string] $Name
+    )
+
+    $value = Get-EnvValue $EnvValues $Name
+    if ([string]::IsNullOrWhiteSpace($value)) {
+        Add-Issue "$Name must be set for $Stage."
+        return
+    }
+    if (Test-Placeholder $value) {
+        Add-Issue "$Name still looks like a placeholder: '$value'."
+    }
+    if ($value -match '[\r\n\t]') {
+        Add-Issue "$Name entries must be DNS hosts separated by single spaces only."
+        return
+    }
+
+    foreach ($hostName in ($value.Trim() -split ' +')) {
+        if (-not (Test-DnsHostName $hostName)) {
+            Add-Issue "$Name entry '$hostName' must be a DNS host without scheme, path, port, comma, wildcard, or control characters."
+        }
     }
 }
 
@@ -185,10 +235,17 @@ Require-Exact $EnvValues "SEED_CONTENT_ENABLED" "false"
 Require-Exact $EnvValues "SPRING_FLYWAY_ENABLED" "true"
 Require-Exact $EnvValues "SPRING_JPA_HIBERNATE_DDL_AUTO" "validate"
 Require-Exact $EnvValues "DB_ALLOW_PUBLIC_KEY_RETRIEVAL" "false"
+Require-Exact $EnvValues "PUBLIC_METRICS_ENABLED" "false"
+Require-Exact $EnvValues "RATE_LIMIT_REDIS_ENABLED" "true"
+Require-Exact $EnvValues "RATE_LIMIT_REDIS_FAIL_CLOSED" "true"
+Require-Exact $EnvValues "BRUTE_FORCE_REDIS_ENABLED" "true"
+Require-Exact $EnvValues "BRUTE_FORCE_REDIS_FAIL_CLOSED" "true"
+Require-Exact $EnvValues "SCRAPLING_ALLOW_UNAUTHENTICATED" "false"
 
 foreach ($name in @(
     "JWT_SECRET",
     "CSRF_SIGNING_SECRET",
+    "CACHE_KEY_HMAC_SECRET",
     "ADMIN_ENCRYPTION_KEY",
     "PAYMENT_CALLBACK_SECRET",
     "DB_PASSWORD",
@@ -199,16 +256,18 @@ foreach ($name in @(
     "RECAPTCHA_SITE_KEY",
     "RECAPTCHA_SECRET_KEY",
     "VITE_AMAP_KEY",
-    "VITE_AMAP_SECURITY_CODE",
-    "NGINX_REDIRECT_HOST",
-    "NGINX_CERT_DOMAIN"
+    "VITE_AMAP_SECURITY_CODE"
 )) {
     Require-RealValue $EnvValues $name
 }
 
-$redirectHost = Get-EnvValue $EnvValues "NGINX_REDIRECT_HOST"
-if ($redirectHost -and $redirectHost -notmatch '^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$') {
-    Add-Issue "NGINX_REDIRECT_HOST must be one host only, without scheme, port, path, comma, or spaces."
+Require-ServerNameList $EnvValues "NGINX_SERVER_NAME"
+Require-SingleHost $EnvValues "NGINX_REDIRECT_HOST"
+Require-SingleHost $EnvValues "NGINX_CERT_DOMAIN"
+
+$cacheKeyHmacSecret = Get-EnvValue $EnvValues "CACHE_KEY_HMAC_SECRET"
+if ($cacheKeyHmacSecret.Length -lt 64) {
+    Add-Issue "CACHE_KEY_HMAC_SECRET must be at least 64 characters for $Stage."
 }
 
 $dbSslMode = Get-EnvValue $EnvValues "DB_SSL_MODE" "REQUIRED"

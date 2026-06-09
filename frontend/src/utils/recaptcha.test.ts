@@ -66,6 +66,25 @@ describe('recaptcha configuration', () => {
 
     await expect(loaded).resolves.toBeUndefined()
   })
+
+  it('rejects an existing reCAPTCHA script from an untrusted origin', async () => {
+    installDom('<script src="https://evil.example/recaptcha/api.js?render=site-key"></script>')
+    vi.stubEnv('VITE_RECAPTCHA_ENABLED', 'true')
+    vi.stubEnv('VITE_RECAPTCHA_MODE', 'v3')
+    vi.stubEnv('VITE_RECAPTCHA_SITE_KEY', 'site-key')
+    window.grecaptcha = {
+      ready: callback => callback(),
+      execute: vi.fn(),
+      render: vi.fn(),
+      getResponse: vi.fn(),
+      reset: vi.fn()
+    }
+
+    const { loadRecaptcha } = await import('./recaptcha')
+
+    await expect(loadRecaptcha('site-key')).rejects.toMatchObject({ name: 'RecaptchaError' })
+    expect(document.querySelectorAll('script[src*="recaptcha/api.js"]')).toHaveLength(1)
+  })
 })
 
 function installDom(head = '') {

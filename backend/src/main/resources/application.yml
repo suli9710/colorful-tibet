@@ -168,6 +168,7 @@ app:
     registration-recaptcha-required: ${REGISTRATION_RECAPTCHA_REQUIRED:false}
     hotel-booking-pii-read-usernames: ${HOTEL_BOOKING_PII_READ_USERNAMES:${SUPER_ADMIN_USERNAME:}}
     csrf-signing-secret: ${CSRF_SIGNING_SECRET:}
+    cache-key-hmac-secret: ${CACHE_KEY_HMAC_SECRET:}
     pii-keys: ${PII_KEYS:}
     pii-active-kid: ${PII_ACTIVE_KID:}
     pii-encryption-key: ${PII_ENCRYPTION_KEY:}
@@ -179,6 +180,7 @@ app:
     rate-limit:
       enabled: ${RATE_LIMIT_ENABLED:true}
       redis-enabled: ${RATE_LIMIT_REDIS_ENABLED:true}
+      redis-fail-closed: ${RATE_LIMIT_REDIS_FAIL_CLOSED:false}
       trust-proxy-headers: ${TRUST_PROXY_HEADERS:false}
       trusted-proxy-cidrs: ${RATE_LIMIT_TRUSTED_PROXY_CIDRS:${TRUSTED_PROXY_CIDRS:}}
       default:
@@ -221,6 +223,7 @@ app:
       ip-max-attempts: ${BRUTE_FORCE_IP_MAX_ATTEMPTS:30}
       network-max-attempts: ${BRUTE_FORCE_NETWORK_MAX_ATTEMPTS:120}
       redis-enabled: ${BRUTE_FORCE_REDIS_ENABLED:true}
+      redis-fail-closed: ${BRUTE_FORCE_REDIS_FAIL_CLOSED:false}
       exempt-usernames: ${BRUTE_FORCE_EXEMPT_USERNAMES:}
     antibot:
       enabled: ${ANTIBOT_ENABLED:false}

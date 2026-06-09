@@ -15,7 +15,7 @@
 
 不要用 `docker-compose.yml` 承载公网生产流量；也不要把从 `.env.example` 复制出的本地 `.env` 直接用于生产。生产发布前必须用 `docker compose -f docker-compose.prod.yml config` 检查最终展开结果，确认没有 `change-me`、`replace-with-*` 或本地 profile 值残留。
 
-生产 Compose 还包含一次性的 `production-preflight` 服务。真正执行 `docker compose -f docker-compose.prod.yml up` 时，它会在 MySQL、Redis、backend、Scrapling 和 Grafana 启动前拒绝基础设施密码占位值，包括 `DB_PASSWORD`、`MYSQL_ROOT_PASSWORD`、`REDIS_PASSWORD`、`GRAFANA_ADMIN_PASSWORD`，以及已设置但仍是占位值的 `MYSQL_PASSWORD`。`upload-server.ps1` 的远端 preflight 使用同一规则，避免绕过 Compose 直接发布。
+生产 Compose 还包含一次性的 `production-preflight` 服务。真正执行 `docker compose -f docker-compose.prod.yml up` 时，它会在 MySQL、Redis、backend、Scrapling 和 Grafana 启动前拒绝基础设施密码占位值，包括 `DB_PASSWORD`、`MYSQL_ROOT_PASSWORD`、`REDIS_PASSWORD`、`GRAFANA_ADMIN_PASSWORD`、`CACHE_KEY_HMAC_SECRET`，以及已设置但仍是占位值的 `MYSQL_PASSWORD`。它也会拒绝匿名 metrics、Redis 保护降级、mock 支付、非 secure cookie、MySQL public key retrieval 和 Scrapling 匿名访问等生产危险覆盖值。`upload-server.ps1` 的远端 preflight 使用同一规则，避免绕过 Compose 直接发布。
 
 `TRUST_PROXY_HEADERS` 生产默认关闭，`TRUSTED_PROXY_CIDRS` 生产默认留空。只有确认 backend 的直接来源确实是受控反向代理或负载均衡器时，才可以把 `TRUST_PROXY_HEADERS=true` 并填写具体代理 IP/CIDR，例如单个 `/32` 或明确的负载均衡器子网。不要使用 `10.0.0.0/8`、`172.16.0.0/12`、`192.168.0.0/16`、`0.0.0.0/0` 或 `::/0` 这类宽范围；preflight 会拒绝这些值。
 
@@ -31,7 +31,7 @@ Docker Compose 展开变量时，宿主机环境变量和 `--env-file`/`.env` �
 | `.env` 或 `--env-file` | Compose 插值和容器环境 | `DB_PASSWORD`、`REDIS_PASSWORD`、`NGINX_SERVER_NAME`、`NGINX_REDIRECT_HOST` | 每个环境独立维护；生产值来自密钥管理或受控主机，不复用本地值 |
 | 宿主机环境变量 | 覆盖 Compose 插值 | `ARK_API_KEY`、`DOUBAO_API_KEY`、`AI_MODEL` | 适合临时注入或 CI/CD 注入；上线前用 `docker compose config` 确认最终值 |
 | `docker-compose.yml` | 本地默认值和必填保护 | `MYSQL_*`、`REQUIRE_STRONG_SECRETS=false`、`COOKIE_SECURE=false` | 仅用于本地和内网调试；不要通过改本地默认值来满足生产需求 |
-| `docker-compose.prod.yml` | 生产默认值、必填保护和监控栈 | `SPRING_PROFILES_ACTIVE=prod`、`REQUIRE_STRONG_SECRETS=true`、`PUBLIC_METRICS_ENABLED=${PUBLIC_METRICS_ENABLED:-true}` | 生产发布入口；任何公开性、证书、数据库 TLS 决策都要在发布记录中确认 |
+| `docker-compose.prod.yml` | 生产默认值、必填保护和监控栈 | `SPRING_PROFILES_ACTIVE=prod`、`REQUIRE_STRONG_SECRETS=true`、`PUBLIC_METRICS_ENABLED=${PUBLIC_METRICS_ENABLED:-false}` | 生产发布入口；任何公开性、证书、数据库 TLS 决策都要在发布记录中确认 |
 | Docker build args | 镜像构建期变量 | `VITE_API_BASE_URL`、`VITE_AMAP_KEY`、`VITE_RECAPTCHA_*` | 前端 build args 会固化到构建产物；修改后必须重建 frontend 镜像 |
 | GitHub Actions secrets/settings | CI 运行时 | Gitleaks、Trivy、构建权限 | 不在仓库中保存密钥；通过 GitHub settings 管理并定期轮换 |
 
@@ -42,26 +42,34 @@ Docker Compose 展开变量时，宿主机环境变量和 `--env-file`/`.env` �
 | Profile | `SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-local}` | `SPRING_PROFILES_ACTIVE=prod` |
 | 数据库 | `MYSQL_DATABASE`、`MYSQL_USERNAME`、`MYSQL_PASSWORD` | `DB_NAME`、`DB_USERNAME`、`DB_PASSWORD`、`DB_SSL_MODE`、`DB_JDBC_EXTRA_PARAMS` |
 | Redis | 本地 Redis 不要求密码 | `REDIS_PASSWORD` 必填 |
-| 强密钥 | 关键密钥必须非空，可用本地随机值 | `JWT_SECRET`、`CSRF_SIGNING_SECRET`、`PII_KEYS`、`ADMIN_ENCRYPTION_KEY` 等必须为强随机生产值 |
+| 强密钥 | 关键密钥必须非空，可用本地随机值 | `JWT_SECRET`、`CSRF_SIGNING_SECRET`、`CACHE_KEY_HMAC_SECRET`、`PII_KEYS`、`ADMIN_ENCRYPTION_KEY` 等必须为强随机生产值 |
 | 文档公开 | `PUBLIC_DOCS_ENABLED` 默认 false，可本地打开 | 默认 false，生产公开前必须有明确审批 |
-| Metrics 公开 | 应显式评估 `PUBLIC_METRICS_ENABLED` | 生产 Compose 默认 true，以便内置 Prometheus 无认证采集；只有后端 metrics 处在受信 Prometheus 网络内时才保持 true |
+| Metrics 公开 | 应显式评估 `PUBLIC_METRICS_ENABLED` | 生产 Compose 默认 false；只有配置认证代理、独立内网 management 端口或明确 allowlist 后才可打开匿名采集 |
 | 前端公开配置 | 可留空或使用开发 key | `VITE_AMAP_KEY`、`VITE_AMAP_SECURITY_CODE`、`VITE_RECAPTCHA_SITE_KEY` 必须使用生产配置 |
 | 反向代理 | 本地 HTTP 和 `localhost` | `NGINX_SERVER_NAME` 可包含多个域名；`NGINX_REDIRECT_HOST` 必须是单一规范 host，不带 scheme、path、port、逗号、空白或控制字符；`NGINX_CERT_DOMAIN` 和证书挂载必须真实可用 |
 
+前端容器启动时会在 `envsubst` 渲染 Nginx 模板前再次校验这些 host 值；`NGINX_SERVER_NAME` 仅允许空格分隔的 DNS host，`NGINX_REDIRECT_HOST` 和 `NGINX_CERT_DOMAIN` 必须是单一 DNS host。生产 HTTPS 模板还包含 default server，未匹配的 Host/SNI 会直接关闭连接，避免落到正式站点。
+
 ## Metrics 公开性
 
-后端 Prometheus 指标路径是 `/actuator/prometheus`。应用配置默认 `PUBLIC_METRICS_ENABLED=false`，此时该路径要求管理员权限；生产 Compose 的内置 Prometheus 不携带登录态或长期 ADMIN JWT，因此 `docker-compose.prod.yml` 默认将 `PUBLIC_METRICS_ENABLED` 展开为 true，让同一受控 Compose 网络内的 Prometheus 能够采集指标。
+后端 Prometheus 指标路径是 `/actuator/prometheus`。应用配置和生产 Compose 默认 `PUBLIC_METRICS_ENABLED=false`，此时该路径要求管理员权限；仓库内置 Prometheus 不能再依赖匿名抓取作为默认生产路径。
 
-如果生产环境不是使用仓库内置 Prometheus，或者 backend 会被公网、第三方容器、非受信内网直接访问，应显式设置 `PUBLIC_METRICS_ENABLED=false`，并改用认证代理、防火墙 allowlist、独立内部 metrics path，或其他受控采集方案。
+如需采集生产指标，应改用认证代理、防火墙 allowlist、独立内部 management 端口或其他受控采集方案；只有在发布记录中证明 backend metrics 仅对受信采集主体可达时，才可显式设置 `PUBLIC_METRICS_ENABLED=true`。
 
 这里的“公开”指任何能连到 backend 的网络主体都可无认证读取 metrics，不等同于一定暴露到公网。生产安全边界必须同时满足：
 
 - backend 宿主机端口保持 `127.0.0.1:8080:8080` 或处在受控内网。
 - Nginx 和外部反向代理不得把 `/actuator/prometheus` 代理给公网用户。
 - Prometheus、Grafana、Alertmanager、Zipkin 的宿主机端口保持 `127.0.0.1` 绑定，或放到带认证和访问控制的运维网络。
-- 如果 backend 会被公网或非受信网络直接访问，设置 `PUBLIC_METRICS_ENABLED=false`，并改用受控网络、认证代理或防火墙 allowlist 完成采集。
+- 如果 backend 会被公网或非受信网络直接访问，保持 `PUBLIC_METRICS_ENABLED=false`，并改用受控网络、认证代理或防火墙 allowlist 完成采集。
 
-上线评审应把 `PUBLIC_METRICS_ENABLED` 作为显式检查项，不能只凭默认值通过。
+上线评审应把 `PUBLIC_METRICS_ENABLED=false` 作为默认门禁；`scripts/deploy-preflight.ps1` 会拒绝匿名 metrics 和 Redis 保护降级配置。
+
+## Redis 安全依赖
+
+生产限流和登录暴破保护必须使用 Redis，并在 Redis 不可用时 fail-closed。`RATE_LIMIT_REDIS_ENABLED=true`、`RATE_LIMIT_REDIS_FAIL_CLOSED=true`、`BRUTE_FORCE_REDIS_ENABLED=true`、`BRUTE_FORCE_REDIS_FAIL_CLOSED=true` 是生产 preflight 的必检项；后端启动校验也会在生产 profile、生产环境变量或云运行信号下拒绝关闭这些开关。
+
+本地环境仍可通过 `RATE_LIMIT_REDIS_FAIL_CLOSED=false` 和 `BRUTE_FORCE_REDIS_FAIL_CLOSED=false` 保留单机内存降级，便于 Redis 未启动时开发调试。不要把这些本地值带到生产 `.env`。
 
 ## 远程开发代理
 
@@ -82,7 +90,7 @@ MySQL healthcheck 使用 `--defaults-extra-file` 读取 root 凭据，并在每�
 
 ## Supply-chain Pinning
 
-`CI / Supply chain pin gate` 是发布闸门，不是普通提示。当前工作区已把 GitHub Actions tag ref 固定到通过官方 GitHub 仓库 `git ls-remote` 查询到的 40 位 commit SHA；Scrapler Python 依赖已生成 exact pins + `--hash=sha256:` 锁文件，并在 CI 与 Dockerfile 中启用 `pip --require-hashes`。外部镜像 digest 仍必须由发布操作者联网核验后补齐。补齐前该 CI job 应保持失败，避免把 tag-only 或 digest-less 镜像误判为可上线。可执行检查脚本是 `npm run check:supply-chain-pins`，脚本测试是 `npm run test:ops`，人工执行清单见 `docs/release-supply-chain-pin-checklist.md`。
+`CI / Supply chain pin gate` 是发布闸门，不是普通提示。当前工作区已把 GitHub Actions tag ref 固定到通过官方 GitHub 仓库 `git ls-remote` 查询到的 40 位 commit SHA；Scrapler Python 依赖已生成 exact pins + `--hash=sha256:` 锁文件，并在 CI 与 Dockerfile 中启用 `pip --require-hashes`。Dockerfile、Compose 和 workflow 中的外部镜像也已经写入 `name:tag@sha256:<digest>`，并由 `docker-digest-evidence.json` 记录 source/image/digest 证据。后续轮换任何镜像 tag 或 digest 时，必须同步更新配置、resolver source 清单和 evidence JSON。可执行检查脚本是 `npm run check:supply-chain-pins`，脚本测试是 `npm run test:ops`，人工执行清单见 `docs/release-supply-chain-pin-checklist.md`。
 
 已核验并固定的 GitHub Actions refs：
 
@@ -97,7 +105,7 @@ MySQL healthcheck 使用 `--defaults-extra-file` 读取 root 凭据，并在每�
 | `docker/setup-buildx-action@v3` | `8d2750c68a42422c14e847fe6c8ac0403b4cbd6f` |
 | `actions/upload-artifact@v4` | `ea165f8d65b6e75b540449e92b4886f43607fa02` |
 
-上线前必须把以下 Docker image tag ref 替换为 `name:tag@sha256:<digest>`，并确认 digest 对应目标平台和预期 tag：
+以下 Docker image ref 必须保持 `name:tag@sha256:<digest>` 形式；如果版本或 digest 轮换，需从官方 registry 重新生成证据并同步这些引用：
 
 - `backend/Dockerfile`: `maven:3.9-eclipse-temurin-17`, `eclipse-temurin:17-jre-alpine`
 - `frontend/Dockerfile`: `node:22-alpine`, `nginx:alpine`
@@ -106,7 +114,7 @@ MySQL healthcheck 使用 `--defaults-extra-file` 读取 root 凭据，并在每�
 - `docker-compose.prod.yml`: `alpine:3.21`, `redis:7-alpine`, `mysql:8.4`, `prom/prometheus:v2.55.1`, `prom/alertmanager:v0.27.0`, `grafana/grafana:11.4.0`, `openzipkin/zipkin:3.4`
 - `.github/workflows/ci.yml` Docker runs: `prom/prometheus:v2.55.1`
 
-在能访问 Docker Hub 的发布工作站上运行：
+轮换镜像 pin 时，在能访问 Docker Hub 的发布工作站上运行：
 
 ```powershell
 node scripts/resolve-docker-image-digests.mjs --evidence --verifier=<name-or-email> --target-platform=multi-platform-index > docker-digest-evidence.json
@@ -114,7 +122,7 @@ node scripts/check-supply-chain-pins.mjs --evidence-only --evidence docker-diges
 node scripts/resolve-docker-image-digests.mjs --markdown
 ```
 
-该脚本会通过 Docker Hub token endpoint 和 Docker Registry manifest endpoint 读取 `Docker-Content-Digest`，输出每个源文件位置对应的 `image:tag@sha256:<digest>`。只有把这些 digest 写回上面的 Dockerfile、Compose 和 workflow 后，`npm run check:supply-chain-pins` 才允许通过。
+该脚本会通过 Docker Hub token endpoint 和 Docker Registry manifest endpoint 读取 `Docker-Content-Digest`，输出每个源文件位置对应的 `image:tag@sha256:<digest>`。把新 digest 写回上面的 Dockerfile、Compose 和 workflow 后，再运行 `npm run check:supply-chain-pins` 确认配置引用和 evidence JSON 同步。
 
 `--evidence` 输出带 `schemaVersion`、`generatedAt`、`verifier`、`targetPlatforms`、`lookupSource`、registry 和逐项 source/image/digest 的 JSON 证据。`node scripts/check-supply-chain-pins.mjs --evidence-only --evidence docker-digest-evidence.json` 不访问外网，只校验证据是否覆盖所有必需镜像、digest 是否为 `sha256:<64 hex>`、`pinned` 是否等于 `image@digest`，以及同一镜像 tag 是否出现冲突 digest。`npm run check:supply-chain-pins` 默认也会校验根目录 `docker-digest-evidence.json`，所以 digest pins 和操作者证据必须一起提交。发布记录应保存该 evidence JSON；它不能替代把 verified digest 写回配置文件。
 

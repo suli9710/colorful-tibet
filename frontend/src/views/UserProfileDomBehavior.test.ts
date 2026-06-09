@@ -319,7 +319,8 @@ const createTestI18n = () => createI18n({
         delete: 'Delete',
         edit: 'Edit',
         loading: 'Loading',
-        pendingConfirm: 'Pending'
+        pendingConfirm: 'Pending',
+        retry: 'Retry'
       },
       community: {
         nextPage: 'Next page'
@@ -330,6 +331,8 @@ const createTestI18n = () => createI18n({
         bookingsCount: 'bookings',
         browseHotelsLink: 'Browse hotels',
         browseSpotsLink: 'Browse spots',
+        bookingsAppendLoadFailed: 'More scenic bookings failed to load',
+        bookingsLoadFailed: 'Scenic bookings failed to load',
         cancel: 'Cancel',
         cancelBooking: 'Cancel booking',
         cancelFailed: 'Cancel failed',
@@ -360,6 +363,8 @@ const createTestI18n = () => createI18n({
         deleteSuccess: 'Deleted',
         editNickname: 'Edit nickname',
         fillAllFields: 'Fill all fields',
+        hotelBookingsLoadFailed: 'Hotel bookings failed to load',
+        hotelBookingsAppendLoadFailed: 'More hotel bookings failed to load',
         loadFailed: 'Load failed',
         member: 'Member',
         myBookingsTab: 'Scenic bookings',
@@ -379,10 +384,19 @@ const createTestI18n = () => createI18n({
         passwordMismatch: 'Passwords do not match',
         pending: 'Pending',
         registeredAt: 'Registered at',
+        retryBookings: 'Retry scenic bookings',
+        retryComments: 'Retry comments',
+        retryHotelBookings: 'Retry hotel bookings',
+        retryListLoading: 'Retry list',
+        retryRoutes: 'Retry routes',
         room: 'Room',
         routeComments: 'Route comments',
         routeCount: 'routes',
+        routesAppendLoadFailed: 'More routes failed to load',
         routesCount: 'routes',
+        routesLoadFailed: 'Routes failed to load',
+        commentsAppendLoadFailed: 'More comments failed to load',
+        commentsLoadFailed: 'Comments failed to load',
         spotComments: 'Spot comments',
         tickets: ' tickets',
         title: 'Profile',
@@ -431,6 +445,14 @@ const commentsResponse = (
   }
 })
 
+const unauthorizedError = () => ({
+  isAxiosError: true,
+  message: 'Unauthorized',
+  response: {
+    status: 401
+  }
+})
+
 const scenicBooking = (id: number, name: string) => ({
   id,
   spot: {
@@ -459,6 +481,18 @@ const hotelBooking = (id: number, name: string) => ({
   roomName: 'Panorama room',
   status: 'PENDING',
   totalPrice: 880
+})
+
+const profileRoute = (id: number, title: string) => ({
+  budget: 'Midrange',
+  commentCount: 4,
+  createdAt: '2026-06-08T08:30:00Z',
+  days: 5,
+  id,
+  likeCount: 7,
+  preference: 'Culture',
+  title,
+  viewCount: 120
 })
 
 const spotComment = (id: number, spotName: string, content: string) => ({
@@ -559,6 +593,18 @@ const clickButtonByText = async (root: ParentNode, text: string, turns?: number)
   return button!
 }
 
+const clickButtonByLabel = async (root: ParentNode, text: string, turns?: number) => {
+  const button = Array.from(root.querySelectorAll<HTMLButtonElement>('button')).find(button =>
+    button.getAttribute('aria-label')?.includes(text)
+  ) ?? null
+
+  expect(button).toBeTruthy()
+  button!.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+  await settleVue(turns)
+
+  return button!
+}
+
 const clickProfileTab = async (root: ParentNode, label: string) => {
   const tab = Array.from(root.querySelectorAll<HTMLButtonElement>('[role="tab"]')).find(button =>
     button.textContent?.includes(label)
@@ -574,6 +620,11 @@ const clickProfileTab = async (root: ParentNode, label: string) => {
 const findLoadMoreButton = (root: ParentNode) =>
   Array.from(root.querySelectorAll<HTMLButtonElement>('button')).find(button =>
     button.textContent?.includes('Next page') || button.textContent?.includes('Loading')
+  ) ?? null
+
+const findAlertByText = (root: ParentNode, text: string) =>
+  Array.from(root.querySelectorAll<HTMLElement>('[role="alert"]')).find(alert =>
+    alert.textContent?.includes(text)
   ) ?? null
 
 const setFieldValue = async (root: ParentNode, selector: string, value: string) => {
@@ -618,6 +669,282 @@ afterEach(() => {
 })
 
 describe('UserProfile stale-response DOM behavior', () => {
+  it('clears forced password-change state without reloading stale profile details after a successful change', async () => {
+    testState.routeQuery.changePassword = '1'
+    testState.authUser = {
+      mustChangePassword: true,
+      nickname: 'Traveler',
+      role: 'USER'
+    }
+
+    installProfileGetMock({
+      [endpointsMock.auth.me]: [
+        {
+          data: {
+            createdAt: '2026-01-01T00:00:00Z',
+            mustChangePassword: true,
+            nickname: 'Traveler',
+            role: 'USER'
+          }
+        }
+      ]
+    })
+
+    const root = await mountUserProfile()
+
+    expect(root.querySelector('#profile-current-password')).toBeTruthy()
+    expect(testState.updateUser).toHaveBeenCalledWith({ mustChangePassword: true })
+    expect(testState.apiGet).not.toHaveBeenCalledWith(endpointsMock.auth.meStats)
+
+    await setFieldValue(root, '#profile-current-password', 'oldpass1')
+    await setFieldValue(root, '#profile-new-password', 'newpass1')
+    await setFieldValue(root, '#profile-confirm-new-password', 'newpass1')
+    await clickButtonByText(root, 'Confirm change', 4)
+
+    expect(testState.apiPost).toHaveBeenCalledWith(endpointsMock.auth.changePassword, {
+      oldPassword: 'oldpass1',
+      newPassword: 'newpass1'
+    })
+    expect(testState.updateUser).toHaveBeenLastCalledWith({ mustChangePassword: false })
+    expect(testState.routerReplace).toHaveBeenCalledWith({ path: '/profile' })
+    expect(testState.apiGet).not.toHaveBeenCalledWith(endpointsMock.auth.meStats)
+    expect(testState.apiGet).not.toHaveBeenCalledWith(endpointsMock.routes.myRoutes, {
+      params: { page: 0, size: pageSize }
+    })
+    expect(testState.showToast).toHaveBeenCalledWith('Password changed', 'success')
+    expect(testState.showToast).not.toHaveBeenCalledWith('Password change failed', 'error')
+    expect(root.querySelector('#profile-current-password')).toBeNull()
+  })
+
+  it('shows the latest routes refresh failure as an alert without the empty state and recovers on retry', async () => {
+    const failedRefresh = createDeferred<ReturnType<typeof pageResponse>>()
+    const retryRefresh = createDeferred<ReturnType<typeof pageResponse>>()
+
+    installProfileGetMock({
+      [endpointsMock.routes.myRoutes]: [
+        pageResponse([profileRoute(1, 'Deletable Route')]),
+        failedRefresh.promise,
+        retryRefresh.promise
+      ]
+    })
+
+    const root = await mountUserProfile()
+
+    expect(root.textContent).toContain('Deletable Route')
+
+    await clickButtonByLabel(root, 'Delete Deletable Route', 2)
+
+    failedRefresh.reject(new Error('Routes refresh failed'))
+    await settleVue()
+
+    expect(findAlertByText(root, 'Routes failed to load')).toBeTruthy()
+    expect(root.textContent).not.toContain('No routes')
+
+    await clickButtonByText(root, 'Retry routes', 2)
+
+    const routeRequests = testState.apiGet.mock.calls.filter(([url]) =>
+      url === endpointsMock.routes.myRoutes
+    )
+    expect(routeRequests.at(-1)?.[1]).toEqual({
+      params: { page: 0, size: pageSize }
+    })
+
+    retryRefresh.resolve(pageResponse([profileRoute(2, 'Recovered Route')]))
+    await settleVue()
+
+    const renderedText = root.textContent || ''
+    expect(renderedText).toContain('Recovered Route')
+    expect(renderedText).not.toContain('Routes failed to load')
+    expect(findAlertByText(root, 'Routes failed to load')).toBeNull()
+  })
+
+  it('does not let a stale failed routes refresh overwrite newer successful route data', async () => {
+    const staleRefresh = createDeferred<ReturnType<typeof pageResponse>>()
+    const latestRefresh = createDeferred<ReturnType<typeof pageResponse>>()
+
+    installProfileGetMock({
+      [endpointsMock.routes.myRoutes]: [
+        pageResponse([profileRoute(1, 'Initial Route')]),
+        staleRefresh.promise,
+        latestRefresh.promise
+      ]
+    })
+
+    const root = await mountUserProfile()
+
+    expect(root.textContent).toContain('Initial Route')
+
+    await clickButtonByLabel(root, 'Delete Initial Route', 2)
+    await clickButtonByLabel(root, 'Delete Initial Route', 2)
+
+    latestRefresh.resolve(pageResponse([profileRoute(2, 'Fresh Route')]))
+    await settleVue()
+
+    staleRefresh.reject(new Error('Stale routes refresh failed'))
+    await settleVue()
+
+    const renderedText = root.textContent || ''
+    expect(renderedText).toContain('Fresh Route')
+    expect(renderedText).not.toContain('Initial Route')
+    expect(renderedText).not.toContain('Routes failed to load')
+    expect(findAlertByText(root, 'Routes failed to load')).toBeNull()
+  })
+
+  it('shows an append-specific routes alert, keeps existing routes, and retries page one', async () => {
+    const retryAppend = createDeferred<ReturnType<typeof pageResponse>>()
+
+    installProfileGetMock({
+      [endpointsMock.routes.myRoutes]: [
+        pageResponse([profileRoute(1, 'First Route')], 0, 2),
+        Promise.reject(new Error('Routes append failed')),
+        retryAppend.promise
+      ]
+    })
+
+    const root = await mountUserProfile()
+
+    expect(root.textContent).toContain('First Route')
+
+    const loadMore = findLoadMoreButton(root)
+    expect(loadMore).toBeTruthy()
+    loadMore!.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+    await settleVue()
+
+    expect(findAlertByText(root, 'More routes failed to load')).toBeTruthy()
+    expect(root.textContent).toContain('First Route')
+    expect(root.textContent).not.toContain('No routes')
+
+    await clickButtonByText(root, 'Retry routes', 2)
+
+    const routeRequests = testState.apiGet.mock.calls.filter(([url]) =>
+      url === endpointsMock.routes.myRoutes
+    )
+    expect(routeRequests.at(-1)?.[1]).toEqual({
+      params: { page: 1, size: pageSize }
+    })
+
+    retryAppend.resolve(pageResponse([profileRoute(2, 'Second Route')], 1, 2))
+    await settleVue()
+
+    const renderedText = root.textContent || ''
+    expect(renderedText).toContain('First Route')
+    expect(renderedText).toContain('Second Route')
+    expect(renderedText).not.toContain('More routes failed to load')
+  })
+
+  it('does not render a retryable routes error or empty state for 401 route failures', async () => {
+    installProfileGetMock({
+      [endpointsMock.routes.myRoutes]: [
+        Promise.reject(unauthorizedError())
+      ]
+    })
+
+    const root = await mountUserProfile()
+
+    const renderedText = root.textContent || ''
+    expect(findAlertByText(root, 'Routes failed to load')).toBeNull()
+    expect(findAlertByText(root, 'More routes failed to load')).toBeNull()
+    expect(renderedText).not.toContain('Retry routes')
+    expect(renderedText).not.toContain('No routes')
+    expect(testState.showToast).not.toHaveBeenCalledWith('Load failed', 'error')
+  })
+
+  it('shows a retryable scenic booking refresh failure instead of the empty state', async () => {
+    const failedRefresh = createDeferred<ReturnType<typeof pageResponse>>()
+    const retryRefresh = createDeferred<ReturnType<typeof pageResponse>>()
+
+    installProfileGetMock({
+      [endpointsMock.bookings.my]: [
+        pageResponse([scenicBooking(1, 'Cancelable Scenic Booking')]),
+        failedRefresh.promise,
+        retryRefresh.promise
+      ]
+    })
+
+    const root = await mountUserProfile()
+    await clickProfileTab(root, 'Scenic bookings')
+
+    expect(root.textContent).toContain('Cancelable Scenic Booking')
+
+    await clickButtonByText(root, 'Cancel booking', 2)
+
+    failedRefresh.reject(new Error('Scenic refresh failed'))
+    await settleVue()
+
+    const failedAlert = findAlertByText(root, 'Scenic bookings failed to load')
+    expect(failedAlert).toBeTruthy()
+    expect(root.textContent).not.toContain('No scenic bookings')
+
+    await clickButtonByText(root, 'Retry scenic bookings', 2)
+
+    retryRefresh.resolve(pageResponse([scenicBooking(2, 'Recovered Scenic Booking')]))
+    await settleVue()
+
+    const renderedText = root.textContent || ''
+    expect(renderedText).toContain('Recovered Scenic Booking')
+    expect(renderedText).not.toContain('Scenic bookings failed to load')
+    expect(findAlertByText(root, 'Scenic bookings failed to load')).toBeNull()
+  })
+
+  it('retries a failed scenic booking append as the next page', async () => {
+    const retryAppend = createDeferred<ReturnType<typeof pageResponse>>()
+
+    installProfileGetMock({
+      [endpointsMock.bookings.my]: [
+        pageResponse([scenicBooking(1, 'First Scenic Booking')], 0, 2),
+        Promise.reject(new Error('Scenic append failed')),
+        retryAppend.promise
+      ]
+    })
+
+    const root = await mountUserProfile()
+    await clickProfileTab(root, 'Scenic bookings')
+
+    expect(root.textContent).toContain('First Scenic Booking')
+
+    const loadMore = findLoadMoreButton(root)
+    expect(loadMore).toBeTruthy()
+    loadMore!.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+    await settleVue()
+
+    expect(findAlertByText(root, 'More scenic bookings failed to load')).toBeTruthy()
+    expect(root.textContent).toContain('First Scenic Booking')
+    expect(root.textContent).not.toContain('No scenic bookings')
+
+    await clickButtonByText(root, 'Retry scenic bookings', 2)
+
+    const scenicBookingRequests = testState.apiGet.mock.calls.filter(([url]) =>
+      url === endpointsMock.bookings.my
+    )
+    expect(scenicBookingRequests.at(-1)?.[1]).toEqual({
+      params: { page: 1, size: pageSize }
+    })
+
+    retryAppend.resolve(pageResponse([scenicBooking(2, 'Second Scenic Booking')], 1, 2))
+    await settleVue()
+
+    const renderedText = root.textContent || ''
+    expect(renderedText).toContain('First Scenic Booking')
+    expect(renderedText).toContain('Second Scenic Booking')
+    expect(renderedText).not.toContain('More scenic bookings failed to load')
+  })
+
+  it('does not render a retryable list error or empty state for 401 booking failures', async () => {
+    installProfileGetMock({
+      [endpointsMock.bookings.my]: [
+        Promise.reject(unauthorizedError())
+      ]
+    })
+
+    const root = await mountUserProfile()
+    await clickProfileTab(root, 'Scenic bookings')
+
+    const renderedText = root.textContent || ''
+    expect(findAlertByText(root, 'Scenic bookings failed to load')).toBeNull()
+    expect(renderedText).not.toContain('No scenic bookings')
+    expect(testState.showToast).not.toHaveBeenCalledWith('Load failed', 'error')
+  })
+
   it('ignores an older scenic booking refresh that returns after a newer refresh', async () => {
     const oldRefresh = createDeferred<ReturnType<typeof pageResponse>>()
     const newRefresh = createDeferred<ReturnType<typeof pageResponse>>()
@@ -647,6 +974,39 @@ describe('UserProfile stale-response DOM behavior', () => {
     const renderedText = root.textContent || ''
     expect(renderedText).toContain('Fresh Scenic Booking')
     expect(renderedText).not.toContain('Stale Scenic Booking')
+  })
+
+  it('ignores an older failed scenic booking refresh after a newer refresh succeeds', async () => {
+    const oldRefresh = createDeferred<ReturnType<typeof pageResponse>>()
+    const newRefresh = createDeferred<ReturnType<typeof pageResponse>>()
+
+    installProfileGetMock({
+      [endpointsMock.bookings.my]: [
+        pageResponse([scenicBooking(1, 'Initial Scenic Booking')]),
+        oldRefresh.promise,
+        newRefresh.promise
+      ]
+    })
+
+    const root = await mountUserProfile()
+    await clickProfileTab(root, 'Scenic bookings')
+
+    expect(root.textContent).toContain('Initial Scenic Booking')
+
+    await clickButtonByText(root, 'Cancel booking', 2)
+    await clickButtonByText(root, 'Cancel booking', 2)
+
+    newRefresh.resolve(pageResponse([scenicBooking(2, 'Fresh Scenic Booking')]))
+    await settleVue()
+
+    oldRefresh.reject(new Error('Stale scenic refresh failed'))
+    await settleVue()
+
+    const renderedText = root.textContent || ''
+    expect(renderedText).toContain('Fresh Scenic Booking')
+    expect(renderedText).not.toContain('Initial Scenic Booking')
+    expect(renderedText).not.toContain('Scenic bookings failed to load')
+    expect(findAlertByText(root, 'Scenic bookings failed to load')).toBeNull()
   })
 
   it('keeps cancel-triggered scenic refresh authoritative while load-more is clicked', async () => {
@@ -774,15 +1134,87 @@ describe('UserProfile stale-response DOM behavior', () => {
     expect(finalLoadMore?.getAttribute('aria-busy')).toBe('false')
   })
 
+  it('shows a retryable hotel booking refresh failure instead of the empty state', async () => {
+    const retryRefresh = createDeferred<ReturnType<typeof pageResponse>>()
+
+    installProfileGetMock({
+      [endpointsMock.hotelBookings.my]: [
+        Promise.reject(new Error('Hotel refresh failed')),
+        retryRefresh.promise
+      ]
+    })
+
+    const root = await mountUserProfile()
+    await clickProfileTab(root, 'Hotel bookings')
+
+    expect(findAlertByText(root, 'Hotel bookings failed to load')).toBeTruthy()
+    expect(root.textContent).not.toContain('No hotel bookings')
+
+    await clickButtonByText(root, 'Retry hotel bookings', 2)
+
+    retryRefresh.resolve(pageResponse([hotelBooking(1, 'Recovered Hotel Booking')]))
+    await settleVue()
+
+    const renderedText = root.textContent || ''
+    expect(renderedText).toContain('Recovered Hotel Booking')
+    expect(renderedText).not.toContain('Hotel bookings failed to load')
+  })
+
+  it('ignores a stale failed hotel booking append after a full refresh succeeds', async () => {
+    const staleAppend = createDeferred<ReturnType<typeof pageResponse>>()
+    const refreshLoad = createDeferred<ReturnType<typeof pageResponse>>()
+
+    installProfileGetMock({
+      [endpointsMock.hotelBookings.my]: [
+        pageResponse([hotelBooking(1, 'Initial Hotel Booking')], 0, 2),
+        staleAppend.promise,
+        refreshLoad.promise
+      ]
+    })
+
+    const root = await mountUserProfile()
+    await clickProfileTab(root, 'Hotel bookings')
+
+    expect(root.textContent).toContain('Initial Hotel Booking')
+
+    const initialLoadMore = findLoadMoreButton(root)
+    expect(initialLoadMore).toBeTruthy()
+
+    initialLoadMore!.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+    await settleVue(2)
+
+    await clickButtonByText(root, 'Cancel booking', 2)
+
+    refreshLoad.resolve(pageResponse([hotelBooking(2, 'Fresh Hotel Booking')], 0, 2))
+    await settleVue()
+
+    staleAppend.reject(new Error('Stale hotel append failed'))
+    await settleVue()
+
+    const renderedText = root.textContent || ''
+    const finalLoadMore = findLoadMoreButton(root)
+    expect(renderedText).toContain('Fresh Hotel Booking')
+    expect(renderedText).not.toContain('Initial Hotel Booking')
+    expect(renderedText).not.toContain('Hotel bookings failed to load')
+    expect(findAlertByText(root, 'Hotel bookings failed to load')).toBeNull()
+    expect(finalLoadMore?.disabled).toBe(false)
+    expect(finalLoadMore?.getAttribute('aria-busy')).toBe('false')
+  })
+
   it('ignores stale comments refresh and append responses after newer comment pages win', async () => {
-    const oldInitialRefresh = createDeferred<ReturnType<typeof commentsResponse>>()
+    const staleRefresh = createDeferred<ReturnType<typeof commentsResponse>>()
     const newerRefresh = createDeferred<ReturnType<typeof commentsResponse>>()
     const staleAppend = createDeferred<ReturnType<typeof commentsResponse>>()
     const latestRefresh = createDeferred<ReturnType<typeof commentsResponse>>()
 
     installProfileGetMock({
       [endpointsMock.auth.meComments]: [
-        oldInitialRefresh.promise,
+        commentsResponse([
+          spotComment(1, 'Initial Comment Spot', 'Initial spot comment')
+        ], [
+          routeComment(2, 'Initial Route', 'Initial route comment')
+        ], 0, 2),
+        staleRefresh.promise,
         newerRefresh.promise,
         staleAppend.promise,
         latestRefresh.promise
@@ -790,8 +1222,13 @@ describe('UserProfile stale-response DOM behavior', () => {
     })
 
     const root = await mountUserProfile()
+    await clickProfileTab(root, 'Comments')
 
-    await submitPasswordChange(root)
+    expect(root.textContent).toContain('Initial Comment Spot')
+    expect(root.textContent).toContain('Initial Route')
+
+    await clickButtonByText(root, 'Delete', 2)
+    await clickButtonByText(root, 'Delete', 2)
 
     newerRefresh.resolve(commentsResponse([
       spotComment(1, 'Fresh Comment Spot', 'Fresh spot comment')
@@ -800,14 +1237,12 @@ describe('UserProfile stale-response DOM behavior', () => {
     ], 0, 2))
     await settleVue()
 
-    oldInitialRefresh.resolve(commentsResponse([
+    staleRefresh.resolve(commentsResponse([
       spotComment(3, 'Stale Comment Spot', 'Stale spot comment')
     ], [
       routeComment(4, 'Stale Route', 'Stale route comment')
     ], 0, 2))
     await settleVue()
-
-    await clickProfileTab(root, 'Comments')
 
     let renderedText = root.textContent || ''
     expect(renderedText).toContain('Fresh Comment Spot')
@@ -821,7 +1256,7 @@ describe('UserProfile stale-response DOM behavior', () => {
     commentsLoadMore!.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
     await settleVue(2)
 
-    await submitPasswordChange(root)
+    await clickButtonByText(root, 'Delete', 2)
 
     latestRefresh.resolve(commentsResponse([
       spotComment(5, 'Latest Comment Spot', 'Latest spot comment')
@@ -844,5 +1279,88 @@ describe('UserProfile stale-response DOM behavior', () => {
     expect(renderedText).not.toContain('Stale Append Route')
     expect(renderedText).not.toContain('Stale Comment Spot')
     expect(renderedText).not.toContain('Stale Route')
+  })
+
+  it('shows a retryable comments refresh failure instead of the empty state', async () => {
+    const retryRefresh = createDeferred<ReturnType<typeof commentsResponse>>()
+
+    installProfileGetMock({
+      [endpointsMock.auth.meComments]: [
+        Promise.reject(new Error('Comments refresh failed')),
+        retryRefresh.promise
+      ]
+    })
+
+    const root = await mountUserProfile()
+    await clickProfileTab(root, 'Comments')
+
+    expect(findAlertByText(root, 'Comments failed to load')).toBeTruthy()
+    expect(root.textContent).not.toContain('No comments')
+
+    await clickButtonByText(root, 'Retry comments', 2)
+
+    retryRefresh.resolve(commentsResponse([
+      spotComment(1, 'Recovered Comment Spot', 'Recovered spot comment')
+    ], [
+      routeComment(2, 'Recovered Route', 'Recovered route comment')
+    ]))
+    await settleVue()
+
+    const renderedText = root.textContent || ''
+    expect(renderedText).toContain('Recovered Comment Spot')
+    expect(renderedText).toContain('Recovered Route')
+    expect(renderedText).not.toContain('Comments failed to load')
+  })
+
+  it('ignores a stale failed comments append after a full refresh succeeds', async () => {
+    const staleAppend = createDeferred<ReturnType<typeof commentsResponse>>()
+    const latestRefresh = createDeferred<ReturnType<typeof commentsResponse>>()
+
+    installProfileGetMock({
+      [endpointsMock.auth.meComments]: [
+        commentsResponse([
+          spotComment(1, 'Initial Comment Spot', 'Initial spot comment')
+        ], [
+          routeComment(2, 'Initial Route', 'Initial route comment')
+        ], 0, 2),
+        staleAppend.promise,
+        latestRefresh.promise
+      ]
+    })
+
+    const root = await mountUserProfile()
+    await clickProfileTab(root, 'Comments')
+
+    expect(root.textContent).toContain('Initial Comment Spot')
+    expect(root.textContent).toContain('Initial Route')
+
+    const commentsLoadMore = findLoadMoreButton(root)
+    expect(commentsLoadMore).toBeTruthy()
+
+    commentsLoadMore!.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+    await settleVue(2)
+
+    await clickButtonByText(root, 'Delete', 2)
+
+    latestRefresh.resolve(commentsResponse([
+      spotComment(3, 'Latest Comment Spot', 'Latest spot comment')
+    ], [
+      routeComment(4, 'Latest Route', 'Latest route comment')
+    ], 0, 2))
+    await settleVue()
+
+    staleAppend.reject(new Error('Stale comments append failed'))
+    await settleVue()
+
+    const renderedText = root.textContent || ''
+    const finalLoadMore = findLoadMoreButton(root)
+    expect(renderedText).toContain('Latest Comment Spot')
+    expect(renderedText).toContain('Latest Route')
+    expect(renderedText).not.toContain('Initial Comment Spot')
+    expect(renderedText).not.toContain('Initial Route')
+    expect(renderedText).not.toContain('Comments failed to load')
+    expect(findAlertByText(root, 'Comments failed to load')).toBeNull()
+    expect(finalLoadMore?.disabled).toBe(false)
+    expect(finalLoadMore?.getAttribute('aria-busy')).toBe('false')
   })
 })

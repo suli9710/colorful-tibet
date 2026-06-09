@@ -24,6 +24,7 @@ public class LoginAttemptService {
     private static final String IP_SCOPE = "ip:";
     private static final String NETWORK_SCOPE = "network:";
     private static final long MAX_LOCK_SECONDS = 7 * 24 * 60 * 60;
+    private static final long BACKEND_UNAVAILABLE_RETRY_SECONDS = 60;
     private static final int MAX_INMEMORY_ENTRIES = 10_000;
 
     private final StringRedisTemplate redisTemplate;
@@ -49,6 +50,9 @@ public class LoginAttemptService {
 
     @Value("${app.security.brute-force.redis-enabled:true}")
     private boolean redisEnabled;
+
+    @Value("${app.security.brute-force.redis-fail-closed:false}")
+    private boolean redisFailClosed;
 
     private final Set<String> exemptUsernames;
 
@@ -79,8 +83,12 @@ public class LoginAttemptService {
         if (!enabled || username == null || username.isBlank() || isExempt(username)) {
             return 0;
         }
-        AttemptRecord record = getRecord(accountKey(username));
-        return record == null ? 0 : remainingSeconds(record, safeThreshold(maxAttempts));
+        try {
+            AttemptRecord record = getRecord(accountKey(username));
+            return record == null ? 0 : remainingSeconds(record, safeThreshold(maxAttempts));
+        } catch (ProtectionBackendUnavailableException e) {
+            return BACKEND_UNAVAILABLE_RETRY_SECONDS;
+        }
     }
 
     public LoginAttemptDecision evaluate(String username, String clientIp) {
@@ -88,19 +96,24 @@ public class LoginAttemptService {
             return LoginAttemptDecision.allowed(false, 0);
         }
 
-        String accountKey = accountKey(username);
-        AttemptRecord accountRecord = getRecord(accountKey);
-        int accountFailures = accountRecord == null ? 0 : accountRecord.failures;
-        boolean stepUpRequired = accountFailures >= safeThreshold(accountStepUpAt);
+        try {
+            String accountKey = accountKey(username);
+            AttemptRecord accountRecord = getRecord(accountKey);
+            int accountFailures = accountRecord == null ? 0 : accountRecord.failures;
+            boolean stepUpRequired = accountFailures >= safeThreshold(accountStepUpAt);
 
-        LoginAttemptDecision blocked = strongestBlockedDecision(
-                lockState("account", accountRecord, safeThreshold(maxAttempts)),
-                blockedDecision(clientIp, accountKey));
-        if (blocked != null) {
-            return blocked.withAccountState(stepUpRequired, accountFailures);
+            LoginAttemptDecision blocked = strongestBlockedDecision(
+                    lockState("account", accountRecord, safeThreshold(maxAttempts)),
+                    blockedDecision(clientIp, accountKey));
+            if (blocked != null) {
+                return blocked.withAccountState(stepUpRequired, accountFailures);
+            }
+
+            return LoginAttemptDecision.allowed(stepUpRequired, accountFailures);
+        } catch (ProtectionBackendUnavailableException e) {
+            logger.warn("Login throttle backend unavailable during evaluation: user={}", userLabel(username));
+            return backendUnavailableDecision();
         }
-
-        return LoginAttemptDecision.allowed(stepUpRequired, accountFailures);
     }
 
     public long remainingLockSeconds(String username, String clientIp) {
@@ -111,16 +124,24 @@ public class LoginAttemptService {
         if (!enabled || username == null || username.isBlank() || isExempt(username)) {
             return false;
         }
-        AttemptRecord record = getRecord(accountKey(username));
-        return record != null && record.failures >= safeThreshold(accountStepUpAt);
+        try {
+            AttemptRecord record = getRecord(accountKey(username));
+            return record != null && record.failures >= safeThreshold(accountStepUpAt);
+        } catch (ProtectionBackendUnavailableException e) {
+            return true;
+        }
     }
 
     public int failureCount(String username) {
         if (!enabled || username == null || username.isBlank()) {
             return 0;
         }
-        AttemptRecord record = getRecord(accountKey(username));
-        return record == null ? 0 : record.failures;
+        try {
+            AttemptRecord record = getRecord(accountKey(username));
+            return record == null ? 0 : record.failures;
+        } catch (ProtectionBackendUnavailableException e) {
+            return safeThreshold(maxAttempts);
+        }
     }
 
     public long recordFailure(String username) {
@@ -135,10 +156,19 @@ public class LoginAttemptService {
         long now = System.currentTimeMillis();
 
         String accountKey = accountKey(username);
-        AttemptRecord accountRecord = incrementRecord(accountKey, now);
-        AttemptRecord pairRecord = incrementRecord(pairKey(username, clientIp), now);
-        AttemptRecord ipRecord = incrementRecord(ipKey(clientIp), now);
-        AttemptRecord networkRecord = incrementRecord(networkKey(clientIp), now);
+        AttemptRecord accountRecord;
+        AttemptRecord pairRecord;
+        AttemptRecord ipRecord;
+        AttemptRecord networkRecord;
+        try {
+            accountRecord = incrementRecord(accountKey, now);
+            pairRecord = incrementRecord(pairKey(username, clientIp), now);
+            ipRecord = incrementRecord(ipKey(clientIp), now);
+            networkRecord = incrementRecord(networkKey(clientIp), now);
+        } catch (ProtectionBackendUnavailableException e) {
+            logger.warn("Login throttle backend unavailable while recording failure: user={}", userLabel(username));
+            return backendUnavailableDecision();
+        }
 
         evictStaleInMemory(now);
 
@@ -225,7 +255,11 @@ public class LoginAttemptService {
     }
 
     private AttemptRecord getRecord(String key) {
-        if (redisEnabled && redisTemplate != null) {
+        if (redisEnabled) {
+            if (redisTemplate == null) {
+                failClosedIfRedisUnavailable(null);
+                return memory.get(key);
+            }
             try {
                 String value = redisTemplate.opsForValue().get(REDIS_PREFIX + key);
                 if (value == null) {
@@ -241,13 +275,20 @@ public class LoginAttemptService {
             } catch (Exception e) {
                 logger.debug("Redis unavailable for brute-force check; falling back to in-memory: {}",
                         SensitiveLogSanitizer.exceptionSummary(e));
+                if (redisFailClosed) {
+                    throw new ProtectionBackendUnavailableException(e);
+                }
             }
         }
         return memory.get(key);
     }
 
     private AttemptRecord readFromRedis(String key) {
-        if (redisEnabled && redisTemplate != null) {
+        if (redisEnabled) {
+            if (redisTemplate == null) {
+                failClosedIfRedisUnavailable(null);
+                return null;
+            }
             try {
                 String value = redisTemplate.opsForValue().get(REDIS_PREFIX + key);
                 if (value != null) {
@@ -257,19 +298,39 @@ public class LoginAttemptService {
                 logger.debug("Redis read failed for brute-force keyHash={}: {}",
                         shortHash(key),
                         SensitiveLogSanitizer.exceptionSummary(e));
+                if (redisFailClosed) {
+                    throw new ProtectionBackendUnavailableException(e);
+                }
             }
         }
         return null;
     }
 
     private void syncToRedis(String key, AttemptRecord record) {
-        if (redisEnabled && redisTemplate != null) {
+        if (redisEnabled) {
+            if (redisTemplate == null) {
+                failClosedIfRedisUnavailable(null);
+                return;
+            }
             try {
                 redisTemplate.opsForValue().set(REDIS_PREFIX + key, record.toRedisValue(), MAX_LOCK_SECONDS, TimeUnit.SECONDS);
             } catch (Exception e) {
                 logger.debug("Redis unavailable for brute-force save: {}", SensitiveLogSanitizer.exceptionSummary(e));
+                if (redisFailClosed) {
+                    throw new ProtectionBackendUnavailableException(e);
+                }
             }
         }
+    }
+
+    private void failClosedIfRedisUnavailable(Throwable cause) {
+        if (redisFailClosed) {
+            throw new ProtectionBackendUnavailableException(cause);
+        }
+    }
+
+    private LoginAttemptDecision backendUnavailableDecision() {
+        return LoginAttemptDecision.blocked("backend", BACKEND_UNAVAILABLE_RETRY_SECONDS, 0, false);
     }
 
     private void evictStaleInMemory(long now) {
@@ -446,6 +507,12 @@ public class LoginAttemptService {
     private record AttemptRecord(int failures, long lastFailureAt) {
         String toRedisValue() {
             return failures + ":" + lastFailureAt;
+        }
+    }
+
+    private static final class ProtectionBackendUnavailableException extends RuntimeException {
+        ProtectionBackendUnavailableException(Throwable cause) {
+            super(cause);
         }
     }
 

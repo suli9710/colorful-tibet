@@ -58,6 +58,7 @@ services:
       - DOUBAO_MODEL=${DOUBAO_MODEL:-ep-20260516173036-4dpgm}
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required; generate a private 64+ character value}
       - CSRF_SIGNING_SECRET=${CSRF_SIGNING_SECRET:?CSRF_SIGNING_SECRET is required; generate a private 64+ character value}
+      - CACHE_KEY_HMAC_SECRET=${CACHE_KEY_HMAC_SECRET:?CACHE_KEY_HMAC_SECRET is required; generate a private 64+ character value}
       - PII_KEYS=${PII_KEYS:?PII_KEYS is required; use kid:base64-32-byte-key format}
       - PII_ACTIVE_KID=${PII_ACTIVE_KID:?PII_ACTIVE_KID is required}
       - PII_ENCRYPTION_KEY=${PII_ENCRYPTION_KEY:?PII_ENCRYPTION_KEY is required; keep it private}

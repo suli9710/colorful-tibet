@@ -81,8 +81,8 @@ public class RequestRateLimitFilter extends OncePerRequestFilter {
     @Value("${app.security.rate-limit.redis-enabled:true}")
     private boolean redisEnabled;
 
-    @Value("${app.security.rate-limit.fail-closed-on-redis-outage:false}")
-    private boolean failClosedOnRedisOutage;
+    @Value("${app.security.rate-limit.redis-fail-closed:false}")
+    private boolean redisFailClosed;
 
     @Value("${app.security.rate-limit.default.requests:300}")
     private int defaultRequests;
@@ -153,9 +153,9 @@ public class RequestRateLimitFilter extends OncePerRequestFilter {
             response.setHeader(HttpHeaders.RETRY_AFTER, String.valueOf(decision.retryAfterSeconds()));
             SecurityErrorResponseWriter.writeJson(
                     response,
-                    429,
-                    "Too Many Requests",
-                    "Request rate limit exceeded");
+                    decision.status(),
+                    decision.error(),
+                    decision.message());
             return;
         }
 
@@ -163,31 +163,49 @@ public class RequestRateLimitFilter extends OncePerRequestFilter {
     }
 
     private RateDecision tryAcquire(HttpServletRequest request, LimitRule rule, long now) {
-        if (redisEnabled && redisTemplate != null) {
-            try {
-                RateDecision redisDecision = tryAcquireWithRedis(request, rule, now);
-                if (redisDecision != null) {
-                    clearRedisFallbackIfActive();
-                    return redisDecision;
+        if (redisEnabled) {
+            if (redisTemplate == null) {
+                recordRedisFallback("missing-template", "Redis rate limit backend is not configured");
+                if (shouldFailClosed(rule)) {
+                    return backendUnavailable(now);
                 }
-                recordRedisFallback("empty-result", "Redis script returned no count");
-            } catch (Exception e) {
-                recordRedisFallback("exception", SensitiveLogSanitizer.exceptionSummary(e));
-            }
-            // Redis was expected for shared rate limiting but is unavailable. For abuse- and
-            // cost-sensitive buckets, fail closed instead of dropping to per-node in-memory
-            // counters that an attacker can multiply by rotating across instances.
-            if (failClosedOnRedisOutage && rule.sensitive()) {
-                return deniedDecision(rule, now);
+            } else {
+                try {
+                    RateDecision redisDecision = tryAcquireWithRedis(request, rule, now);
+                    if (redisDecision != null) {
+                        clearRedisFallbackIfActive();
+                        return redisDecision;
+                    }
+                    recordRedisFallback("empty-result", "Redis script returned no count");
+                    if (shouldFailClosed(rule)) {
+                        return backendUnavailable(now);
+                    }
+                } catch (Exception e) {
+                    recordRedisFallback("exception", SensitiveLogSanitizer.exceptionSummary(e));
+                    if (shouldFailClosed(rule)) {
+                        return backendUnavailable(now);
+                    }
+                }
             }
         }
 
         return tryAcquireInMemory(request, rule, now);
     }
 
-    private RateDecision deniedDecision(LimitRule rule, long now) {
-        long retryAfter = Math.max(1, rule.windowMillis() / 1000);
-        return new RateDecision(false, 0, retryAfter, (now + retryAfter * 1000) / 1000);
+    private boolean shouldFailClosed(LimitRule rule) {
+        return redisFailClosed && redisEnabled && rule.sensitive();
+    }
+
+    private RateDecision backendUnavailable(long now) {
+        long retryAfterSeconds = 60;
+        return new RateDecision(
+                false,
+                0,
+                retryAfterSeconds,
+                (now / 1000) + retryAfterSeconds,
+                503,
+                "Service Unavailable",
+                "Rate limit verification is temporarily unavailable");
     }
 
     private void recordRedisFallback(String reason, String detail) {
@@ -272,10 +290,10 @@ public class RequestRateLimitFilter extends OncePerRequestFilter {
             return new LimitRule("guide-chat", guideChatRequests, configuredWindowMillis(guideChatWindowSeconds), true);
         }
         if (normalized.contains("/upload-image") || normalized.endsWith("/upload-avatar")) {
-            return new LimitRule("upload", uploadRequests, configuredWindowMillis(uploadWindowSeconds), false);
+            return new LimitRule("upload", uploadRequests, configuredWindowMillis(uploadWindowSeconds), true);
         }
         if (normalized.startsWith("/api/admin/")) {
-            return new LimitRule("admin", adminRequests, configuredWindowMillis(adminWindowSeconds), false);
+            return new LimitRule("admin", adminRequests, configuredWindowMillis(adminWindowSeconds), true);
         }
         return new LimitRule("default", defaultRequests, configuredWindowMillis(defaultWindowSeconds), false);
     }
@@ -322,7 +340,24 @@ public class RequestRateLimitFilter extends OncePerRequestFilter {
         }
     }
 
-    private record RateDecision(boolean allowed, int remaining, long retryAfterSeconds, long resetEpochSeconds) {
+    private record RateDecision(
+            boolean allowed,
+            int remaining,
+            long retryAfterSeconds,
+            long resetEpochSeconds,
+            int status,
+            String error,
+            String message) {
+        private RateDecision(boolean allowed, int remaining, long retryAfterSeconds, long resetEpochSeconds) {
+            this(
+                    allowed,
+                    remaining,
+                    retryAfterSeconds,
+                    resetEpochSeconds,
+                    429,
+                    "Too Many Requests",
+                    "Request rate limit exceeded");
+        }
     }
 
     private static class RateWindow {

@@ -1655,8 +1655,6 @@ public class OrderCenterService {
                 order.getTotalAmount(),
                 order.getDiscountAmount(),
                 order.getPayableAmount(),
-                PiiMasker.maskName(order.getCustomerName()),
-                PiiMasker.maskPhone(order.getCustomerPhone()),
                 order.getSourceType(),
                 order.getSourceReferenceId(),
                 order.getLockedUntil(),

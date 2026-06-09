@@ -3,6 +3,11 @@ import { applyThirdPartyScriptSecurity } from './scriptSecurity'
 let loadPromise: Promise<void> | null = null
 let loadedScriptKey = ''
 const ENABLED_VALUES = new Set(['1', 'true', 'yes', 'on'])
+const TRUSTED_RECAPTCHA_SCRIPT_ORIGINS = new Set([
+  'https://www.recaptcha.net',
+  'https://www.google.com'
+])
+const RECAPTCHA_SCRIPT_PATH = '/recaptcha/api.js'
 type RecaptchaMode = 'v2' | 'v3'
 
 export class RecaptchaError extends Error {
@@ -33,6 +38,20 @@ function recaptchaEnabled(): boolean {
     return Boolean(recaptchaSiteKey())
   }
   return ENABLED_VALUES.has(String(rawValue).trim().toLowerCase())
+}
+
+function isTrustedRecaptchaScript(script: HTMLScriptElement, mode: RecaptchaMode, siteKey: string): boolean {
+  try {
+    const url = new URL(script.src)
+    const expectedRender = mode === 'v2' ? 'explicit' : siteKey
+
+    return url.protocol === 'https:'
+      && TRUSTED_RECAPTCHA_SCRIPT_ORIGINS.has(url.origin)
+      && url.pathname === RECAPTCHA_SCRIPT_PATH
+      && url.searchParams.get('render') === expectedRender
+  } catch {
+    return false
+  }
 }
 
 function waitForReady(mode: RecaptchaMode, timeoutMs = 8000): Promise<void> {
@@ -74,6 +93,10 @@ function loadScript(mode: RecaptchaMode, siteKey: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const existingScript = document.querySelector<HTMLScriptElement>('script[src*="recaptcha/api.js"]')
     if (existingScript) {
+      if (!isTrustedRecaptchaScript(existingScript, mode, siteKey)) {
+        reject(new RecaptchaError())
+        return
+      }
       applyThirdPartyScriptSecurity(existingScript, 'recaptcha')
       waitForReady(mode).then(resolve, reject)
       return

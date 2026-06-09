@@ -43,7 +43,7 @@
       >
         <div
           v-if="loadError"
-          class="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+          class="mb-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
           role="alert"
           aria-live="assertive"
           aria-atomic="true"
@@ -59,7 +59,7 @@
           </button>
         </div>
         <div
-          v-else-if="loading"
+          v-if="loading && sortedOrders.length === 0"
           class="rounded-2xl border border-tibet-gold/15 bg-amber-50/50 px-4 py-8 text-center text-gray-600"
           role="status"
           aria-live="polite"
@@ -69,7 +69,7 @@
           <p class="text-sm font-medium">{{ t('hotel.ordersLoading') }}</p>
         </div>
         <div
-          v-else-if="sortedOrders.length === 0"
+          v-else-if="!loadError && sortedOrders.length === 0"
           class="rounded-2xl border border-dashed border-tibet-gold/25 bg-white/70 px-4 py-10 text-center text-gray-600"
           role="status"
           aria-live="polite"
@@ -83,7 +83,7 @@
             {{ t('hotel.bookNow') }}
           </router-link>
         </div>
-        <div v-else class="space-y-4">
+        <div v-else-if="sortedOrders.length > 0" class="space-y-4">
           <div class="space-y-4" role="list" :aria-label="t('hotel.ordersTitle')">
           <motion.div
             v-for="(order, index) in sortedOrders"
@@ -240,7 +240,7 @@ const loadOrders = async (page = 0, append = false) => {
   } catch (error) {
     clearHotelOrderCache()
     if (!isCurrentHotelOrdersRequest(requestSequence)) return
-    if (!append) {
+    if (!append && orders.value.length === 0) {
       orders.value = []
       hotelOrdersPageInfo.value = {
         page: 0,

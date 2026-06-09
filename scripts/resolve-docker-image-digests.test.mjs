@@ -1,10 +1,12 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import {
   createDigestEvidence,
   dockerHubRepository,
   dockerHubTokenUrl,
   dockerRegistryManifestUrl,
+  REQUIRED_IMAGE_REFS,
   resolveDockerHubDigest,
   splitDockerImageRef
 } from './resolve-docker-image-digests.mjs'
@@ -12,6 +14,17 @@ import {
 const digest = `sha256:${'a'.repeat(64)}`
 
 describe('Docker image digest resolver', () => {
+  it('keeps required image source labels aligned with current repository files', () => {
+    for (const item of REQUIRED_IMAGE_REFS) {
+      const separator = item.source.lastIndexOf(':')
+      const file = item.source.slice(0, separator)
+      const lineNumber = Number.parseInt(item.source.slice(separator + 1), 10)
+      const line = readFileSync(file, 'utf8').split(/\r?\n/)[lineNumber - 1]
+
+      assert.ok(line?.includes(item.image), `${item.source} should contain ${item.image}`)
+    }
+  })
+
   it('normalizes Docker Hub official and namespaced image references', () => {
     assert.deepEqual(splitDockerImageRef('alpine:3.21'), {
       name: 'alpine',

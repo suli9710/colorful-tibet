@@ -1,8 +1,16 @@
 <template>
   <div class="min-h-screen bg-tibet-white py-12 pt-24 sm:py-24">
     <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div v-if="loading" class="text-center py-12">
-        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-tibet-red mx-auto"></div>
+      <div
+        v-if="loading"
+        class="text-center py-12"
+        role="status"
+        aria-live="polite"
+        aria-busy="true"
+        :aria-label="t('questionDetail.loadingQuestion')"
+      >
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-tibet-red mx-auto" aria-hidden="true"></div>
+        <span class="sr-only">{{ t('questionDetail.loadingQuestion') }}</span>
       </div>
 
       <motion.div v-else-if="question"
@@ -72,7 +80,36 @@
             ({{ answers.length }}<template v-if="answersTotalElements > answers.length"> / {{ answersTotalElements }}</template>)
           </h3>
 
-          <div v-if="answers.length === 0" class="text-center py-8 text-gray-400 text-sm">
+          <div
+            v-if="answersLoading"
+            class="text-center py-8 text-gray-400 text-sm"
+            role="status"
+            aria-live="polite"
+            aria-busy="true"
+            :aria-label="t('questionDetail.loadingAnswers')"
+          >
+            <div class="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-b-2 border-tibet-red" aria-hidden="true"></div>
+            <span class="sr-only">{{ t('questionDetail.loadingAnswers') }}</span>
+          </div>
+
+          <div
+            v-else-if="answersLoadError"
+            class="mb-6 rounded-2xl border border-red-100 bg-red-50 px-5 py-4 text-red-700"
+            role="alert"
+            aria-live="assertive"
+            aria-atomic="true"
+          >
+            <p class="mb-3 font-medium">{{ answersLoadError }}</p>
+            <button
+              type="button"
+              @click="retryLoadAnswers"
+              class="min-h-11 rounded-xl bg-tibet-red px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-tibet-red/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-tibet-gold focus-visible:ring-offset-2"
+            >
+              {{ t('questionDetail.retryAnswers') }}
+            </button>
+          </div>
+
+          <div v-else-if="answers.length === 0" class="text-center py-8 text-gray-400 text-sm">
             {{ t('community.noAnswers') }}
           </div>
 
@@ -108,7 +145,7 @@
           </div>
 
           <div
-            v-if="answersTotalPages > 1"
+            v-if="!answersLoading && !answersLoadError && answersTotalPages > 1"
             class="mt-6 flex flex-wrap items-center justify-center gap-3"
             role="navigation"
             :aria-label="t('community.answers')"
@@ -146,13 +183,30 @@
         </div>
       </motion.div>
 
-      <div v-else class="text-center py-12 text-gray-500">{{ t('questionDetail.questionNotFound') }}</div>
+      <div
+        v-else-if="questionLoadError"
+        class="rounded-2xl border border-red-100 bg-red-50 px-5 py-8 text-center text-red-700"
+        role="alert"
+        aria-live="assertive"
+        aria-atomic="true"
+      >
+        <p class="mb-4 font-medium">{{ questionLoadError }}</p>
+        <button
+          type="button"
+          @click="loadQuestion"
+          class="min-h-11 rounded-xl bg-tibet-red px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-tibet-red/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-tibet-gold focus-visible:ring-offset-2"
+        >
+          {{ t('questionDetail.retryLoad') }}
+        </button>
+      </div>
+
+      <div v-else-if="questionNotFound" class="text-center py-12 text-gray-500">{{ t('questionDetail.questionNotFound') }}</div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { motion } from 'motion-v'
@@ -183,13 +237,20 @@ const answersPageInfo = ref<PageMetadata>({
   totalPages: 0
 })
 const loading = ref(true)
+const questionLoadError = ref('')
+const questionNotFound = ref(false)
 const answering = ref(false)
+const answersLoading = ref(false)
+const answersLoadError = ref('')
 const answersLoadingMore = ref(false)
 const newAnswer = ref('')
 const isLiked = ref(false)
 const liking = ref(false)
 const acceptingAnswerId = ref<number | null>(null)
 const deletingQuestion = ref(false)
+let questionRequestId = 0
+let answersRequestId = 0
+let likeStatusRequestId = 0
 
 const isAuthor = computed(() => Boolean(question.value?.author?.owner))
 const isQuestionAuthor = isAuthor
@@ -230,6 +291,20 @@ const parseTags = (tagsStr: string): string[] => {
   return tagsStr.split(',').map(s => s.trim()).filter(Boolean)
 }
 
+const resetAnswersPageInfo = () => {
+  answersPageInfo.value = {
+    page: 0,
+    size: answersPageSize,
+    totalElements: 0,
+    totalPages: 0
+  }
+}
+
+const resetAnswers = () => {
+  answers.value = []
+  resetAnswersPageInfo()
+}
+
 const applyAnswersPage = (response: any, append = false) => {
   const page = readPaginatedResponse<any>(response, {
     page: append ? answersPageInfo.value.page + 1 : 0,
@@ -245,52 +320,135 @@ const applyAnswersPage = (response: any, append = false) => {
   }
 }
 
-const fetchAnswersPage = async (page = 0, append = false) => {
-  if (!question.value) return
-  const response = await api.get(endpoints.community.questionAnswers(question.value.id), {
+const currentRouteQuestionId = () => String(route.params.id ?? '')
+
+const fetchAnswersPage = async (
+  page = 0,
+  append = false,
+  questionId: number | string | undefined = question.value?.id,
+  requestId = answersRequestId
+) => {
+  if (!questionId) return
+  const response = await api.get(endpoints.community.questionAnswers(questionId), {
     params: { page, size: answersPageSize }
   })
+  if (requestId !== answersRequestId || String(question.value?.id ?? '') !== String(questionId)) return
   applyAnswersPage(response, append)
 }
 
-const loadQuestion = async () => {
-  loading.value = true
-  try {
-    const id = route.params.id
-    const [qRes, aRes] = await Promise.all([
-      api.get(endpoints.community.questionDetail(String(id))),
-      api.get(endpoints.community.questionAnswers(String(id)), {
-        params: { page: 0, size: answersPageSize }
-      })
-    ])
-    question.value = qRes.data
-    applyAnswersPage(aRes)
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value)
 
-    // Check like status
-    if (auth.hasValidSession()) {
-      try {
-        const likeRes = await api.get(endpoints.community.questionLikeStatus(String(id)))
-        isLiked.value = likeRes.data.liked
-      } catch { /* ignore */ }
-    }
+const responseStatus = (error: unknown) => {
+  if (!isRecord(error) || !isRecord(error.response)) return undefined
+  const status = error.response.status
+  if (typeof status === 'number' && Number.isFinite(status)) return status
+  if (typeof status === 'string' && status.trim()) {
+    const parsedStatus = Number(status)
+    return Number.isFinite(parsedStatus) ? parsedStatus : undefined
+  }
+  return undefined
+}
+
+const isNotFoundError = (error: unknown) => responseStatus(error) === 404
+
+const loadLikeStatus = async (id: number | string) => {
+  const requestId = ++likeStatusRequestId
+  if (!auth.hasValidSession()) {
+    isLiked.value = false
+    return
+  }
+
+  try {
+    const likeRes = await api.get(endpoints.community.questionLikeStatus(String(id)))
+    if (requestId !== likeStatusRequestId || currentRouteQuestionId() !== String(id)) return
+    isLiked.value = Boolean(likeRes.data.liked)
+  } catch {
+    if (requestId !== likeStatusRequestId || currentRouteQuestionId() !== String(id)) return
+    isLiked.value = false
+  }
+}
+
+const loadInitialAnswers = async () => {
+  if (!question.value) return
+  const questionId = question.value.id
+  const requestId = ++answersRequestId
+  answersLoading.value = true
+  answersLoadError.value = ''
+  try {
+    await fetchAnswersPage(0, false, questionId, requestId)
   } catch (error) {
+    if (requestId !== answersRequestId || String(question.value?.id ?? '') !== String(questionId)) return
+    console.error('Failed to load question answers:', summarizeClientError(error))
+    resetAnswers()
+    answersLoadError.value = t('questionDetail.answersLoadFailed')
+  } finally {
+    if (requestId === answersRequestId && String(question.value?.id ?? '') === String(questionId)) {
+      answersLoading.value = false
+    }
+  }
+}
+
+const retryLoadAnswers = () => {
+  if (!question.value || answersLoading.value) return
+  loadInitialAnswers()
+}
+
+const loadQuestion = async () => {
+  const requestId = ++questionRequestId
+  const id = currentRouteQuestionId()
+  answersRequestId += 1
+  likeStatusRequestId += 1
+  loading.value = true
+  questionLoadError.value = ''
+  questionNotFound.value = false
+  answersLoadError.value = ''
+  answersLoading.value = false
+  isLiked.value = false
+  try {
+    const qRes = await api.get(endpoints.community.questionDetail(String(id)))
+    if (requestId !== questionRequestId || currentRouteQuestionId() !== String(id)) return
+    if (!qRes.data) {
+      question.value = null
+      resetAnswers()
+      questionNotFound.value = true
+      return
+    }
+
+    question.value = qRes.data
+    loading.value = false
+    await Promise.all([loadInitialAnswers(), loadLikeStatus(String(id))])
+  } catch (error) {
+    if (requestId !== questionRequestId || currentRouteQuestionId() !== String(id)) return
     console.error('Failed to load question:', summarizeClientError(error))
     question.value = null
+    resetAnswers()
+    if (isNotFoundError(error)) {
+      questionNotFound.value = true
+    } else {
+      questionLoadError.value = t('questionDetail.loadFailed')
+    }
   } finally {
-    loading.value = false
+    if (requestId === questionRequestId && currentRouteQuestionId() === String(id)) {
+      loading.value = false
+    }
   }
 }
 
 const loadNextAnswersPage = async () => {
-  if (answersLoadingMore.value || !hasMoreAnswers.value) return
+  if (answersLoading.value || answersLoadingMore.value || !hasMoreAnswers.value) return
   answersLoadingMore.value = true
+  const questionId = question.value?.id
+  const requestId = ++answersRequestId
   try {
-    await fetchAnswersPage(answersPageInfo.value.page + 1, true)
+    await fetchAnswersPage(answersPageInfo.value.page + 1, true, questionId, requestId)
   } catch (error) {
     console.error('Failed to load more answers:', summarizeClientError(error))
     showToast(t('questionDetail.answerFailed'), 'error')
   } finally {
-    answersLoadingMore.value = false
+    if (requestId === answersRequestId) {
+      answersLoadingMore.value = false
+    }
   }
 }
 
@@ -303,7 +461,7 @@ const submitAnswer = async () => {
 
     await api.post(endpoints.community.createQuestionAnswer(question.value.id), { content })
     newAnswer.value = ''
-    await fetchAnswersPage(0)
+    await fetchAnswersPage(0, false, question.value.id, ++answersRequestId)
     if (question.value) {
       question.value.answerCount = answersPageInfo.value.totalElements
     }
@@ -389,4 +547,13 @@ onMounted(async () => {
   await auth.refreshSession()
   loadQuestion()
 })
+
+watch(
+  () => route.params.id,
+  (id, oldId) => {
+    if (String(id ?? '') !== String(oldId ?? '')) {
+      loadQuestion()
+    }
+  }
+)
 </script>

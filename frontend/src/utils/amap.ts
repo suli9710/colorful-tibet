@@ -2,8 +2,21 @@ import { applyThirdPartyScriptSecurity } from './scriptSecurity'
 
 const AMAP_KEY = import.meta.env.VITE_AMAP_KEY
 const AMAP_SECURITY_CODE = import.meta.env.VITE_AMAP_SECURITY_CODE
+const AMAP_SCRIPT_ORIGIN = 'https://webapi.amap.com'
+const AMAP_SCRIPT_PATH = '/maps'
 
 let amapLoader: Promise<any> | null = null
+
+function isTrustedAmapScript(script: HTMLScriptElement) {
+  try {
+    const url = new URL(script.src)
+    return url.protocol === 'https:'
+      && url.origin === AMAP_SCRIPT_ORIGIN
+      && url.pathname === AMAP_SCRIPT_PATH
+  } catch {
+    return false
+  }
+}
 
 export const loadAmap = () => {
   if (typeof window === 'undefined') {
@@ -30,6 +43,10 @@ export const loadAmap = () => {
     const existingScript = document.querySelector<HTMLScriptElement>('script[data-amap-loader="colorful-tibet"]')
 
     if (existingScript) {
+      if (!isTrustedAmapScript(existingScript)) {
+        reject(new Error('Refusing to load untrusted AMap script.'))
+        return
+      }
       applyThirdPartyScriptSecurity(existingScript, 'amap')
       existingScript.addEventListener('load', () => resolve((window as any).AMap), { once: true })
       existingScript.addEventListener('error', () => reject(new Error('Failed to load AMap script.')), { once: true })
@@ -44,6 +61,9 @@ export const loadAmap = () => {
     script.onload = () => resolve((window as any).AMap)
     script.onerror = () => reject(new Error('Failed to load AMap script.'))
     document.head.appendChild(script)
+  }).catch(error => {
+    amapLoader = null
+    throw error
   })
 
   return amapLoader

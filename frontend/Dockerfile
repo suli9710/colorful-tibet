@@ -22,8 +22,7 @@ ENV VITE_AMAP_SECURITY_CODE=$VITE_AMAP_SECURITY_CODE
 RUN npm run build
 
 FROM nginx:alpine@sha256:8b1e78743a03dbb2c95171cc58639fef29abc8816598e27fb910ed2e621e589a
-# Install gettext and apply security patches for base-image OS packages.
-RUN apk add --no-cache --upgrade gettext libcrypto3 libssl3 libxml2 \
+RUN apk add --no-cache gettext \
     && mkdir -p /etc/nginx/certs /var/cache/nginx /var/run /run \
     && chown -R 101:101 /etc/nginx/conf.d /etc/nginx/certs /var/cache/nginx /var/run /run
 
@@ -38,11 +37,64 @@ ENV NGINX_SERVER_NAME=localhost
 ENV NGINX_REDIRECT_HOST=localhost
 ENV NGINX_CERT_DOMAIN=localhost
 ENV NGINX_HTTP_ONLY=false
-# Trusted upstream proxy/CDN networks for real client IP recovery. Leave empty
-# (default) to use $remote_addr directly. When set (comma/space separated CIDRs),
-# the entrypoint renders /etc/nginx/conf.d/real-ip.conf with real_ip directives.
-ENV NGINX_REAL_IP_FROM=
-ENV NGINX_REAL_IP_HEADER=X-Forwarded-For
+
+RUN printf '%s\n' \
+    '#!/bin/sh' \
+    'set -eu' \
+    'set -f' \
+    '' \
+    'fail() {' \
+    '    echo "$1" >&2' \
+    '    exit 1' \
+    '}' \
+    '' \
+    "host_label='[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?'" \
+    'host_pattern="^${host_label}(\\.${host_label})*$"' \
+    '' \
+    'is_dns_host() {' \
+    "    printf '%s' \"\$1\" | grep -Eq \"\$host_pattern\"" \
+    '}' \
+    '' \
+    'require_single_host() {' \
+    '    name="$1"' \
+    '    value="$2"' \
+    '    [ -n "$value" ] || fail "$name must be set."' \
+    "    if printf '%s' \"\$value\" | grep -q '[[:space:]]'; then" \
+    '        fail "$name must be a single DNS host without scheme, path, port, comma, whitespace, or control characters."' \
+    '    fi' \
+    '    is_dns_host "$value" || fail "$name must be a single DNS host without scheme, path, port, comma, whitespace, or control characters."' \
+    '}' \
+    '' \
+    'require_server_names() {' \
+    '    value="$1"' \
+    "    if printf '%s' \"\$value\" | grep -q '[[:cntrl:]]'; then" \
+    '        fail "NGINX_SERVER_NAME entries must be DNS hosts separated by spaces only."' \
+    '    fi' \
+    '    set -- $value' \
+    '    [ "$#" -gt 0 ] || fail "NGINX_SERVER_NAME must be set."' \
+    '    for host do' \
+    '        is_dns_host "$host" || fail "NGINX_SERVER_NAME entries must be DNS hosts separated by spaces only."' \
+    '    done' \
+    '}' \
+    '' \
+    'require_server_names "$NGINX_SERVER_NAME"' \
+    'if [ "$NGINX_HTTP_ONLY" = "true" ]; then' \
+    "    envsubst '\$NGINX_SERVER_NAME \$NGINX_CERT_DOMAIN \$NGINX_REDIRECT_HOST' < /etc/nginx/http.conf.template > /etc/nginx/conf.d/default.conf" \
+    'else' \
+    '    require_single_host NGINX_REDIRECT_HOST "$NGINX_REDIRECT_HOST"' \
+    '    require_single_host NGINX_CERT_DOMAIN "$NGINX_CERT_DOMAIN"' \
+    '    cert_dir="/etc/nginx/certs/$NGINX_CERT_DOMAIN"' \
+    '    for cert_file in fullchain.pem privkey.pem chain.pem; do' \
+    '        if [ ! -f "$cert_dir/$cert_file" ]; then' \
+    '            echo "Missing TLS certificate file: $cert_dir/$cert_file" >&2' \
+    '            exit 1' \
+    '        fi' \
+    '    done' \
+    "    envsubst '\$NGINX_SERVER_NAME \$NGINX_CERT_DOMAIN \$NGINX_REDIRECT_HOST' < /etc/nginx/default.conf.template > /etc/nginx/conf.d/default.conf" \
+    'fi' \
+    "nginx -g 'daemon off;'" \
+    > /usr/local/bin/render-nginx-config \
+    && chmod 755 /usr/local/bin/render-nginx-config
 
 # Expose unprivileged ports; compose maps public 80/443 to these.
 EXPOSE 8080 8443
@@ -53,4 +105,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
 USER 101:101
 
 # Render only our deployment variables and keep nginx runtime variables intact.
-CMD ["sh", "-c", "set -e; if [ \"$NGINX_HTTP_ONLY\" = \"true\" ]; then envsubst '$NGINX_SERVER_NAME $NGINX_CERT_DOMAIN $NGINX_REDIRECT_HOST' < /etc/nginx/http.conf.template > /etc/nginx/conf.d/default.conf; else cert_dir=\"/etc/nginx/certs/$NGINX_CERT_DOMAIN\"; for cert_file in fullchain.pem privkey.pem chain.pem; do if [ ! -f \"$cert_dir/$cert_file\" ]; then echo \"Missing TLS certificate file: $cert_dir/$cert_file\" >&2; exit 1; fi; done; envsubst '$NGINX_SERVER_NAME $NGINX_CERT_DOMAIN $NGINX_REDIRECT_HOST' < /etc/nginx/default.conf.template > /etc/nginx/conf.d/default.conf; fi; real_ip_conf=/etc/nginx/conf.d/real-ip.conf; : > \"$real_ip_conf\"; if [ -n \"$NGINX_REAL_IP_FROM\" ]; then { echo \"real_ip_header ${NGINX_REAL_IP_HEADER:-X-Forwarded-For};\"; echo 'real_ip_recursive on;'; for cidr in $(echo \"$NGINX_REAL_IP_FROM\" | tr ',' ' '); do [ -n \"$cidr\" ] && echo \"set_real_ip_from $cidr;\"; done; } > \"$real_ip_conf\"; fi; nginx -g 'daemon off;'"]
+CMD ["/usr/local/bin/render-nginx-config"]

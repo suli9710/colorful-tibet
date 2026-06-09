@@ -1,6 +1,7 @@
 package com.tibet.tourism.modules.recommendation.application.strategy;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.tibet.tourism.common.security.CacheKeyHasher;
 import com.tibet.tourism.modules.recommendation.application.RecommendationLogPrivacy;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -18,24 +19,27 @@ public class RecommendationCacheService {
     private static final long SIMILARITY_CACHE_TTL_MINUTES = 30;
     private static final long TAG_PROFILE_CACHE_TTL_MINUTES = 60;
     private static final int LOCAL_CACHE_SIZE_LIMIT = 1000;
+    private static final String USER_CACHE_NAMESPACE = "user";
+    private static final String SIMILAR_USER_CACHE_NAMESPACE = "similar-user";
 
     private static final TypeReference<Map<String, Double>> STRING_DOUBLE_MAP = new TypeReference<>() {};
 
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
+    private final CacheKeyHasher cacheKeyHasher;
 
-    private final Map<Long, Map<Long, Double>> localSimilarityCache = Collections.synchronizedMap(
-            new LinkedHashMap<Long, Map<Long, Double>>(16, 0.75f, true) {
+    private final Map<String, Map<String, Double>> localSimilarityCache = Collections.synchronizedMap(
+            new LinkedHashMap<String, Map<String, Double>>(16, 0.75f, true) {
                 @Override
-                protected boolean removeEldestEntry(Map.Entry<Long, Map<Long, Double>> eldest) {
+                protected boolean removeEldestEntry(Map.Entry<String, Map<String, Double>> eldest) {
                     return size() > LOCAL_CACHE_SIZE_LIMIT;
                 }
             });
 
-    private final Map<Long, Map<String, Double>> localTagProfileCache = Collections.synchronizedMap(
-            new LinkedHashMap<Long, Map<String, Double>>(16, 0.75f, true) {
+    private final Map<String, Map<String, Double>> localTagProfileCache = Collections.synchronizedMap(
+            new LinkedHashMap<String, Map<String, Double>>(16, 0.75f, true) {
                 @Override
-                protected boolean removeEldestEntry(Map.Entry<Long, Map<String, Double>> eldest) {
+                protected boolean removeEldestEntry(Map.Entry<String, Map<String, Double>> eldest) {
                     return size() > LOCAL_CACHE_SIZE_LIMIT;
                 }
             });
@@ -43,44 +47,74 @@ public class RecommendationCacheService {
     private volatile boolean redisCacheWarningLogged = false;
 
     public RecommendationCacheService(@Autowired(required = false) StringRedisTemplate redisTemplate,
-                                      ObjectMapper objectMapper) {
+                                      ObjectMapper objectMapper,
+                                      CacheKeyHasher cacheKeyHasher) {
         this.redisTemplate = redisTemplate;
         this.objectMapper = objectMapper;
+        this.cacheKeyHasher = cacheKeyHasher;
     }
 
     public Map<String, Double> getTagProfile(Long userId) {
-        Map<String, Double> redisValue = toStringDoubleMap(getRedisValue(tagProfileKey(userId), "get tag profile"));
-        return redisValue != null ? redisValue : localTagProfileCache.get(userId);
+        String userCacheKey = userCacheKey(userId);
+        Map<String, Double> redisValue = toStringDoubleMap(getRedisValue(tagProfileKey(userCacheKey), "get tag profile"));
+        return redisValue != null ? redisValue : localTagProfileCache.get(userCacheKey);
     }
 
-    public Map<Long, Double> getSimilarity(Long userId) {
-        Map<Long, Double> redisValue = toLongDoubleMap(getRedisValue(similarityKey(userId), "get similarity"));
-        return redisValue != null ? redisValue : localSimilarityCache.get(userId);
+    public Map<String, Double> getSimilarity(Long userId) {
+        String userCacheKey = userCacheKey(userId);
+        Map<String, Double> redisValue = toStringDoubleMap(getRedisValue(similarityKey(userCacheKey), "get similarity"));
+        return redisValue != null ? redisValue : localSimilarityCache.get(userCacheKey);
     }
 
     public void cacheTagProfile(Long userId, Map<String, Double> tagProfile) {
-        localTagProfileCache.put(userId, new HashMap<>(tagProfile));
-        setRedisValue(tagProfileKey(userId), tagProfile, TAG_PROFILE_CACHE_TTL_MINUTES, "set tag profile");
+        String userCacheKey = userCacheKey(userId);
+        localTagProfileCache.put(userCacheKey, new HashMap<>(tagProfile));
+        setRedisValue(tagProfileKey(userCacheKey), tagProfile, TAG_PROFILE_CACHE_TTL_MINUTES, "set tag profile");
     }
 
     public void cacheSimilarity(Long userId, Map<Long, Double> similarities) {
-        localSimilarityCache.put(userId, new HashMap<>(similarities));
-        setRedisValue(similarityKey(userId), new HashMap<>(similarities), SIMILARITY_CACHE_TTL_MINUTES, "set similarity");
+        String userCacheKey = userCacheKey(userId);
+        Map<String, Double> minimizedSimilarities = toMinimizedSimilarityMap(similarities);
+        localSimilarityCache.put(userCacheKey, minimizedSimilarities);
+        setRedisValue(similarityKey(userCacheKey), minimizedSimilarities, SIMILARITY_CACHE_TTL_MINUTES, "set similarity");
     }
 
     public void invalidateUserCache(Long userId) {
-        localSimilarityCache.remove(userId);
-        localTagProfileCache.remove(userId);
-        deleteRedisValue(similarityKey(userId));
-        deleteRedisValue(tagProfileKey(userId));
+        String userCacheKey = userCacheKey(userId);
+        localSimilarityCache.remove(userCacheKey);
+        localTagProfileCache.remove(userCacheKey);
+        deleteRedisValue(similarityKey(userCacheKey));
+        deleteRedisValue(tagProfileKey(userCacheKey));
     }
 
-    private static String similarityKey(Long userId) {
-        return "recommend:similarity:" + userId;
+    String similarUserCacheKey(Long userId) {
+        return cacheKeyHasher.cacheKey(SIMILAR_USER_CACHE_NAMESPACE, userId);
     }
 
-    private static String tagProfileKey(Long userId) {
-        return "recommend:tagprofile:" + userId;
+    private String userCacheKey(Long userId) {
+        return cacheKeyHasher.cacheKey(USER_CACHE_NAMESPACE, userId);
+    }
+
+    private Map<String, Double> toMinimizedSimilarityMap(Map<Long, Double> similarities) {
+        Map<String, Double> minimized = new HashMap<>();
+        if (similarities == null) {
+            return minimized;
+        }
+        for (Map.Entry<Long, Double> entry : similarities.entrySet()) {
+            Double score = toDouble(entry.getValue());
+            if (entry.getKey() != null && score != null) {
+                minimized.put(similarUserCacheKey(entry.getKey()), score);
+            }
+        }
+        return minimized;
+    }
+
+    private String similarityKey(String userCacheKey) {
+        return "recommend:similarity:" + userCacheKey;
+    }
+
+    private String tagProfileKey(String userCacheKey) {
+        return "recommend:tagprofile:" + userCacheKey;
     }
 
     private String getRedisValue(String key, String operation) {
@@ -141,34 +175,6 @@ public class RecommendationCacheService {
             }
         }
         return result;
-    }
-
-    private Map<Long, Double> toLongDoubleMap(String value) {
-        if (value == null || value.isBlank()) return null;
-        Map<String, Double> source;
-        try {
-            source = objectMapper.readValue(value, STRING_DOUBLE_MAP);
-        } catch (Exception ex) {
-            logRedisCacheFailure("parse similarity", new IllegalStateException("Invalid recommendation cache payload", ex));
-            return null;
-        }
-        Map<Long, Double> result = new HashMap<>();
-        for (Map.Entry<String, Double> entry : source.entrySet()) {
-            Long id = toLong(entry.getKey());
-            Double score = toDouble(entry.getValue());
-            if (id != null && score != null) {
-                result.put(id, score);
-            }
-        }
-        return result;
-    }
-
-    private Long toLong(Object value) {
-        if (value instanceof Number number) return number.longValue();
-        if (value instanceof String text) {
-            try { return Long.parseLong(text); } catch (NumberFormatException ex) { return null; }
-        }
-        return null;
     }
 
     private Double toDouble(Object value) {

@@ -276,6 +276,7 @@ class LoginAttemptServiceTest {
         ReflectionTestUtils.setField(target, "ipMaxAttempts", 3);
         ReflectionTestUtils.setField(target, "networkMaxAttempts", 6);
         ReflectionTestUtils.setField(target, "redisEnabled", redisEnabled);
+        ReflectionTestUtils.setField(target, "redisFailClosed", false);
     }
 
     @SuppressWarnings("unchecked")
@@ -285,5 +286,63 @@ class LoginAttemptServiceTest {
         LoginAttemptService redisService = new LoginAttemptService(provider, "");
         configure(redisService, true);
         return redisService;
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void redisReadFailureFailsClosedWhenStrict() {
+        StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
+        ValueOperations<String, String> operations = mock(ValueOperations.class);
+        when(redisTemplate.opsForValue()).thenReturn(operations);
+        when(operations.get(argThat((String key) -> key != null && key.startsWith("brute-force:"))))
+                .thenThrow(new RuntimeException("redis down"));
+
+        service = serviceWithRedis(redisTemplate);
+        ReflectionTestUtils.setField(service, "redisFailClosed", true);
+
+        LoginAttemptService.LoginAttemptDecision decision =
+                service.evaluate("strict-user", "203.0.113.100");
+
+        assertThat(decision.allowed()).isFalse();
+        assertThat(decision.reason()).isEqualTo("backend");
+        assertThat(decision.retryAfterSeconds()).isEqualTo(60);
+    }
+
+    @Test
+    void missingRedisBackendFailsClosedWhenStrict() {
+        configure(service, true);
+        ReflectionTestUtils.setField(service, "redisFailClosed", true);
+
+        LoginAttemptService.LoginAttemptDecision decision =
+                service.evaluate("strict-user", "203.0.113.100");
+
+        assertThat(decision.allowed()).isFalse();
+        assertThat(decision.reason()).isEqualTo("backend");
+        assertThat(decision.retryAfterSeconds()).isEqualTo(60);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void redisWriteFailureFailsClosedWhenStrict() {
+        StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
+        ValueOperations<String, String> operations = mock(ValueOperations.class);
+        when(redisTemplate.opsForValue()).thenReturn(operations);
+        org.mockito.Mockito.doThrow(new RuntimeException("redis down"))
+                .when(operations)
+                .set(
+                        org.mockito.ArgumentMatchers.anyString(),
+                        org.mockito.ArgumentMatchers.anyString(),
+                        org.mockito.ArgumentMatchers.anyLong(),
+                        org.mockito.ArgumentMatchers.any());
+
+        service = serviceWithRedis(redisTemplate);
+        ReflectionTestUtils.setField(service, "redisFailClosed", true);
+
+        LoginAttemptService.LoginAttemptDecision decision =
+                service.recordFailure("strict-user", "203.0.113.100");
+
+        assertThat(decision.allowed()).isFalse();
+        assertThat(decision.reason()).isEqualTo("backend");
+        assertThat(decision.retryAfterSeconds()).isEqualTo(60);
     }
 }

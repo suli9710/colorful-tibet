@@ -645,6 +645,94 @@ describe('OrderCenter DOM behavior', () => {
     expect(currentNextPageButton.disabled).toBe(false)
     expect(currentNextPageButton.getAttribute('aria-busy')).toBe('false')
   })
+
+  it('keeps existing orders and selected detail actionable when a refresh fails', async () => {
+    const failedRefresh = deferred<ReturnType<typeof pageResponse>>()
+    let listRequests = 0
+    apiGet.mockImplementation((url: string) => {
+      if (url === '/orders/my') {
+        listRequests += 1
+        if (listRequests === 1) return Promise.resolve(pageResponse([orders.pending, orders.confirmed]))
+        return failedRefresh.promise
+      }
+
+      const detailMatch = String(url).match(/^\/orders\/(\d+)$/)
+      if (detailMatch) {
+        const order = Object.values(orders).find(candidate => candidate.id === Number(detailMatch[1]))
+        return order
+          ? Promise.resolve({ data: order })
+          : Promise.reject(new Error(`Unknown order ${detailMatch[1]}`))
+      }
+
+      return Promise.reject(new Error(`Unexpected GET ${url}`))
+    })
+
+    const root = await mountOrderCenter()
+    getOrderCard(orders.pending.productSummary).dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await settleVue()
+
+    clickButtonByText(root, 'Refresh')
+    await nextTick()
+
+    const refreshButton = findButtonByText(root, 'Refresh')
+    expect(refreshButton.disabled).toBe(true)
+    expect(refreshButton.getAttribute('aria-busy')).toBe('true')
+
+    failedRefresh.reject(new Error('network down'))
+    await settleVue()
+
+    const alert = root.querySelector<HTMLElement>('[role="alert"]')
+    const retryButton = findButtonByText(root, 'Retry')
+
+    expect(alert).not.toBeNull()
+    expect(alert?.getAttribute('aria-live')).toBe('assertive')
+    expect(alert?.getAttribute('aria-atomic')).toBe('true')
+    expect(alert?.textContent).toContain('Load failed')
+    expect(retryButton.disabled).toBe(false)
+    expect(retryButton.getAttribute('aria-busy')).toBe('false')
+    expect(root.textContent).toContain(orders.pending.productSummary)
+    expect(root.textContent).toContain(orders.confirmed.productSummary)
+    expect(document.getElementById('order-detail-panel')?.textContent).toContain(orders.pending.orderNo)
+    expect(getOrderCard(orders.pending.productSummary).getAttribute('aria-expanded')).toBe('true')
+  })
+
+  it('keeps the latest selected detail loading when an older detail request settles first', async () => {
+    const pendingDetail = deferred<{ data: OrderFixture }>()
+    const confirmedDetail = deferred<{ data: OrderFixture }>()
+    apiGet.mockImplementation((url: string) => {
+      if (url === '/orders/my') return Promise.resolve(pageResponse([orders.pending, orders.confirmed]))
+      if (url === '/orders/101') return pendingDetail.promise
+      if (url === '/orders/102') return confirmedDetail.promise
+      return Promise.reject(new Error(`Unexpected GET ${url}`))
+    })
+
+    const root = await mountOrderCenter()
+    getOrderCard(orders.pending.productSummary).dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await settleVue(2)
+
+    expect(document.getElementById('order-detail-panel')?.textContent).toContain(orders.pending.orderNo)
+    expect(document.getElementById('order-detail-panel')?.textContent).toContain('Loading detail')
+
+    getOrderCard(orders.confirmed.productSummary).dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await settleVue(2)
+
+    expect(document.getElementById('order-detail-panel')?.textContent).toContain(orders.confirmed.orderNo)
+    expect(document.getElementById('order-detail-panel')?.textContent).toContain('Loading detail')
+
+    pendingDetail.resolve({ data: orders.pending })
+    await settleVue()
+
+    expect(document.getElementById('order-detail-panel')?.textContent).toContain(orders.confirmed.orderNo)
+    expect(document.getElementById('order-detail-panel')?.textContent).toContain('Loading detail')
+    expect(document.getElementById('order-detail-panel')?.textContent).not.toContain(orders.pending.orderNo)
+
+    confirmedDetail.resolve({ data: orders.confirmed })
+    await settleVue()
+
+    expect(document.getElementById('order-detail-panel')?.textContent).toContain(orders.confirmed.orderNo)
+    expect(document.getElementById('order-detail-panel')?.textContent).toContain(`${orders.confirmed.productSummary} item`)
+    expect(document.getElementById('order-detail-panel')?.textContent).not.toContain('Loading detail')
+  })
 })
 
 function createOrder(overrides: Partial<OrderFixture>): OrderFixture {

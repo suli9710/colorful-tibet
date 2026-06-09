@@ -115,6 +115,7 @@ print(json.dumps({
     "mysqlPassword": token(30),
     "jwtSecret": b64(64),
     "csrfSigningSecret": b64(64),
+    "cacheKeyHmacSecret": b64(64),
     "adminEncryptionKey": b64(48),
     "piiEncryptionKey": b64(48),
     "piiKey": b64(32),
@@ -166,6 +167,7 @@ REDIS_DATABASE=0
 JWT_SECRET=$($Secrets.jwtSecret)
 ADMIN_ENCRYPTION_KEY=$($Secrets.adminEncryptionKey)
 CSRF_SIGNING_SECRET=$($Secrets.csrfSigningSecret)
+CACHE_KEY_HMAC_SECRET=$($Secrets.cacheKeyHmacSecret)
 PII_ACTIVE_KID=v1
 PII_KEYS=v1:$($Secrets.piiKey)
 PII_ENCRYPTION_KEY=$($Secrets.piiEncryptionKey)

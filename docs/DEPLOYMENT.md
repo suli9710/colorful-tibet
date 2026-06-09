@@ -77,6 +77,7 @@ DB_JDBC_EXTRA_PARAMS=
 
 JWT_SECRET=replace-with-at-least-64-random-characters-for-local-dev
 CSRF_SIGNING_SECRET=replace-with-a-different-64-random-character-local-secret
+CACHE_KEY_HMAC_SECRET=replace-with-a-different-64-random-character-local-secret
 ADMIN_ENCRYPTION_KEY=replace-with-at-least-64-random-characters-for-local-dev
 PAYMENT_CALLBACK_SECRET=replace-with-at-least-64-random-characters-for-local-dev
 
@@ -296,6 +297,7 @@ $env:REDIS_PORT = "6380"
 $env:SCRAPLING_SERVICE_URL = "http://localhost:8000"
 $env:JWT_SECRET = "replace-with-at-least-64-random-characters-for-local-dev"
 $env:CSRF_SIGNING_SECRET = "replace-with-a-different-64-random-character-local-secret"
+$env:CACHE_KEY_HMAC_SECRET = "replace-with-a-different-64-random-character-local-secret"
 $env:ADMIN_ENCRYPTION_KEY = "replace-with-at-least-64-random-characters-for-local-dev"
 $env:PAYMENT_CALLBACK_SECRET = "replace-with-at-least-64-random-characters-for-local-dev"
 $env:PII_KEYS = "v1:replace-with-base64-32-byte-key"
@@ -564,7 +566,7 @@ docker compose logs -f backend
 
 - 数据库连接是否成功。
 - Redis 是否可连接。
-- `JWT_SECRET`、`PII_KEYS`、`PII_ACTIVE_KID`、`SUPER_ADMIN_TOTP_SECRET` 是否存在。
+- `JWT_SECRET`、`CACHE_KEY_HMAC_SECRET`、`PII_KEYS`、`PII_ACTIVE_KID`、`SUPER_ADMIN_TOTP_SECRET` 是否存在。
 - `SPRING_PROFILES_ACTIVE` 是否为 `local`。
 - 本地 profile 可以使用 `MYSQL_SSL_MODE=DISABLED`；生产环境应使用 `DB_SSL_MODE=REQUIRED` 或 `VERIFY_IDENTITY`。
 

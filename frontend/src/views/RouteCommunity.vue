@@ -95,18 +95,18 @@
           :transition="revealTransition"
         >
           <div class="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0" role="group" :aria-label="t('community.sharedRoutes')">
-            <select v-model="routeFilters.days" @change="loadRoutes" :aria-label="t('community.allDays')" :title="t('community.allDays')" class="min-h-11 min-w-36 shrink-0 px-4 py-2 rounded-xl bg-white/50 border border-tibet-gold/25 focus:border-tibet-gold outline-none text-sm">
+            <select v-model="routeFilters.days" @change="applyRouteFilters" :aria-label="t('community.allDays')" :title="t('community.allDays')" class="min-h-11 min-w-36 shrink-0 px-4 py-2 rounded-xl bg-white/50 border border-tibet-gold/25 focus:border-tibet-gold outline-none text-sm">
               <option value="">{{ t('community.allDays') }}</option>
               <option value="3">3{{ t('community.days') }}</option>
               <option value="5">5{{ t('community.days') }}</option>
               <option value="7">7{{ t('community.days') }}</option>
               <option value="10">10{{ t('community.days') }}+</option>
             </select>
-            <select v-model="routeFilters.budget" @change="loadRoutes" :aria-label="t('community.allBudget')" :title="t('community.allBudget')" class="min-h-11 min-w-36 shrink-0 px-4 py-2 rounded-xl bg-white/50 border border-tibet-gold/25 focus:border-tibet-gold outline-none text-sm">
+            <select v-model="routeFilters.budget" @change="applyRouteFilters" :aria-label="t('community.allBudget')" :title="t('community.allBudget')" class="min-h-11 min-w-36 shrink-0 px-4 py-2 rounded-xl bg-white/50 border border-tibet-gold/25 focus:border-tibet-gold outline-none text-sm">
               <option value="">{{ t('community.allBudget') }}</option>
               <option v-for="opt in budgetOptions" :key="opt.key" :value="opt.key">{{ opt.label }}</option>
             </select>
-            <select v-model="routeFilters.preference" @change="loadRoutes" :aria-label="t('community.allPreference')" :title="t('community.allPreference')" class="min-h-11 min-w-36 shrink-0 px-4 py-2 rounded-xl bg-white/50 border border-tibet-gold/25 focus:border-tibet-gold outline-none text-sm">
+            <select v-model="routeFilters.preference" @change="applyRouteFilters" :aria-label="t('community.allPreference')" :title="t('community.allPreference')" class="min-h-11 min-w-36 shrink-0 px-4 py-2 rounded-xl bg-white/50 border border-tibet-gold/25 focus:border-tibet-gold outline-none text-sm">
               <option value="">{{ t('community.allPreference') }}</option>
               <option v-for="opt in preferenceOptions" :key="opt.key" :value="opt.key">{{ opt.label }}</option>
             </select>
@@ -232,7 +232,7 @@
             <div class="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0" role="group" :aria-label="t('community.allTags')">
               <button
                 type="button"
-                @click="qaFilters.tag = ''; loadQuestions()"
+                @click="applyQuestionTagFilter('')"
                 :aria-pressed="!qaFilters.tag"
                 :aria-label="t('community.allTags')"
                 :title="t('community.allTags')"
@@ -242,7 +242,7 @@
               <button
                 v-for="tag in tagOptions" :key="tag.value"
                 type="button"
-                @click="qaFilters.tag = qaFilters.tag === tag.value ? '' : tag.value; loadQuestions()"
+                @click="applyQuestionTagFilter(tag.value)"
                 :aria-pressed="qaFilters.tag === tag.value"
                 :aria-label="tag.value"
                 :title="tag.value"
@@ -252,7 +252,7 @@
               >{{ tag.value }}</button>
             </div>
             <!-- Sort -->
-            <select v-model="qaFilters.sort" @change="loadQuestions" :aria-label="qaSortControlLabel" :title="qaSortControlLabel" class="min-h-11 min-w-36 px-3 py-2 rounded-xl bg-white/60 border border-tibet-gold/25 focus:border-tibet-gold outline-none text-xs">
+            <select v-model="qaFilters.sort" @change="applyQuestionSortFilter" :aria-label="qaSortControlLabel" :title="qaSortControlLabel" class="min-h-11 min-w-36 px-3 py-2 rounded-xl bg-white/60 border border-tibet-gold/25 focus:border-tibet-gold outline-none text-xs">
               <option value="latest">{{ t('community.sortLatest') }}</option>
               <option value="hot">{{ t('community.sortHot') }}</option>
               <option value="unsolved">{{ t('community.sortUnanswered') }}</option>
@@ -495,6 +495,7 @@ const routeError = ref('')
 const routes = ref<any[]>([])
 const routePage = ref(0)
 const routeTotalPages = ref(0)
+let latestRoutesRequest = 0
 
 const BUDGET_KEY_TO_LABEL: Record<string, string> = {
   '经济型': 'routePlanner.budget.economy',
@@ -534,6 +535,7 @@ const routePreviousPageLabel = computed(() => `${t('community.sharedRoutes')} ${
 const routeNextPageLabel = computed(() => `${t('community.sharedRoutes')} ${t('community.nextPage')}`)
 
 const loadRoutes = async () => {
+  const requestId = ++latestRoutesRequest
   routeLoading.value = true
   routeError.value = ''
   try {
@@ -542,15 +544,24 @@ const loadRoutes = async () => {
     if (routeFilters.budget) params.budget = routeFilters.budget
     if (routeFilters.preference) params.preference = routeFilters.preference
     const response = await api.get(endpoints.routes.shared, { params })
+    if (requestId !== latestRoutesRequest) return
     routes.value = response.data.content || []
     routeTotalPages.value = response.data.totalPages || 0
   } catch (error) {
+    if (requestId !== latestRoutesRequest) return
     console.error('Failed to load routes:', summarizeClientError(error))
     routeError.value = text('community.routesLoadFailed', '路线列表加载失败，请稍后重试。')
     routeTotalPages.value = 0
   } finally {
-    routeLoading.value = false
+    if (requestId === latestRoutesRequest) {
+      routeLoading.value = false
+    }
   }
+}
+
+const applyRouteFilters = () => {
+  routePage.value = 0
+  loadRoutes()
 }
 
 const changeRoutePage = (p: number) => { routePage.value = p; loadRoutes(); window.scrollTo({ top: 0, behavior: 'smooth' }) }
@@ -563,6 +574,7 @@ const qaError = ref('')
 const questions = ref<any[]>([])
 const qaPage = ref(0)
 const qaTotalPages = ref(0)
+let latestQuestionsRequest = 0
 const qaFilters = reactive({ tag: '', sort: 'latest' })
 const showAskModal = ref(false)
 const qaSubmitting = ref(false)
@@ -600,21 +612,37 @@ const toggleTag = (tag: string) => {
 }
 
 const loadQuestions = async () => {
+  const requestId = ++latestQuestionsRequest
   qaLoading.value = true
   qaError.value = ''
   try {
     const params: any = { page: qaPage.value, size: 10, sort: qaFilters.sort }
     if (qaFilters.tag) params.tag = qaFilters.tag
     const response = await api.get(endpoints.community.questions, { params })
+    if (requestId !== latestQuestionsRequest) return
     questions.value = response.data.content || []
     qaTotalPages.value = response.data.totalPages || 0
   } catch (error) {
+    if (requestId !== latestQuestionsRequest) return
     console.error('Failed to load questions:', summarizeClientError(error))
     qaError.value = text('community.questionsLoadFailed', '问答列表加载失败，请稍后重试。')
     qaTotalPages.value = 0
   } finally {
-    qaLoading.value = false
+    if (requestId === latestQuestionsRequest) {
+      qaLoading.value = false
+    }
   }
+}
+
+const applyQuestionTagFilter = (tag: string) => {
+  qaFilters.tag = tag && qaFilters.tag === tag ? '' : tag
+  qaPage.value = 0
+  loadQuestions()
+}
+
+const applyQuestionSortFilter = () => {
+  qaPage.value = 0
+  loadQuestions()
 }
 
 const submitQuestion = async () => {

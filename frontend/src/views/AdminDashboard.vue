@@ -82,7 +82,13 @@
               <div class="w-9 h-9 rounded-lg bg-amber-100 flex items-center justify-center">
                 <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
               </div>
-                <h3 class="text-lg font-bold text-stone-800">{{ t('admin.hotelOrders') }} <span class="text-sm font-normal text-stone-400">({{ hotelOrders.length }}{{ t('common.items') }})</span></h3>
+                <h3 class="text-lg font-bold text-stone-800">
+                  {{ t('admin.hotelOrders') }}
+                  <span class="text-sm font-normal text-stone-400">
+                    <template v-if="hotelOrdersError && hotelOrders.length === 0">{{ t('admin.listUnavailable') }}</template>
+                    <template v-else>({{ hotelOrders.length }}{{ t('common.items') }})</template>
+                  </span>
+                </h3>
             </div>
             <div class="flex flex-wrap items-center gap-2">
               <button @click.stop="fetchHotelOrders" :disabled="loadingHotelOrders" class="text-xs px-3 py-1.5 rounded-lg bg-stone-100 text-stone-600 hover:bg-stone-200 transition-colors">
@@ -94,13 +100,33 @@
             </div>
           </div>
 
-          <div v-if="loadingHotelOrders" class="p-8 text-center text-stone-500">
+          <div v-if="loadingHotelOrders && hotelOrders.length === 0" class="p-8 text-center text-stone-500" role="status" aria-live="polite" aria-busy="true">
             <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
             <p>{{ t('admin.loadingHotelOrders') }}</p>
           </div>
 
+          <div v-else-if="hotelOrdersError && !showAllHotelOrders" class="border-t border-red-100 bg-red-50 px-6 py-4" role="alert">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p class="text-sm font-medium text-red-700">{{ hotelOrdersError }}</p>
+              <button @click="fetchHotelOrders" :disabled="loadingHotelOrders" class="inline-flex min-h-10 items-center justify-center rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60">
+                {{ loadingHotelOrders ? t('common.loading') : t('admin.retryHotelOrders') }}
+              </button>
+            </div>
+          </div>
+
           <div v-else-if="showAllHotelOrders" id="admin-hotel-orders-content" class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-stone-200">
+            <div v-if="hotelOrdersError" class="border-b border-red-100 bg-red-50 px-6 py-4" role="alert">
+              <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p class="text-sm font-medium text-red-700">{{ hotelOrdersError }}</p>
+                <button @click="fetchHotelOrders" :disabled="loadingHotelOrders" class="inline-flex min-h-10 items-center justify-center rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60">
+                  {{ loadingHotelOrders ? t('common.loading') : t('admin.retryHotelOrders') }}
+                </button>
+              </div>
+            </div>
+            <div v-if="loadingHotelOrders && hotelOrders.length > 0" class="border-b border-amber-100 bg-amber-50 px-6 py-3 text-sm font-medium text-amber-800" role="status" aria-live="polite" aria-busy="true">
+              {{ t('admin.loadingHotelOrders') }}
+            </div>
+            <table v-if="!hotelOrdersError || hotelOrders.length > 0" class="min-w-full divide-y divide-stone-200">
               <thead class="bg-stone-50">
                 <tr>
                   <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">{{ t('admin.orderId') }}</th>
@@ -137,25 +163,38 @@
                   <td class="px-6 py-4 whitespace-nowrap">
                     <select
                       :value="order.status"
-                      @change="updateHotelOrderStatus(order.id, ($event.target as HTMLSelectElement).value)"
-                      class="text-xs px-2 py-1 rounded-full font-semibold border-0 cursor-pointer"
+                      :disabled="isHotelOrderStatusUpdating(order.id)"
+                      :aria-label="t('admin.changeHotelOrderStatus', { id: order.id })"
+                      :aria-describedby="hotelOrderStatusErrors[order.id] ? hotelOrderStatusErrorId(order.id) : undefined"
+                      @change="updateHotelOrderStatus(order, $event)"
+                      class="text-xs px-2 py-1 rounded-full font-semibold border-0"
                       :class="{
                         'bg-yellow-100 text-yellow-800': order.status === 'PENDING',
                         'bg-green-100 text-green-800': order.status === 'CONFIRMED',
-                        'bg-red-100 text-red-800': order.status === 'CANCELLED'
+                        'bg-red-100 text-red-800': order.status === 'CANCELLED',
+                        'cursor-pointer': !isHotelOrderStatusUpdating(order.id),
+                        'cursor-not-allowed opacity-70': isHotelOrderStatusUpdating(order.id)
                       }"
                     >
                       <option value="PENDING">{{ t('admin.statusLabel.PENDING') }}</option>
                       <option value="CONFIRMED">{{ t('admin.statusLabel.CONFIRMED') }}</option>
                       <option value="CANCELLED">{{ t('admin.statusLabel.CANCELLED') }}</option>
                     </select>
+                    <p
+                      v-if="hotelOrderStatusErrors[order.id]"
+                      :id="hotelOrderStatusErrorId(order.id)"
+                      class="mt-2 max-w-[12rem] text-xs font-medium text-red-600"
+                      role="alert"
+                    >
+                      {{ hotelOrderStatusErrors[order.id] }}
+                    </p>
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-500">{{ displayHotelOrderDateTime(order.createdAt) }}</td>
                   <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <button @click="deleteHotelOrder(order.id)" class="text-red-600 hover:text-red-900">{{ t('common.delete') }}</button>
                   </td>
                 </tr>
-                <tr v-if="hotelOrders.length === 0">
+                <tr v-if="!hotelOrdersError && hotelOrders.length === 0">
                   <td colspan="9" class="px-6 py-8 text-center text-stone-500">{{ t('admin.noHotelOrders') }}</td>
                 </tr>
               </tbody>
@@ -277,10 +316,16 @@
               <div class="w-9 h-9 rounded-lg bg-emerald-100 flex items-center justify-center">
                 <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
               </div>
-              <h3 class="text-lg font-bold text-stone-800">{{ t('admin.spotManagement') }} <span class="text-sm font-normal text-stone-400">({{ spots.length }}{{ t('common.countUnit') }})</span></h3>
+              <h3 class="text-lg font-bold text-stone-800">
+                {{ t('admin.spotManagement') }}
+                <span class="text-sm font-normal text-stone-400">
+                  <template v-if="spotsError && spots.length === 0">{{ t('admin.listUnavailable') }}</template>
+                  <template v-else>({{ spots.length }}{{ t('common.countUnit') }})</template>
+                </span>
+              </h3>
             </div>
             <div class="flex items-center gap-2">
-              <button @click.stop="fetchSpots" :disabled="loadingSpots" class="text-xs px-3 py-1.5 rounded-lg bg-stone-100 text-stone-600 hover:bg-stone-200 transition-colors">
+              <button @click.stop="fetchSpots" :disabled="loadingSpots" class="text-xs px-3 py-1.5 rounded-lg bg-stone-100 text-stone-600 hover:bg-stone-200 transition-colors disabled:cursor-not-allowed disabled:opacity-60">
                 {{ loadingSpots ? t('common.loading') : t('common.refresh') }}
               </button>
               <button @click.stop="batchFetchPrices" :disabled="batchFetching" class="text-xs px-3 py-1.5 rounded-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-colors font-medium">
@@ -319,29 +364,35 @@
 
           <div v-if="showSpots" id="admin-spots-content">
             <!-- Loading State -->
-            <div v-if="loadingSpots" class="p-12 text-center">
+            <div v-if="loadingSpots && spots.length === 0" class="p-12 text-center" role="status" aria-live="polite" aria-busy="true">
               <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-500 mx-auto mb-4"></div>
               <p class="text-stone-400 text-sm">{{ t('admin.loadingSpots') }}</p>
             </div>
 
-            <!-- Error State -->
-            <div v-else-if="spotsError" class="p-12 text-center">
-              <div class="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
-                <svg class="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+            <div v-else>
+              <div v-if="spotsError" class="border-b border-red-100 bg-red-50 px-6 py-4" role="alert">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p class="text-sm font-semibold text-red-700">{{ t('admin.loadFailed') }}</p>
+                    <p class="mt-1 text-sm text-red-700/90">{{ spotsError }}</p>
+                  </div>
+                  <button @click="fetchSpots" :disabled="loadingSpots" class="inline-flex min-h-10 items-center justify-center rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60">
+                    {{ loadingSpots ? t('common.loading') : t('common.retry') }}
+                  </button>
+                </div>
               </div>
-              <p class="text-red-500 text-sm mb-1">{{ t('admin.loadFailed') }}</p>
-              <p class="text-stone-400 text-xs mb-4">{{ spotsError }}</p>
-              <button @click="fetchSpots" class="text-sm px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors">{{ t('common.retry') }}</button>
-            </div>
+              <div v-if="loadingSpots && spots.length > 0" class="border-b border-amber-100 bg-amber-50 px-6 py-3 text-sm font-medium text-amber-800" role="status" aria-live="polite" aria-busy="true">
+                {{ t('admin.loadingSpots') }}
+              </div>
+              <template v-if="!spotsError || spots.length > 0">
+                <!-- Empty State -->
+                <div v-if="spots.length === 0" class="p-16 text-center">
+                  <svg class="w-16 h-16 text-stone-200 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>
+                  <p class="text-stone-400">{{ t('admin.noSpotData') }}</p>
+                </div>
 
-            <!-- Empty State -->
-            <div v-else-if="spots.length === 0" class="p-16 text-center">
-              <svg class="w-16 h-16 text-stone-200 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>
-              <p class="text-stone-400">{{ t('admin.noSpotData') }}</p>
-            </div>
-
-            <!-- Spots Card Grid -->
-            <div v-else class="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- Spots Card Grid -->
+                <div v-else class="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               <div v-for="spot in displayedSpots" :key="spot.id"
                    class="group bg-white rounded-xl border border-stone-200 overflow-hidden hover:shadow-lg hover:border-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 transition-all duration-200 cursor-pointer"
                    role="button"
@@ -397,6 +448,16 @@
                   </div>
                 </div>
               </div>
+                </div>
+              </template>
+            </div>
+          </div>
+          <div v-else-if="spotsError && spots.length === 0" class="border-t border-red-100 bg-red-50 px-6 py-4" role="alert">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p class="text-sm font-medium text-red-700">{{ spotsError }}</p>
+              <button @click="fetchSpots" :disabled="loadingSpots" class="inline-flex min-h-10 items-center justify-center rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60">
+                {{ loadingSpots ? t('common.loading') : t('common.retry') }}
+              </button>
             </div>
           </div>
           <div v-else class="px-6 py-4 text-center text-stone-500 text-sm">
@@ -421,14 +482,34 @@
               <div class="w-9 h-9 rounded-lg bg-violet-100 flex items-center justify-center">
                 <svg class="w-5 h-5 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"/></svg>
               </div>
-              <h3 class="text-lg font-bold text-stone-800">{{ t('admin.userManagement') }} <span class="text-sm font-normal text-stone-400">({{ users.length }}{{ t('common.peopleUnit') }})</span></h3>
+              <h3 class="text-lg font-bold text-stone-800">
+                {{ t('admin.userManagement') }}
+                <span class="text-sm font-normal text-stone-400">
+                  <template v-if="usersError && users.length === 0">{{ t('admin.listUnavailable') }}</template>
+                  <template v-else>({{ users.length }}{{ t('common.peopleUnit') }})</template>
+                </span>
+              </h3>
             </div>
             <div class="flex items-center gap-2">
-            <button @click.stop="fetchUsers" class="text-xs px-3 py-1.5 rounded-lg bg-stone-100 text-stone-600 hover:bg-stone-200 transition-colors">{{ t('common.refresh') }}</button>
+            <button @click.stop="fetchUsers" :disabled="loadingUsers" class="text-xs px-3 py-1.5 rounded-lg bg-stone-100 text-stone-600 hover:bg-stone-200 transition-colors disabled:cursor-not-allowed disabled:opacity-60">{{ loadingUsers ? t('common.loading') : t('common.refresh') }}</button>
               <svg class="w-5 h-5 text-stone-400 transition-transform duration-200" :class="{ 'rotate-180': showUsers }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
             </div>
           </div>
           <div v-if="showUsers" id="admin-users-content">
+            <div v-if="loadingUsers && users.length === 0" class="p-8 text-center text-stone-500" role="status" aria-live="polite" aria-busy="true">
+              <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-violet-500 mx-auto mb-4"></div>
+              <p>{{ t('admin.loadingUsers') }}</p>
+            </div>
+            <div v-else>
+              <div v-if="usersError" class="border-b border-red-100 bg-red-50 px-6 py-4" role="alert">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <p class="text-sm font-medium text-red-700">{{ usersError }}</p>
+                  <button @click="fetchUsers" :disabled="loadingUsers" class="inline-flex min-h-10 items-center justify-center rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60">
+                    {{ loadingUsers ? t('common.loading') : t('admin.retryUsers') }}
+                  </button>
+                </div>
+              </div>
+              <template v-if="!usersError || users.length > 0">
             <div class="divide-y divide-stone-100 md:hidden">
               <div v-for="u in users" :key="u.id" class="space-y-3 px-4 py-4" :class="{ 'bg-red-50/50': u.locked }">
                 <div class="flex items-start justify-between gap-3">
@@ -519,6 +600,16 @@
               </table>
             </div>
           </div>
+              </template>
+            </div>
+          </div>
+          <div v-else-if="usersError" class="border-t border-red-100 bg-red-50 px-6 py-4" role="alert">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p class="text-sm font-medium text-red-700">{{ usersError }}</p>
+              <button @click="fetchUsers" :disabled="loadingUsers" class="inline-flex min-h-10 items-center justify-center rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60">
+                {{ loadingUsers ? t('common.loading') : t('admin.retryUsers') }}
+              </button>
+            </div>
         </div>
 
         </div>
@@ -540,10 +631,16 @@
               <div class="w-9 h-9 rounded-lg bg-cyan-100 flex items-center justify-center">
                 <svg class="w-5 h-5 text-cyan-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"/></svg>
               </div>
-              <h3 class="text-lg font-bold text-stone-800">{{ t('admin.newsManagement') }} <span class="text-sm font-normal text-stone-400">({{ newsList.length }}{{ t('common.items') }})</span></h3>
+              <h3 class="text-lg font-bold text-stone-800">
+                {{ t('admin.newsManagement') }}
+                <span class="text-sm font-normal text-stone-400">
+                  <template v-if="newsError && newsList.length === 0">{{ t('admin.listUnavailable') }}</template>
+                  <template v-else>({{ newsList.length }}{{ t('common.items') }})</template>
+                </span>
+              </h3>
             </div>
             <div class="flex items-center gap-2">
-              <button @click.stop="fetchNews" :disabled="loadingNews" class="text-xs px-3 py-1.5 rounded-lg bg-stone-100 text-stone-600 hover:bg-stone-200 transition-colors">
+              <button @click.stop="fetchNews" :disabled="loadingNews" class="text-xs px-3 py-1.5 rounded-lg bg-stone-100 text-stone-600 hover:bg-stone-200 transition-colors disabled:cursor-not-allowed disabled:opacity-60">
                 {{ loadingNews ? t('common.loading') : t('common.refresh') }}
               </button>
               <button @click.stop="openCreateNewsModal" class="text-xs px-3 py-1.5 rounded-lg bg-cyan-500 text-white hover:bg-cyan-600 transition-colors">{{ t('admin.createNews') }}</button>
@@ -554,13 +651,25 @@
           </div>
           
           <!-- Loading State -->
-          <div v-if="loadingNews" class="p-8 text-center text-stone-500">
+          <div v-if="loadingNews && newsList.length === 0" class="p-8 text-center text-stone-500" role="status" aria-live="polite" aria-busy="true">
             <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
             <p>{{ t('admin.loadingNews') }}</p>
           </div>
           
           <!-- News List (Collapsible) -->
           <div v-else-if="showAllNews" id="admin-news-content" class="divide-y divide-stone-200">
+            <div v-if="newsError" class="border-b border-red-100 bg-red-50 px-6 py-4" role="alert">
+              <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p class="text-sm font-medium text-red-700">{{ newsError }}</p>
+                <button @click="fetchNews" :disabled="loadingNews" class="inline-flex min-h-10 items-center justify-center rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60">
+                  {{ loadingNews ? t('common.loading') : t('common.retry') }}
+                </button>
+              </div>
+            </div>
+            <div v-if="loadingNews && newsList.length > 0" class="border-b border-amber-100 bg-amber-50 px-6 py-3 text-sm font-medium text-amber-800" role="status" aria-live="polite" aria-busy="true">
+              {{ t('admin.loadingNews') }}
+            </div>
+            <template v-if="!newsError || newsList.length > 0">
             <div v-for="news in newsList" :key="news.id" class="px-4 py-4 transition-colors hover:bg-stone-50 sm:px-6">
               <div class="flex flex-col gap-4 sm:flex-row sm:items-start">
                 <div class="h-40 w-full flex-shrink-0 overflow-hidden rounded-lg bg-gray-200 sm:h-24 sm:w-24">
@@ -597,6 +706,15 @@
             <div v-if="newsList.length === 0" class="px-6 py-8 text-center text-stone-500">
               {{ t('admin.noNews') }}
             </div>
+            </template>
+          </div>
+          <div v-else-if="newsError && newsList.length === 0" class="border-t border-red-100 bg-red-50 px-6 py-4" role="alert">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p class="text-sm font-medium text-red-700">{{ newsError }}</p>
+              <button @click="fetchNews" :disabled="loadingNews" class="inline-flex min-h-10 items-center justify-center rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60">
+                {{ loadingNews ? t('common.loading') : t('common.retry') }}
+              </button>
+            </div>
           </div>
           <div v-else-if="!loadingNews && newsList.length > 0" class="px-6 py-4 text-center text-stone-500 text-sm">
             {{ t('admin.expandNews', { count: newsList.length }) }}
@@ -620,15 +738,40 @@
               <div class="w-9 h-9 rounded-lg bg-pink-100 flex items-center justify-center">
                 <svg class="w-5 h-5 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
               </div>
-              <h3 class="text-lg font-bold text-stone-800">{{ t('admin.carouselManagement') }} <span class="text-sm font-normal text-stone-400">({{ carousels.length }}{{ t('common.imagesUnit') }})</span></h3>
+              <h3 class="text-lg font-bold text-stone-800">
+                {{ t('admin.carouselManagement') }}
+                <span class="text-sm font-normal text-stone-400">
+                  <template v-if="carouselsError && carousels.length === 0">{{ t('admin.listUnavailable') }}</template>
+                  <template v-else>({{ carousels.length }}{{ t('common.imagesUnit') }})</template>
+                </span>
+              </h3>
             </div>
             <div class="flex items-center gap-2">
+              <button @click.stop="fetchCarousels" :disabled="loadingCarousels" class="text-xs px-3 py-1.5 rounded-lg bg-stone-100 text-stone-600 hover:bg-stone-200 transition-colors disabled:cursor-not-allowed disabled:opacity-60">
+                {{ loadingCarousels ? t('common.loading') : t('common.refresh') }}
+              </button>
               <button @click.stop="openCreateCarouselModal" class="text-xs px-3 py-1.5 rounded-lg bg-pink-500 text-white hover:bg-pink-600 transition-colors">{{ t('admin.addCarousel') }}</button>
               <svg class="w-5 h-5 text-stone-400 transition-transform duration-200" :class="{ 'rotate-180': showCarousels }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
             </div>
           </div>
           <div v-if="showCarousels" id="admin-carousels-content" class="p-6">
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div v-if="loadingCarousels && carousels.length === 0" class="py-10 text-center text-stone-500" role="status" aria-live="polite" aria-busy="true">
+              <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-pink-500 mx-auto mb-3"></div>
+              {{ t('admin.loadingCarousels') }}
+            </div>
+            <div v-else>
+              <div v-if="carouselsError" class="mb-4 rounded-lg border border-red-100 bg-red-50 px-4 py-3" role="alert">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <p class="text-sm font-medium text-red-700">{{ carouselsError }}</p>
+                  <button @click="fetchCarousels" :disabled="loadingCarousels" class="inline-flex min-h-10 items-center justify-center rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60">
+                    {{ loadingCarousels ? t('common.loading') : t('common.retry') }}
+                  </button>
+                </div>
+              </div>
+              <div v-if="loadingCarousels && carousels.length > 0" class="mb-4 rounded-lg border border-amber-100 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800" role="status" aria-live="polite" aria-busy="true">
+                {{ t('admin.loadingCarousels') }}
+              </div>
+              <div v-if="!carouselsError || carousels.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <div v-for="c in carousels" :key="c.id" class="border rounded-lg overflow-hidden">
                 <img :src="textOrEmpty(c.imageUrl)" class="w-full h-32 object-cover">
                 <div class="p-3">
@@ -643,6 +786,18 @@
                   </div>
                 </div>
               </div>
+              <div v-if="carousels.length === 0" class="rounded-lg border border-dashed border-stone-200 px-6 py-10 text-center text-sm text-stone-500 md:col-span-2 lg:col-span-3">
+                {{ t('admin.noCarousels') }}
+              </div>
+              </div>
+            </div>
+          </div>
+          <div v-else-if="carouselsError && carousels.length === 0" class="border-t border-red-100 bg-red-50 px-6 py-4" role="alert">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p class="text-sm font-medium text-red-700">{{ carouselsError }}</p>
+              <button @click="fetchCarousels" :disabled="loadingCarousels" class="inline-flex min-h-10 items-center justify-center rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60">
+                {{ loadingCarousels ? t('common.loading') : t('common.retry') }}
+              </button>
             </div>
           </div>
         </div>
@@ -664,15 +819,38 @@
               <div class="w-9 h-9 rounded-lg bg-teal-100 flex items-center justify-center">
                 <svg class="w-5 h-5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
               </div>
-              <h3 class="text-lg font-bold text-stone-800">{{ t('admin.routeManagement') }} <span class="text-sm font-normal text-stone-400">({{ adminRoutes.length }}{{ t('common.items') }})</span></h3>
+              <h3 class="text-lg font-bold text-stone-800">
+                {{ t('admin.routeManagement') }}
+                <span class="text-sm font-normal text-stone-400">
+                  <template v-if="adminRoutesError && adminRoutes.length === 0">{{ t('admin.listUnavailable') }}</template>
+                  <template v-else>({{ adminRoutes.length }}{{ t('common.items') }})</template>
+                </span>
+              </h3>
             </div>
             <div class="flex items-center gap-2">
-              <button @click.stop="fetchAdminRoutes" class="text-xs px-3 py-1.5 rounded-lg bg-stone-100 text-stone-600 hover:bg-stone-200 transition-colors">{{ t('common.refresh') }}</button>
+              <button @click.stop="fetchAdminRoutes" :disabled="loadingAdminRoutes" class="text-xs px-3 py-1.5 rounded-lg bg-stone-100 text-stone-600 hover:bg-stone-200 transition-colors disabled:cursor-not-allowed disabled:opacity-60">{{ loadingAdminRoutes ? t('common.loading') : t('common.refresh') }}</button>
               <button @click.stop="openCreateRouteModal" class="text-xs px-3 py-1.5 rounded-lg bg-teal-500 text-white hover:bg-teal-600 transition-colors">{{ t('admin.addNew') }}</button>
               <svg class="w-5 h-5 text-stone-400 transition-transform duration-200" :class="{ 'rotate-180': showRoutes }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
             </div>
           </div>
-          <div v-if="showRoutes" id="admin-routes-content" class="overflow-x-auto">
+          <div v-if="showRoutes" id="admin-routes-content">
+            <div v-if="loadingAdminRoutes && adminRoutes.length === 0" class="py-10 text-center text-stone-500" role="status" aria-live="polite" aria-busy="true">
+              <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-teal-500 mx-auto mb-3"></div>
+              {{ t('admin.loadingRoutes') }}
+            </div>
+            <div v-else>
+              <div v-if="adminRoutesError" class="border-b border-red-100 bg-red-50 px-6 py-4" role="alert">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <p class="text-sm font-medium text-red-700">{{ adminRoutesError }}</p>
+                  <button @click="fetchAdminRoutes" :disabled="loadingAdminRoutes" class="inline-flex min-h-10 items-center justify-center rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60">
+                    {{ loadingAdminRoutes ? t('common.loading') : t('common.retry') }}
+                  </button>
+                </div>
+              </div>
+              <div v-if="loadingAdminRoutes && adminRoutes.length > 0" class="border-b border-amber-100 bg-amber-50 px-6 py-3 text-sm font-medium text-amber-800" role="status" aria-live="polite" aria-busy="true">
+                {{ t('admin.loadingRoutes') }}
+              </div>
+              <div v-if="!adminRoutesError || adminRoutes.length > 0" class="overflow-x-auto">
             <table class="min-w-full divide-y divide-stone-200">
               <thead class="bg-stone-50">
                 <tr>
@@ -716,11 +894,21 @@
                     <button @click="deleteRoute(r.id)" class="text-red-600">{{ t('common.delete') }}</button>
                   </td>
                 </tr>
-                <tr v-if="adminRoutes.length === 0">
+                <tr v-if="!adminRoutesError && adminRoutes.length === 0">
                   <td colspan="7" class="px-4 py-8 text-center text-stone-500">{{ t('admin.noCommunityRoutes') }}</td>
                 </tr>
               </tbody>
             </table>
+              </div>
+            </div>
+          </div>
+          <div v-else-if="adminRoutesError && adminRoutes.length === 0" class="border-t border-red-100 bg-red-50 px-6 py-4" role="alert">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p class="text-sm font-medium text-red-700">{{ adminRoutesError }}</p>
+              <button @click="fetchAdminRoutes" :disabled="loadingAdminRoutes" class="inline-flex min-h-10 items-center justify-center rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60">
+                {{ loadingAdminRoutes ? t('common.loading') : t('common.retry') }}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -741,10 +929,16 @@
               <div class="w-9 h-9 rounded-lg bg-indigo-100 flex items-center justify-center">
                 <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
               </div>
-              <h3 class="text-lg font-bold text-stone-800">{{ t('admin.hotelManagement') }} <span class="text-sm font-normal text-stone-400">({{ adminHotels.length }}{{ t('common.hotelsUnit') }})</span></h3>
+              <h3 class="text-lg font-bold text-stone-800">
+                {{ t('admin.hotelManagement') }}
+                <span class="text-sm font-normal text-stone-400">
+                  <template v-if="adminHotelsError && adminHotels.length === 0">{{ t('admin.listUnavailable') }}</template>
+                  <template v-else>({{ adminHotels.length }}{{ t('common.hotelsUnit') }})</template>
+                </span>
+              </h3>
             </div>
             <div class="flex items-center gap-2">
-              <button @click.stop="fetchAdminHotels" class="text-xs px-3 py-1.5 rounded-lg bg-stone-100 text-stone-600 hover:bg-stone-200 transition-colors">{{ t('common.refresh') }}</button>
+              <button @click.stop="fetchAdminHotels" :disabled="loadingAdminHotels" class="text-xs px-3 py-1.5 rounded-lg bg-stone-100 text-stone-600 hover:bg-stone-200 transition-colors disabled:cursor-not-allowed disabled:opacity-60">{{ loadingAdminHotels ? t('common.loading') : t('common.refresh') }}</button>
               <button @click.stop="openCreateHotelModal" class="text-xs px-4 py-2 rounded-lg bg-indigo-500 text-white hover:bg-indigo-600 transition-colors shadow-sm">{{ t('admin.addHotel') }}</button>
               <svg class="w-5 h-5 text-stone-400 transition-transform duration-200" :class="{ 'rotate-180': showHotels }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
             </div>
@@ -752,6 +946,23 @@
 
           <!-- Card Grid -->
           <div v-if="showHotels" id="admin-hotels-content" class="p-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div v-if="loadingAdminHotels && adminHotels.length === 0" class="col-span-full py-10 text-center text-stone-500" role="status" aria-live="polite" aria-busy="true">
+              <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-500 mx-auto mb-3"></div>
+              {{ t('admin.loadingHotels') }}
+            </div>
+            <template v-else>
+            <div v-if="adminHotelsError" class="col-span-full rounded-lg border border-red-100 bg-red-50 px-4 py-3" role="alert">
+              <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p class="text-sm font-medium text-red-700">{{ adminHotelsError }}</p>
+                <button @click="fetchAdminHotels" :disabled="loadingAdminHotels" class="inline-flex min-h-10 items-center justify-center rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60">
+                  {{ loadingAdminHotels ? t('common.loading') : t('common.retry') }}
+                </button>
+              </div>
+            </div>
+            <div v-if="loadingAdminHotels && adminHotels.length > 0" class="col-span-full rounded-lg border border-amber-100 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800" role="status" aria-live="polite" aria-busy="true">
+              {{ t('admin.loadingHotels') }}
+            </div>
+            <template v-if="!adminHotelsError || adminHotels.length > 0">
             <div v-for="h in adminHotels" :key="h.id"
                  class="bg-white rounded-xl border border-stone-200 overflow-hidden hover:shadow-md transition-all duration-200"
                  :class="{ 'ring-2 ring-indigo-200 shadow-md': expandedHotelId === h.id }">
@@ -861,6 +1072,16 @@
               <svg class="w-16 h-16 text-stone-200 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
               <p class="text-stone-400">{{ t('admin.noHotels') }}</p>
               <button @click="openCreateHotelModal" class="mt-3 text-sm text-indigo-500 hover:text-indigo-700">{{ t('admin.addFirstHotel') }}</button>
+            </div>
+            </template>
+            </template>
+          </div>
+          <div v-else-if="adminHotelsError && adminHotels.length === 0" class="border-t border-red-100 bg-red-50 px-6 py-4" role="alert">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p class="text-sm font-medium text-red-700">{{ adminHotelsError }}</p>
+              <button @click="fetchAdminHotels" :disabled="loadingAdminHotels" class="inline-flex min-h-10 items-center justify-center rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60">
+                {{ loadingAdminHotels ? t('common.loading') : t('common.retry') }}
+              </button>
             </div>
           </div>
           <div v-else class="px-6 py-4 text-center text-stone-500 text-sm">
@@ -1275,10 +1496,6 @@ const numberOrNull = (value: unknown) => {
   return Number.isFinite(numericValue) ? numericValue : null
 }
 const numberOrDefault = (value: unknown, fallback: number) => numberOrNull(value) ?? fallback
-const reportAdminListLoadFailure = (resource: string, error: unknown) => {
-  console.error(`Failed to fetch ${resource}:`, summarizeClientError(error))
-  showToast(apiErrorMessage(error, '列表加载失败，请稍后重试'), 'error')
-}
 const activateKeyboardPanel = (event: KeyboardEvent, action: () => void | Promise<void>) => {
   if (event.target !== event.currentTarget) return
   event.preventDefault()
@@ -1516,8 +1733,12 @@ const getClickCountPercentage = (spot: AdminSpot) => {
 }
 
 const users = ref<AdminUserSummary[]>([])
+const loadingUsers = ref(false)
+const usersError = ref('')
+let usersRequestId = 0
 const spots = ref<AdminSpot[]>([])
 const loadingSpots = ref(false)
+let spotsRequestId = 0
 const fetchingPriceId = ref<number | null>(null)
 const batchFetching = ref(false)
 const priceBatchJob = ref<PriceBatchJob | null>(null)
@@ -1535,6 +1756,8 @@ const originalBodyOverflow = ref<string | null>(null)
 // News management
 const newsList = ref<AdminNewsItem[]>([])
 const loadingNews = ref(false)
+const newsError = ref('')
+let newsRequestId = 0
 const showAllNews = ref(false) // 默认折叠
 const showNewsModal = ref(false)
 const editingNews = ref<Partial<AdminNewsItem>>({})
@@ -1588,43 +1811,58 @@ const toList = <T>(value: unknown): T[] => {
   return []
 }
 
+const adminListErrorMessage = (error: unknown, fallback: string) => {
+  const status = apiErrorStatus(error)
+  if (status === 401) return t('admin.unauthorizedAdmin')
+  if (status === 403) return t('admin.forbiddenAdmin')
+  if (status) return safeClientErrorMessage(error, t('admin.serverError', { status }))
+  if (isNetworkClientError(error)) return t('admin.connectionFailed')
+  return safeClientErrorMessage(error, fallback)
+}
+
+const reportAdminListLoadFailure = (resource: string, error: unknown, fallback: string) => {
+  console.error(`Failed to fetch ${resource}:`, summarizeClientError(error))
+  const message = adminListErrorMessage(error, fallback)
+  showToast(message, 'error')
+  return message
+}
+
 const fetchUsers = async () => {
+  const requestId = usersRequestId + 1
+  usersRequestId = requestId
+  loadingUsers.value = true
+  usersError.value = ''
   try {
     const response = await api.get<unknown>(endpoints.admin.users, { params: adminPageParams })
+    if (requestId !== usersRequestId) return
     users.value = toList<AdminUserSummary>(response.data)
   } catch (error: unknown) {
+    if (requestId !== usersRequestId) return
     console.error('Failed to fetch users:', summarizeClientError(error))
-    users.value = []
+    usersError.value = adminListErrorMessage(error, t('admin.usersLoadFailed'))
+  } finally {
+    if (requestId === usersRequestId) {
+      loadingUsers.value = false
+    }
   }
 }
 
 const fetchSpots = async () => {
+  const requestId = spotsRequestId + 1
+  spotsRequestId = requestId
   loadingSpots.value = true
   spotsError.value = ''
   try {
     const response = await api.get<unknown>(endpoints.admin.spots, { params: adminPageParams })
-    
+    if (requestId !== spotsRequestId) return
     spots.value = toList<AdminSpot>(response.data)
   } catch (error: unknown) {
-    console.error('Failed to fetch spots:', summarizeClientError(error))
-    
-    const status = apiErrorStatus(error)
-    if (status) {
-      if (status === 401) {
-        spotsError.value = t('admin.unauthorizedAdmin')
-      } else if (status === 403) {
-        spotsError.value = t('admin.forbiddenAdmin')
-      } else {
-        spotsError.value = safeClientErrorMessage(error, t('admin.serverError', { status }))
-      }
-    } else if (isNetworkClientError(error)) {
-      spotsError.value = t('admin.connectionFailed')
-    } else {
-      spotsError.value = safeClientErrorMessage(error, t('admin.unknownError'))
-    }
-    spots.value = []
+    if (requestId !== spotsRequestId) return
+    spotsError.value = reportAdminListLoadFailure('admin spots', error, t('admin.spotsLoadFailed'))
   } finally {
-    loadingSpots.value = false
+    if (requestId === spotsRequestId) {
+      loadingSpots.value = false
+    }
   }
 }
 
@@ -1792,21 +2030,56 @@ const unlockUser = async (user: AdminUserSummary) => {
 // Hotel orders management
 const hotelOrders = ref<HotelOrder[]>([])
 const loadingHotelOrders = ref(false)
+const hotelOrdersError = ref('')
+let hotelOrdersRequestId = 0
+const updatingHotelOrderStatuses = ref<Record<number, boolean>>({})
+const hotelOrderStatusErrors = ref<Record<number, string>>({})
 const showAllHotelOrders = ref(false)
 const showRecentOrders = ref(false)
 const showPopularSpots = ref(false)
 const showUsers = ref(false)
 
+const hotelOrderStatusErrorId = (orderId: number) => `hotel-order-status-error-${orderId}`
+const isHotelOrderStatusUpdating = (orderId: number) => Boolean(updatingHotelOrderStatuses.value[orderId])
+
+const setHotelOrderStatusUpdating = (orderId: number, updating: boolean) => {
+  const next = { ...updatingHotelOrderStatuses.value }
+  if (updating) {
+    next[orderId] = true
+  } else {
+    delete next[orderId]
+  }
+  updatingHotelOrderStatuses.value = next
+}
+
+const setHotelOrderStatusError = (orderId: number, message: string) => {
+  const next = { ...hotelOrderStatusErrors.value }
+  if (message) {
+    next[orderId] = message
+  } else {
+    delete next[orderId]
+  }
+  hotelOrderStatusErrors.value = next
+}
+
 const fetchHotelOrders = async () => {
+  const requestId = hotelOrdersRequestId + 1
+  hotelOrdersRequestId = requestId
   loadingHotelOrders.value = true
+  hotelOrdersError.value = ''
   try {
     const response = await api.get<unknown>(endpoints.hotelBookings.all, { params: adminPageParams })
+    if (requestId !== hotelOrdersRequestId) return
     hotelOrders.value = toList<HotelOrder>(response.data)
+    hotelOrderStatusErrors.value = {}
   } catch (error: unknown) {
+    if (requestId !== hotelOrdersRequestId) return
     console.error('Failed to fetch hotel orders:', summarizeClientError(error))
-    hotelOrders.value = []
+    hotelOrdersError.value = adminListErrorMessage(error, t('admin.hotelOrdersLoadFailed'))
   } finally {
-    loadingHotelOrders.value = false
+    if (requestId === hotelOrdersRequestId) {
+      loadingHotelOrders.value = false
+    }
   }
 }
 
@@ -1814,13 +2087,31 @@ const refreshOperationalData = async () => {
   await Promise.all([fetchStats(), fetchHotelOrders()])
 }
 
-const updateHotelOrderStatus = async (orderId: number, status: string) => {
+const updateHotelOrderStatus = async (order: HotelOrder, event: Event) => {
+  const select = event.target instanceof HTMLSelectElement ? event.target : null
+  const nextStatus = select?.value || ''
+  const previousStatus = normalizeDisplayText(order.status)
+  if (!nextStatus || nextStatus === previousStatus || isHotelOrderStatusUpdating(order.id)) {
+    if (select) select.value = previousStatus
+    return
+  }
+
+  setHotelOrderStatusUpdating(order.id, true)
+  setHotelOrderStatusError(order.id, '')
   try {
-    await api.put(endpoints.hotelBookings.updateStatus(orderId), { status })
+    await api.put(endpoints.hotelBookings.updateStatus(order.id), { status: nextStatus })
+    hotelOrders.value = hotelOrders.value.map(current =>
+      current.id === order.id ? { ...current, status: nextStatus } : current
+    )
     await refreshOperationalData()
   } catch (error) {
+    if (select) select.value = previousStatus
     console.error('Failed to update hotel order status:', summarizeClientError(error))
-    showToast(t('admin.statusUpdateFailed'), 'error')
+    const message = apiErrorMessage(error, t('admin.statusUpdateFailedInline'))
+    setHotelOrderStatusError(order.id, message)
+    showToast(message, 'error')
+  } finally {
+    setHotelOrderStatusUpdating(order.id, false)
   }
 }
 
@@ -1838,43 +2129,34 @@ const deleteHotelOrder = async (orderId: number) => {
 }
 
 const fetchNews = async () => {
+  const requestId = newsRequestId + 1
+  newsRequestId = requestId
   loadingNews.value = true
+  newsError.value = ''
   try {
     if (!(await auth.ensureSession())) {
+      if (requestId !== newsRequestId) return
       showToast(t('admin.notLoggedIn'), 'warning')
       await router.push('/login')
       return
     }
 
     if (!auth.isAdmin) {
+      if (requestId !== newsRequestId) return
       showToast(t('admin.noAdminPermission'), 'warning')
       return
     }
     
     const response = await api.get<unknown>(endpoints.admin.news, { params: adminPageParams })
-    
+    if (requestId !== newsRequestId) return
     newsList.value = toList<AdminNewsItem>(response.data)
   } catch (error: unknown) {
-    console.error('Failed to fetch news:', summarizeClientError(error))
-    
-    const status = apiErrorStatus(error)
-    if (status) {
-      if (status === 401) {
-        showToast(t('admin.unauthorizedAdmin'), 'warning')
-      } else if (status === 403) {
-        showToast(t('admin.forbiddenAdmin'), 'warning')
-      } else {
-        const errorMsg = safeClientErrorMessage(error, t('admin.serverError', { status }))
-        showToast(t('admin.fetchNewsFailed', { message: errorMsg }), 'error')
-      }
-    } else if (isNetworkClientError(error)) {
-      showToast(t('admin.connectionFailed'), 'error')
-    } else {
-      showToast(t('admin.fetchNewsFailed', { message: safeClientErrorMessage(error, t('admin.unknownError')) }), 'error')
-    }
-    newsList.value = []
+    if (requestId !== newsRequestId) return
+    newsError.value = reportAdminListLoadFailure('admin news', error, t('admin.newsLoadFailed'))
   } finally {
-    loadingNews.value = false
+    if (requestId === newsRequestId) {
+      loadingNews.value = false
+    }
   }
 }
 
@@ -2009,18 +2291,30 @@ const canDeleteUser = (user: AdminUserSummary) => Boolean(user.deletable)
 
 // Carousel management
 const carousels = ref<AdminCarouselItem[]>([])
+const loadingCarousels = ref(false)
+const carouselsError = ref('')
+let carouselsRequestId = 0
 const showCarousels = ref(false)
 const showCarouselModal = ref(false)
 const editingCarousel = ref<Partial<AdminCarouselItem>>({})
 const carouselForm = ref({ title: '', subtitle: '', tag: '', imageUrl: '', linkUrl: '', sortOrder: 0, active: true })
 
 const fetchCarousels = async () => {
+  const requestId = carouselsRequestId + 1
+  carouselsRequestId = requestId
+  loadingCarousels.value = true
+  carouselsError.value = ''
   try {
     const res = await api.get<unknown>(endpoints.carousels.adminList)
+    if (requestId !== carouselsRequestId) return
     carousels.value = toList<AdminCarouselItem>(res.data)
   } catch (e) {
-    carousels.value = []
-    reportAdminListLoadFailure('admin carousels', e)
+    if (requestId !== carouselsRequestId) return
+    carouselsError.value = reportAdminListLoadFailure('admin carousels', e, t('admin.carouselsLoadFailed'))
+  } finally {
+    if (requestId === carouselsRequestId) {
+      loadingCarousels.value = false
+    }
   }
 }
 
@@ -2062,6 +2356,9 @@ const deleteCarousel = async (id: number) => {
 
 // Route management
 const adminRoutes = ref<AdminRouteItem[]>([])
+const loadingAdminRoutes = ref(false)
+const adminRoutesError = ref('')
+let adminRoutesRequestId = 0
 const showRoutes = ref(false)
 const showRouteModal = ref(false)
 const editingRoute = ref<Partial<AdminRouteItem>>({})
@@ -2091,12 +2388,21 @@ const adminPreferenceOptions = computed(() => [
 ])
 
 const fetchAdminRoutes = async () => {
+  const requestId = adminRoutesRequestId + 1
+  adminRoutesRequestId = requestId
+  loadingAdminRoutes.value = true
+  adminRoutesError.value = ''
   try {
     const res = await api.get<unknown>(endpoints.adminRoutes.list, { params: adminPageParams })
+    if (requestId !== adminRoutesRequestId) return
     adminRoutes.value = toList<AdminRouteItem>(res.data)
   } catch (e) {
-    adminRoutes.value = []
-    reportAdminListLoadFailure('admin routes', e)
+    if (requestId !== adminRoutesRequestId) return
+    adminRoutesError.value = reportAdminListLoadFailure('admin routes', e, t('admin.routesLoadFailed'))
+  } finally {
+    if (requestId === adminRoutesRequestId) {
+      loadingAdminRoutes.value = false
+    }
   }
 }
 
@@ -2168,6 +2474,9 @@ const deleteRoute = async (id: number) => {
 
 // Hotel management
 const adminHotels = ref<AdminHotelItem[]>([])
+const loadingAdminHotels = ref(false)
+const adminHotelsError = ref('')
+let adminHotelsRequestId = 0
 const showHotels = ref(false)
 const showHotelModal = ref(false)
 const editingHotel = ref<Partial<AdminHotelItem>>({})
@@ -2175,14 +2484,22 @@ const hotelForm = ref({ name: '', location: '', phone: '', priceRange: '', ratin
 const failedHotelImages = ref<Record<number, boolean>>({})
 
 const fetchAdminHotels = async () => {
+  const requestId = adminHotelsRequestId + 1
+  adminHotelsRequestId = requestId
+  loadingAdminHotels.value = true
+  adminHotelsError.value = ''
   try {
     const res = await api.get<unknown>(endpoints.adminHotels.list, { params: adminPageParams })
+    if (requestId !== adminHotelsRequestId) return
     adminHotels.value = toList<AdminHotelItem>(res.data)
     failedHotelImages.value = {}
   } catch (e) {
-    adminHotels.value = []
-    failedHotelImages.value = {}
-    reportAdminListLoadFailure('admin hotels', e)
+    if (requestId !== adminHotelsRequestId) return
+    adminHotelsError.value = reportAdminListLoadFailure('admin hotels', e, t('admin.hotelsLoadFailed'))
+  } finally {
+    if (requestId === adminHotelsRequestId) {
+      loadingAdminHotels.value = false
+    }
   }
 }
 
@@ -2240,7 +2557,7 @@ const toggleHotelExpand = async (hotel: AdminHotelItem) => {
       expandedRoomTypes.value = toList<AdminRoomType>(res.data)
     } catch (e) {
       expandedRoomTypes.value = []
-      reportAdminListLoadFailure('admin room types', e)
+      reportAdminListLoadFailure('admin room types', e, t('admin.hotelsLoadFailed'))
     }
     loadingRoomTypes.value = false
   }

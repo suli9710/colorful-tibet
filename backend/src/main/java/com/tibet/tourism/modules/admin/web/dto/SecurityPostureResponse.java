@@ -261,8 +261,10 @@ public class SecurityPostureResponse {
     public static class ProtectionSnapshot {
         private boolean rateLimitEnabled;
         private boolean rateLimitRedisEnabled;
+        private boolean rateLimitRedisFailClosed;
         private boolean bruteForceEnabled;
         private boolean bruteForceRedisEnabled;
+        private boolean bruteForceRedisFailClosed;
         private boolean antibotEnabled;
         private boolean recaptchaConfigured;
 
@@ -282,6 +284,14 @@ public class SecurityPostureResponse {
             this.rateLimitRedisEnabled = rateLimitRedisEnabled;
         }
 
+        public boolean isRateLimitRedisFailClosed() {
+            return rateLimitRedisFailClosed;
+        }
+
+        public void setRateLimitRedisFailClosed(boolean rateLimitRedisFailClosed) {
+            this.rateLimitRedisFailClosed = rateLimitRedisFailClosed;
+        }
+
         public boolean isBruteForceEnabled() {
             return bruteForceEnabled;
         }
@@ -296,6 +306,14 @@ public class SecurityPostureResponse {
 
         public void setBruteForceRedisEnabled(boolean bruteForceRedisEnabled) {
             this.bruteForceRedisEnabled = bruteForceRedisEnabled;
+        }
+
+        public boolean isBruteForceRedisFailClosed() {
+            return bruteForceRedisFailClosed;
+        }
+
+        public void setBruteForceRedisFailClosed(boolean bruteForceRedisFailClosed) {
+            this.bruteForceRedisFailClosed = bruteForceRedisFailClosed;
         }
 
         public boolean isAntibotEnabled() {
