@@ -6,7 +6,6 @@ import com.tibet.tourism.common.validation.InputSanitizer;
 import com.tibet.tourism.modules.content.application.HeritageService;
 import com.tibet.tourism.modules.content.domain.HeritageComment;
 import com.tibet.tourism.modules.content.domain.HeritageItem;
-import com.tibet.tourism.modules.content.domain.HeritageLike;
 import com.tibet.tourism.modules.content.infra.HeritageCommentRepository;
 import com.tibet.tourism.modules.content.infra.HeritageItemRepository;
 import com.tibet.tourism.modules.content.infra.HeritageLikeRepository;
@@ -22,7 +21,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -109,7 +107,7 @@ public class HeritageController {
     @Transactional
     public ResponseEntity<?> toggleLike(@PathVariable Long id, HttpServletRequest request) {
         User user = jwtAuthSupport.resolveCurrentUser(request);
-        HeritageItem item = heritageItemRepository.findById(id)
+        heritageItemRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Heritage item not found"));
 
         boolean exists = heritageLikeRepository.existsByUserIdAndHeritageItemId(user.getId(), id);
@@ -121,14 +119,9 @@ public class HeritageController {
             }
             liked = false;
         } else {
-            HeritageLike like = new HeritageLike();
-            like.setUser(user);
-            like.setHeritageItem(item);
-            try {
-                heritageLikeRepository.saveAndFlush(like);
+            int inserted = heritageLikeRepository.insertIgnore(user.getId(), id);
+            if (inserted > 0) {
                 heritageItemRepository.incrementLikeCount(id);
-            } catch (DataIntegrityViolationException duplicate) {
-                // Concurrent duplicate like; the unique row already represents the desired state.
             }
             liked = true;
         }

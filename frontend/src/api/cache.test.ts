@@ -1,4 +1,4 @@
-import type { AxiosResponse } from 'axios'
+import type { AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from 'axios'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 class MemoryStorage implements Storage {
@@ -45,10 +45,17 @@ function installBrowserStorage() {
   return { localStorage, sessionStorage }
 }
 
-function createApi(rawGet: ReturnType<typeof vi.fn>) {
+type TestGet = (url: string, config?: AxiosRequestConfig) => Promise<AxiosResponse>
+type TestGetMock = ReturnType<typeof vi.fn> & TestGet
+
+function createRawGet() {
+  return vi.fn() as TestGetMock
+}
+
+function createApi(rawGet: TestGet) {
   return {
     get: rawGet
-  } as any
+  }
 }
 
 const response = (data: unknown): AxiosResponse => ({
@@ -56,7 +63,7 @@ const response = (data: unknown): AxiosResponse => ({
   status: 200,
   statusText: 'OK',
   headers: {},
-  config: {} as any
+  config: { headers: {} } as InternalAxiosRequestConfig
 })
 
 describe('GET cache storage guardrails', () => {
@@ -69,7 +76,8 @@ describe('GET cache storage guardrails', () => {
     const { localStorage } = installBrowserStorage()
     localStorage.setItem('user', '{bad-json')
     const { installGetCache } = await import('./cache')
-    const rawGet = vi.fn().mockResolvedValue(response({ ok: true }))
+    const rawGet = createRawGet()
+    rawGet.mockResolvedValue(response({ ok: true }))
     const api = createApi(rawGet)
 
     installGetCache(api)
@@ -85,8 +93,8 @@ describe('GET cache storage guardrails', () => {
     const { localStorage } = installBrowserStorage()
     localStorage.setItem('auth-session-version', '5')
     const { installGetCache } = await import('./cache')
-    const rawGet = vi
-      .fn()
+    const rawGet = createRawGet()
+    rawGet
       .mockResolvedValueOnce(response({ seq: 1 }))
       .mockResolvedValueOnce(response({ seq: 2 }))
       .mockResolvedValueOnce(response({ seq: 3 }))
@@ -122,8 +130,8 @@ describe('GET cache storage guardrails', () => {
   it('does not keep oversized responses in the in-memory GET cache', async () => {
     installBrowserStorage()
     const { installGetCache } = await import('./cache')
-    const rawGet = vi
-      .fn()
+    const rawGet = createRawGet()
+    rawGet
       .mockResolvedValueOnce(response({ text: 'x'.repeat(100_001) }))
       .mockResolvedValueOnce(response({ text: 'small' }))
     const api = createApi(rawGet)
@@ -163,8 +171,8 @@ describe('GET cache storage guardrails', () => {
   it('does not cache order detail list endpoints for anonymous sessions', async () => {
     installBrowserStorage()
     const { installGetCache } = await import('./cache')
-    const rawGet = vi
-      .fn()
+    const rawGet = createRawGet()
+    rawGet
       .mockResolvedValueOnce(response({ seq: 1 }))
       .mockResolvedValueOnce(response({ seq: 2 }))
       .mockResolvedValueOnce(response({ seq: 3 }))
@@ -192,7 +200,8 @@ describe('GET cache storage guardrails', () => {
   it('keeps anonymous public hotel catalog GETs eligible for short memory cache', async () => {
     installBrowserStorage()
     const { installGetCache } = await import('./cache')
-    const rawGet = vi.fn().mockResolvedValue(response({ hotels: [] }))
+    const rawGet = createRawGet()
+    rawGet.mockResolvedValue(response({ hotels: [] }))
     const api = createApi(rawGet)
 
     installGetCache(api)
@@ -206,8 +215,8 @@ describe('GET cache storage guardrails', () => {
   it('does not cache personalized spot recommendation endpoints', async () => {
     installBrowserStorage()
     const { installGetCache } = await import('./cache')
-    const rawGet = vi
-      .fn()
+    const rawGet = createRawGet()
+    rawGet
       .mockResolvedValueOnce(response({ seq: 1 }))
       .mockResolvedValueOnce(response({ seq: 2 }))
       .mockResolvedValueOnce(response({ seq: 3 }))

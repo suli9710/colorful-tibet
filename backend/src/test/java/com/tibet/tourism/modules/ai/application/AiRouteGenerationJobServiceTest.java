@@ -1,6 +1,7 @@
 package com.tibet.tourism.modules.ai.application;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -9,6 +10,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -18,9 +20,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tibet.tourism.modules.ai.domain.AiRouteRecord;
 import com.tibet.tourism.modules.ai.web.dto.AiRouteGenerateRequest;
 import com.tibet.tourism.modules.user.domain.User;
+import java.io.IOException;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
@@ -35,10 +40,20 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.data.domain.Range;
+import org.springframework.data.redis.connection.Limit;
+import org.springframework.data.redis.connection.stream.MapRecord;
+import org.springframework.data.redis.connection.stream.ReadOffset;
+import org.springframework.data.redis.connection.stream.RecordId;
+import org.springframework.data.redis.connection.stream.StreamOffset;
+import org.springframework.data.redis.connection.stream.StreamReadOptions;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.StreamOperations;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyEmitter;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @ExtendWith(MockitoExtension.class)
 class AiRouteGenerationJobServiceTest {
@@ -294,6 +309,68 @@ class AiRouteGenerationJobServiceTest {
     }
 
     @Test
+    void distributedLockHeldBeforeRecordIsReadableStreamsRetryableInterruptedEvent() throws Exception {
+        Executor holdingExecutor = command -> { };
+        RedisFixture redis = redisFixture();
+        CapturingSseEmitter capturingEmitter = new CapturingSseEmitter();
+        ObjectMapper objectMapper = objectMapper();
+        AiRouteGenerationJobService service = new AiRouteGenerationJobService(
+                aiRouteService,
+                aiQuotaService,
+                aiRouteRecordService,
+                holdingExecutor,
+                objectMapper,
+                provider(redis.template())
+        ) {
+            @Override
+            protected SseEmitter createEmitter() {
+                return capturingEmitter;
+            }
+        };
+
+        User user = new User();
+        user.setId(7L);
+        AiRouteGenerateRequest request = new AiRouteGenerateRequest();
+        request.setDays(5);
+        request.setBudget("comfort");
+        request.setPreference("natural");
+
+        when(aiQuotaService.buildCacheKey(7L, 5, "comfort", "natural", "zh")).thenReturn("cache-key");
+        when(aiQuotaService.getCachedRoute("cache-key")).thenReturn(null);
+        when(redis.valueOperations().setIfAbsent(
+                eq("ai:route-job:start:cache-key"), anyString(), any(Duration.class)))
+                .thenReturn(false);
+        when(redis.valueOperations().get("ai:route-job:start:cache-key")).thenReturn("job-205");
+        when(redis.valueOperations().get("ai:route-job:pending:job-205"))
+                .thenReturn(objectMapper.writeValueAsString(Map.of(
+                        "userId", 7L,
+                        "cacheKey", "cache-key",
+                        "days", 5,
+                        "budget", "comfort",
+                        "preference", "natural",
+                        "locale", "zh")));
+        when(aiRouteRecordService.findJobRecord(7L, "job-205")).thenReturn(Optional.empty());
+        when(redis.streamOperations().reverseRange(
+                eq("ai:route-job:events:job-205"), any(Range.class), any(Limit.class)))
+                .thenReturn(List.of());
+
+        AiRouteJobSnapshot snapshot = service.startJob(request, user, "zh");
+        service.streamJob(snapshot.jobId(), user);
+
+        assertEquals("job-205", snapshot.jobId());
+        assertEquals("RUNNING", snapshot.status());
+        assertEquals(5, snapshot.days());
+        assertTrue(capturingEmitter.completed);
+        assertTrue(capturingEmitter.sentData().stream()
+                .anyMatch(payload -> payload.contains("\"type\":\"snapshot\"")));
+        assertTrue(capturingEmitter.sentData().stream()
+                .anyMatch(payload -> payload.contains("\"type\":\"interrupted\"")
+                        && payload.contains("\"retryable\":true")
+                        && payload.contains("running-record-not-ready")));
+        verify(aiQuotaService, never()).tryConsumeQuota(7L);
+    }
+
+    @Test
     void distributedLockIsReleasedWithJobTokenAfterCompletion() {
         Executor directExecutor = Runnable::run;
         RedisFixture redis = redisFixture();
@@ -440,7 +517,159 @@ class AiRouteGenerationJobServiceTest {
     }
 
     @Test
-    void terminalJobsExpireAfterRetentionWindow() {
+    void streamJobEmitsRetryableInterruptedEventWhenRedisStreamIsUnavailable() {
+        Executor holdingExecutor = command -> { };
+        CapturingSseEmitter capturingEmitter = new CapturingSseEmitter();
+        AiRouteGenerationJobService service = new AiRouteGenerationJobService(
+                aiRouteService,
+                aiQuotaService,
+                aiRouteRecordService,
+                holdingExecutor,
+                objectMapper()
+        ) {
+            @Override
+            protected SseEmitter createEmitter() {
+                return capturingEmitter;
+            }
+        };
+
+        User user = new User();
+        user.setId(7L);
+        AiRouteRecord runningRecord = runningRecord(205L, "job-205", "# Partial route");
+        when(aiRouteRecordService.findJobRecord(7L, "job-205")).thenReturn(Optional.of(runningRecord));
+
+        service.streamJob("job-205", user);
+
+        assertTrue(capturingEmitter.completed);
+        assertTrue(capturingEmitter.sendCount >= 1);
+        assertTrue(capturingEmitter.sentData().stream()
+                .anyMatch(payload -> payload.contains("\"type\":\"snapshot\"")));
+        assertTrue(capturingEmitter.sentData().stream()
+                .anyMatch(payload -> payload.contains("\"type\":\"interrupted\"")
+                        && payload.contains("\"retryable\":true")));
+        assertFalse(capturingEmitter.sentData().stream()
+                .anyMatch(payload -> payload.contains("\"type\":\"error\"")));
+    }
+
+    @Test
+    void detachedPersistedRunningStreamRelaysRedisStreamEvents() {
+        Executor directExecutor = Runnable::run;
+        RedisFixture redis = redisFixture();
+        CapturingSseEmitter capturingEmitter = new CapturingSseEmitter();
+        AiRouteGenerationJobService service = new AiRouteGenerationJobService(
+                aiRouteService,
+                aiQuotaService,
+                aiRouteRecordService,
+                directExecutor,
+                objectMapper(),
+                provider(redis.template())
+        ) {
+            @Override
+            protected SseEmitter createEmitter() {
+                return capturingEmitter;
+            }
+        };
+
+        User user = new User();
+        user.setId(7L);
+        AiRouteRecord runningRecord = runningRecord(205L, "job-205", "# Partial route");
+        when(aiRouteRecordService.findJobRecord(7L, "job-205")).thenReturn(Optional.of(runningRecord));
+
+        String streamKey = "ai:route-job:events:job-205";
+        MapRecord<String, String, String> latestReplace = redisEvent(
+                streamKey,
+                "10-0",
+                "replace",
+                "{\"type\":\"replace\",\"content\":\"# Partial route plus\",\"text\":\"# Partial route plus\"}");
+        MapRecord<String, String, String> done = redisEvent(
+                streamKey,
+                "11-0",
+                "done",
+                "{\"type\":\"done\",\"content\":\"# Partial route plus done\"}");
+        when(redis.streamOperations().reverseRange(
+                eq(streamKey), any(Range.class), any(Limit.class)))
+                .thenReturn(List.of(latestReplace));
+        when(redis.streamOperations().read(
+                any(StreamReadOptions.class), any(StreamOffset.class)))
+                .thenReturn(List.of(done));
+
+        service.streamJob("job-205", user);
+
+        assertTrue(capturingEmitter.completed);
+        assertTrue(capturingEmitter.sentData().stream()
+                .anyMatch(payload -> payload.contains("\"type\":\"snapshot\"")));
+        assertTrue(capturingEmitter.sentData().stream()
+                .anyMatch(payload -> payload.contains("\"type\":\"replace\"")
+                        && payload.contains("# Partial route plus")));
+        assertTrue(capturingEmitter.sentData().stream()
+                .anyMatch(payload -> payload.contains("\"type\":\"done\"")
+                        && payload.contains("# Partial route plus done")));
+    }
+
+    @Test
+    void runningJobPublishesCumulativeRedisStreamEvents() {
+        Executor directExecutor = Runnable::run;
+        RedisFixture redis = redisFixture();
+        AiRouteGenerationJobService service = new AiRouteGenerationJobService(
+                aiRouteService,
+                aiQuotaService,
+                aiRouteRecordService,
+                directExecutor,
+                objectMapper(),
+                provider(redis.template())
+        );
+
+        User user = new User();
+        user.setId(7L);
+        AiRouteGenerateRequest request = new AiRouteGenerateRequest();
+        request.setDays(5);
+        request.setBudget("comfort");
+        request.setPreference("natural");
+
+        when(aiQuotaService.buildCacheKey(7L, 5, "comfort", "natural", "zh")).thenReturn("cache-key");
+        when(aiQuotaService.getCachedRoute("cache-key")).thenReturn(null);
+        when(redis.valueOperations().setIfAbsent(
+                eq("ai:route-job:start:cache-key"), anyString(), any(Duration.class)))
+                .thenReturn(true);
+        when(aiQuotaService.tryConsumeQuota(7L)).thenReturn(new AiQuotaService.QuotaConsumptionResult(true, 19));
+        when(aiRouteRecordService.createRunningRecord(eq(user), any(), eq(5), eq("comfort"), eq("natural"), eq("zh")))
+                .thenReturn(record(106L));
+        when(aiRouteRecordService.recordCompletedRoute(
+                eq(user), any(), eq(5), eq("comfort"), eq("natural"), eq("zh"), eq("# Fresh route")))
+                .thenReturn(record(106L));
+
+        doAnswer(invocation -> {
+            AiRouteService.RouteStreamListener listener = invocation.getArgument(5);
+            listener.onDelta("# Fresh");
+            listener.onDelta(" route");
+            listener.onDone("# Fresh route");
+            return "# Fresh route";
+        }).when(aiRouteService).streamRouteToListener(
+                eq(5),
+                eq("comfort"),
+                eq("natural"),
+                eq(user),
+                eq("zh"),
+                any(AiRouteService.RouteStreamListener.class));
+
+        AiRouteJobSnapshot snapshot = service.startJob(request, user, "zh");
+
+        assertEquals("COMPLETED", snapshot.status());
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, String>> eventCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(redis.streamOperations(), times(4)).add(
+                eq("ai:route-job:events:" + snapshot.jobId()), eventCaptor.capture());
+        List<Map<String, String>> events = eventCaptor.getAllValues();
+        assertEquals("replace", events.get(0).get("type"));
+        assertTrue(events.get(0).get("event").contains("\"content\":\"# Fresh\""));
+        assertEquals("replace", events.get(1).get("type"));
+        assertTrue(events.get(1).get("event").contains("\"content\":\"# Fresh route\""));
+        assertEquals("snapshot", events.get(2).get("type"));
+        assertEquals("done", events.get(3).get("type"));
+    }
+
+    @Test
+    void terminalJobLookupFallsBackToPersistedCompletedSnapshotAfterMemoryRetention() {
         Executor directExecutor = Runnable::run;
         AiRouteGenerationJobService service = new AiRouteGenerationJobService(
                 aiRouteService,
@@ -465,7 +694,7 @@ class AiRouteGenerationJobServiceTest {
                 .thenReturn(record(103L));
         when(aiRouteRecordService.recordCompletedRoute(
                 eq(user), any(), eq(5), eq("comfort"), eq("natural"), eq("zh"), eq("# Fresh route")))
-                .thenReturn(record(103L));
+                .thenAnswer(invocation -> completedRecord(103L, invocation.getArgument(1), "# Fresh route"));
 
         doAnswer(invocation -> {
             AiRouteService.RouteStreamListener listener = invocation.getArgument(5);
@@ -482,7 +711,15 @@ class AiRouteGenerationJobServiceTest {
         AiRouteJobSnapshot snapshot = service.startJob(request, user, "zh");
 
         assertEquals("COMPLETED", snapshot.status());
-        assertThrows(IllegalArgumentException.class, () -> service.getJob(snapshot.jobId(), user));
+        when(aiRouteRecordService.findJobRecord(7L, snapshot.jobId()))
+                .thenReturn(Optional.of(completedRecord(103L, snapshot.jobId(), "# Fresh route")));
+
+        AiRouteJobSnapshot restoredSnapshot = service.getJob(snapshot.jobId(), user);
+
+        assertEquals(snapshot.jobId(), restoredSnapshot.jobId());
+        assertEquals(103L, restoredSnapshot.routeRecordId());
+        assertEquals("COMPLETED", restoredSnapshot.status());
+        assertEquals("# Fresh route", restoredSnapshot.content());
     }
 
     @Test
@@ -568,12 +805,29 @@ class AiRouteGenerationJobServiceTest {
         return record;
     }
 
-    @SuppressWarnings("unchecked")
+    private static AiRouteRecord completedRecord(Long id, String jobId, String content) {
+        AiRouteRecord record = runningRecord(id, jobId, content);
+        record.setStatus(AiRouteRecord.Status.COMPLETED);
+        return record;
+    }
+
+    private static ObjectMapper objectMapper() {
+        return new ObjectMapper().findAndRegisterModules();
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
     private static RedisFixture redisFixture() {
         StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
         ValueOperations<String, String> valueOperations = mock(ValueOperations.class);
-        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
-        return new RedisFixture(redisTemplate, valueOperations);
+        StreamOperations<String, String, String> streamOperations = mock(StreamOperations.class);
+        lenient().when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        lenient().when(redisTemplate.<String, String>opsForStream()).thenReturn(streamOperations);
+        return new RedisFixture(redisTemplate, valueOperations, streamOperations);
+    }
+
+    private static MapRecord<String, String, String> redisEvent(String streamKey, String id, String type, String event) {
+        return MapRecord.create(streamKey, Map.of("type", type, "event", event))
+                .withId(RecordId.of(id));
     }
 
     private static ObjectProvider<StringRedisTemplate> provider(StringRedisTemplate redisTemplate) {
@@ -612,7 +866,34 @@ class AiRouteGenerationJobServiceTest {
 
     private record RedisFixture(
             StringRedisTemplate template,
-            ValueOperations<String, String> valueOperations
+            ValueOperations<String, String> valueOperations,
+            StreamOperations<String, String, String> streamOperations
     ) {
+    }
+
+    private static final class CapturingSseEmitter extends SseEmitter {
+        private final List<SseEventBuilder> events = new ArrayList<>();
+        private int sendCount;
+        private boolean completed;
+
+        @Override
+        public synchronized void send(SseEventBuilder builder) throws IOException {
+            events.add(builder);
+            sendCount++;
+        }
+
+        List<String> sentData() {
+            return events.stream()
+                    .map(event -> event.build().stream()
+                            .map(ResponseBodyEmitter.DataWithMediaType::getData)
+                            .map(String::valueOf)
+                            .reduce("", String::concat))
+                    .toList();
+        }
+
+        @Override
+        public void complete() {
+            completed = true;
+        }
     }
 }

@@ -177,7 +177,7 @@ def scrape_price_for_spot(
     with ManagedFetcher(active_config) as fetcher:
         for url in urls:
             try:
-                validate_target_url(url, allowed_domains=())
+                validate_target_url(url, allowed_domains=active_config.allowed_domains)
                 page = fetcher.fetch(url)
             except Exception as exc:
                 logger.warning("Price source fetch failed. url=%s cause=%s", url, exc)

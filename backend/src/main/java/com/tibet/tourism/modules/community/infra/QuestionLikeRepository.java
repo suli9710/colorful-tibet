@@ -23,4 +23,11 @@ public interface QuestionLikeRepository extends JpaRepository<QuestionLike, Long
     @Modifying
     @Query("DELETE FROM QuestionLike ql WHERE ql.question.author.id = :userId")
     void deleteByQuestionAuthorId(@Param("userId") Long userId);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(value = """
+            INSERT IGNORE INTO question_likes (question_id, user_id, created_at)
+            VALUES (:questionId, :userId, CURRENT_TIMESTAMP)
+            """, nativeQuery = true)
+    int insertIgnore(@Param("questionId") Long questionId, @Param("userId") Long userId);
 }

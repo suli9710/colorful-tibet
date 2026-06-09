@@ -63,6 +63,7 @@ output/
 
 # Temporary files
 .startup/
+.tmp-supply-chain-pins/
 *.tmp
 *.temp
 *.bak

@@ -10,6 +10,9 @@ const props = withDefaults(defineProps<{
   secondaryLabel?: string
   primaryDisabled?: boolean
   secondaryDisabled?: boolean
+  primaryBusy?: boolean
+  primaryDescribedBy?: string
+  secondaryDescribedBy?: string
 }>(), {
   show: true,
   eyebrow: '',
@@ -17,7 +20,10 @@ const props = withDefaults(defineProps<{
   meta: '',
   secondaryLabel: '',
   primaryDisabled: false,
-  secondaryDisabled: false
+  secondaryDisabled: false,
+  primaryBusy: false,
+  primaryDescribedBy: '',
+  secondaryDescribedBy: ''
 })
 
 const emit = defineEmits<{
@@ -59,6 +65,7 @@ const actionBarLabel = computed(() =>
             class="mobile-sticky-action__button mobile-sticky-action__button--secondary min-h-12 rounded-2xl border border-tibet-gold/25 px-4 py-2.5 text-sm font-semibold leading-tight text-tibet-brown transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tibet-gold/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
             :disabled="secondaryDisabled"
             :aria-label="secondaryLabel"
+            :aria-describedby="secondaryDescribedBy || undefined"
             @click="emit('secondary')"
           >
             <span class="line-clamp-2 break-words">{{ secondaryLabel }}</span>
@@ -68,6 +75,8 @@ const actionBarLabel = computed(() =>
             class="mobile-sticky-action__button mobile-sticky-action__button--primary min-h-12 rounded-2xl bg-tibet-red px-5 py-2.5 text-sm font-bold leading-tight text-tibet-yellow shadow-lg shadow-tibet-red/20 transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tibet-gold/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
             :disabled="primaryDisabled"
             :aria-label="primaryLabel"
+            :aria-busy="primaryBusy"
+            :aria-describedby="primaryDescribedBy || undefined"
             @click="emit('primary')"
           >
             <span class="line-clamp-2 break-words">{{ primaryLabel }}</span>

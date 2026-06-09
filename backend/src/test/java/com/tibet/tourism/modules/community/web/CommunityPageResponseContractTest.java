@@ -17,6 +17,9 @@ import com.tibet.tourism.modules.community.domain.Favorite;
 import com.tibet.tourism.modules.community.domain.SharedRoute;
 import com.tibet.tourism.modules.community.domain.TravelQuestion;
 import com.tibet.tourism.modules.community.domain.TravelRoute;
+import com.tibet.tourism.modules.community.web.dto.PublicUserResponse;
+import com.tibet.tourism.modules.community.web.dto.SharedRouteSummaryResponse;
+import com.tibet.tourism.modules.community.web.dto.TravelQuestionSummaryResponse;
 import com.tibet.tourism.modules.community.infra.FavoriteRepository;
 import com.tibet.tourism.modules.community.infra.TravelRouteRepository;
 import com.tibet.tourism.modules.user.domain.User;
@@ -80,13 +83,12 @@ class CommunityPageResponseContractTest {
     void sharedRoutesReturnStablePageEnvelopeWithoutSpringDataInternals() throws Exception {
         SharedRouteController controller = new SharedRouteController();
         ReflectionTestUtils.setField(controller, "routeService", sharedRouteService);
-        ReflectionTestUtils.setField(controller, "userRepository", userRepository);
         ReflectionTestUtils.setField(controller, "jwtAuthSupport", jwtAuthSupport);
 
         PageRequest pageRequest = PageRequest.of(1, 2);
         when(jwtAuthSupport.resolveOptionalCurrentUser(any())).thenReturn(Optional.empty());
-        when(sharedRouteService.getRoutes(isNull(), isNull(), isNull(), any(Pageable.class)))
-                .thenReturn(new PageImpl<>(List.of(sharedRoute()), pageRequest, 5));
+        when(sharedRouteService.getRoutes(isNull(), isNull(), isNull(), any(Pageable.class), isNull()))
+                .thenReturn(new PageImpl<>(List.of(sharedRouteSummary()), pageRequest, 5));
 
         ResponseEntity<?> response = controller.getSharedRoutes(
                 null, null, null, 1, 2, "createdAt", new MockHttpServletRequest());
@@ -102,8 +104,8 @@ class CommunityPageResponseContractTest {
 
         PageRequest pageRequest = PageRequest.of(1, 2);
         when(jwtAuthSupport.resolveOptionalCurrentUser(any())).thenReturn(Optional.empty());
-        when(travelQAService.getQuestions(isNull(), eq("latest"), isNull(), any(Pageable.class)))
-                .thenReturn(new PageImpl<>(List.of(question()), pageRequest, 5));
+        when(travelQAService.getQuestionSummaries(isNull(), isNull(), any(Pageable.class), isNull()))
+                .thenReturn(new PageImpl<>(List.of(questionSummary()), pageRequest, 5));
 
         ResponseEntity<?> response = controller.getQuestions(
                 null, "latest", null, 1, 2, new MockHttpServletRequest());
@@ -169,42 +171,40 @@ class CommunityPageResponseContractTest {
                 new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities()));
     }
 
-    private SharedRoute sharedRoute() {
-        SharedRoute route = new SharedRoute();
-        route.setId(10L);
-        route.setAuthor(publicUser());
-        route.setTitle("Everest loop");
-        route.setContent("Shared route content");
-        route.setDays(6);
-        route.setBudget("comfort");
-        route.setPreference("natural");
-        route.setSourceType(SharedRoute.SourceType.USER);
-        route.setPrice(new BigDecimal("2999.00"));
-        route.setDifficulty("medium");
-        route.setTemperature("5C - 15C");
-        route.setGeography("plateau");
-        route.setViewCount(8);
-        route.setLikeCount(3);
-        route.setCommentCount(1);
-        route.setCreatedAt(LocalDateTime.parse("2026-06-01T10:00:00"));
-        route.setUpdatedAt(LocalDateTime.parse("2026-06-01T10:30:00"));
-        return route;
+    private SharedRouteSummaryResponse sharedRouteSummary() {
+        return new SharedRouteSummaryResponse(
+                10L,
+                new PublicUserResponse("Traveler", "/avatars/u7.png", false),
+                "Everest loop",
+                6,
+                "comfort",
+                "natural",
+                SharedRoute.SourceType.USER,
+                null,
+                new BigDecimal("2999.00"),
+                "medium",
+                "5C - 15C",
+                "plateau",
+                8,
+                3,
+                1,
+                LocalDateTime.parse("2026-06-01T10:00:00"),
+                LocalDateTime.parse("2026-06-01T10:30:00"));
     }
 
-    private TravelQuestion question() {
-        TravelQuestion question = new TravelQuestion();
-        question.setId(20L);
-        question.setAuthor(publicUser());
-        question.setTitle("How to plan acclimation?");
-        question.setContent("Question content");
-        question.setTags("health,route");
-        question.setViewCount(7);
-        question.setAnswerCount(2);
-        question.setLikeCount(4);
-        question.setIsResolved(false);
-        question.setCreatedAt(LocalDateTime.parse("2026-06-02T11:00:00"));
-        question.setUpdatedAt(LocalDateTime.parse("2026-06-02T11:30:00"));
-        return question;
+    private TravelQuestionSummaryResponse questionSummary() {
+        return new TravelQuestionSummaryResponse(
+                20L,
+                PublicUserResponse.fromEntity(publicUser()),
+                "How to plan acclimation?",
+                "Question content",
+                "health,route",
+                7,
+                2,
+                4,
+                false,
+                LocalDateTime.parse("2026-06-02T11:00:00"),
+                LocalDateTime.parse("2026-06-02T11:30:00"));
     }
 
     private Favorite favorite(User user) {

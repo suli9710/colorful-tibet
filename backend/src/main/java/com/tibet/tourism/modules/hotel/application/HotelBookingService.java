@@ -26,6 +26,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -35,6 +36,7 @@ public class HotelBookingService {
 
     private static final int MAX_NIGHTS = 30;
     private static final int PENDING_HOLD_MINUTES = 15;
+    private static final int STALE_PENDING_BOOKING_BATCH_SIZE = 100;
     private static final Set<HotelBooking.Status> ACTIVE_BOOKING_STATUSES =
             Set.of(HotelBooking.Status.PENDING, HotelBooking.Status.CONFIRMED);
     private enum PiiView {
@@ -47,15 +49,21 @@ public class HotelBookingService {
     private final HotelRepository hotelRepository;
     private final RoomTypeRepository roomTypeRepository;
     private final OrderCenterService orderCenterService;
+    private final HotelBookingPiiAuditService piiAuditService;
+    private final HotelBookingPiiAccessGuard piiAccessGuard;
 
     public HotelBookingService(HotelBookingRepository hotelBookingRepository,
                                HotelRepository hotelRepository,
                                RoomTypeRepository roomTypeRepository,
-                               OrderCenterService orderCenterService) {
+                               OrderCenterService orderCenterService,
+                               HotelBookingPiiAuditService piiAuditService,
+                               HotelBookingPiiAccessGuard piiAccessGuard) {
         this.hotelBookingRepository = hotelBookingRepository;
         this.hotelRepository = hotelRepository;
         this.roomTypeRepository = roomTypeRepository;
         this.orderCenterService = orderCenterService;
+        this.piiAuditService = piiAuditService;
+        this.piiAccessGuard = piiAccessGuard;
     }
 
     @Transactional(readOnly = true)
@@ -133,10 +141,13 @@ public class HotelBookingService {
     }
 
     @Transactional(readOnly = true)
-    public HotelBookingResponse revealBookingPii(User user, Long id) {
-        requireAdmin(user);
-        HotelBooking booking = hotelBookingRepository.findById(id)
-                .orElseThrow(() -> new NoSuchElementException("Booking not found"));
+    public HotelBookingResponse revealBookingPii(Authentication authentication, Long id) {
+        User user = piiAccessGuard.requireReveal(authentication, id);
+        HotelBooking booking = hotelBookingRepository.findById(id).orElseThrow(() -> {
+            piiAuditService.recordRevealRejected(user, id, "not_found");
+            return new NoSuchElementException("Booking not found");
+        });
+        piiAuditService.recordRevealAllowed(user, booking);
         return toResponse(booking, PiiView.FULL);
     }
 
@@ -216,7 +227,7 @@ public class HotelBookingService {
     }
 
     private boolean isAdmin(User user) {
-        return user.getRole() == User.Role.ADMIN;
+        return user != null && user.getRole() == User.Role.ADMIN;
     }
 
     private void validateBookingRequest(HotelBookingRequest request, RoomType roomType) {
@@ -253,14 +264,23 @@ public class HotelBookingService {
     @Transactional
     public void expireStalePendingBookings() {
         LocalDateTime cutoff = LocalDateTime.now().minusMinutes(PENDING_HOLD_MINUTES);
-        hotelBookingRepository.findByStatusAndDeletedAtIsNullAndCreatedAtBeforeOrderByCreatedAtAsc(
-                        HotelBooking.Status.PENDING, cutoff)
-                .forEach(booking -> {
-                    transitionStatus(booking, HotelBooking.Status.CANCELLED);
-                    hotelBookingRepository.save(booking);
-                    orderCenterService.cancelLegacyMirror(null, "LEGACY_HOTEL_BOOKING",
-                            booking.getId(), "Legacy hotel booking hold expired");
-                });
+        Pageable batchPage = PageRequest.of(0, STALE_PENDING_BOOKING_BATCH_SIZE);
+        while (true) {
+            List<HotelBooking> staleBookings = hotelBookingRepository.findStalePendingBookings(
+                    HotelBooking.Status.PENDING, cutoff, batchPage);
+            if (staleBookings.isEmpty()) {
+                break;
+            }
+            staleBookings.forEach(booking -> {
+                transitionStatus(booking, HotelBooking.Status.CANCELLED);
+                hotelBookingRepository.save(booking);
+                orderCenterService.cancelLegacyMirror(null, "LEGACY_HOTEL_BOOKING",
+                        booking.getId(), "Legacy hotel booking hold expired");
+            });
+            if (staleBookings.size() < STALE_PENDING_BOOKING_BATCH_SIZE) {
+                break;
+            }
+        }
     }
 
     private void transitionStatus(HotelBooking booking, HotelBooking.Status nextStatus) {

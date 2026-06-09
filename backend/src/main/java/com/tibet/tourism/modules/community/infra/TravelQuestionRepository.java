@@ -28,6 +28,37 @@ public interface TravelQuestionRepository extends JpaRepository<TravelQuestion, 
     @EntityGraph(attributePaths = {"author"})
     Page<TravelQuestion> findAllByOrderByCreatedAtDesc(Pageable pageable);
 
+    @Query("""
+            SELECT new com.tibet.tourism.modules.community.infra.TravelQuestionSummaryRow(
+                q.id,
+                a.id,
+                a.username,
+                a.nickname,
+                a.avatar,
+                q.title,
+                CASE
+                    WHEN q.content IS NULL THEN NULL
+                    WHEN LENGTH(q.content) <= 160 THEN q.content
+                    ELSE CONCAT(SUBSTRING(q.content, 1, 157), '...')
+                END,
+                q.tags,
+                q.viewCount,
+                q.answerCount,
+                q.likeCount,
+                q.isResolved,
+                q.createdAt,
+                q.updatedAt
+            )
+            FROM TravelQuestion q
+            JOIN q.author a
+            WHERE (:tag IS NULL OR q.tags LIKE CONCAT('%', :tag, '%'))
+              AND (:resolved IS NULL OR q.isResolved = :resolved)
+            """)
+    Page<TravelQuestionSummaryRow> findSummaries(
+            @Param("tag") String tag,
+            @Param("resolved") Boolean resolved,
+            Pageable pageable);
+
     void deleteByAuthor(User author);
 
     @Query("SELECT COALESCE(q.likeCount, 0) FROM TravelQuestion q WHERE q.id = :id")

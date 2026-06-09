@@ -109,7 +109,12 @@
     "ticketPrice": "票价",
     "ticketFrom": "参考票价",
     "resultSummary": "共 {count} 个目的地 · {category}",
+    "resultSummaryWithKeyword": "{base} · 关键词「{keyword}」",
     "loadingLabel": "正在加载景点列表",
+    "searchPlaceholder": "搜索景点、地区或标签",
+    "searchHelp": "输入关键词会按景点名称、地区和标签筛选；按 Escape 可清空搜索。",
+    "clearSearch": "清除景点搜索",
+    "paginationLabel": "景点分页",
     "filterByCategory": "筛选{category}",
     "loadErrorTitle": "景点列表加载失败",
     "retryLoad": "重新加载景点",
@@ -138,6 +143,7 @@
     "errorSolutionRemote": "- 检查 FRP 客户端是否运行\n- 或切换到本地模式（使用 start.bat）",
     "noCategoryTitle": "该分类暂无景点",
     "noCategoryMessage": "当前分类下没有找到景点数据，请查看其他分类",
+    "noSearchMessage": "没有找到匹配搜索条件的景点，请尝试更换关键词或查看全部景点。",
     "showAll": "查看全部景点"
   },
   "heritage": {
@@ -576,6 +582,46 @@
     "dateConnector": "至",
     "guests": "人",
     "booker": "预订人",
+    "bookingDateHelp": "离店日期需要晚于入住日期，最长可提交 {max} 晚咨询；系统仅提交咨询意向，不在站内收款。",
+    "guestCapacityHelp": "当前房型建议 {capacity} 人内入住，超出人数请备注说明或更换房型。",
+    "contactHelp": "联系方式仅用于酒店咨询确认，请填写可联系到您的姓名和电话。",
+    "roomSubtotal": "房费小计",
+    "platformServiceFee": "平台服务费",
+    "dueToday": "今日应付",
+    "availabilityStatus": "房态",
+    "roomUnavailablePrompt": "当前房型暂不可咨询，请返回酒店详情重新选择。",
+    "availability": {
+      "full": "暂满",
+      "needsConfirm": "需二次确认"
+    },
+    "assurance": {
+      "availability": {
+        "title": "房态说明",
+        "description": "提交后生成咨询单，客服或供应商确认房态后再推进预订。"
+      },
+      "fee": {
+        "title": "费用说明",
+        "description": "今日无需支付，参考房费按所选晚数估算，实际价格以供应商确认为准。"
+      },
+      "cancellation": {
+        "title": "退改说明",
+        "description": "确认前可在订单中心取消咨询；确认后的退改政策以酒店或第三方平台为准。"
+      },
+      "platform": {
+        "title": "平台提示"
+      }
+    },
+    "validation": {
+      "roomUnavailable": "当前房型暂不可咨询，请返回酒店详情重新选择",
+      "dateRequired": "请选择入住和离店日期",
+      "checkInPast": "入住日期不能早于今天",
+      "dateRangeInvalid": "离店日期需要晚于入住日期",
+      "nightsTooLong": "单次酒店咨询最多支持 {max} 晚",
+      "guestsTooHigh": "入住人数超过当前房型建议容量，请调整人数或在备注中说明",
+      "guestNameRequired": "请填写预订人姓名",
+      "phoneRequired": "请填写可联系到的电话号码",
+      "securityVerificationFailed": "安全校验未通过，请稍后重试"
+    },
     "status": {
       "pending": "待确认",
       "confirmed": "已确认",

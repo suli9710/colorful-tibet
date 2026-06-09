@@ -1,4 +1,5 @@
 package com.tibet.tourism.modules.order.domain;
+import com.tibet.tourism.common.security.PiiCryptoConverter;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -31,6 +32,7 @@ public class RefundOrder {
     @Column(nullable = false, length = 32)
     private Status status = Status.REQUESTED;
 
+    @Convert(converter = PiiCryptoConverter.class)
     @Column(columnDefinition = "TEXT")
     private String reason;
 

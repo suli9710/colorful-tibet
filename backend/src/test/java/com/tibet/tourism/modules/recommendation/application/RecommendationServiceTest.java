@@ -199,6 +199,25 @@ class RecommendationServiceTest {
     }
 
     @Test
+    void recordSpotViewUsesAtomicUpsertAndInvalidatesCache() {
+        recommendationService.recordSpotView(testUser, spot4);
+
+        verify(historyRepository).upsertSpotView(eq(1L), eq(4L), any(LocalDateTime.class));
+        verify(historyRepository, never()).saveAndFlush(any(UserVisitHistory.class));
+        verify(historyRepository, never()).incrementSpotView(anyLong(), anyLong(), any(LocalDateTime.class));
+        verify(cacheService).invalidateUserCache(1L);
+    }
+
+    @Test
+    void recordSpotViewIgnoresInvalidInput() {
+        recommendationService.recordSpotView(null, spot4);
+        recommendationService.recordSpotView(testUser, null);
+
+        verify(historyRepository, never()).upsertSpotView(anyLong(), anyLong(), any(LocalDateTime.class));
+        verify(cacheService, never()).invalidateUserCache(anyLong());
+    }
+
+    @Test
     void testFallbackWhenNoVisitedSpotIds() {
         List<UserVisitHistory> badHistory = List.of(createHistory(testUser, new ScenicSpot(), 3, 1, 60, LocalDateTime.now()));
         when(historyRepository.findRecentByUserId(1L)).thenReturn(badHistory);

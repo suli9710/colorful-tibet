@@ -133,7 +133,7 @@ public class HotelBookingController {
     }
 
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> getAllBookings(@PageableDefault(size = 20) Pageable pageable) {
         User user = getCurrentUser();
         if (user == null) {
@@ -151,7 +151,7 @@ public class HotelBookingController {
     }
 
     @GetMapping("/{id}/pii")
-    @PreAuthorize("hasRole('ADMIN') and hasAuthority('HOTEL_BOOKING_PII_READ')")
+    @PreAuthorize("@hotelBookingPiiAccessGuard.canReveal(authentication, #id) and hasAuthority('HOTEL_BOOKING_PII_READ')")
     public ResponseEntity<?> revealBookingPii(@PathVariable Long id) {
         User user = getCurrentUser();
         if (user == null) {
@@ -159,7 +159,8 @@ public class HotelBookingController {
         }
 
         try {
-            return ResponseEntity.ok(hotelBookingService.revealBookingPii(user, id));
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            return ResponseEntity.ok(hotelBookingService.revealBookingPii(authentication, id));
         } catch (SecurityException e) {
             return ResponseEntity.status(403).body(Map.of("error", ERROR_ACCESS_DENIED));
         } catch (NoSuchElementException e) {
@@ -168,7 +169,7 @@ public class HotelBookingController {
     }
 
     @PutMapping("/{id}/status")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> updateStatus(@PathVariable Long id, @RequestBody Map<String, String> payload) {
         User user = getCurrentUser();
         if (user == null) {

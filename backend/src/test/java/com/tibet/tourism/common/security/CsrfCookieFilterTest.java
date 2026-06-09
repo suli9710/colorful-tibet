@@ -176,6 +176,43 @@ class CsrfCookieFilterTest {
     }
 
     @Test
+    void stateChangingApiRequestUsesRequestUriWhenServletPathIsBlank() throws Exception {
+        MockHttpServletRequest request = apiRequestWithBlankServletPath(
+                "POST",
+                "/api/auth/me/change-password");
+        request.setCookies(new Cookie(CookieAuthConstants.AUTH_COOKIE_NAME, SESSION_TOKEN));
+        request.addHeader("Origin", "http://localhost:5173");
+
+        MockHttpServletResponse response = doFilter(request);
+
+        assertEquals(403, response.getStatus());
+    }
+
+    @Test
+    void stateChangingApiRequestStripsContextPathWhenServletPathIsBlank() throws Exception {
+        MockHttpServletRequest request = apiRequestWithBlankServletPath(
+                "POST",
+                "/app/api/auth/me/change-password");
+        request.setContextPath("/app");
+        request.setCookies(new Cookie(CookieAuthConstants.AUTH_COOKIE_NAME, SESSION_TOKEN));
+        request.addHeader("Origin", "http://localhost:5173");
+
+        MockHttpServletResponse response = doFilter(request);
+
+        assertEquals(403, response.getStatus());
+    }
+
+    @Test
+    void publicPostUsesRequestUriWhenServletPathIsBlankForBrowserMetadataChecks() throws Exception {
+        MockHttpServletRequest request = apiRequestWithBlankServletPath("POST", "/api/auth/login");
+        request.addHeader("Origin", "https://evil.example");
+
+        MockHttpServletResponse response = doFilter(request);
+
+        assertEquals(403, response.getStatus());
+    }
+
+    @Test
     void stateChangingRequestWithAuthCookieAndBearerStillRequiresCsrfToken() throws Exception {
         MockHttpServletRequest request = apiRequest("POST", "/api/orders");
         request.addHeader("Authorization", "Bearer api-token");
@@ -296,6 +333,12 @@ class CsrfCookieFilterTest {
         request.setScheme("http");
         request.setServerName("localhost");
         request.setServerPort(8080);
+        return request;
+    }
+
+    private MockHttpServletRequest apiRequestWithBlankServletPath(String method, String path) {
+        MockHttpServletRequest request = apiRequest(method, path);
+        request.setServletPath("");
         return request;
     }
 

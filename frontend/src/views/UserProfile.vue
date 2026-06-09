@@ -1,17 +1,18 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue'
+import { isAxiosError } from 'axios'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { AnimatePresence, LayoutGroup, motion } from 'motion-v'
 import api, { endpoints } from '@/api'
-import { hasNextPage, mergeUniqueById, readPaginatedResponse, type PageMetadata } from '@/api/endpoints'
+import { hasNextPage, mergeUniqueById, readPaginatedResponse, type PageMetadata, type PaginatedHttpResponse } from '@/api/endpoints'
 import { useAuthStore } from '@/stores/auth'
 import { applyHotelImageFallback, resolveHotelBookingImage } from '@/data/hotelImages'
 import MotionModal from '@/components/motion/MotionModal.vue'
 import { showConfirm } from '@/composables/useConfirm'
 import { showToast } from '@/composables/useToast'
-import { readBrowserStorage } from '@/utils/browserStorage'
 import { safeClientErrorMessage, summarizeClientError } from '@/utils/errorMonitoring'
+import { toIntlLocale } from '@/i18n/formatting'
 import {
   cardExit,
   cardInitial,
@@ -23,14 +24,153 @@ import {
   softSpring
 } from '@/motion/presets'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
-const userInfo = ref<any>(null)
-const stats = ref<any>(null)
-const myRoutes = ref<any[]>([])
+
+type BookingStatus = 'PENDING' | 'CONFIRMED' | 'CANCELLED' | string
+
+interface ProfileUser {
+  nickname?: string | null
+  avatar?: string | null
+  avatarUrl?: string | null
+  role?: string | null
+  mustChangePassword?: boolean | null
+  createdAt?: string | null
+}
+
+interface ProfileStats {
+  routeCount?: number | null
+  commentCount?: number | null
+  bookingCount?: number | null
+}
+
+interface ProfileRoute {
+  id: number
+  title: string
+  days?: number | string | null
+  budget?: string | null
+  preference?: string | null
+  viewCount?: number | null
+  likeCount?: number | null
+  commentCount?: number | null
+  createdAt?: string | null
+}
+
+interface ProfileSpotBooking {
+  id: number
+  spot?: {
+    id?: number
+    name?: string | null
+    imageUrl?: string | null
+  } | null
+  visitDate?: string | null
+  ticketCount?: number | string | null
+  totalPrice?: number | string | null
+  status: BookingStatus
+}
+
+interface ProfileHotelBooking {
+  id: number
+  hotel?: {
+    id?: number
+    name?: string | null
+    imageUrl?: string | null
+    coverImage?: string | null
+  } | null
+  hotelName?: string | null
+  roomName?: string | null
+  nights?: number | string | null
+  checkInDate?: string | null
+  checkOutDate?: string | null
+  totalPrice?: number | string | null
+  status: BookingStatus
+}
+
+interface ProfileSpotComment {
+  id: number
+  spot?: {
+    id?: number
+    name?: string | null
+  } | null
+  rating?: number | null
+  content?: string | null
+  imageUrl?: string | null
+  likeCount?: number | null
+  createdAt?: string | null
+}
+
+interface ProfileRouteComment {
+  id: number
+  route?: {
+    id?: number
+    title?: string | null
+  } | null
+  content?: string | null
+  createdAt?: string | null
+}
+
+interface ProfileCommentsResponse {
+  spotCommentsPage?: unknown
+  spotComments?: unknown
+  routeCommentsPage?: unknown
+  routeComments?: unknown
+}
+
+interface AvatarUploadResponse {
+  avatarUrl?: string
+}
+
+interface PaginatedRequestGuard {
+  sequence: number
+  activeAppendToken: number | null
+}
+
+const createPaginatedRequestGuard = (): PaginatedRequestGuard => ({
+  sequence: 0,
+  activeAppendToken: null
+})
+
+const beginPaginatedRequest = (
+  guard: PaginatedRequestGuard,
+  append: boolean,
+  clearAppendLoading: () => void
+) => {
+  const token = guard.sequence + 1
+  guard.sequence = token
+
+  if (append) {
+    guard.activeAppendToken = token
+  } else {
+    guard.activeAppendToken = null
+    clearAppendLoading()
+  }
+
+  return token
+}
+
+const isLatestPaginatedRequest = (guard: PaginatedRequestGuard, token: number) =>
+  guard.sequence === token
+
+const finishAppendRequest = (
+  guard: PaginatedRequestGuard,
+  token: number,
+  clearAppendLoading: () => void
+) => {
+  if (guard.activeAppendToken !== token) return
+
+  guard.activeAppendToken = null
+  clearAppendLoading()
+}
+
+const isUnauthorizedError = (error: unknown) =>
+  isAxiosError(error) && error.response?.status === 401
+
+const userInfo = ref<ProfileUser | null>(null)
+const stats = ref<ProfileStats | null>(null)
+const myRoutes = ref<ProfileRoute[]>([])
 const myRoutesPageSize = 20
 const myRoutesPageInfo = ref<PageMetadata>({
   page: 0,
@@ -39,13 +179,87 @@ const myRoutesPageInfo = ref<PageMetadata>({
   totalPages: 0
 })
 const myRoutesLoadingMore = ref(false)
-const bookings = ref<any[]>([])
-const hotelBookings = ref<any[]>([])
-const spotComments = ref<any[]>([])
-const routeComments = ref<any[]>([])
+const bookings = ref<ProfileSpotBooking[]>([])
+const bookingsPageSize = 20
+const bookingsPageInfo = ref<PageMetadata>({
+  page: 0,
+  size: bookingsPageSize,
+  totalElements: 0,
+  totalPages: 0
+})
+const bookingsRefreshing = ref(false)
+const bookingsLoadingMore = ref(false)
+const bookingsRequestGuard = createPaginatedRequestGuard()
+const hotelBookings = ref<ProfileHotelBooking[]>([])
+const hotelBookingsPageSize = 20
+const hotelBookingsPageInfo = ref<PageMetadata>({
+  page: 0,
+  size: hotelBookingsPageSize,
+  totalElements: 0,
+  totalPages: 0
+})
+const hotelBookingsRefreshing = ref(false)
+const hotelBookingsLoadingMore = ref(false)
+const hotelBookingsRequestGuard = createPaginatedRequestGuard()
+const spotComments = ref<ProfileSpotComment[]>([])
+const routeComments = ref<ProfileRouteComment[]>([])
+const commentsPageSize = 20
+const spotCommentsPageInfo = ref<PageMetadata>({
+  page: 0,
+  size: commentsPageSize,
+  totalElements: 0,
+  totalPages: 0
+})
+const routeCommentsPageInfo = ref<PageMetadata>({
+  page: 0,
+  size: commentsPageSize,
+  totalElements: 0,
+  totalPages: 0
+})
+const commentsRefreshing = ref(false)
+const commentsLoadingMore = ref(false)
+const commentsRequestGuard = createPaginatedRequestGuard()
 const loading = ref(true)
 type ProfileTabId = 'routes' | 'bookings' | 'hotel-bookings' | 'comments'
 const activeTab = ref<ProfileTabId>('routes')
+const profileTabId = (tabId: ProfileTabId) => `profile-tab-${tabId}`
+const profileTabPanelId = (tabId: ProfileTabId) => `profile-tabpanel-${tabId}`
+const activateProfileTab = (tabId: ProfileTabId) => {
+  activeTab.value = tabId
+}
+const focusProfileTab = (tabId: ProfileTabId) => {
+  if (typeof document === 'undefined') return
+  const focusTab = () => document.getElementById(profileTabId(tabId))?.focus()
+
+  if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+    window.requestAnimationFrame(focusTab)
+  } else {
+    focusTab()
+  }
+}
+const moveProfileTabFocus = (currentIndex: number, nextIndex: number) => {
+  const tabs = profileTabs.value
+  const nextTab = tabs[(nextIndex + tabs.length) % tabs.length]
+
+  if (!nextTab) return
+  activateProfileTab(nextTab.id)
+  focusProfileTab(nextTab.id)
+}
+const handleProfileTabKeydown = (event: KeyboardEvent, index: number) => {
+  if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+    event.preventDefault()
+    moveProfileTabFocus(index, index + 1)
+  } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+    event.preventDefault()
+    moveProfileTabFocus(index, index - 1)
+  } else if (event.key === 'Home') {
+    event.preventDefault()
+    moveProfileTabFocus(index, 0)
+  } else if (event.key === 'End') {
+    event.preventDefault()
+    moveProfileTabFocus(index, profileTabs.value.length - 1)
+  }
+}
 const showPasswordModal = ref(false)
 const passwordForm = ref({
   oldPassword: '',
@@ -100,15 +314,31 @@ const profileAvatarInitial = computed(() => profileDisplayName.value.charAt(0).t
 
 const profileTabs = computed<Array<{ id: ProfileTabId; label: string; count: number }>>(() => [
   { id: 'routes', label: t('profile.myRoutesTab'), count: myRoutesPageInfo.value.totalElements || myRoutes.value.length },
-  { id: 'bookings', label: t('profile.myBookingsTab'), count: bookings.value.length },
-  { id: 'hotel-bookings', label: t('profile.myHotelBookingsTab'), count: hotelBookings.value.length },
-  { id: 'comments', label: t('profile.myCommentsTab'), count: spotComments.value.length + routeComments.value.length }
+  { id: 'bookings', label: t('profile.myBookingsTab'), count: bookingsPageInfo.value.totalElements || bookings.value.length },
+  { id: 'hotel-bookings', label: t('profile.myHotelBookingsTab'), count: hotelBookingsPageInfo.value.totalElements || hotelBookings.value.length },
+  {
+    id: 'comments',
+    label: t('profile.myCommentsTab'),
+    count: (spotCommentsPageInfo.value.totalElements + routeCommentsPageInfo.value.totalElements) || (spotComments.value.length + routeComments.value.length)
+  }
 ])
 
 const myRoutesPage = computed(() => myRoutesPageInfo.value.page)
 const myRoutesTotalPages = computed(() => myRoutesPageInfo.value.totalPages)
 const myRoutesTotalElements = computed(() => myRoutesPageInfo.value.totalElements)
 const hasMoreMyRoutes = computed(() => hasNextPage(myRoutesPageInfo.value))
+const bookingsPage = computed(() => bookingsPageInfo.value.page)
+const bookingsTotalPages = computed(() => bookingsPageInfo.value.totalPages)
+const hasMoreBookings = computed(() => hasNextPage(bookingsPageInfo.value))
+const bookingsLoadMoreBusy = computed(() => bookingsLoadingMore.value || bookingsRefreshing.value)
+const hotelBookingsPage = computed(() => hotelBookingsPageInfo.value.page)
+const hotelBookingsTotalPages = computed(() => hotelBookingsPageInfo.value.totalPages)
+const hasMoreHotelBookings = computed(() => hasNextPage(hotelBookingsPageInfo.value))
+const hotelBookingsLoadMoreBusy = computed(() => hotelBookingsLoadingMore.value || hotelBookingsRefreshing.value)
+const commentsPage = computed(() => Math.max(spotCommentsPageInfo.value.page, routeCommentsPageInfo.value.page))
+const commentsTotalPages = computed(() => Math.max(spotCommentsPageInfo.value.totalPages, routeCommentsPageInfo.value.totalPages))
+const hasMoreComments = computed(() => hasNextPage(spotCommentsPageInfo.value) || hasNextPage(routeCommentsPageInfo.value))
+const commentsLoadMoreBusy = computed(() => commentsLoadingMore.value || commentsRefreshing.value)
 
 onMounted(async () => {
   if (!(await auth.ensureSession())) {
@@ -128,10 +358,10 @@ onMounted(async () => {
     }
 
     await loadProfileDetails()
-  } catch (e: any) {
+  } catch (e: unknown) {
     // 如果API调用失败（特别是401），响应拦截器会处理跳转
     console.error('Failed to load user profile:', summarizeClientError(e))
-    if (e.response?.status !== 401) {
+    if (!isUnauthorizedError(e)) {
       // 如果不是401错误，显示错误信息
       showToast(t('profile.loadFailed'), 'error')
     }
@@ -152,12 +382,12 @@ const loadProfileDetails = async () => {
 
 const fetchUserInfo = async () => {
   try {
-    const response = await api.get(endpoints.auth.me)
+    const response = await api.get<ProfileUser>(endpoints.auth.me)
     userInfo.value = response.data
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error('Failed to fetch user info:', summarizeClientError(e))
     // 如果是401错误，说明token无效，让响应拦截器处理跳转
-    if (e.response?.status === 401) {
+    if (isUnauthorizedError(e)) {
       throw e // 重新抛出，让响应拦截器处理
     }
   }
@@ -165,19 +395,19 @@ const fetchUserInfo = async () => {
 
 const fetchStats = async () => {
   try {
-    const response = await api.get(endpoints.auth.meStats)
+    const response = await api.get<ProfileStats>(endpoints.auth.meStats)
     stats.value = response.data
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error('Failed to fetch stats:', summarizeClientError(e))
     // 如果是401错误，说明token无效，让响应拦截器处理跳转
-    if (e.response?.status === 401) {
+    if (isUnauthorizedError(e)) {
       throw e // 重新抛出，让响应拦截器处理
     }
   }
 }
 
-const applyMyRoutesPage = (response: any, append = false) => {
-  const page = readPaginatedResponse<any>(response, {
+const applyMyRoutesPage = (response: PaginatedHttpResponse, append = false) => {
+  const page = readPaginatedResponse<ProfileRoute>(response, {
     page: append ? myRoutesPageInfo.value.page + 1 : 0,
     size: myRoutesPageSize
   })
@@ -197,10 +427,10 @@ const fetchMyRoutes = async (page = 0, append = false) => {
       params: { page, size: myRoutesPageSize }
     })
     applyMyRoutesPage(response, append)
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error('Failed to fetch my routes:', summarizeClientError(e))
     // 如果是401错误，说明token无效，让响应拦截器处理跳转
-    if (e.response?.status === 401) {
+    if (isUnauthorizedError(e)) {
       throw e // 重新抛出，让响应拦截器处理
     }
     if (!append) {
@@ -225,27 +455,159 @@ const loadNextMyRoutesPage = async () => {
   }
 }
 
-const fetchBookings = async () => {
+const applyBookingsPage = (response: PaginatedHttpResponse, append = false) => {
+  const page = readPaginatedResponse<ProfileSpotBooking>(response, {
+    page: append ? bookingsPageInfo.value.page + 1 : 0,
+    size: bookingsPageSize
+  })
+
+  bookings.value = append ? mergeUniqueById(bookings.value, page.content) : page.content
+  bookingsPageInfo.value = {
+    page: page.page,
+    size: page.size || bookingsPageSize,
+    totalElements: page.totalElements,
+    totalPages: page.totalPages
+  }
+}
+
+const fetchBookings = async (page = 0, append = false) => {
+  if (append && bookingsRefreshing.value) return
+
+  const requestToken = beginPaginatedRequest(
+    bookingsRequestGuard,
+    append,
+    () => {
+      bookingsLoadingMore.value = false
+    }
+  )
+
+  if (append) {
+    bookingsLoadingMore.value = true
+  } else {
+    bookingsRefreshing.value = true
+  }
+
   try {
-    const response = await api.get(endpoints.bookings.my)
-    bookings.value = response.data || []
+    const response = await api.get(endpoints.bookings.my, {
+      params: { page, size: bookingsPageSize }
+    })
+    if (!isLatestPaginatedRequest(bookingsRequestGuard, requestToken)) return
+
+    applyBookingsPage(response, append)
   } catch (e) {
+    if (!isLatestPaginatedRequest(bookingsRequestGuard, requestToken)) return
+
     console.error('Failed to fetch bookings:', summarizeClientError(e))
-    bookings.value = []
+    if (isUnauthorizedError(e)) {
+      throw e
+    }
+    if (!append) {
+      bookings.value = []
+      bookingsPageInfo.value = emptyPageInfo(bookingsPageSize)
+    }
+  } finally {
+    if (append) {
+      finishAppendRequest(bookingsRequestGuard, requestToken, () => {
+        bookingsLoadingMore.value = false
+      })
+    } else if (isLatestPaginatedRequest(bookingsRequestGuard, requestToken)) {
+      bookingsRefreshing.value = false
+    }
   }
 }
 
-const fetchHotelBookings = async () => {
+const loadNextBookingsPage = async () => {
+  if (bookingsLoadMoreBusy.value || !hasMoreBookings.value) return
+  await fetchBookings(bookingsPageInfo.value.page + 1, true)
+}
+
+const emptyPageInfo = (size: number): PageMetadata => ({
+  page: 0,
+  size,
+  totalElements: 0,
+  totalPages: 0
+})
+
+const pageAfterItemRemoval = (pageInfo: PageMetadata) => {
+  const totalElements = Math.max(0, pageInfo.totalElements - 1)
+  const size = pageInfo.size || 1
+  const totalPages = size > 0 && totalElements > 0 ? Math.ceil(totalElements / size) : 0
+
+  return {
+    ...pageInfo,
+    page: totalPages > 0 ? Math.min(pageInfo.page, totalPages - 1) : 0,
+    totalElements,
+    totalPages
+  }
+}
+
+const applyHotelBookingsPage = (response: PaginatedHttpResponse, append = false) => {
+  const page = readPaginatedResponse<ProfileHotelBooking>(response, {
+    page: append ? hotelBookingsPageInfo.value.page + 1 : 0,
+    size: hotelBookingsPageSize
+  })
+
+  hotelBookings.value = append ? mergeUniqueById(hotelBookings.value, page.content) : page.content
+  hotelBookingsPageInfo.value = {
+    page: page.page,
+    size: page.size || hotelBookingsPageSize,
+    totalElements: page.totalElements,
+    totalPages: page.totalPages
+  }
+}
+
+const fetchHotelBookings = async (page = 0, append = false) => {
+  if (append && hotelBookingsRefreshing.value) return
+
+  const requestToken = beginPaginatedRequest(
+    hotelBookingsRequestGuard,
+    append,
+    () => {
+      hotelBookingsLoadingMore.value = false
+    }
+  )
+
+  if (append) {
+    hotelBookingsLoadingMore.value = true
+  } else {
+    hotelBookingsRefreshing.value = true
+  }
+
   try {
-    const response = await api.get(endpoints.hotelBookings.my)
-    hotelBookings.value = response.data?.content || response.data || []
+    const response = await api.get(endpoints.hotelBookings.my, {
+      params: { page, size: hotelBookingsPageSize }
+    })
+    if (!isLatestPaginatedRequest(hotelBookingsRequestGuard, requestToken)) return
+
+    applyHotelBookingsPage(response, append)
   } catch (e) {
+    if (!isLatestPaginatedRequest(hotelBookingsRequestGuard, requestToken)) return
+
     console.error('Failed to fetch hotel bookings:', summarizeClientError(e))
-    hotelBookings.value = []
+    if (isUnauthorizedError(e)) {
+      throw e
+    }
+    if (!append) {
+      hotelBookings.value = []
+      hotelBookingsPageInfo.value = emptyPageInfo(hotelBookingsPageSize)
+    }
+  } finally {
+    if (append) {
+      finishAppendRequest(hotelBookingsRequestGuard, requestToken, () => {
+        hotelBookingsLoadingMore.value = false
+      })
+    } else if (isLatestPaginatedRequest(hotelBookingsRequestGuard, requestToken)) {
+      hotelBookingsRefreshing.value = false
+    }
   }
 }
 
-const getApiErrorMessage = (error: any, fallback: string) => {
+const loadNextHotelBookingsPage = async () => {
+  if (hotelBookingsLoadMoreBusy.value || !hasMoreHotelBookings.value) return
+  await fetchHotelBookings(hotelBookingsPageInfo.value.page + 1, true)
+}
+
+const getApiErrorMessage = (error: unknown, fallback: string) => {
   return safeClientErrorMessage(error, fallback)
 }
 
@@ -256,7 +618,7 @@ const cancelHotelBooking = async (id: number) => {
 
   try {
     await api.delete(endpoints.hotelBookings.cancel(id))
-    fetchHotelBookings()
+    await fetchHotelBookings()
   } catch (e) {
     console.error('Failed to cancel hotel booking:', summarizeClientError(e))
     showToast(t('profile.cancelHotelBookingFailed'), 'error')
@@ -269,25 +631,99 @@ const deleteHotelBooking = async (id: number) => {
   try {
     await api.delete(endpoints.hotelBookings.delete(id))
     hotelBookings.value = hotelBookings.value.filter(booking => booking.id !== id)
-  } catch (e: any) {
+    hotelBookingsPageInfo.value = pageAfterItemRemoval(hotelBookingsPageInfo.value)
+    await fetchHotelBookings()
+  } catch (e: unknown) {
     console.error('Failed to delete hotel booking:', summarizeClientError(e))
     showToast(getApiErrorMessage(e, t('profile.deleteBookingFailed')), 'error')
   }
 }
 
-const fetchMyComments = async () => {
+const applyCommentsPage = (response: PaginatedHttpResponse, append = false) => {
+  const body = response.data && typeof response.data === 'object'
+    ? response.data as ProfileCommentsResponse
+    : {}
+  const fallbackPage = append ? commentsPage.value + 1 : 0
+  const spotPage = readPaginatedResponse<ProfileSpotComment>({
+    data: body.spotCommentsPage || body.spotComments || []
+  }, {
+    page: fallbackPage,
+    size: commentsPageSize
+  })
+  const routePage = readPaginatedResponse<ProfileRouteComment>({
+    data: body.routeCommentsPage || body.routeComments || []
+  }, {
+    page: fallbackPage,
+    size: commentsPageSize
+  })
+
+  spotComments.value = append ? mergeUniqueById(spotComments.value, spotPage.content) : spotPage.content
+  routeComments.value = append ? mergeUniqueById(routeComments.value, routePage.content) : routePage.content
+  spotCommentsPageInfo.value = {
+    page: spotPage.page,
+    size: spotPage.size || commentsPageSize,
+    totalElements: spotPage.totalElements,
+    totalPages: spotPage.totalPages
+  }
+  routeCommentsPageInfo.value = {
+    page: routePage.page,
+    size: routePage.size || commentsPageSize,
+    totalElements: routePage.totalElements,
+    totalPages: routePage.totalPages
+  }
+}
+
+const fetchMyComments = async (page = 0, append = false) => {
+  if (append && commentsRefreshing.value) return
+
+  const requestToken = beginPaginatedRequest(
+    commentsRequestGuard,
+    append,
+    () => {
+      commentsLoadingMore.value = false
+    }
+  )
+
+  if (append) {
+    commentsLoadingMore.value = true
+  } else {
+    commentsRefreshing.value = true
+  }
+
   try {
-    const response = await api.get(endpoints.auth.meComments)
-    spotComments.value = response.data.spotComments || []
-    routeComments.value = response.data.routeComments || []
-  } catch (e: any) {
+    const response = await api.get(endpoints.auth.meComments, {
+      params: { page, size: commentsPageSize }
+    })
+    if (!isLatestPaginatedRequest(commentsRequestGuard, requestToken)) return
+
+    applyCommentsPage(response, append)
+  } catch (e: unknown) {
+    if (!isLatestPaginatedRequest(commentsRequestGuard, requestToken)) return
+
     console.error('Failed to fetch my comments:', summarizeClientError(e))
-    if (e.response?.status === 401) {
+    if (isUnauthorizedError(e)) {
       throw e
     }
-    spotComments.value = []
-    routeComments.value = []
+    if (!append) {
+      spotComments.value = []
+      routeComments.value = []
+      spotCommentsPageInfo.value = emptyPageInfo(commentsPageSize)
+      routeCommentsPageInfo.value = emptyPageInfo(commentsPageSize)
+    }
+  } finally {
+    if (append) {
+      finishAppendRequest(commentsRequestGuard, requestToken, () => {
+        commentsLoadingMore.value = false
+      })
+    } else if (isLatestPaginatedRequest(commentsRequestGuard, requestToken)) {
+      commentsRefreshing.value = false
+    }
   }
+}
+
+const loadNextCommentsPage = async () => {
+  if (commentsLoadMoreBusy.value || !hasMoreComments.value) return
+  await fetchMyComments(commentsPage.value + 1, true)
 }
 
 const cancelBooking = async (id: number) => {
@@ -295,8 +731,8 @@ const cancelBooking = async (id: number) => {
 
   try {
     await api.post(endpoints.bookings.cancel(id))
-    fetchBookings()
-  } catch (e: any) {
+    await fetchBookings()
+  } catch (e: unknown) {
     console.error('Failed to cancel booking:', summarizeClientError(e))
     showToast(getApiErrorMessage(e, t('profile.cancelFailed')), 'error')
   }
@@ -307,8 +743,10 @@ const deleteBooking = async (id: number) => {
 
   try {
     await api.delete(endpoints.bookings.delete(id))
-    fetchBookings()
-  } catch (e: any) {
+    bookings.value = bookings.value.filter(booking => booking.id !== id)
+    bookingsPageInfo.value = pageAfterItemRemoval(bookingsPageInfo.value)
+    await fetchBookings()
+  } catch (e: unknown) {
     console.error('Failed to delete booking:', summarizeClientError(e))
     showToast(getApiErrorMessage(e, t('profile.deleteBookingFailed')), 'error')
   }
@@ -333,16 +771,19 @@ const deleteSpotComment = async (id: number) => {
   try {
     await api.delete(endpoints.comments.delete(id))
     spotComments.value = spotComments.value.filter(comment => comment.id !== id)
-    if (stats.value?.commentCount > 0) {
-      stats.value.commentCount--
+    spotCommentsPageInfo.value = pageAfterItemRemoval(spotCommentsPageInfo.value)
+    const currentStats = stats.value
+    if (currentStats && (currentStats.commentCount ?? 0) > 0) {
+      currentStats.commentCount = (currentStats.commentCount ?? 0) - 1
     }
+    await Promise.all([fetchMyComments(), fetchStats()])
   } catch (e) {
     console.error('Failed to delete spot comment:', summarizeClientError(e))
     showToast(t('profile.deleteFailed'), 'error')
   }
 }
 
-const deleteRouteComment = async (comment: any) => {
+const deleteRouteComment = async (comment: ProfileRouteComment) => {
   if (!(await confirmDangerousAction(t('profile.confirmDeleteComment')))) return
   const routeId = comment.route?.id
 
@@ -354,9 +795,12 @@ const deleteRouteComment = async (comment: any) => {
   try {
     await api.delete(endpoints.routes.deleteSharedComment(routeId, comment.id))
     routeComments.value = routeComments.value.filter(item => item.id !== comment.id)
-    if (stats.value?.commentCount > 0) {
-      stats.value.commentCount--
+    routeCommentsPageInfo.value = pageAfterItemRemoval(routeCommentsPageInfo.value)
+    const currentStats = stats.value
+    if (currentStats && (currentStats.commentCount ?? 0) > 0) {
+      currentStats.commentCount = (currentStats.commentCount ?? 0) - 1
     }
+    await Promise.all([fetchMyComments(), fetchStats()])
   } catch (e) {
     console.error('Failed to delete route comment:', summarizeClientError(e))
     showToast(t('profile.deleteFailed'), 'error')
@@ -413,7 +857,7 @@ const changePassword = async () => {
       confirmPassword: ''
     }
     await loadProfileDetails()
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error('Failed to change password:', summarizeClientError(e))
     const errorMsg = safeClientErrorMessage(e, t('profile.passwordChangeFailed'))
     showPasswordFormError(errorMsg, 'error')
@@ -422,9 +866,11 @@ const changePassword = async () => {
   }
 }
 
-const formatDate = (dateStr: string) => {
-  const locale = readBrowserStorage('localStorage', 'locale', 'zh')
-  return new Date(dateStr).toLocaleDateString(locale === 'bo' ? 'bo-CN' : 'zh-CN')
+const formatDate = (dateStr?: string | null) => {
+  if (!dateStr) return ''
+  const date = new Date(dateStr)
+  if (Number.isNaN(date.getTime())) return t('common.pendingConfirm')
+  return date.toLocaleDateString(toIntlLocale(locale.value))
 }
 
 const openPasswordModal = () => {
@@ -480,7 +926,7 @@ const updateNickname = async () => {
     showNicknameModal.value = false
     await fetchUserInfo()
     auth.updateUser({ nickname })
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error('Failed to update nickname:', summarizeClientError(e))
     const errorMsg = safeClientErrorMessage(e, t('profile.nicknameUpdateFailed'))
     showNicknameFormError(errorMsg, 'error')
@@ -519,12 +965,12 @@ const handleAvatarUpload = async (event: Event) => {
     const formData = new FormData()
     formData.append('file', file)
     
-    const response = await api.post(endpoints.auth.uploadAvatar, formData)
+    const response = await api.post<AvatarUploadResponse>(endpoints.auth.uploadAvatar, formData)
     
     showToast(t('profile.avatarUploadSuccess'), 'success')
     await fetchUserInfo()
     auth.updateUser({ avatar: response.data.avatarUrl })
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error('Failed to upload avatar:', summarizeClientError(e))
     const errorMsg = safeClientErrorMessage(e, t('profile.avatarUploadFailed'))
     showToast(errorMsg, 'error')
@@ -857,14 +1303,18 @@ const getAvatarUrl = (): string | undefined => profileAvatarUrl.value || undefin
         :transition="cardTransition(1, 0.08)"
       >
         <LayoutGroup>
-        <div class="-mx-4 flex gap-2 overflow-x-auto border-b border-tibet-gold/25 px-4 pb-1 mb-5 sm:mx-0 sm:gap-4 sm:px-0 sm:pb-0 sm:mb-6" role="tablist">
+        <div class="-mx-4 flex gap-2 overflow-x-auto border-b border-tibet-gold/25 px-4 pb-1 mb-5 sm:mx-0 sm:gap-4 sm:px-0 sm:pb-0 sm:mb-6" role="tablist" :aria-label="t('profile.title')">
           <motion.button
-            v-for="tab in profileTabs"
+            v-for="(tab, index) in profileTabs"
             :key="tab.id"
+            :id="profileTabId(tab.id)"
             type="button"
             role="tab"
             :aria-selected="activeTab === tab.id"
-            @click="activeTab = tab.id"
+            :aria-controls="profileTabPanelId(tab.id)"
+            :tabindex="activeTab === tab.id ? 0 : -1"
+            @click="activateProfileTab(tab.id)"
+            @keydown="handleProfileTabKeydown($event, index)"
             class="relative shrink-0 px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors sm:px-6 sm:text-base"
             :class="activeTab === tab.id ? 'text-tibet-gold' : 'text-tibet-brown/70 hover:text-tibet-dark/80'"
             :whileHover="{ y: -1 }"
@@ -905,7 +1355,7 @@ const getAvatarUrl = (): string | undefined => profileAvatarUrl.value || undefin
         >
 
         <!-- My Routes -->
-        <div v-if="activeTab === 'routes'">
+        <div v-if="activeTab === 'routes'" role="tabpanel" :id="profileTabPanelId('routes')" :aria-labelledby="profileTabId('routes')" tabindex="0">
           <div v-if="myRoutes.length === 0" class="text-center py-12">
             <p class="text-gray-500 mb-4">{{ t('profile.noRoutes') }}</p>
             <router-link to="/create-route" class="text-tibet-gold hover:text-tibet-gold/80 font-medium">
@@ -1005,7 +1455,7 @@ const getAvatarUrl = (): string | undefined => profileAvatarUrl.value || undefin
         </div>
 
         <!-- My Bookings -->
-        <div v-if="activeTab === 'bookings'">
+        <div v-if="activeTab === 'bookings'" role="tabpanel" :id="profileTabPanelId('bookings')" :aria-labelledby="profileTabId('bookings')" tabindex="0" :aria-busy="bookingsLoadMoreBusy">
           <div v-if="bookings.length === 0" class="text-center py-12">
             <p class="text-gray-500 mb-4">{{ t('profile.noBookings') }}</p>
             <router-link to="/spots" class="text-tibet-gold hover:text-tibet-gold/80 font-medium">
@@ -1013,7 +1463,8 @@ const getAvatarUrl = (): string | undefined => profileAvatarUrl.value || undefin
             </router-link>
           </div>
 
-          <div v-else class="space-y-4">
+          <template v-else>
+          <div class="space-y-4">
             <motion.div
               v-for="(booking, index) in bookings"
               :key="booking.id"
@@ -1027,7 +1478,7 @@ const getAvatarUrl = (): string | undefined => profileAvatarUrl.value || undefin
             >
               <div class="flex w-full min-w-0 items-start gap-3 mb-4 md:mb-0 md:w-auto sm:items-center sm:gap-4">
                 <div class="h-16 w-16 rounded-xl bg-gray-100 overflow-hidden flex-shrink-0">
-                  <img :src="booking.spot?.imageUrl" class="w-full h-full object-cover" alt="">
+                  <img :src="booking.spot?.imageUrl || ''" class="w-full h-full object-cover" alt="">
                 </div>
                 <div class="min-w-0">
                   <h3 class="truncate text-lg font-bold text-gray-900 mb-1">{{ booking.spot?.name }}</h3>
@@ -1071,10 +1522,30 @@ const getAvatarUrl = (): string | undefined => profileAvatarUrl.value || undefin
               </div>
             </motion.div>
           </div>
+          <div
+            v-if="bookingsTotalPages > 1"
+            class="mt-8 flex flex-wrap items-center justify-center gap-3"
+            role="navigation"
+            :aria-label="t('profile.myBookingsTab')"
+          >
+            <span class="text-sm text-gray-500" role="status" aria-live="polite">
+              {{ bookingsPage + 1 }} / {{ bookingsTotalPages }}
+            </span>
+            <button
+              type="button"
+              @click="loadNextBookingsPage"
+              :disabled="bookingsLoadMoreBusy || !hasMoreBookings"
+              :aria-busy="bookingsLoadMoreBusy"
+              class="min-h-11 rounded-xl border border-tibet-gold/25 bg-white px-5 py-2 text-sm font-medium text-tibet-brown/80 transition-colors hover:bg-gray-50 disabled:cursor-wait disabled:opacity-50"
+            >
+              {{ bookingsLoadMoreBusy ? t('common.loading') : t('community.nextPage') }}
+            </button>
+          </div>
+          </template>
         </div>
 
         <!-- My Hotel Bookings -->
-        <div v-if="activeTab === 'hotel-bookings'">
+        <div v-if="activeTab === 'hotel-bookings'" role="tabpanel" :id="profileTabPanelId('hotel-bookings')" :aria-labelledby="profileTabId('hotel-bookings')" tabindex="0" :aria-busy="hotelBookingsLoadMoreBusy">
           <div v-if="hotelBookings.length === 0" class="text-center py-12">
             <p class="text-gray-500 mb-4">{{ t('profile.noHotelBookings') }}</p>
             <router-link to="/hotels" class="text-tibet-gold hover:text-tibet-gold/80 font-medium">
@@ -1144,10 +1615,29 @@ const getAvatarUrl = (): string | undefined => profileAvatarUrl.value || undefin
               </div>
             </motion.div>
           </div>
+          <div
+            v-if="hotelBookingsTotalPages > 1"
+            class="mt-8 flex flex-wrap items-center justify-center gap-3"
+            role="navigation"
+            :aria-label="t('profile.myHotelBookingsTab')"
+          >
+            <span class="text-sm text-gray-500" role="status" aria-live="polite">
+              {{ hotelBookingsPage + 1 }} / {{ hotelBookingsTotalPages }}
+            </span>
+            <button
+              type="button"
+              @click="loadNextHotelBookingsPage"
+              :disabled="hotelBookingsLoadMoreBusy || !hasMoreHotelBookings"
+              :aria-busy="hotelBookingsLoadMoreBusy"
+              class="min-h-11 rounded-xl border border-tibet-gold/25 bg-white px-5 py-2 text-sm font-medium text-tibet-brown/80 transition-colors hover:bg-gray-50 disabled:cursor-wait disabled:opacity-50"
+            >
+              {{ hotelBookingsLoadMoreBusy ? t('common.loading') : t('community.nextPage') }}
+            </button>
+          </div>
         </div>
 
         <!-- My Comments -->
-        <div v-if="activeTab === 'comments'">
+        <div v-if="activeTab === 'comments'" role="tabpanel" :id="profileTabPanelId('comments')" :aria-labelledby="profileTabId('comments')" tabindex="0" :aria-busy="commentsLoadMoreBusy">
           <div v-if="spotComments.length === 0 && routeComments.length === 0" class="text-center py-12">
             <p class="text-gray-500 mb-4">{{ t('profile.noComments') }}</p>
             <router-link to="/spots" class="text-tibet-gold hover:text-tibet-gold/80 font-medium">
@@ -1187,7 +1677,7 @@ const getAvatarUrl = (): string | undefined => profileAvatarUrl.value || undefin
                       </div>
                       <p class="text-gray-700 mb-2">{{ comment.content }}</p>
                       <div v-if="comment.imageUrl" class="mb-2">
-                        <img :src="comment.imageUrl" alt="评论图片" class="max-w-full rounded-lg sm:max-w-xs">
+                        <img :src="comment.imageUrl" :alt="t('profile.commentImageAlt')" class="max-w-full rounded-lg sm:max-w-xs">
                       </div>
                       <div class="flex flex-wrap items-center gap-4 text-sm text-gray-500">
                         <span>👍 {{ comment.likeCount || 0 }}</span>
@@ -1243,6 +1733,26 @@ const getAvatarUrl = (): string | undefined => profileAvatarUrl.value || undefin
                   </div>
                 </motion.div>
               </div>
+            </div>
+
+            <div
+              v-if="commentsTotalPages > 1"
+              class="mt-8 flex flex-wrap items-center justify-center gap-3"
+              role="navigation"
+              :aria-label="t('profile.myCommentsTab')"
+            >
+              <span class="text-sm text-gray-500" role="status" aria-live="polite">
+                {{ commentsPage + 1 }} / {{ commentsTotalPages }}
+              </span>
+              <button
+                type="button"
+                @click="loadNextCommentsPage"
+                :disabled="commentsLoadMoreBusy || !hasMoreComments"
+                :aria-busy="commentsLoadMoreBusy"
+                class="min-h-11 rounded-xl border border-tibet-gold/25 bg-white px-5 py-2 text-sm font-medium text-tibet-brown/80 transition-colors hover:bg-gray-50 disabled:cursor-wait disabled:opacity-50"
+              >
+                {{ commentsLoadMoreBusy ? t('common.loading') : t('community.nextPage') }}
+              </button>
             </div>
           </div>
         </div>

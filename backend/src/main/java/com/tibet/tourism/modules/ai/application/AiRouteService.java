@@ -51,6 +51,10 @@ public class AiRouteService {
     private static final Pattern ROUTE_DAY_HEADING_PATTERN = Pattern.compile(
             "^(?:#{1,6}\\s*)?(?:第\\s*([一二三四五六七八九十百0-9]+)\\s*天|Day\\s*(\\d+)|D\\s*(\\d+)).*$",
             Pattern.CASE_INSENSITIVE);
+    private static final Pattern DAY_ONE_HIGH_ALTITUDE_PATTERN = Pattern.compile(
+            "珠峰|纳木错|羊卓雍措|羊湖|岗巴拉|冈仁波齐|阿里|色季拉|米拉山|5200|5,200|5000|5,000|4718|4,718|4500|4,500|4441|4,441");
+    private static final int MIN_DAILY_ROUTE_ITEMS = 4;
+    private static final int MAX_DAILY_ROUTE_ITEMS = 8;
     private static final Map<String, String> BUDGET_LABELS = Map.of(
             "economy", "经济型",
             "comfort", "舒适型",
@@ -787,6 +791,11 @@ public class AiRouteService {
                 + "[逐日输出至第%d天，每天必须包含清晨/上午、午餐/转场、下午、傍晚、晚上/住宿、在地彩蛋、当日理由、贴心提示]\n\n"
                 + "## 预算预估\n"
                 + "按%s标准，用3条以内列出交通、住宿餐饮、门票其他的人均估算。\n\n"
+                + "## 安全与执行校验\n"
+                + "- **高原适应**：第1天只安排拉萨低强度适应，后续再逐步进入高海拔区域。\n"
+                + "- **每日负载**：每一天固定4-8条可执行安排，避免赶场和时间冲突。\n"
+                + "- **路线完整性**：不得输出空路线、缺失天数或重复天数；如不确定，给出保守 fallback。\n"
+                + "- **医疗免责声明**：本路线不是医疗建议；出现胸闷、持续头痛、呼吸困难等症状应立即停止行程并就医。\n\n"
                 + "## 进藏必读\n"
                 + "列出4-5条最关键实用信息：高原反应、边防证、穿衣防晒、通讯现金、尊重风俗。\n\n"
                 + "【再次强调】直接从 # 标题开始回复，不要输出任何其他内容。"
@@ -1102,7 +1111,139 @@ public class AiRouteService {
             return null;
         }
 
-        return String.join("\n", bodyLines).trim();
+        String canonical = String.join("\n", bodyLines).trim();
+        if (!passesRouteExecutionGuardrails(canonical, days)) {
+            return null;
+        }
+        return withSafetyGuardrailSection(canonical, days);
+    }
+
+    private boolean passesRouteExecutionGuardrails(String content, int days) {
+        Map<Integer, Integer> dailyItemCounts = new HashMap<>();
+        StringBuilder dayOneContent = new StringBuilder();
+        boolean inDailySection = false;
+        int currentDay = 0;
+
+        for (String line : content.split("\\R")) {
+            String trimmed = line.trim();
+            if (trimmed.isEmpty()) {
+                continue;
+            }
+            if (isDailyContainerHeading(trimmed)) {
+                inDailySection = true;
+                currentDay = 0;
+                continue;
+            }
+            if (!inDailySection) {
+                continue;
+            }
+            Integer dayNumber = extractRouteDayNumber(trimmed);
+            if (dayNumber != null) {
+                currentDay = dayNumber;
+                dailyItemCounts.putIfAbsent(dayNumber, 0);
+                if (currentDay == 1) {
+                    dayOneContent.append(trimmed);
+                }
+                continue;
+            }
+            if (isMajorMarkdownHeading(trimmed)) {
+                inDailySection = false;
+                currentDay = 0;
+                continue;
+            }
+            if (currentDay > 0) {
+                if (currentDay == 1) {
+                    dayOneContent.append(trimmed);
+                }
+                if (isDailyItineraryItem(trimmed)) {
+                    dailyItemCounts.merge(currentDay, 1, Integer::sum);
+                }
+            }
+        }
+
+        for (int day = 1; day <= days; day++) {
+            int itemCount = dailyItemCounts.getOrDefault(day, 0);
+            if (itemCount < MIN_DAILY_ROUTE_ITEMS || itemCount > MAX_DAILY_ROUTE_ITEMS) {
+                log.warn("AI route execution validation failed: day={}, itemCount={}, expectedRange={}-{}",
+                        day, itemCount, MIN_DAILY_ROUTE_ITEMS, MAX_DAILY_ROUTE_ITEMS);
+                return false;
+            }
+        }
+
+        String dayOne = dayOneContent.toString();
+        boolean dayOneAcclimatized = dayOne.contains("拉萨") && !DAY_ONE_HIGH_ALTITUDE_PATTERN.matcher(dayOne).find();
+        if (!dayOneAcclimatized) {
+            log.warn("AI route execution validation failed: dayOneHighlandAcclimatization=false");
+            return false;
+        }
+        return true;
+    }
+
+    private boolean isDailyItineraryItem(String text) {
+        return text.startsWith("- ") || text.startsWith("* ");
+    }
+
+    private String withSafetyGuardrailSection(String content, int days) {
+        String normalized = removeSafetyGuardrailSection(content).trim();
+        String safetySection = buildSafetyGuardrailSection(days);
+        String[] lines = normalized.split("\\R", -1);
+        StringBuilder builder = new StringBuilder();
+        boolean inserted = false;
+
+        for (String line : lines) {
+            if (!inserted && isEssentialsHeading(line.trim())) {
+                if (!builder.isEmpty() && builder.charAt(builder.length() - 1) != '\n') {
+                    builder.append('\n');
+                }
+                builder.append('\n').append(safetySection).append("\n\n");
+                inserted = true;
+            }
+            builder.append(line).append('\n');
+        }
+
+        if (!inserted) {
+            if (!builder.isEmpty() && builder.charAt(builder.length() - 1) != '\n') {
+                builder.append('\n');
+            }
+            builder.append('\n').append(safetySection).append('\n');
+        }
+        return builder.toString().trim();
+    }
+
+    private String removeSafetyGuardrailSection(String content) {
+        StringBuilder builder = new StringBuilder();
+        boolean skippingSafetySection = false;
+        for (String line : content.split("\\R", -1)) {
+            String trimmed = line.trim();
+            if (isSafetyGuardrailHeading(trimmed)) {
+                skippingSafetySection = true;
+                continue;
+            }
+            if (skippingSafetySection && isMajorMarkdownHeading(trimmed)) {
+                skippingSafetySection = false;
+            }
+            if (!skippingSafetySection) {
+                builder.append(line).append('\n');
+            }
+        }
+        return builder.toString().trim();
+    }
+
+    private boolean isSafetyGuardrailHeading(String text) {
+        return text.matches("^#{1,6}\\s*(安全与执行校验|行程安全校验|路线安全校验|Safety\\s+Guardrails?)\\s*$");
+    }
+
+    private boolean isEssentialsHeading(String text) {
+        return text.matches("^#{1,2}\\s*(进藏必读|Tibet\\s+Essentials|Essentials)\\s*$");
+    }
+
+    private String buildSafetyGuardrailSection(int days) {
+        return "## 安全与执行校验\n"
+                + "- **高原适应**：第1天限定拉萨低强度适应，不安排羊湖、纳木错、珠峰等高海拔目的地。\n"
+                + "- **每日负载**：已校验" + days + "天行程完整，且每天为"
+                + MIN_DAILY_ROUTE_ITEMS + "-" + MAX_DAILY_ROUTE_ITEMS + "条可执行安排。\n"
+                + "- **路线完整性**：如 AI 输出为空、缺天、重复天数或每日项目过少/过多，系统改用保守基准路线。\n"
+                + "- **医疗免责声明**：本路线不是医疗建议；出现胸闷、持续头痛、呼吸困难等症状应立即停止行程并就医。";
     }
 
     private String stripRepeatedRouteRestart(String content) {
@@ -1339,6 +1480,7 @@ public class AiRouteService {
 
         builder.append("## 预算预估\n");
         builder.append("按").append(budgetLabel).append("标准估算：交通约占40%，住宿占30%，餐饮占15%，门票占10%，其他占5%。实际花费以出行时市场价格为准。\n\n");
+        builder.append(buildSafetyGuardrailSection(days)).append("\n\n");
         builder.append("## 进藏必读\n");
         builder.append("- **边防证**：前往珠峰、阿里、墨脱等边境地区需提前在户籍所在地办理边防证\n");
         builder.append("- **高原反应**：抵达后放慢节奏，多喝水，备好氧气瓶和常用药\n");

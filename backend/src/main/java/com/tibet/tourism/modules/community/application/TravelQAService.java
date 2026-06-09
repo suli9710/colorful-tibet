@@ -9,13 +9,15 @@ import com.tibet.tourism.modules.community.domain.TravelQuestion;
 import com.tibet.tourism.modules.community.infra.QuestionLikeRepository;
 import com.tibet.tourism.modules.community.infra.TravelAnswerRepository;
 import com.tibet.tourism.modules.community.infra.TravelQuestionRepository;
+import com.tibet.tourism.modules.community.infra.TravelQuestionSummaryRow;
+import com.tibet.tourism.modules.community.web.dto.PublicUserResponse;
+import com.tibet.tourism.modules.community.web.dto.TravelQuestionSummaryResponse;
 import com.tibet.tourism.modules.hotel.domain.Hotel;
 import com.tibet.tourism.modules.user.domain.User;
 import com.tibet.tourism.modules.user.infra.UserRepository;
 import jakarta.persistence.criteria.Predicate;
 import java.util.*;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -87,6 +89,18 @@ public class TravelQAService {
 
             return criteriaBuilder.and(predicates.toArray(new Predicate[0]));
         }, pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<TravelQuestionSummaryResponse> getQuestionSummaries(
+            String tag,
+            String status,
+            Pageable pageable,
+            Long currentUserId) {
+        String safeTag = InputSanitizer.optionalTagFilter(tag);
+        Boolean resolved = resolvedStatus(status);
+        return questionRepository.findSummaries(safeTag, resolved, pageable)
+                .map(row -> toSummaryResponse(row, currentUserId));
     }
 
     @Transactional
@@ -165,18 +179,9 @@ public class TravelQAService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        if (likeRepository.existsByQuestionAndUser(question, user)) {
-            return new LikeResult(true, readQuestionLikeCount(questionId));
-        }
-
-        QuestionLike like = new QuestionLike();
-        like.setQuestion(question);
-        like.setUser(user);
-        try {
-            likeRepository.saveAndFlush(like);
+        int inserted = likeRepository.insertIgnore(question.getId(), user.getId());
+        if (inserted > 0) {
             questionRepository.incrementLikeCount(questionId);
-        } catch (DataIntegrityViolationException duplicate) {
-            // Concurrent duplicate like; the unique row already represents the desired state.
         }
         return new LikeResult(true, readQuestionLikeCount(questionId));
     }
@@ -229,5 +234,61 @@ public class TravelQAService {
     private int readQuestionLikeCount(Long questionId) {
         return questionRepository.findLikeCountById(questionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Question not found"));
+    }
+
+    private TravelQuestionSummaryResponse toSummaryResponse(
+            TravelQuestionSummaryRow row,
+            Long currentUserId) {
+        if (row == null) {
+            return null;
+        }
+        return new TravelQuestionSummaryResponse(
+                row.id(),
+                publicAuthor(row.authorId(), row.authorUsername(), row.authorNickname(), row.authorAvatar(), currentUserId),
+                row.title(),
+                row.excerpt(),
+                row.tags(),
+                row.viewCount(),
+                row.answerCount(),
+                row.likeCount(),
+                row.isResolved(),
+                row.createdAt(),
+                row.updatedAt());
+    }
+
+    private PublicUserResponse publicAuthor(
+            Long authorId,
+            String username,
+            String nickname,
+            String avatar,
+            Long currentUserId) {
+        if (authorId == null && !StringUtils.hasText(username) && !StringUtils.hasText(nickname) && !StringUtils.hasText(avatar)) {
+            return null;
+        }
+        return new PublicUserResponse(
+                publicNickname(username, nickname),
+                avatar,
+                currentUserId != null && currentUserId.equals(authorId));
+    }
+
+    private String publicNickname(String username, String nickname) {
+        if (!StringUtils.hasText(nickname)) {
+            return null;
+        }
+        String normalizedNickname = nickname.trim();
+        if (StringUtils.hasText(username) && normalizedNickname.equalsIgnoreCase(username.trim())) {
+            return null;
+        }
+        return normalizedNickname;
+    }
+
+    private Boolean resolvedStatus(String status) {
+        if ("unsolved".equals(status)) {
+            return false;
+        }
+        if ("solved".equals(status)) {
+            return true;
+        }
+        return null;
     }
 }

@@ -91,9 +91,9 @@ interface AnalyticsStats {
   orderCount: number
   totalRevenue: number
   spotCount?: number
-  recentBookings?: any[]
-  recentHotelBookings?: any[]
-  popularSpots?: any[]
+  recentBookings?: AnalyticsRecentOrder[]
+  recentHotelBookings?: AnalyticsRecentOrder[]
+  popularSpots?: AnalyticsPopularSpot[]
   newsCount?: number
   monthlyBookingTrend?: Array<{ month: string; orderCount: number; revenue: number }>
   userGrowthTrend?: Array<{ month: string; count: number }>
@@ -101,6 +101,19 @@ interface AnalyticsStats {
   spotCategories?: Array<{ name: string; value: number }>
   visitorCityDistribution?: Array<{ name: string; value: number }>
   updatedAt?: string
+}
+
+interface AnalyticsRecentOrder {
+  id?: number | string
+  totalPrice?: number | string | null
+  status?: string | null
+  createdAt?: string | null
+}
+
+interface AnalyticsPopularSpot {
+  id?: number | string
+  name?: string | null
+  visitCount?: number | null
 }
 
 const props = defineProps<{

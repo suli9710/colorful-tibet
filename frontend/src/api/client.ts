@@ -1,4 +1,5 @@
 import axios from 'axios'
+import type { AxiosError } from 'axios'
 import { clearStoredAuth } from '../stores/auth'
 import { getDeviceFingerprint } from '../utils/deviceFingerprint'
 import { apiBaseURL, isSameOriginApi } from '../utils/apiOrigin'
@@ -39,12 +40,24 @@ export const expireAuthSession = (redirectTo = '/login') => {
   }
 }
 
-export function handleUnauthorizedResponse(error: any) {
+const isAxiosClientError = (error: unknown): error is AxiosError => axios.isAxiosError(error)
+const readSkipAuthRedirect = (error: unknown) => {
+  if (isAxiosClientError(error)) {
+    return Boolean(error.config?.skipAuthRedirect)
+  }
+
+  if (!error || typeof error !== 'object') return false
+  const config = (error as { config?: unknown }).config
+  if (!config || typeof config !== 'object') return false
+  return Boolean((config as { skipAuthRedirect?: unknown }).skipAuthRedirect)
+}
+
+export function handleUnauthorizedResponse(error: unknown) {
   if (import.meta.env.DEV) {
     console.error(`[401] ${summarizeClientError(error)}`)
   }
 
-  const skipAuthRedirect = Boolean(error.config?.skipAuthRedirect)
+  const skipAuthRedirect = readSkipAuthRedirect(error)
 
   if (!skipAuthRedirect) {
     const currentPath = window.location.pathname

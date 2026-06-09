@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -21,6 +22,7 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.IntStream;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -144,8 +146,8 @@ class AiRouteRecordServiceTest {
         emptyRecord.setJobId("job-empty");
         emptyRecord.setUpdatedAt(LocalDateTime.now().minusHours(4));
 
-        when(routeRecordRepository.findByStatusAndUpdatedAtBeforeOrderByUpdatedAtAsc(
-                eq(AiRouteRecord.Status.RUNNING), any(LocalDateTime.class)))
+        when(routeRecordRepository.findStaleRunningRecordsForRecovery(
+                eq(AiRouteRecord.Status.RUNNING), any(LocalDateTime.class), any(Pageable.class)))
                 .thenReturn(List.of(titledRecord, emptyRecord));
 
         int recovered = service.failStaleRunningRecords(Duration.ofHours(2));
@@ -159,10 +161,43 @@ class AiRouteRecordServiceTest {
         assertEquals("job-empty", emptyRecord.getJobId());
         assertEquals(AiRouteRecord.defaultTitle(emptyRecord.getDays()), emptyRecord.getTitle());
         ArgumentCaptor<LocalDateTime> cutoff = ArgumentCaptor.forClass(LocalDateTime.class);
-        verify(routeRecordRepository).findByStatusAndUpdatedAtBeforeOrderByUpdatedAtAsc(
-                eq(AiRouteRecord.Status.RUNNING), cutoff.capture());
+        ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
+        verify(routeRecordRepository).findStaleRunningRecordsForRecovery(
+                eq(AiRouteRecord.Status.RUNNING), cutoff.capture(), pageable.capture());
         assertTrue(cutoff.getValue().isBefore(LocalDateTime.now().minusMinutes(119)));
+        assertEquals(0, pageable.getValue().getPageNumber());
+        assertEquals(100, pageable.getValue().getPageSize());
         verify(routeRecordRepository).saveAll(List.of(titledRecord, emptyRecord));
+    }
+
+    @Test
+    void staleRunningCleanupContinuesPastFirstRecoveryBatch() {
+        User user = user(7L);
+        List<AiRouteRecord> firstBatch = IntStream.range(0, 100)
+                .mapToObj(index -> {
+                    AiRouteRecord record = record(1000L + index, user, "");
+                    record.setStatus(AiRouteRecord.Status.RUNNING);
+                    record.setJobId("job-batch-" + index);
+                    return record;
+                })
+                .toList();
+        AiRouteRecord secondBatchRecord = record(2000L, user, "# Still stale");
+        secondBatchRecord.setStatus(AiRouteRecord.Status.RUNNING);
+        secondBatchRecord.setJobId("job-batch-101");
+
+        when(routeRecordRepository.findStaleRunningRecordsForRecovery(
+                eq(AiRouteRecord.Status.RUNNING), any(LocalDateTime.class), any(Pageable.class)))
+                .thenReturn(firstBatch, List.of(secondBatchRecord));
+
+        int recovered = service.failStaleRunningRecords(Duration.ofHours(2));
+
+        assertEquals(101, recovered);
+        assertEquals(AiRouteRecord.Status.FAILED, firstBatch.get(0).getStatus());
+        assertEquals(AiRouteRecord.Status.FAILED, secondBatchRecord.getStatus());
+        verify(routeRecordRepository, times(2)).findStaleRunningRecordsForRecovery(
+                eq(AiRouteRecord.Status.RUNNING), any(LocalDateTime.class), any(Pageable.class));
+        verify(routeRecordRepository).saveAll(firstBatch);
+        verify(routeRecordRepository).saveAll(List.of(secondBatchRecord));
     }
 
     @Test

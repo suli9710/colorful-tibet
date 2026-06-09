@@ -8,6 +8,7 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Stream;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -25,6 +26,14 @@ import org.springframework.web.bind.annotation.RestController;
 class ControllerAuthorizationMatrixTest {
 
     private static final List<Class<?>> CONTROLLERS = discoverRestControllers();
+    private static final Set<String> READ_METHODS = Set.of("GET", "HEAD");
+    private static final Set<String> PUBLIC_STATE_CHANGING_ALLOWLIST = Set.of(
+            "POST /api/auth/login",
+            "POST /api/auth/register",
+            "POST /api/guide/chat");
+    private static final Set<String> ADMIN_ONLY_BUSINESS_ENDPOINTS = Set.of(
+            "GET /api/hotel-bookings",
+            "PUT /api/hotel-bookings/1/status");
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("mappedEndpoints")
@@ -40,6 +49,60 @@ class ControllerAuthorizationMatrixTest {
                         endpoint.controller().getSimpleName(),
                         endpoint.method().getName())
                 .isNotNull();
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("mappedEndpoints")
+    void publicStateChangingEndpointsRemainExplicitAllowlist(Endpoint endpoint) {
+        if (!ApiSecurityPaths.isPublicRequest(endpoint.httpMethod(), endpoint.samplePath())
+                || READ_METHODS.contains(endpoint.httpMethod())) {
+            return;
+        }
+
+        assertThat(endpoint.signature())
+                .as("public state-changing endpoints must stay tightly reviewed")
+                .isIn(PUBLIC_STATE_CHANGING_ALLOWLIST);
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("mappedEndpoints")
+    void adminNamespaceEndpointsRequireAdminRole(Endpoint endpoint) {
+        if (!isAdminNamespace(endpoint.samplePath())) {
+            return;
+        }
+
+        PreAuthorize preAuthorize = effectivePreAuthorize(endpoint.controller(), endpoint.method());
+
+        assertThat(preAuthorize)
+                .as("%s must declare an admin role guard", endpoint)
+                .isNotNull();
+        assertThat(preAuthorize.value())
+                .as("%s must require ADMIN, not only authentication", endpoint)
+                .contains("ADMIN");
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("mappedEndpoints")
+    void privilegedBusinessEndpointsRequireExpectedAuthorities(Endpoint endpoint) {
+        PreAuthorize preAuthorize = effectivePreAuthorize(endpoint.controller(), endpoint.method());
+
+        if (ADMIN_ONLY_BUSINESS_ENDPOINTS.contains(endpoint.signature())) {
+            assertThat(preAuthorize)
+                    .as("%s must declare an admin role guard", endpoint)
+                    .isNotNull();
+            assertThat(preAuthorize.value())
+                    .as("%s must require ADMIN, not only authentication", endpoint)
+                    .contains("ADMIN");
+        }
+
+        if (endpoint.samplePath().contains("/pii")) {
+            assertThat(preAuthorize)
+                    .as("%s must declare a dedicated PII authority guard", endpoint)
+                    .isNotNull();
+            assertThat(preAuthorize.value())
+                    .as("%s must require an explicit PII read authority", endpoint)
+                    .contains("PII");
+        }
     }
 
     static Stream<Endpoint> mappedEndpoints() {
@@ -166,14 +229,22 @@ class ControllerAuthorizationMatrixTest {
         return path.replaceAll("\\{[^/]+}", "1");
     }
 
+    private static boolean isAdminNamespace(String path) {
+        return path.startsWith("/api/admin/") || path.startsWith("/api/spots/admin/");
+    }
+
     private record MethodMapping(List<String> httpMethods, List<String> paths) {
     }
 
     private record Endpoint(Class<?> controller, Method method, String httpMethod, String samplePath) {
 
+        private String signature() {
+            return httpMethod + " " + samplePath;
+        }
+
         @Override
         public String toString() {
-            return httpMethod + " " + samplePath + " -> "
+            return signature() + " -> "
                     + controller.getSimpleName() + "#" + method.getName();
         }
     }

@@ -29,6 +29,13 @@ public class NewsService {
         return newsRepository.findAll(pageable);
     }
 
+    public Page<News> getNews(News.Category category, String keyword, Pageable pageable) {
+        if (category == null && keyword == null) {
+            return newsRepository.findAll(pageable);
+        }
+        return newsRepository.search(category, keyword, pageable);
+    }
+
     @CacheEvict(value = CacheConfig.NEWS_CACHE, allEntries = true)
     public News createNews(@NonNull News news) {
         return newsRepository.save(news);

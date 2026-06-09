@@ -18,6 +18,7 @@ import com.tibet.tourism.modules.user.domain.User;
 import com.tibet.tourism.modules.user.infra.UserRepository;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,10 +27,12 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/api/spots")
@@ -77,8 +80,12 @@ public class ScenicSpotController {
     }
 
     @GetMapping("/{id}")
-    public ScenicSpotResponse getSpotById(@PathVariable Long id, @RequestParam(required = false, defaultValue = "zh") String locale) {
+    public ScenicSpotResponse getSpotById(
+            @PathVariable Long id,
+            @RequestParam(required = false, defaultValue = "zh") String locale,
+            Authentication authentication) {
         ScenicSpot spot = scenicSpotService.getSpotById(id);
+        recordAuthenticatedSpotView(authentication, spot);
         return ScenicSpotResponse.fromEntity(spot, locale);
     }
 
@@ -92,12 +99,28 @@ public class ScenicSpotController {
     @GetMapping("/search")
     public PageResponse<ScenicSpotResponse> searchSpots(
             @RequestParam String keyword,
+            @RequestParam(required = false) String category,
             @RequestParam(required = false, defaultValue = "zh") String locale,
             @PageableDefault(size = 20) Pageable pageable) {
         Pageable safePageable = InputSanitizer.sanitizePageable(
                 pageable, ALLOWED_SPOT_SORT_FIELDS, DEFAULT_SPOT_SORT, 20, 100);
-        Page<ScenicSpot> spots = scenicSpotService.searchSpots(keyword, safePageable);
+        Page<ScenicSpot> spots = scenicSpotService.searchSpots(
+                InputSanitizer.requiredPlainText(keyword, 100, "搜索关键词"),
+                parseCategoryOrNull(category),
+                safePageable);
         return PageResponse.from(spots.map(spot -> ScenicSpotResponse.fromEntity(spot, locale)));
+    }
+
+    private ScenicSpot.Category parseCategoryOrNull(String category) {
+        String normalized = InputSanitizer.optionalPlainText(category, 40, "景点类别");
+        if (normalized == null) {
+            return null;
+        }
+        try {
+            return ScenicSpot.Category.valueOf(normalized.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid spot category");
+        }
     }
 
     @GetMapping("/recommendations")
@@ -359,6 +382,20 @@ public class ScenicSpotController {
         }
         return userRepository.findByUsername(authentication.getName())
                 .orElseThrow(() -> new AccessDeniedException("User not found"));
+    }
+
+    private void recordAuthenticatedSpotView(Authentication authentication, ScenicSpot spot) {
+        if (authentication == null
+                || !authentication.isAuthenticated()
+                || "anonymousUser".equals(authentication.getPrincipal())) {
+            return;
+        }
+        try {
+            Optional<User> user = userRepository.findByUsername(authentication.getName());
+            user.ifPresent(value -> recommendationService.recordSpotView(value, spot));
+        } catch (Exception e) {
+            logger.warn("Failed to record scenic spot view: detail={}", SensitiveLogSanitizer.exceptionSummary(e));
+        }
     }
 
     private List<ScenicSpotResponse> recommendForUser(Long userId, RecommendationContext context, String locale) {

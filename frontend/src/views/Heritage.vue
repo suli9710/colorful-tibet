@@ -1033,6 +1033,22 @@
                   </div>
                   <p class="text-sm text-stone-600 leading-relaxed">{{ comment.content }}</p>
                 </div>
+                <div class="flex flex-col gap-2 pt-1 sm:flex-row sm:items-center sm:justify-between">
+                  <span class="text-xs text-stone-400">
+                    {{ itemCommentsPage + 1 }} / {{ itemCommentsTotalPages || 1 }}
+                    <span v-if="itemCommentsTotalElements"> · {{ itemCommentsTotalElements }}</span>
+                  </span>
+                  <button
+                    v-if="hasMoreItemComments"
+                    type="button"
+                    class="mobile-touch-target inline-flex items-center justify-center rounded-full border border-stone-200 bg-white px-4 py-2 text-xs font-medium text-stone-600 transition hover:border-tibet-red/30 hover:text-tibet-red disabled:cursor-wait disabled:opacity-60"
+                    :disabled="commentsLoadingMore"
+                    :aria-busy="commentsLoadingMore"
+                    @click="loadNextItemCommentsPage"
+                  >
+                    {{ commentsLoadingMore ? t('common.loading') : t('community.nextPage', '加载更多') }}
+                  </button>
+                </div>
               </div>
               <p v-else class="text-xs text-stone-400 text-center py-3">
                 {{ t('heritage.noComments', '暂无评论，快来发表第一条吧') }}
@@ -1087,6 +1103,7 @@ import {
 } from 'lucide-vue-next'
 import MotionModal from '../components/motion/MotionModal.vue'
 import api, { endpoints } from '../api'
+import { hasNextPage, mergeUniqueById, readPaginatedResponse, type PageMetadata } from '../api/endpoints'
 import type {
   HeritageCommentItem,
   HeritageEventItem,
@@ -1097,6 +1114,7 @@ import { useAuthStore } from '../stores/auth'
 import { useToast } from '../composables/useToast'
 import { createTextCardPopupContent } from '../utils/domText'
 import { safeClientErrorMessage, summarizeClientError } from '../utils/errorMonitoring'
+import { toIntlLocale } from '../i18n/formatting'
 import type * as Leaflet from 'leaflet'
 import {
   cardExit,
@@ -1113,6 +1131,7 @@ import {
 
 const { t, locale } = useI18n()
 const { showToast } = useToast()
+const activeIntlLocale = computed(() => toIntlLocale(locale.value))
 
 const heritageCategories = computed(() => [
   {
@@ -1181,6 +1200,23 @@ const safeExternalUrl = (value?: string | null): string => {
   }
 }
 
+const responseContent = <T>(data: unknown): T[] => {
+  if (Array.isArray(data)) return data as T[]
+  if (data && typeof data === 'object' && Array.isArray((data as { content?: unknown }).content)) {
+    return (data as { content: T[] }).content
+  }
+  return []
+}
+
+const heritageCommentsPageSize = 20
+
+const emptyHeritageCommentsPage = (): PageMetadata => ({
+  page: 0,
+  size: heritageCommentsPageSize,
+  totalElements: 0,
+  totalPages: 0
+})
+
 const heritageItems = ref<HeritageItem[]>([])
 const loading = ref(true)
 const heritageErrorMessage = ref('')
@@ -1191,7 +1227,9 @@ const searchLoading = ref(false)
 const failedHeritageImages = ref<Record<string, boolean>>({})
 
 const itemComments = ref<HeritageCommentItem[]>([])
+const itemCommentsPageInfo = ref<PageMetadata>(emptyHeritageCommentsPage())
 const commentsLoading = ref(false)
+const commentsLoadingMore = ref(false)
 const itemInheritors = ref<HeritageInheritorItem[]>([])
 const itemEvents = ref<HeritageEventItem[]>([])
 const detailAuthRequired = ref(false)
@@ -1207,6 +1245,14 @@ const selectedCategory = ref('all')
 type HeritageSortMode = 'hot' | 'views' | 'likes' | 'comments' | 'latest' | 'name'
 
 const sortMode = ref<HeritageSortMode>('hot')
+const itemCommentsPage = computed(() => itemCommentsPageInfo.value.page)
+const itemCommentsTotalPages = computed(() => itemCommentsPageInfo.value.totalPages)
+const itemCommentsTotalElements = computed(() => itemCommentsPageInfo.value.totalElements)
+const hasMoreItemComments = computed(() => hasNextPage(itemCommentsPageInfo.value))
+
+const resetItemCommentsPageInfo = () => {
+  itemCommentsPageInfo.value = emptyHeritageCommentsPage()
+}
 
 const genericHeritageImagePatterns = [
   'images.unsplash.com/photo-1559827291'
@@ -1805,7 +1851,7 @@ const categoryOptions = computed(() => {
     const category = item.category?.trim()
     if (category) categories.add(category)
   })
-  return Array.from(categories).sort((a, b) => a.localeCompare(b, 'zh-CN'))
+  return Array.from(categories).sort((a, b) => a.localeCompare(b, activeIntlLocale.value))
 })
 
 const heritageNameById = computed<Record<number, string>>(() => {
@@ -1859,7 +1905,7 @@ const filteredHeritageItems = computed<HeritageItem[]>(() => {
       case 'latest':
         return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
       case 'name':
-        return (a.name || '').localeCompare(b.name || '', 'zh-CN')
+        return (a.name || '').localeCompare(b.name || '', activeIntlLocale.value)
       case 'hot':
       default:
         return getHeritageScore(b) - getHeritageScore(a)
@@ -1868,7 +1914,7 @@ const filteredHeritageItems = computed<HeritageItem[]>(() => {
 })
 
 const formatCompact = (value: number) =>
-  new Intl.NumberFormat('zh-CN', {
+  new Intl.NumberFormat(activeIntlLocale.value, {
     notation: 'compact',
     maximumFractionDigits: 1
   }).format(value)
@@ -1924,7 +1970,7 @@ const fetchFeaturedInheritors = async (items: HeritageItem[]) => {
     const responses = await Promise.all(
       candidates.map(item =>
         api.get(endpoints.heritage.inheritors(item.id))
-          .then(response => response.data || [])
+          .then(response => responseContent<HeritageInheritorItem>(response.data))
           .catch(() => [])
       )
     )
@@ -1943,7 +1989,7 @@ const fetchFeaturedInheritors = async (items: HeritageItem[]) => {
 const fetchUpcomingEvents = async () => {
   try {
     const response = await api.get(endpoints.heritage.upcomingEvents, { params: { size: 6 } })
-    upcomingEvents.value = response.data?.content || response.data || []
+    upcomingEvents.value = responseContent<HeritageEventItem>(response.data)
   } catch (error) {
     console.error('Failed to fetch upcoming heritage events:', summarizeClientError(error))
   }
@@ -1967,8 +2013,7 @@ const fetchHeritageItems = async (keyword?: string) => {
     const params: Record<string, string> = { size: '100' }
     if (keyword) params.keyword = keyword
     const response = await api.get(endpoints.heritage.list, { params })
-    const items = response.data?.content || response.data || []
-    heritageItems.value = Array.isArray(items) ? items : []
+    heritageItems.value = responseContent<HeritageItem>(response.data)
     if (authStore.isLoggedIn) {
       void fetchFeaturedInheritors(heritageItems.value)
     } else {
@@ -2009,6 +2054,7 @@ const loadDetailData = async (item: HeritageItem) => {
   if (!item.id || item.id >= 10000) return
 
   commentsLoading.value = true
+  commentsLoadingMore.value = false
   detailAuthRequired.value = false
   try {
     const detailRes = await api.get(endpoints.heritage.detail(item.id), detailRequestConfig)
@@ -2028,7 +2074,10 @@ const loadDetailData = async (item: HeritageItem) => {
     }
 
     const [commentsRes, inheritorsRes, eventsRes] = await Promise.all([
-      api.get(endpoints.heritage.comments(item.id), detailRequestConfig).catch(error => {
+      api.get(endpoints.heritage.comments(item.id), {
+        ...detailRequestConfig,
+        params: { page: 0, size: heritageCommentsPageSize }
+      }).catch(error => {
         if (isUnauthorizedError(error)) return null
         throw error
       }),
@@ -2046,9 +2095,9 @@ const loadDetailData = async (item: HeritageItem) => {
       selectedItem.value = { ...item, ...detailItem }
       updateHeritageItem(item.id, detailItem)
     }
-    itemComments.value = commentsRes?.data?.content || commentsRes?.data || []
-    itemInheritors.value = inheritorsRes?.data || []
-    itemEvents.value = eventsRes?.data || []
+    applyItemCommentsPage(commentsRes)
+    itemInheritors.value = responseContent<HeritageInheritorItem>(inheritorsRes?.data)
+    itemEvents.value = responseContent<HeritageEventItem>(eventsRes?.data)
     mergeFeaturedInheritors(itemInheritors.value)
   } catch (e) {
     console.error('Failed to load detail data:', summarizeClientError(e))
@@ -2061,6 +2110,38 @@ const loadDetailData = async (item: HeritageItem) => {
       const res = await api.get(endpoints.heritage.likeStatus(item.id), detailRequestConfig)
       liked.value = res.data?.liked || false
     } catch { liked.value = false }
+  }
+}
+
+const applyItemCommentsPage = (response: any, append = false) => {
+  const page = readPaginatedResponse<HeritageCommentItem>(response ?? { data: [] }, {
+    page: append ? itemCommentsPageInfo.value.page + 1 : 0,
+    size: heritageCommentsPageSize
+  })
+
+  itemComments.value = append ? mergeUniqueById(itemComments.value, page.content) : page.content
+  itemCommentsPageInfo.value = {
+    page: page.page,
+    size: page.size || heritageCommentsPageSize,
+    totalElements: page.totalElements,
+    totalPages: page.totalPages
+  }
+}
+
+const loadNextItemCommentsPage = async () => {
+  if (!selectedItem.value || commentsLoadingMore.value || !hasMoreItemComments.value) return
+  commentsLoadingMore.value = true
+  try {
+    const response = await api.get(endpoints.heritage.comments(selectedItem.value.id), {
+      ...detailRequestConfig,
+      params: { page: itemCommentsPageInfo.value.page + 1, size: heritageCommentsPageSize }
+    })
+    applyItemCommentsPage(response, true)
+  } catch (error) {
+    console.error('Failed to load more heritage comments:', summarizeClientError(error))
+    showToast(t('toast.pageLoadFailed'), 'error')
+  } finally {
+    commentsLoadingMore.value = false
   }
 }
 
@@ -2090,6 +2171,15 @@ const submitComment = async () => {
     })
     if (res.data) {
       itemComments.value = [res.data, ...itemComments.value]
+      const nextTotalElements = itemCommentsPageInfo.value.totalElements + 1
+      itemCommentsPageInfo.value = {
+        ...itemCommentsPageInfo.value,
+        totalElements: nextTotalElements,
+        totalPages: Math.max(
+          itemCommentsPageInfo.value.totalPages,
+          Math.ceil(nextTotalElements / heritageCommentsPageSize)
+        )
+      }
       if (selectedItem.value) {
         const nextCommentCount = (selectedItem.value.commentCount || 0) + 1
         selectedItem.value = { ...selectedItem.value, commentCount: nextCommentCount }
@@ -2110,6 +2200,12 @@ const deleteComment = async (commentId: number) => {
   try {
     await api.delete(endpoints.heritage.deleteComment(selectedItem.value.id, commentId))
     itemComments.value = itemComments.value.filter(c => c.id !== commentId)
+    const nextTotalElements = Math.max(0, itemCommentsPageInfo.value.totalElements - 1)
+    itemCommentsPageInfo.value = {
+      ...itemCommentsPageInfo.value,
+      totalElements: nextTotalElements,
+      totalPages: Math.ceil(nextTotalElements / heritageCommentsPageSize)
+    }
     if (selectedItem.value) {
       const nextCommentCount = Math.max(0, (selectedItem.value.commentCount || 1) - 1)
       selectedItem.value = { ...selectedItem.value, commentCount: nextCommentCount }
@@ -2122,7 +2218,7 @@ const deleteComment = async (commentId: number) => {
 
 const formatDate = (dateStr: string) => {
   try {
-    return new Date(dateStr).toLocaleDateString('zh-CN', { year: 'numeric', month: 'short', day: 'numeric' })
+    return new Date(dateStr).toLocaleDateString(activeIntlLocale.value, { year: 'numeric', month: 'short', day: 'numeric' })
   } catch { return dateStr }
 }
 
@@ -2141,6 +2237,7 @@ watch(() => authStore.isLoggedIn, (isLoggedIn) => {
   } else {
     featuredInheritors.value = []
     itemComments.value = []
+    resetItemCommentsPageInfo()
     itemInheritors.value = []
     itemEvents.value = []
     if (selectedItem.value && selectedItem.value.id < 10000) {
@@ -2156,6 +2253,7 @@ const toggleCategory = (categoryName: string) => {
 const openDetail = (item: HeritageItem) => {
   selectedItem.value = item
   itemComments.value = []
+  resetItemCommentsPageInfo()
   itemInheritors.value = []
   itemEvents.value = []
   detailAuthRequired.value = false

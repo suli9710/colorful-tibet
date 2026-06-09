@@ -1,6 +1,7 @@
 package com.tibet.tourism.modules.ai.application;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.tibet.tourism.modules.ai.domain.AiRouteRecord;
 import com.tibet.tourism.modules.ai.web.dto.AiRouteGenerateRequest;
 import com.tibet.tourism.modules.user.domain.User;
@@ -17,6 +18,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.slf4j.Logger;
@@ -25,7 +27,15 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
+import org.springframework.data.domain.Range;
+import org.springframework.data.redis.connection.Limit;
+import org.springframework.data.redis.connection.stream.MapRecord;
+import org.springframework.data.redis.connection.stream.ReadOffset;
+import org.springframework.data.redis.connection.stream.RecordId;
+import org.springframework.data.redis.connection.stream.StreamOffset;
+import org.springframework.data.redis.connection.stream.StreamReadOptions;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.StreamOperations;
 import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -38,6 +48,12 @@ public class AiRouteGenerationJobService {
     private static final long SSE_TIMEOUT_MILLIS = 30 * 60 * 1000L;
     private static final int RUNNING_RECORD_PERSIST_DELTA_CHARS = 1200;
     private static final String START_LOCK_PREFIX = "ai:route-job:start:";
+    private static final String PENDING_START_PREFIX = "ai:route-job:pending:";
+    private static final String EVENT_STREAM_PREFIX = "ai:route-job:events:";
+    private static final String EVENT_FIELD_TYPE = "type";
+    private static final String EVENT_FIELD_JSON = "event";
+    private static final String STREAM_START_OFFSET = "0-0";
+    private static final Duration REDIS_STREAM_READ_BLOCK = Duration.ofSeconds(2);
     private static final int START_LOCK_RECORD_LOOKUP_ATTEMPTS = 4;
     private static final Duration START_LOCK_RECORD_LOOKUP_DELAY = Duration.ofMillis(50);
     private static final RedisScript<Long> RELEASE_START_LOCK_SCRIPT = RedisScript.of("""
@@ -67,6 +83,12 @@ public class AiRouteGenerationJobService {
 
     @Value("${app.ai.route-jobs.start-lock-ttl-seconds:1800}")
     private long startLockTtlSeconds = 1800;
+
+    @Value("${app.ai.route-jobs.event-stream-ttl-minutes:120}")
+    private long eventStreamTtlMinutes = 120;
+
+    @Value("${app.ai.route-jobs.event-stream-max-events:2000}")
+    private long eventStreamMaxEvents = 2000;
 
     @Autowired
     public AiRouteGenerationJobService(AiRouteService aiRouteService,
@@ -137,6 +159,10 @@ public class AiRouteGenerationJobService {
         boolean releaseStartLockOnExit = startLock != null;
         RouteJob job = null;
         try {
+            if (startLock != null) {
+                writePendingDistributedJobStart(candidateJobId, userId, cacheKey, days, budget, preference, safeLocale);
+            }
+
             synchronized (activeJobByCacheKey) {
                 RouteJob activeJob = findLocalActiveJobLocked(cacheKey, userId);
                 if (activeJob != null) {
@@ -189,11 +215,16 @@ public class AiRouteGenerationJobService {
     public SseEmitter streamJob(String jobId, User currentUser) {
         cleanupJobs();
         RouteJob job = requireOwnedJob(jobId, currentUser);
-        SseEmitter emitter = new SseEmitter(SSE_TIMEOUT_MILLIS);
+        SseEmitter emitter = createEmitter();
 
         if (job.isTerminal()) {
             sendEvent(emitter, "snapshot", job.snapshot());
             sendTerminalEvents(emitter, job);
+            return emitter;
+        }
+
+        if (job.isDetachedRecordBackedRunning()) {
+            streamDetachedRecordBackedRunningJob(job, emitter);
             return emitter;
         }
 
@@ -207,6 +238,10 @@ public class AiRouteGenerationJobService {
             sendTerminalEvents(emitter, job);
         }
         return emitter;
+    }
+
+    protected SseEmitter createEmitter() {
+        return new SseEmitter(SSE_TIMEOUT_MILLIS);
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -296,7 +331,18 @@ public class AiRouteGenerationJobService {
 
         log.info("Returning pending AI route job snapshot for distributed lock owner: jobId={}, user={}",
                 ownerJobId, AiLogPrivacy.userRef(currentUser == null ? userId : currentUser.getId()));
-        return RouteJob.running(ownerJobId, userId, cacheKey, days, budget, preference, locale).snapshot();
+        PendingJobStart pendingStart = readPendingDistributedJobStart(ownerJobId)
+                .filter(pending -> pending.userId() == userId)
+                .orElse(new PendingJobStart(userId, cacheKey, days, budget, preference, locale));
+        RouteJob pendingJob = RouteJob.detachedRunning(
+                ownerJobId,
+                pendingStart.userId(),
+                pendingStart.days(),
+                pendingStart.budget(),
+                pendingStart.preference(),
+                pendingStart.locale());
+        jobs.putIfAbsent(ownerJobId, pendingJob);
+        return pendingJob.snapshot();
     }
 
     private void pauseBeforeRecordRetry(int attempt) {
@@ -326,6 +372,9 @@ public class AiRouteGenerationJobService {
                             }
                             job.appendContent(text);
                             notifyDeltaSubscribers(job, text);
+                            publishRedisJobEvent(job, "replace", Map.of(
+                                    "content", job.contentText(),
+                                    "text", job.contentText()));
                             persistRunningContentIfDue(job);
                         }
 
@@ -336,6 +385,7 @@ public class AiRouteGenerationJobService {
                             }
                             job.replaceContent(content);
                             notifyReplaceSubscribers(job, content);
+                            publishRedisJobEvent(job, "replace", Map.of("content", content, "text", content));
                             persistRunningContent(job, content);
                         }
 
@@ -354,6 +404,7 @@ public class AiRouteGenerationJobService {
             if (content.isBlank()) {
                 job.fail("AI route generation returned empty content");
                 recordFailedRoute(job, currentUser, "AI route generation returned empty content");
+                publishTerminalRedisJobEvents(job);
                 notifySubscribers(job);
                 return;
             }
@@ -361,12 +412,14 @@ public class AiRouteGenerationJobService {
             aiQuotaService.cacheRoute(job.cacheKey, content);
             recordCompletedRoute(job, currentUser, content);
             job.complete(content);
+            publishTerminalRedisJobEvents(job);
             notifySubscribers(job);
         } catch (Exception e) {
             log.warn("AI route job failed: jobId={}, user={}, days={}, reason={}",
                     job.jobId, AiLogPrivacy.userRef(job.userId), job.days, AiLogPrivacy.exceptionSummary(e));
             job.fail("AI route generation failed");
             recordFailedRoute(job, currentUser, "AI route generation failed");
+            publishTerminalRedisJobEvents(job);
             notifySubscribers(job);
         } finally {
             activeJobByCacheKey.remove(job.cacheKey, job.jobId);
@@ -389,6 +442,7 @@ public class AiRouteGenerationJobService {
         }
         try {
             redisTemplate.execute(RELEASE_START_LOCK_SCRIPT, List.of(startLock.lockKey()), startLock.token());
+            deletePendingDistributedJobStart(startLock.token());
         } catch (RuntimeException e) {
             log.warn("Failed to release AI route start lock; ttl will expire it: {}",
                     AiLogPrivacy.exceptionSummary(e));
@@ -450,6 +504,15 @@ public class AiRouteGenerationJobService {
         }
         return aiRouteRecordService.findJobRecord(currentUser.getId(), jobId)
                 .map(record -> recordBackedJob(record, currentUser.getId()))
+                .or(() -> readPendingDistributedJobStart(jobId)
+                        .filter(pending -> pending.userId() == currentUser.getId().longValue())
+                        .map(pending -> RouteJob.detachedRunning(
+                                jobId,
+                                pending.userId(),
+                                pending.days(),
+                                pending.budget(),
+                                pending.preference(),
+                                pending.locale())))
                 .orElseThrow(() -> new IllegalArgumentException("AI route job not found"));
     }
 
@@ -467,10 +530,61 @@ public class AiRouteGenerationJobService {
                 false,
                 record.getId(),
                 toInstant(record.getCreatedAt()),
-                toInstant(record.getUpdatedAt()));
+                toInstant(record.getUpdatedAt()),
+                true);
         job.errorMessage = record.getErrorMessage();
         job.markContentPersisted();
         return job;
+    }
+
+    private void writePendingDistributedJobStart(String jobId, long userId, String cacheKey, int days,
+                                                 String budget, String preference, String locale) {
+        if (redisTemplate == null || !StringUtils.hasText(jobId)) {
+            return;
+        }
+        try {
+            PendingJobStart pendingStart = new PendingJobStart(userId, cacheKey, days, budget, preference, locale);
+            redisTemplate.opsForValue().set(
+                    pendingStartKey(jobId),
+                    objectMapper.writeValueAsString(pendingStart),
+                    Duration.ofSeconds(Math.max(60, startLockTtlSeconds)));
+        } catch (RuntimeException | JsonProcessingException e) {
+            log.debug("Could not persist pending AI route start metadata: jobId={}, reason={}",
+                    jobId, AiLogPrivacy.exceptionSummary(e));
+        }
+    }
+
+    private java.util.Optional<PendingJobStart> readPendingDistributedJobStart(String jobId) {
+        if (redisTemplate == null || !StringUtils.hasText(jobId)) {
+            return java.util.Optional.empty();
+        }
+        try {
+            String pendingJson = redisTemplate.opsForValue().get(pendingStartKey(jobId));
+            if (!StringUtils.hasText(pendingJson)) {
+                return java.util.Optional.empty();
+            }
+            return java.util.Optional.of(objectMapper.readValue(pendingJson, PendingJobStart.class));
+        } catch (RuntimeException | IOException e) {
+            log.debug("Could not read pending AI route start metadata: jobId={}, reason={}",
+                    jobId, AiLogPrivacy.exceptionSummary(e));
+            return java.util.Optional.empty();
+        }
+    }
+
+    private void deletePendingDistributedJobStart(String jobId) {
+        if (redisTemplate == null || !StringUtils.hasText(jobId)) {
+            return;
+        }
+        try {
+            redisTemplate.delete(pendingStartKey(jobId));
+        } catch (RuntimeException e) {
+            log.debug("Could not delete pending AI route start metadata: jobId={}, reason={}",
+                    jobId, AiLogPrivacy.exceptionSummary(e));
+        }
+    }
+
+    private String pendingStartKey(String jobId) {
+        return PENDING_START_PREFIX + jobId;
     }
 
     private static RouteJobStatus toJobStatus(AiRouteRecord.Status status) {
@@ -556,6 +670,225 @@ public class AiRouteGenerationJobService {
         }
     }
 
+    private void streamDetachedRecordBackedRunningJob(RouteJob job, SseEmitter emitter) {
+        if (redisTemplate == null) {
+            sendInterruptedDetachedStream(emitter, job, "redis-unavailable");
+            return;
+        }
+
+        RedisJobEvent latestEvent = readLatestRedisJobEvent(job.jobId);
+        RouteJob latestJob = refreshRecordBackedJob(job);
+        sendEvent(emitter, "snapshot", latestJob.snapshot());
+
+        if (latestJob.routeRecordId == null && latestEvent == null) {
+            sendInterruptedEvent(emitter, "running-record-not-ready");
+            emitter.complete();
+            return;
+        }
+
+        String lastEventId = latestEvent == null ? STREAM_START_OFFSET : latestEvent.id();
+        if (latestEvent != null && shouldSendCatchUpEvent(latestJob, latestEvent)) {
+            sendStoredRedisEvent(emitter, latestEvent);
+            if (isTerminalRedisEvent(latestEvent)) {
+                emitter.complete();
+                return;
+            }
+        }
+
+        AtomicBoolean active = new AtomicBoolean(true);
+        emitter.onCompletion(() -> active.set(false));
+        emitter.onTimeout(() -> active.set(false));
+        emitter.onError(error -> active.set(false));
+
+        try {
+            taskExecutor.execute(() -> relayRedisJobEvents(job.jobId, job.userId, emitter, lastEventId, active));
+        } catch (RuntimeException e) {
+            active.set(false);
+            log.warn("Could not start AI route Redis stream relay: jobId={}, reason={}",
+                    job.jobId, AiLogPrivacy.exceptionSummary(e));
+            sendInterruptedDetachedStream(emitter, refreshRecordBackedJob(job), "relay-start-failed");
+        }
+    }
+
+    private void relayRedisJobEvents(String jobId, long userId, SseEmitter emitter,
+                                     String initialEventId, AtomicBoolean active) {
+        String streamKey = eventStreamKey(jobId);
+        String lastEventId = StringUtils.hasText(initialEventId) ? initialEventId : STREAM_START_OFFSET;
+        try {
+            while (active.get()) {
+                List<MapRecord<String, String, String>> events = streamOperations().read(
+                        StreamReadOptions.empty().block(REDIS_STREAM_READ_BLOCK).count(25),
+                        StreamOffset.create(streamKey, ReadOffset.from(lastEventId)));
+                if (events == null || events.isEmpty()) {
+                    continue;
+                }
+                for (MapRecord<String, String, String> record : events) {
+                    RedisJobEvent event = toRedisJobEvent(record);
+                    lastEventId = record.getId().getValue();
+                    if (event == null) {
+                        continue;
+                    }
+                    sendStoredRedisEvent(emitter, event);
+                    if (isTerminalRedisEvent(event)) {
+                        active.set(false);
+                        emitter.complete();
+                        return;
+                    }
+                }
+            }
+        } catch (RuntimeException e) {
+            if (active.get()) {
+                log.warn("AI route Redis stream relay interrupted: jobId={}, user={}, reason={}",
+                        jobId, AiLogPrivacy.userRef(userId), AiLogPrivacy.exceptionSummary(e));
+                aiRouteRecordService.findJobRecord(userId, jobId)
+                        .map(record -> recordBackedJob(record, userId))
+                        .ifPresent(snapshotJob -> sendEvent(emitter, "snapshot", snapshotJob.snapshot()));
+                sendInterruptedEvent(emitter, "redis-stream-interrupted");
+                emitter.complete();
+            }
+        }
+    }
+
+    private RouteJob refreshRecordBackedJob(RouteJob fallback) {
+        return aiRouteRecordService.findJobRecord(fallback.userId, fallback.jobId)
+                .map(record -> recordBackedJob(record, fallback.userId))
+                .orElse(fallback);
+    }
+
+    private RedisJobEvent readLatestRedisJobEvent(String jobId) {
+        if (redisTemplate == null || !StringUtils.hasText(jobId)) {
+            return null;
+        }
+        String streamKey = eventStreamKey(jobId);
+        try {
+            List<MapRecord<String, String, String>> latest = streamOperations().reverseRange(
+                    streamKey, Range.unbounded(), Limit.limit().count(1));
+            if (latest == null || latest.isEmpty()) {
+                return null;
+            }
+            return toRedisJobEvent(latest.get(0));
+        } catch (RuntimeException e) {
+            log.warn("Could not read latest AI route Redis stream event: jobId={}, reason={}",
+                    jobId, AiLogPrivacy.exceptionSummary(e));
+            return null;
+        }
+    }
+
+    private boolean shouldSendCatchUpEvent(RouteJob snapshotJob, RedisJobEvent event) {
+        if (event == null) {
+            return false;
+        }
+        if (isTerminalRedisEvent(event)) {
+            return true;
+        }
+        if ("replace".equals(event.type())) {
+            String eventContent = stringField(event.json(), "content", "text");
+            return eventContent == null || eventContent.length() > snapshotJob.contentText().length();
+        }
+        if ("snapshot".equals(event.type())) {
+            String eventContent = stringField(event.json(), "content");
+            return eventContent == null || eventContent.length() >= snapshotJob.contentText().length();
+        }
+        return true;
+    }
+
+    private void sendInterruptedDetachedStream(SseEmitter emitter, RouteJob job, String reason) {
+        sendEvent(emitter, "snapshot", job.snapshot());
+        sendInterruptedEvent(emitter, reason);
+        emitter.complete();
+    }
+
+    private void sendInterruptedEvent(SseEmitter emitter, String reason) {
+        sendEvent(emitter, "interrupted", Map.of(
+                "message", "AI route generation is still running on another worker; retry streaming shortly.",
+                "retryable", true,
+                "retryAfterMillis", 2000,
+                "reason", reason));
+    }
+
+    private void publishTerminalRedisJobEvents(RouteJob job) {
+        publishRedisJobEvent(job, "snapshot", job.snapshot());
+        if (job.status == RouteJobStatus.COMPLETED) {
+            publishRedisJobEvent(job, "done", Map.of("content", job.contentText()));
+        } else if (job.status == RouteJobStatus.FAILED) {
+            publishRedisJobEvent(job, "error", Map.of("message", job.errorMessage));
+        }
+    }
+
+    private void publishRedisJobEvent(RouteJob job, String type, Object payload) {
+        if (redisTemplate == null || job == null || !StringUtils.hasText(job.jobId)) {
+            return;
+        }
+        String streamKey = eventStreamKey(job.jobId);
+        try {
+            String eventJson = eventJson(type, payload);
+            RecordId recordId = streamOperations().add(streamKey, Map.of(
+                    EVENT_FIELD_TYPE, type,
+                    EVENT_FIELD_JSON, eventJson));
+            redisTemplate.expire(streamKey, eventStreamTtl());
+            long maxEvents = Math.max(1, eventStreamMaxEvents);
+            streamOperations().trim(streamKey, maxEvents, true);
+            if (recordId == null) {
+                log.debug("AI route Redis stream append returned no record id: jobId={}, type={}", job.jobId, type);
+            }
+        } catch (RuntimeException | JsonProcessingException e) {
+            log.debug("Could not publish AI route Redis stream event: jobId={}, type={}, reason={}",
+                    job.jobId, type, AiLogPrivacy.exceptionSummary(e));
+        }
+    }
+
+    private StreamOperations<String, String, String> streamOperations() {
+        return redisTemplate.opsForStream();
+    }
+
+    private Duration eventStreamTtl() {
+        long configured = Math.max(1, eventStreamTtlMinutes);
+        long retentionFloor = Math.max(jobRetentionMinutes, staleRunningMinutes);
+        return Duration.ofMinutes(Math.max(configured, retentionFloor));
+    }
+
+    private String eventStreamKey(String jobId) {
+        return EVENT_STREAM_PREFIX + jobId;
+    }
+
+    private RedisJobEvent toRedisJobEvent(MapRecord<String, String, String> record) {
+        if (record == null || record.getId() == null) {
+            return null;
+        }
+        String type = record.getValue().get(EVENT_FIELD_TYPE);
+        String eventJson = record.getValue().get(EVENT_FIELD_JSON);
+        if (!StringUtils.hasText(type) || !StringUtils.hasText(eventJson)) {
+            return null;
+        }
+        return new RedisJobEvent(record.getId().getValue(), type, eventJson);
+    }
+
+    private boolean isTerminalRedisEvent(RedisJobEvent event) {
+        return event != null && ("done".equals(event.type()) || "error".equals(event.type()));
+    }
+
+    private String stringField(String eventJson, String... fieldNames) {
+        try {
+            Map<?, ?> event = objectMapper.readValue(eventJson, Map.class);
+            for (String fieldName : fieldNames) {
+                Object value = event.get(fieldName);
+                if (value instanceof String text) {
+                    return text;
+                }
+            }
+        } catch (RuntimeException | IOException e) {
+            log.debug("Could not parse AI route Redis stream event payload: {}", AiLogPrivacy.exceptionSummary(e));
+        }
+        return null;
+    }
+
+    private void sendStoredRedisEvent(SseEmitter emitter, RedisJobEvent event) {
+        if (event == null) {
+            return;
+        }
+        sendSerializedEvent(emitter, event.type(), event.json());
+    }
+
     private void sendTerminalEvents(SseEmitter emitter, RouteJob job) {
         if (job.status == RouteJobStatus.COMPLETED) {
             sendEvent(emitter, "done", Map.of("content", job.content.toString()));
@@ -567,14 +900,26 @@ public class AiRouteGenerationJobService {
 
     private void sendEvent(SseEmitter emitter, String type, Object payload) {
         try {
-            Map<String, Object> event = new HashMap<>();
-            event.put("type", type);
-            if (payload instanceof Map<?, ?> map) {
-                map.forEach((key, value) -> event.put(String.valueOf(key), value));
-            } else {
-                event.put("payload", payload);
-            }
-            emitter.send(SseEmitter.event().data(objectMapper.writeValueAsString(event)));
+            sendSerializedEvent(emitter, type, eventJson(type, payload));
+        } catch (IOException e) {
+            log.debug("Failed to send AI route job SSE event type={}: {}", type, AiLogPrivacy.exceptionSummary(e));
+        }
+    }
+
+    private String eventJson(String type, Object payload) throws JsonProcessingException {
+        Map<String, Object> event = new HashMap<>();
+        event.put("type", type);
+        if (payload instanceof Map<?, ?> map) {
+            map.forEach((key, value) -> event.put(String.valueOf(key), value));
+        } else {
+            event.put("payload", payload);
+        }
+        return objectMapper.writeValueAsString(event);
+    }
+
+    private void sendSerializedEvent(SseEmitter emitter, String type, String eventJson) {
+        try {
+            emitter.send(SseEmitter.event().data(eventJson));
         } catch (IOException e) {
             log.debug("Failed to send AI route job SSE event type={}: {}", type, AiLogPrivacy.exceptionSummary(e));
         }
@@ -621,6 +966,13 @@ public class AiRouteGenerationJobService {
         }
     }
 
+    private record RedisJobEvent(String id, String type, String json) {
+    }
+
+    private record PendingJobStart(long userId, String cacheKey, int days, String budget, String preference,
+                                   String locale) {
+    }
+
     private static final class RouteJob {
         private final String jobId;
         private final long userId;
@@ -639,6 +991,7 @@ public class AiRouteGenerationJobService {
         private volatile Instant updatedAt;
         private volatile StartLockHandle startLock;
         private int persistedContentLength;
+        private final boolean detachedDistributed;
 
         private RouteJob(long userId, String cacheKey, int days, String budget, String preference,
                          String locale, RouteJobStatus status, String content, boolean cached, Long routeRecordId) {
@@ -649,6 +1002,13 @@ public class AiRouteGenerationJobService {
         private RouteJob(String jobId, long userId, String cacheKey, int days, String budget, String preference,
                          String locale, RouteJobStatus status, String content, boolean cached, Long routeRecordId,
                          Instant createdAt, Instant updatedAt) {
+            this(jobId, userId, cacheKey, days, budget, preference, locale, status, content, cached, routeRecordId,
+                    createdAt, updatedAt, false);
+        }
+
+        private RouteJob(String jobId, long userId, String cacheKey, int days, String budget, String preference,
+                         String locale, RouteJobStatus status, String content, boolean cached, Long routeRecordId,
+                         Instant createdAt, Instant updatedAt, boolean detachedDistributed) {
             this.jobId = jobId;
             this.userId = userId;
             this.cacheKey = cacheKey;
@@ -661,6 +1021,7 @@ public class AiRouteGenerationJobService {
             this.routeRecordId = routeRecordId;
             this.createdAt = createdAt == null ? Instant.now() : createdAt;
             this.updatedAt = updatedAt == null ? this.createdAt : updatedAt;
+            this.detachedDistributed = detachedDistributed;
             if (content != null && !content.isBlank()) {
                 this.content.append(content);
                 this.persistedContentLength = content.length();
@@ -675,6 +1036,12 @@ public class AiRouteGenerationJobService {
                                 String budget, String preference, String locale) {
             return new RouteJob(jobId, userId, cacheKey, days, budget, preference, locale,
                     RouteJobStatus.RUNNING, "", false, null, Instant.now(), Instant.now());
+        }
+
+        static RouteJob detachedRunning(String jobId, long userId, int days,
+                                        String budget, String preference, String locale) {
+            return new RouteJob(jobId, userId, "", days, budget, preference, locale,
+                    RouteJobStatus.RUNNING, "", false, null, Instant.now(), Instant.now(), true);
         }
 
         static RouteJob completed(long userId, String cacheKey, int days, String budget, String preference,
@@ -725,6 +1092,10 @@ public class AiRouteGenerationJobService {
 
         boolean isRunning() {
             return status == RouteJobStatus.RUNNING;
+        }
+
+        boolean isDetachedRecordBackedRunning() {
+            return isRunning() && detachedDistributed;
         }
 
         boolean isTerminal() {

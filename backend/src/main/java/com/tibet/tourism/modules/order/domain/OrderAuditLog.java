@@ -1,4 +1,5 @@
 package com.tibet.tourism.modules.order.domain;
+import com.tibet.tourism.common.security.PiiCryptoConverter;
 import com.tibet.tourism.modules.user.domain.User;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
@@ -30,6 +31,7 @@ public class OrderAuditLog {
     @Column(name = "to_status", length = 32)
     private String toStatus;
 
+    @Convert(converter = PiiCryptoConverter.class)
     @Column(columnDefinition = "TEXT")
     private String note;
 

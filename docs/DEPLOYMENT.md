@@ -141,7 +141,7 @@ DB_JDBC_EXTRA_PARAMS=
 ```dotenv
 DB_SSL_MODE=VERIFY_IDENTITY
 DB_ALLOW_PUBLIC_KEY_RETRIEVAL=false
-DB_JDBC_EXTRA_PARAMS=&trustCertificateKeyStoreUrl=file:/run/secrets/mysql-truststore.p12&trustCertificateKeyStorePassword=change-me&trustCertificateKeyStoreType=PKCS12
+DB_JDBC_EXTRA_PARAMS=&trustCertificateKeyStoreUrl=file:/run/secrets/mysql-truststore.p12&trustCertificateKeyStorePassword=replace-with-truststore-password&trustCertificateKeyStoreType=PKCS12
 ```
 
 `DB_JDBC_EXTRA_PARAMS` 会追加到已有 JDBC 查询串后面，因此必须以 `&` 开头。生产环境不要使用 `DB_SSL_MODE=DISABLED`。只有在有明确记录的临时运维场景下，才可以设置 `DB_ALLOW_PUBLIC_KEY_RETRIEVAL=true`。

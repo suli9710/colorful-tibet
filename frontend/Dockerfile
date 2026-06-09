@@ -1,8 +1,8 @@
 # 多阶段构建：先构建前端，再使用nginx服务
-FROM node:22-alpine AS builder
+FROM node:22-alpine@sha256:968df39aedcea65eeb078fb336ed7191baf48f972b4479711397108be0966920 AS builder
 WORKDIR /app
-COPY package*.json ./
-RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
+COPY package.json package-lock.json ./
+RUN npm ci
 COPY . .
 
 # 构建时传入的环境变量
@@ -21,7 +21,7 @@ ENV VITE_AMAP_SECURITY_CODE=$VITE_AMAP_SECURITY_CODE
 
 RUN npm run build
 
-FROM nginx:alpine
+FROM nginx:alpine@sha256:8b1e78743a03dbb2c95171cc58639fef29abc8816598e27fb910ed2e621e589a
 RUN apk add --no-cache gettext \
     && mkdir -p /etc/nginx/certs /var/cache/nginx /var/run /run \
     && chown -R 101:101 /etc/nginx/conf.d /etc/nginx/certs /var/cache/nginx /var/run /run
@@ -34,6 +34,7 @@ COPY nginx.conf /etc/nginx/default.conf.template
 COPY nginx.http.conf /etc/nginx/http.conf.template
 
 ENV NGINX_SERVER_NAME=localhost
+ENV NGINX_REDIRECT_HOST=localhost
 ENV NGINX_CERT_DOMAIN=localhost
 ENV NGINX_HTTP_ONLY=false
 
@@ -46,4 +47,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
 USER 101:101
 
 # Render only our deployment variables and keep nginx runtime variables intact.
-CMD ["sh", "-c", "set -e; if [ \"$NGINX_HTTP_ONLY\" = \"true\" ]; then envsubst '$NGINX_SERVER_NAME $NGINX_CERT_DOMAIN' < /etc/nginx/http.conf.template > /etc/nginx/conf.d/default.conf; else cert_dir=\"/etc/nginx/certs/$NGINX_CERT_DOMAIN\"; for cert_file in fullchain.pem privkey.pem chain.pem; do if [ ! -f \"$cert_dir/$cert_file\" ]; then echo \"Missing TLS certificate file: $cert_dir/$cert_file\" >&2; exit 1; fi; done; envsubst '$NGINX_SERVER_NAME $NGINX_CERT_DOMAIN' < /etc/nginx/default.conf.template > /etc/nginx/conf.d/default.conf; fi; nginx -g 'daemon off;'"]
+CMD ["sh", "-c", "set -e; if [ \"$NGINX_HTTP_ONLY\" = \"true\" ]; then envsubst '$NGINX_SERVER_NAME $NGINX_CERT_DOMAIN $NGINX_REDIRECT_HOST' < /etc/nginx/http.conf.template > /etc/nginx/conf.d/default.conf; else cert_dir=\"/etc/nginx/certs/$NGINX_CERT_DOMAIN\"; for cert_file in fullchain.pem privkey.pem chain.pem; do if [ ! -f \"$cert_dir/$cert_file\" ]; then echo \"Missing TLS certificate file: $cert_dir/$cert_file\" >&2; exit 1; fi; done; envsubst '$NGINX_SERVER_NAME $NGINX_CERT_DOMAIN $NGINX_REDIRECT_HOST' < /etc/nginx/default.conf.template > /etc/nginx/conf.d/default.conf; fi; nginx -g 'daemon off;'"]

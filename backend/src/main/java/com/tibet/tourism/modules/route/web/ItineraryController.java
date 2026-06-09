@@ -6,6 +6,7 @@ import com.tibet.tourism.modules.route.web.dto.itinerary.BookItineraryItemReques
 import com.tibet.tourism.modules.route.web.dto.itinerary.CreateItineraryVersionRequest;
 import com.tibet.tourism.modules.route.web.dto.itinerary.GenerateItineraryRequest;
 import com.tibet.tourism.modules.route.web.dto.itinerary.ItineraryResponse;
+import com.tibet.tourism.modules.route.web.dto.itinerary.ItinerarySummaryResponse;
 import com.tibet.tourism.modules.user.domain.User;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -51,7 +52,7 @@ public class ItineraryController {
     }
 
     @GetMapping("/my")
-    public ResponseEntity<List<ItineraryResponse>> myItineraries(
+    public ResponseEntity<List<ItinerarySummaryResponse>> myItineraries(
             HttpServletRequest httpRequest,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         User user = jwtAuthSupport.resolveCurrentUser(httpRequest);

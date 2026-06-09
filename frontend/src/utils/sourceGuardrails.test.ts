@@ -27,6 +27,10 @@ const safeClientErrorDisplayFiles = [
   '../views/ScenicSpots.vue',
   '../views/UserProfile.vue'
 ] as const
+const dynamicLeafletOwnerFiles = [
+  '../views/Heritage.vue',
+  '../views/ScenicSpotDetail.vue'
+] as const
 const sourceModules = import.meta.glob('../**/*.{js,jsx,ts,tsx,vue}', {
   eager: true,
   query: '?raw',
@@ -159,6 +163,11 @@ describe('frontend source guardrails', () => {
       const source = getSourceModule(filePath)
 
       expect(source, filePath).toContain('summarizeClientError')
+      expect(source, filePath).toContain('uploadEndpoint: string')
+      expect(source, filePath).not.toContain("uploadEndpoint: '/admin/upload-image'")
+      expect(source, filePath).toContain(':alt="uploadLabel(\'previewAlt\')"')
+      expect(source, filePath).toContain('loading="lazy"')
+      expect(source, filePath).toContain('decoding="async"')
       expect(source, filePath).toContain("t('upload.uploadFailed')")
       expect(source, filePath).not.toMatch(/\b\w+\.response\??\.\s*data\??\.\s*(?:error|message)\b/)
       expect(source, filePath).not.toMatch(/\b\w+\.message\b/)
@@ -213,6 +222,17 @@ describe('frontend source guardrails', () => {
     expect(adminUserActionSource).not.toMatch(/\busername\b/)
   })
 
+  it('keeps admin list loader failures visible through sanitized reporting', () => {
+    const adminDashboardSource = getSourceModule('../views/AdminDashboard.vue')
+
+    expect(adminDashboardSource).toContain('const reportAdminListLoadFailure')
+    expect(adminDashboardSource).toContain('safeClientErrorMessage(error, fallback)')
+    expect(adminDashboardSource).toContain('summarizeClientError(error)')
+    for (const resource of ['admin carousels', 'admin routes', 'admin hotels', 'admin room types']) {
+      expect(adminDashboardSource).toContain(`reportAdminListLoadFailure('${resource}', e)`)
+    }
+  })
+
   it('does not scope route planner drafts by internal user id or persistent job id', () => {
     const routePlannerSource = getSourceModule('../views/RoutePlanner.vue')
     const draftSource = getSourceModule('../composables/useRoutePlannerDraft.ts')
@@ -263,6 +283,86 @@ describe('frontend source guardrails', () => {
       .map(({ filePath }) => `${filePath.replace(/^\.\.\//, '')} uses v-html without the shared sanitizer`)
 
     expect(findings).toEqual([])
+  })
+
+  it('keeps route-level pages lazy-loaded for production entry chunk health', () => {
+    const routerSource = getSourceModule('../router/index.ts')
+    const staticViewImports = findImportSpecifiers(routerSource)
+      .filter(importSpecifier => importSpecifier.modulePath.startsWith('../views/'))
+      .filter(importSpecifier => !importSpecifier.typeOnly)
+      .map(importSpecifier => `router/index.ts imports ${importSpecifier.modulePath} statically`)
+
+    expect(staticViewImports).toEqual([])
+    for (const viewPath of Object.keys(sourceModules).filter(filePath => /^..\/views\/.+\.vue$/.test(filePath))) {
+      const routeImport = `() => import('${viewPath.replace('../views/', '../views/')}')`
+      expect(routerSource, `router should lazy-load ${viewPath}`).toContain(routeImport)
+    }
+  })
+
+  it('keeps ECharts centralized behind lazy chart loaders', () => {
+    const directPackageImports = Object.entries(sourceModules)
+      .map(([filePath, source]) => ({
+        filePath: normalizePath(filePath),
+        source: String(source)
+      }))
+      .filter(({ filePath }) => !isTestFile(filePath))
+      .flatMap(({ filePath, source }) =>
+        findImportSpecifiers(source)
+          .filter(importSpecifier => importSpecifier.modulePath === 'echarts' || importSpecifier.modulePath.startsWith('echarts/'))
+          .filter(() => !filePath.startsWith('../lib/echarts'))
+          .map(importSpecifier => `${filePath.replace(/^\.\.\//, '')} imports ${importSpecifier.modulePath} outside the ECharts adapter`)
+      )
+    const eagerAdapterImports = Object.entries(sourceModules)
+      .map(([filePath, source]) => ({
+        filePath: normalizePath(filePath),
+        source: String(source)
+      }))
+      .filter(({ filePath }) => filePath.endsWith('.vue') && !isTestFile(filePath))
+      .flatMap(({ filePath, source }) =>
+        findImportSpecifiers(source)
+          .filter(importSpecifier => importSpecifier.modulePath.startsWith('@/lib/echarts'))
+          .filter(importSpecifier => !importSpecifier.typeOnly)
+          .map(importSpecifier => `${filePath.replace(/^\.\.\//, '')} eagerly imports ${importSpecifier.modulePath}`)
+      )
+    const lazyChartOwners = [
+      ['../components/AdminAnalyticsPanel.vue', '@/lib/echartsAdmin'],
+      ['../components/HeatMap.vue', '@/lib/echartsHeatMap']
+    ] as const
+
+    expect(directPackageImports).toEqual([])
+    expect(eagerAdapterImports).toEqual([])
+    for (const [filePath, modulePath] of lazyChartOwners) {
+      expect(getSourceModule(filePath), filePath).toContain(`import('${modulePath}')`)
+    }
+  })
+
+  it('keeps Leaflet maps dynamically loaded only by map detail experiences', () => {
+    const findings = Object.entries(sourceModules)
+      .map(([filePath, source]) => ({
+        filePath: normalizePath(filePath),
+        source: String(source)
+      }))
+      .filter(({ filePath }) => !isTestFile(filePath))
+      .flatMap(({ filePath, source }) => {
+        const staticImports = findImportSpecifiers(source)
+          .filter(importSpecifier => importSpecifier.modulePath === 'leaflet' || importSpecifier.modulePath.startsWith('leaflet/'))
+          .filter(importSpecifier => !importSpecifier.typeOnly)
+          .map(importSpecifier => `${filePath.replace(/^\.\.\//, '')} statically imports ${importSpecifier.modulePath}`)
+        const dynamicImports = findDynamicImportSpecifiers(source)
+          .filter(modulePath => modulePath === 'leaflet')
+          .filter(() => !dynamicLeafletOwnerFiles.includes(filePath as typeof dynamicLeafletOwnerFiles[number]))
+          .map(modulePath => `${filePath.replace(/^\.\.\//, '')} dynamically imports ${modulePath} outside the map detail allowlist`)
+
+        return [...staticImports, ...dynamicImports]
+      })
+
+    expect(findings).toEqual([])
+    for (const filePath of dynamicLeafletOwnerFiles) {
+      const source = getSourceModule(filePath)
+
+      expect(source, filePath).toContain("import('leaflet')")
+      expect(source, filePath).toContain("import('leaflet/dist/leaflet.css')")
+    }
   })
 })
 
@@ -470,6 +570,33 @@ const formatFinding = (finding: NativeDialogFinding) =>
   `${finding.filePath.replace(/^\.\.\//, '')}:${finding.line}:${finding.column} uses native ${finding.dialog}(): ${finding.snippet}`
 
 const normalizePath = (filePath: string) => filePath.replace(/\\/g, '/')
+
+const findImportSpecifiers = (source: string) => {
+  const imports: Array<{ modulePath: string; typeOnly: boolean }> = []
+  const importPattern = /^\s*import\s+(type\s+)?(?:[\s\S]*?\s+from\s+)?['"]([^'"]+)['"]/gm
+  let match: RegExpExecArray | null
+
+  while ((match = importPattern.exec(source)) !== null) {
+    imports.push({
+      modulePath: match[2],
+      typeOnly: Boolean(match[1])
+    })
+  }
+
+  return imports
+}
+
+const findDynamicImportSpecifiers = (source: string) => {
+  const imports: string[] = []
+  const importPattern = /\bimport\(\s*['"]([^'"]+)['"]\s*\)/g
+  let match: RegExpExecArray | null
+
+  while ((match = importPattern.exec(source)) !== null) {
+    imports.push(match[1])
+  }
+
+  return imports
+}
 
 const getSourceSection = (source: string, startMarker: string, endMarker: string) => {
   const startIndex = source.indexOf(startMarker)

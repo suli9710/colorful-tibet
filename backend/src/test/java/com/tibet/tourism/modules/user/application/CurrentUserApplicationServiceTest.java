@@ -18,6 +18,7 @@ import com.tibet.tourism.modules.community.infra.SharedRouteRepository;
 import com.tibet.tourism.modules.community.web.dto.CommentDTO;
 import com.tibet.tourism.modules.community.web.dto.RouteCommentResponse;
 import com.tibet.tourism.modules.order.infra.BookingRepository;
+import com.tibet.tourism.modules.spot.domain.ScenicSpot;
 import com.tibet.tourism.modules.upload.application.FileStorageService;
 import com.tibet.tourism.modules.user.domain.User;
 import com.tibet.tourism.modules.user.infra.UserRepository;
@@ -108,12 +109,20 @@ class CurrentUserApplicationServiceTest {
         spotComment.setContent("Spot comment");
         spotComment.setRating(5);
         spotComment.setCreatedAt(LocalDateTime.parse("2026-01-02T03:04:05"));
+        ScenicSpot spot = new ScenicSpot();
+        spot.setId(30L);
+        spot.setName("Potala Palace");
+        spotComment.setSpot(spot);
 
         RouteComment routeComment = new RouteComment();
         routeComment.setId(20L);
         routeComment.setUser(user);
         routeComment.setContent("Route comment");
         routeComment.setCreatedAt(LocalDateTime.parse("2026-01-02T04:04:05"));
+        SharedRoute route = new SharedRoute();
+        route.setId(40L);
+        route.setTitle("Lhasa classic route");
+        routeComment.setRoute(route);
 
         when(userRepository.findById(7L)).thenReturn(Optional.of(user));
         when(commentRepository.findByUser(eq(user), any(Pageable.class)))
@@ -129,6 +138,14 @@ class CurrentUserApplicationServiceTest {
         assertThat(comments.get("routeCommentsPage")).isInstanceOf(PageResponse.class);
         assertThat(comments.get("spotComments").toString()).doesNotContain("hashed-password", "13800138000", "203.0.113.99");
         assertThat(comments.get("routeComments").toString()).doesNotContain("hashed-password", "13800138000", "203.0.113.99");
+        CommentDTO spotDto = (CommentDTO) ((List<?>) comments.get("spotComments")).get(0);
+        RouteCommentResponse routeDto = (RouteCommentResponse) ((List<?>) comments.get("routeComments")).get(0);
+        assertThat(spotDto.getSpot())
+                .extracting(CommentDTO.ParentSpotResponse::id, CommentDTO.ParentSpotResponse::name)
+                .containsExactly(30L, "Potala Palace");
+        assertThat(routeDto.route())
+                .extracting(RouteCommentResponse.ParentRouteResponse::id, RouteCommentResponse.ParentRouteResponse::title)
+                .containsExactly(40L, "Lhasa classic route");
     }
 
     @Test

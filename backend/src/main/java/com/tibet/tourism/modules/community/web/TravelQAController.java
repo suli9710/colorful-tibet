@@ -135,6 +135,8 @@ public class TravelQAController {
             sorting = Sort.by(Sort.Direction.DESC, "answerCount", "createdAt");
         } else if ("oldest".equals(sort)) {
             sorting = Sort.by(Sort.Direction.ASC, "createdAt");
+        } else if ("unsolved".equals(sort)) {
+            sorting = Sort.by(Sort.Order.asc("isResolved"), Sort.Order.desc("createdAt"));
         } else {
             sorting = Sort.by(Sort.Direction.DESC, "createdAt");
         }
@@ -144,8 +146,8 @@ public class TravelQAController {
                 InputSanitizer.normalizePageSize(size, 10, 50),
                 sorting);
         Long currentUserId = getOptionalCurrentUserId(request);
-        Page<TravelQuestionSummaryResponse> questions = qaService.getQuestions(tag, sort, status, pageable)
-                .map(question -> TravelQuestionSummaryResponse.fromEntity(question, currentUserId));
+        Page<TravelQuestionSummaryResponse> questions = qaService.getQuestionSummaries(
+                tag, status, pageable, currentUserId);
         return ResponseEntity.ok(PageResponse.from(questions));
     }
 

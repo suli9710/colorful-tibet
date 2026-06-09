@@ -15,6 +15,7 @@ import com.tibet.tourism.modules.route.infra.ItineraryRepository;
 import com.tibet.tourism.modules.route.web.dto.itinerary.BookItineraryItemRequest;
 import com.tibet.tourism.modules.route.web.dto.itinerary.GenerateItineraryRequest;
 import com.tibet.tourism.modules.route.web.dto.itinerary.ItineraryResponse;
+import com.tibet.tourism.modules.route.web.dto.itinerary.ItinerarySummaryResponse;
 import com.tibet.tourism.modules.spot.domain.ScenicSpot;
 import com.tibet.tourism.modules.spot.infra.ScenicSpotRepository;
 import com.tibet.tourism.modules.user.domain.User;
@@ -147,6 +148,25 @@ class ItineraryServiceTest {
     }
 
     @Test
+    void getMyItinerariesReturnsSummaryWithoutLoadingDays() {
+        Itinerary itinerary = spy(savedItinerary(202L));
+        lenient().doThrow(new AssertionError("List summaries must not load itinerary days"))
+                .when(itinerary).getItineraryDays();
+        when(itineraryRepository.findByUserId(eq(user.getId()), any(Pageable.class)))
+                .thenAnswer(invocation -> new PageImpl<>(
+                        List.of(itinerary),
+                        invocation.getArgument(1),
+                        1));
+
+        var response = itineraryService.getMyItineraries(user, PageRequest.of(0, 20));
+
+        ItinerarySummaryResponse summary = response.getContent().get(0);
+        assertEquals(202L, summary.id());
+        assertEquals("Lhasa itinerary", summary.title());
+        assertEquals("DRAFT", summary.status());
+    }
+
+    @Test
     void getMyItinerariesDefaultsToFirstTwentyWhenPageableIsMissing() {
         Itinerary itinerary = savedItinerary(201L);
         when(itineraryRepository.findByUserId(eq(user.getId()), any(Pageable.class)))
@@ -164,6 +184,45 @@ class ItineraryServiceTest {
         assertEquals(0, safePageable.getPageNumber());
         assertEquals(20, safePageable.getPageSize());
         assertEquals(Sort.Direction.DESC, safePageable.getSort().getOrderFor("createdAt").getDirection());
+    }
+
+    @Test
+    void getItineraryStillReturnsFullDaysItemsAndRelatedNames() {
+        Itinerary itinerary = savedItinerary(203L);
+        ItineraryDay day = new ItineraryDay();
+        day.setId(301L);
+        day.setDayNumber(1);
+        day.setTravelDate(LocalDate.of(2026, 6, 1));
+        day.setTitle("Day 1");
+        day.setRegion("Lhasa");
+        day.setSummary("Arrive and adapt");
+        day.setEstimatedCost(BigDecimal.valueOf(520));
+        day.setAltitudeRisk("LOW");
+
+        ItineraryItem item = new ItineraryItem();
+        item.setId(401L);
+        item.setItemType(ItineraryItem.ItemType.HOTEL);
+        item.setTitle("Hotel stay");
+        item.setDescription("Rest night");
+        item.setEstimatedCost(BigDecimal.valueOf(520));
+        item.setBookingAction(ItineraryItem.BookingAction.BOOK_HOTEL);
+        item.setBookingStatus(ItineraryItem.BookingStatus.BOOKABLE);
+        item.setScenicSpot(potala);
+        item.setHotel(hotel);
+        item.setRoomType(roomType);
+        day.addItem(item);
+        itinerary.addDay(day);
+
+        when(itineraryRepository.findByIdAndUserId(203L, user.getId())).thenReturn(Optional.of(itinerary));
+
+        ItineraryResponse response = itineraryService.getItinerary(user, 203L);
+
+        assertEquals(1, response.itineraryDays().size());
+        assertEquals(1, response.itineraryDays().get(0).items().size());
+        var itemResponse = response.itineraryDays().get(0).items().get(0);
+        assertEquals(potala.getId(), itemResponse.scenicSpotId());
+        assertEquals(hotel.getName(), itemResponse.hotelName());
+        assertEquals(roomType.getName(), itemResponse.roomTypeName());
     }
 
     @Test

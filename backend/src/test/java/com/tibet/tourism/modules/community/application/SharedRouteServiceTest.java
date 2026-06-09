@@ -3,33 +3,37 @@ package com.tibet.tourism.modules.community.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.tibet.tourism.modules.community.domain.RouteComment;
-import com.tibet.tourism.modules.community.domain.RouteLike;
 import com.tibet.tourism.modules.community.domain.SharedRoute;
 import com.tibet.tourism.modules.community.infra.CommentRepository;
 import com.tibet.tourism.modules.community.infra.RouteCommentRepository;
 import com.tibet.tourism.modules.community.infra.RouteLikeRepository;
 import com.tibet.tourism.modules.community.infra.SharedRouteRepository;
+import com.tibet.tourism.modules.community.infra.SharedRouteSummaryRow;
+import com.tibet.tourism.modules.community.web.dto.SharedRouteSummaryResponse;
 import com.tibet.tourism.modules.user.domain.User;
 import com.tibet.tourism.modules.user.infra.UserRepository;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.domain.Specification;
 
 @ExtendWith(MockitoExtension.class)
 class SharedRouteServiceTest {
@@ -85,12 +89,29 @@ class SharedRouteServiceTest {
 
     @Test
     void routeFiltersAcceptCanonicalKeysAndChineseValues() {
-        when(routeRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(Page.empty());
+        when(routeRepository.findSummaries(any(), any(), any(), any(Pageable.class))).thenReturn(Page.empty());
 
         service.getRoutes(null, "economy", "relaxation", PageRequest.of(0, 10));
         service.getRoutes(null, "经济型", "休闲度假", PageRequest.of(0, 10));
 
-        verify(routeRepository, times(2)).findAll(any(Specification.class), any(Pageable.class));
+        verify(routeRepository, times(2))
+                .findSummaries(isNull(), eq("经济型"), eq("休闲度假"), any(Pageable.class));
+    }
+
+    @Test
+    void getRoutesMapsSummaryProjectionWithoutRouteEntityContent() {
+        Pageable pageable = PageRequest.of(0, 10);
+        when(routeRepository.findSummaries(null, null, null, pageable))
+                .thenReturn(new PageImpl<>(List.of(summaryRow(100L, 7L)), pageable, 1));
+
+        Page<SharedRouteSummaryResponse> result = service.getRoutes(null, null, null, pageable, 7L);
+
+        SharedRouteSummaryResponse summary = result.getContent().get(0);
+        assertThat(summary.id()).isEqualTo(100L);
+        assertThat(summary.title()).isEqualTo("Lhasa route");
+        assertThat(summary.author().owner()).isTrue();
+        assertThat(summary.author().nickname()).isEqualTo("Tibet Traveler");
+        verify(routeRepository).findSummaries(null, null, null, pageable);
     }
 
     @Test
@@ -114,17 +135,16 @@ class SharedRouteServiceTest {
     @Test
     void getRoutesByAuthorUsesPagedRepositoryLookup() {
         User author = user();
-        SharedRoute route = new SharedRoute();
-        route.setId(100L);
         Pageable pageable = PageRequest.of(0, 1);
-        when(routeRepository.findByAuthor(author, pageable))
-                .thenReturn(new PageImpl<>(List.of(route), pageable, 6));
+        when(routeRepository.findSummariesByAuthorId(author.getId(), pageable))
+                .thenReturn(new PageImpl<>(List.of(summaryRow(100L, author.getId())), pageable, 6));
 
-        Page<SharedRoute> result = service.getRoutesByAuthor(author, pageable);
+        Page<SharedRouteSummaryResponse> result = service.getRoutesByAuthor(author, pageable);
 
-        assertThat(result.getContent()).containsExactly(route);
+        assertThat(result.getContent().get(0).id()).isEqualTo(100L);
+        assertThat(result.getContent().get(0).author().owner()).isTrue();
         assertThat(result.getTotalElements()).isEqualTo(6);
-        verify(routeRepository).findByAuthor(author, pageable);
+        verify(routeRepository).findSummariesByAuthorId(author.getId(), pageable);
     }
 
     @Test
@@ -133,8 +153,7 @@ class SharedRouteServiceTest {
         SharedRoute route = sharedRoute(user);
         when(routeRepository.findById(100L)).thenReturn(Optional.of(route));
         when(userRepository.findById(7L)).thenReturn(Optional.of(user));
-        when(likeRepository.existsByRouteAndUser(route, user)).thenReturn(false);
-        when(likeRepository.saveAndFlush(any(RouteLike.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(likeRepository.insertIgnore(100L, 7L)).thenReturn(1);
         when(routeRepository.findLikeCountById(100L)).thenReturn(Optional.of(3));
 
         SharedRouteService.LikeResult result = service.likeRoute(100L, 7L);
@@ -151,9 +170,7 @@ class SharedRouteServiceTest {
         SharedRoute route = sharedRoute(user);
         when(routeRepository.findById(100L)).thenReturn(Optional.of(route));
         when(userRepository.findById(7L)).thenReturn(Optional.of(user));
-        when(likeRepository.existsByRouteAndUser(route, user)).thenReturn(false);
-        when(likeRepository.saveAndFlush(any(RouteLike.class)))
-                .thenThrow(new DataIntegrityViolationException("duplicate route like"));
+        when(likeRepository.insertIgnore(100L, 7L)).thenReturn(0);
         when(routeRepository.findLikeCountById(100L)).thenReturn(Optional.of(1));
 
         SharedRouteService.LikeResult result = service.likeRoute(100L, 7L);
@@ -162,6 +179,47 @@ class SharedRouteServiceTest {
         assertThat(result.likeCount()).isEqualTo(1);
         verify(routeRepository, never()).incrementLikeCount(100L);
         verify(routeRepository, never()).incrementViewCount(100L);
+    }
+
+    @Test
+    void deleteRouteCleansChildRowsBeforeDeletingOwnedRoute() {
+        User author = user();
+        SharedRoute route = sharedRoute(author);
+        route.setCommentCount(2);
+        route.setLikeCount(1);
+        when(routeRepository.findById(100L)).thenReturn(Optional.of(route));
+
+        service.deleteRoute(100L, 7L);
+
+        InOrder orderedDeletes = inOrder(likeRepository, commentRepository, routeRepository);
+        orderedDeletes.verify(routeRepository).findById(100L);
+        orderedDeletes.verify(likeRepository).deleteByRouteId(100L);
+        orderedDeletes.verify(commentRepository).deleteByRouteId(100L);
+        orderedDeletes.verify(routeRepository).delete(route);
+    }
+
+    private SharedRouteSummaryRow summaryRow(Long routeId, Long authorId) {
+        return new SharedRouteSummaryRow(
+                routeId,
+                authorId,
+                "traveler",
+                "Tibet Traveler",
+                "/avatars/u7.png",
+                "Lhasa route",
+                3,
+                "舒适型",
+                "自然风光",
+                SharedRoute.SourceType.USER,
+                null,
+                null,
+                "medium",
+                "5C - 15C",
+                "plateau",
+                12,
+                2,
+                0,
+                LocalDateTime.parse("2026-01-02T03:04:05"),
+                LocalDateTime.parse("2026-01-03T03:04:05"));
     }
 
     private User user() {

@@ -7,6 +7,7 @@ from scraper import (
     build_scrape_result,
     build_search_urls,
     extract_price_evidence,
+    scrape_price_for_spot,
     select_best_price,
     validate_target_url,
 )
@@ -75,6 +76,29 @@ class ScraperUrlSafetyTest(unittest.TestCase):
         ):
             with self.assertRaises(ValueError):
                 validate_target_url("https://example.com/spot")
+
+    def test_scrape_price_for_spot_applies_configured_domain_allowlist(self):
+        with patch(
+            "scraper.build_search_urls",
+            return_value=[
+                "https://www.baidu.com/s?wd=%E5%B8%83%E8%BE%BE%E6%8B%89%E5%AE%AB",
+                "https://www.bing.com/search?q=%E5%B8%83%E8%BE%BE%E6%8B%89%E5%AE%AB",
+            ],
+        ), patch(
+            "scraper.socket.getaddrinfo",
+            return_value=[(None, None, None, None, ("8.8.8.8", 0))],
+        ), patch("scraper.ManagedFetcher") as fetcher_class:
+            fetcher = fetcher_class.return_value.__enter__.return_value
+            fetcher.label = "Scrapling (basic)"
+            fetcher.fetch.return_value = "布达拉宫门票价格200元"
+
+            result = scrape_price_for_spot(
+                "布达拉宫",
+                config=ScraperConfig(allowed_domains=("baidu.com",), max_sources=2),
+            )
+
+        fetcher.fetch.assert_called_once_with("https://www.baidu.com/s?wd=%E5%B8%83%E8%BE%BE%E6%8B%89%E5%AE%AB")
+        self.assertEqual(Decimal("200"), result.base_price)
 
     def test_config_defaults_are_bounded(self):
         config = ScraperConfig(max_sources=4, search_providers=("baidu", "bing"))

@@ -9,6 +9,10 @@ import org.springframework.mock.env.MockEnvironment;
 
 class ProductionSafetyValidatorTest {
 
+    private static final String PII_KEYS =
+            "kid-prod:MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=";
+    private static final String PII_ACTIVE_KID = "kid-prod";
+
     @Test
     void prodProfileRejectsInsecureCookies() {
         ProductionSafetyValidator validator = validator(true, false, true, false, "scrapling-key");
@@ -39,6 +43,20 @@ class ProductionSafetyValidatorTest {
     @Test
     void prodProfileRejectsMissingScraplingApiKey() {
         ProductionSafetyValidator validator = validator(true, true, true, false, " ");
+
+        assertThatThrownBy(validator::validateProductionSafety)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("scrapling.service.api-key");
+    }
+
+    @Test
+    void prodProfileRejectsPlaceholderScraplingApiKey() {
+        ProductionSafetyValidator validator = validator(
+                true,
+                true,
+                true,
+                false,
+                "replace-with-at-least-32-random-characters");
 
         assertThatThrownBy(validator::validateProductionSafety)
                 .isInstanceOf(IllegalStateException.class)
@@ -91,6 +109,87 @@ class ProductionSafetyValidatorTest {
     }
 
     @Test
+    void prodProfileRejectsBlankRecaptchaSecretKey() {
+        ProductionSafetyValidator validator = validator(
+                true,
+                true,
+                true,
+                false,
+                "scrapling-key",
+                true,
+                true,
+                "site-key",
+                " ");
+
+        assertThatThrownBy(validator::validateProductionSafety)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("app.security.antibot.recaptcha.secret-key");
+    }
+
+    @Test
+    void prodProfileRejectsPlaceholderSuperAdminTotpSecret() {
+        ProductionSafetyValidator validator = new ProductionSafetyValidator(
+                productionEnvironment(),
+                true,
+                true,
+                false,
+                "scrapling-key",
+                true,
+                true,
+                "site-key",
+                "secret-key",
+                PII_KEYS,
+                PII_ACTIVE_KID,
+                "replace-with-base32-totp-secret");
+
+        assertThatThrownBy(validator::validateProductionSafety)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("app.security.super-admin-totp-secret");
+    }
+
+    @Test
+    void prodProfileRejectsMissingPiiKeys() {
+        ProductionSafetyValidator validator = new ProductionSafetyValidator(
+                productionEnvironment(),
+                true,
+                true,
+                false,
+                "scrapling-key",
+                true,
+                true,
+                "site-key",
+                "secret-key",
+                "",
+                PII_ACTIVE_KID,
+                "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ");
+
+        assertThatThrownBy(validator::validateProductionSafety)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("app.security.pii-keys");
+    }
+
+    @Test
+    void prodProfileRejectsPiiActiveKidOutsideConfiguredKeys() {
+        ProductionSafetyValidator validator = new ProductionSafetyValidator(
+                productionEnvironment(),
+                true,
+                true,
+                false,
+                "scrapling-key",
+                true,
+                true,
+                "site-key",
+                "secret-key",
+                PII_KEYS,
+                "kid-missing",
+                "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ");
+
+        assertThatThrownBy(validator::validateProductionSafety)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("app.security.pii-active-kid to match app.security.pii-keys");
+    }
+
+    @Test
     void productionEnvironmentVariablesTriggerProductionSafety() {
         for (String variableName : List.of("APP_ENV", "ENVIRONMENT", "RAILWAY_ENVIRONMENT")) {
             MockEnvironment environment = localEnvironment();
@@ -99,6 +198,31 @@ class ProductionSafetyValidatorTest {
 
             assertThatThrownBy(validator::validateProductionSafety)
                     .as(variableName)
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("scrapling.service.api-key");
+        }
+    }
+
+    @Test
+    void productionProfileNameTriggersProductionSafety() {
+        MockEnvironment environment = new MockEnvironment();
+        environment.setActiveProfiles("production");
+        ProductionSafetyValidator validator = validator(environment, true, false, false, "scrapling-key");
+
+        assertThatThrownBy(validator::validateProductionSafety)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("app.security.require-strong-secrets=true");
+    }
+
+    @Test
+    void dottedProductionEnvironmentPropertiesTriggerProductionSafety() {
+        for (String propertyName : List.of("app.env", "railway.environment")) {
+            MockEnvironment environment = localEnvironment();
+            environment.setProperty(propertyName, "production");
+            ProductionSafetyValidator validator = validator(environment, true, true, false, "");
+
+            assertThatThrownBy(validator::validateProductionSafety)
+                    .as(propertyName)
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("scrapling.service.api-key");
         }
@@ -184,6 +308,12 @@ class ProductionSafetyValidatorTest {
         return environment;
     }
 
+    private MockEnvironment productionEnvironment() {
+        MockEnvironment environment = new MockEnvironment();
+        environment.setActiveProfiles("prod");
+        return environment;
+    }
+
     private ProductionSafetyValidator validator(
             MockEnvironment environment,
             boolean cookieSecure,
@@ -199,7 +329,10 @@ class ProductionSafetyValidatorTest {
                 true,
                 true,
                 "site-key",
-                "secret-key");
+                "secret-key",
+                PII_KEYS,
+                PII_ACTIVE_KID,
+                "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ");
     }
 
     private ProductionSafetyValidator validator(
@@ -221,6 +354,9 @@ class ProductionSafetyValidatorTest {
                 recaptchaEnabled,
                 registrationRecaptchaRequired,
                 recaptchaSiteKey,
-                recaptchaSecretKey);
+                recaptchaSecretKey,
+                PII_KEYS,
+                PII_ACTIVE_KID,
+                "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ");
     }
 }

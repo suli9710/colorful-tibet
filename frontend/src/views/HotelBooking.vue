@@ -88,7 +88,7 @@
               </div>
             </div>
             <p :id="dateHelpId" class="mt-3 text-xs leading-relaxed text-gray-500">
-              离店日期需要晚于入住日期，最长可提交 30 晚咨询；系统仅提交咨询意向，不在站内收款。
+              {{ t('hotel.bookingDateHelp', { max: MAX_BOOKING_NIGHTS }) }}
             </p>
             <div class="mt-4">
               <label for="hotel-booking-guests" class="block text-sm font-medium text-gray-700 mb-2">{{ t('hotel.guests') }}</label>
@@ -102,7 +102,7 @@
                 <option v-for="n in guestOptions" :key="n" :value="n">{{ n }}{{ t('hotel.guests') }}</option>
               </select>
               <p :id="guestHelpId" class="mt-2 text-xs leading-relaxed text-gray-500">
-                当前房型建议 {{ selectedRoomCapacity }} 人内入住，超出人数请备注说明或更换房型。
+                {{ t('hotel.guestCapacityHelp', { capacity: selectedRoomCapacity }) }}
               </p>
             </div>
           </motion.div>
@@ -146,7 +146,7 @@
               </div>
             </div>
             <p :id="contactHelpId" class="mt-3 text-xs leading-relaxed text-gray-500">
-              联系方式仅用于酒店咨询确认，请填写可联系到您的姓名和电话。
+              {{ t('hotel.contactHelp') }}
             </p>
             <div class="mt-4">
               <label for="hotel-booking-note" class="block text-sm font-medium text-gray-700 mb-2">{{ t('hotel.noteLabel') }}</label>
@@ -252,14 +252,14 @@
                 :transition="{ duration: 0.28, ease: motionEase }"
               >
               <div class="flex justify-between gap-4"><span class="text-gray-500">{{ t('hotel.roomType') }}</span><span class="text-right font-medium">{{ selectedRoom.name }}</span></div>
-              <div class="flex justify-between gap-4"><span class="text-gray-500">{{ t('hotel.perNight') }}</span><span class="font-medium">¥{{ selectedRoom.price }}</span></div>
+              <div class="flex justify-between gap-4"><span class="text-gray-500">{{ t('hotel.perNight') }}</span><span class="font-medium">{{ t('common.priceCny', { price: selectedRoom.price }) }}</span></div>
               <div class="flex justify-between gap-4"><span class="text-gray-500">{{ t('hotel.nights') }}</span><span class="font-medium">{{ nights }}{{ t('common.nightsUnit') }}</span></div>
               <div class="flex justify-between gap-4"><span class="text-gray-500">{{ t('hotel.checkIn') }}</span><span class="font-medium">{{ form.checkInDate || '-' }}</span></div>
               <div class="flex justify-between gap-4"><span class="text-gray-500">{{ t('hotel.checkOut') }}</span><span class="font-medium">{{ form.checkOutDate || '-' }}</span></div>
-              <div class="flex justify-between gap-4"><span class="text-gray-500">房费小计</span><span class="font-medium">¥{{ roomSubtotal }}</span></div>
-              <div class="flex justify-between gap-4"><span class="text-gray-500">平台服务费</span><span class="font-medium">¥0</span></div>
-              <div class="flex justify-between gap-4"><span class="text-gray-500">今日应付</span><span class="font-medium text-emerald-700">¥0</span></div>
-              <div class="flex justify-between gap-4"><span class="text-gray-500">房态</span><span class="font-medium text-amber-700">{{ bookingAvailabilityLabel }}</span></div>
+              <div class="flex justify-between gap-4"><span class="text-gray-500">{{ t('hotel.roomSubtotal') }}</span><span class="font-medium">{{ t('common.priceCny', { price: roomSubtotal }) }}</span></div>
+              <div class="flex justify-between gap-4"><span class="text-gray-500">{{ t('hotel.platformServiceFee') }}</span><span class="font-medium">{{ t('common.priceCny', { price: 0 }) }}</span></div>
+              <div class="flex justify-between gap-4"><span class="text-gray-500">{{ t('hotel.dueToday') }}</span><span class="font-medium text-emerald-700">{{ t('common.priceCny', { price: 0 }) }}</span></div>
+              <div class="flex justify-between gap-4"><span class="text-gray-500">{{ t('hotel.availabilityStatus') }}</span><span class="font-medium text-amber-700">{{ bookingAvailabilityLabel }}</span></div>
               <div class="flex justify-between border-t border-tibet-gold/20 pt-2 mt-2 gap-4">
                 <span class="font-semibold">{{ t('hotel.referenceRoomFee') }}</span>
                 <motion.span
@@ -269,11 +269,11 @@
                   :animate="{ opacity: 1, y: 0 }"
                   :transition="{ duration: 0.2, ease: motionEase }"
                 >
-                  ¥{{ totalPrice }}
+                  {{ totalPriceLabel }}
                 </motion.span>
               </div>
               <div class="space-y-2 pt-1">
-                <p v-for="item in bookingAssuranceItems" :key="item.title" class="rounded-xl px-3 py-2 text-xs leading-5" :class="item.className">
+                <p v-for="item in bookingAssuranceItems" :key="item.id" class="rounded-xl px-3 py-2 text-xs leading-5" :class="item.className">
                   <span class="font-semibold">{{ item.title }}</span> {{ item.description }}
                 </p>
               </div>
@@ -288,7 +288,7 @@
                 :exit="{ opacity: 0, y: 8 }"
                 :transition="{ duration: 0.28, ease: motionEase }"
               >
-                当前房型暂不可咨询，请返回酒店详情重新选择。
+                {{ t('hotel.roomUnavailablePrompt') }}
               </motion.div>
             </AnimatePresence>
           </motion.div>
@@ -300,10 +300,12 @@
   <MobileStickyActionBar
     :show="Boolean(hotel)"
     :eyebrow="t('hotel.referenceRoomFee')"
-    :title="`¥${totalPrice}`"
+    :title="totalPriceLabel"
     :meta="selectedRoom?.name || hotel?.name"
     :primary-label="submitting ? t('common.submitting') : t('hotel.submitInquiry')"
     :primary-disabled="submitting || bookingUnavailable"
+    :primary-busy="submitting"
+    :primary-described-by="bookingFormDescribedBy"
     @primary="submitBooking"
   />
 </template>
@@ -313,13 +315,15 @@ import { computed, ref, watch } from 'vue'
 import { AnimatePresence, motion } from 'motion-v'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { getHotelById, getRoomById, hotels } from '../data/hotels'
+import { isAxiosError } from 'axios'
+import { getHotelById, getRoomById, hotels, type HotelItem, type HotelRoom } from '../data/hotels'
 import { applyHotelImageFallback, resolveHotelCoverImage } from '../data/hotelImages'
 import { getCanonicalRegion, localizeApiRoom, localizeHotel } from '../data/hotelTranslations'
 import api, { endpoints } from '../api'
 import { clearHotelOrderClientStorage } from '../api/cache'
 import MobileStickyActionBar from '../components/MobileStickyActionBar.vue'
 import { useBehaviorTracker } from '../composables/useBehaviorTracker'
+import { toFiniteAmount } from '../i18n/formatting'
 import { safeClientErrorMessage } from '../utils/errorMonitoring'
 import {
   cardInitial,
@@ -337,20 +341,120 @@ const router = useRouter()
 
 const hotelId = computed(() => Number(route.params.id || 1))
 const roomId = computed(() => Number(route.query.roomId || 1))
-const apiHotel = ref<any>(null)
-const apiRoomTypes = ref<any[]>([])
+
+interface ApiHotelResponse {
+  id: number
+  name: string
+  location?: string
+  facilities?: string
+  imageUrl?: string
+  description?: string
+  rating?: number | string | null
+  priceMin?: number | string | null
+  available?: boolean
+}
+
+interface BookingRoom extends HotelRoom {
+  amenities?: string
+  capacity?: number | string | null
+  maxGuests?: number | string | null
+}
+
+interface BookingAssuranceItem {
+  id: string
+  title: string
+  description: string
+  className: string
+}
+
+const apiHotel = ref<ApiHotelResponse | null>(null)
+const apiRoomTypes = ref<BookingRoom[]>([])
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null
+
+const readText = (record: Record<string, unknown>, key: string) => {
+  const value = record[key]
+  if (typeof value === 'string') return value
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value)
+  return undefined
+}
+
+const readBoolean = (record: Record<string, unknown>, key: string) => {
+  const value = record[key]
+  return typeof value === 'boolean' ? value : undefined
+}
+
+const readAmount = (record: Record<string, unknown>, key: string) => {
+  const value = record[key]
+  return typeof value === 'number' || typeof value === 'string' ? value : undefined
+}
+
+const readPositiveId = (record: Record<string, unknown>, key: string) => {
+  const id = Math.trunc(toFiniteAmount(readAmount(record, key)))
+  return id > 0 ? id : undefined
+}
+
+const normalizeApiHotel = (value: unknown): ApiHotelResponse | null => {
+  if (!isRecord(value)) return null
+
+  const id = readPositiveId(value, 'id') ?? hotelId.value
+  const name = readText(value, 'name') || getHotelById(id)?.name || ''
+  if (!name) return null
+
+  return {
+    id,
+    name,
+    location: readText(value, 'location'),
+    facilities: readText(value, 'facilities'),
+    imageUrl: readText(value, 'imageUrl'),
+    description: readText(value, 'description'),
+    rating: readAmount(value, 'rating') ?? null,
+    priceMin: readAmount(value, 'priceMin') ?? null,
+    available: readBoolean(value, 'available')
+  }
+}
+
+const normalizeApiRoom = (value: unknown): BookingRoom | null => {
+  if (!isRecord(value)) return null
+
+  const id = readPositiveId(value, 'id')
+  const name = readText(value, 'name')
+  if (!id || !name) return null
+
+  const desc = readText(value, 'desc') || readText(value, 'amenities') || ''
+  return {
+    id,
+    name,
+    price: toFiniteAmount(readAmount(value, 'price')),
+    desc,
+    amenities: readText(value, 'amenities') || desc,
+    capacity: readAmount(value, 'capacity') ?? null,
+    maxGuests: readAmount(value, 'maxGuests') ?? null
+  }
+}
+
+const toBookingRoom = (room: HotelRoom): BookingRoom => ({
+  ...room,
+  amenities: room.desc
+})
+
+const normalizeApiRooms = (value: unknown) =>
+  Array.isArray(value)
+    ? value.map(normalizeApiRoom).filter((room): room is BookingRoom => room !== null)
+    : []
 
 const loadBookingData = async () => {
   apiHotel.value = null
   apiRoomTypes.value = []
   try {
     const [hotelRes, roomRes] = await Promise.all([
-      api.get(endpoints.hotels.detail(hotelId.value)),
-      api.get(endpoints.hotels.roomTypes(hotelId.value))
+      api.get<unknown>(endpoints.hotels.detail(hotelId.value)),
+      api.get<unknown>(endpoints.hotels.roomTypes(hotelId.value))
     ])
-    apiHotel.value = hotelRes.data
-    apiRoomTypes.value = Array.isArray(roomRes.data) ? roomRes.data : []
-  } catch (e) { /* fallback */ }
+    apiHotel.value = normalizeApiHotel(hotelRes.data)
+    apiRoomTypes.value = normalizeApiRooms(roomRes.data)
+  } catch { /* fallback */ }
 }
 
 watch(
@@ -361,35 +465,46 @@ watch(
   { immediate: true }
 )
 
-const matchingStaticHotel = computed(() => {
-  if (!apiHotel.value) return getHotelById(hotelId.value)
-  return hotels.find(item => item.name === apiHotel.value.name) || getHotelById(hotelId.value)
+const matchingStaticHotel = computed<HotelItem | undefined>(() => {
+  const loadedHotel = apiHotel.value
+  if (!loadedHotel) return getHotelById(hotelId.value)
+  return hotels.find(item => item.name === loadedHotel.name) || getHotelById(hotelId.value)
 })
 
-const mappedApiHotel = computed(() => {
-  if (!apiHotel.value) return null
+const mappedApiHotel = computed<HotelItem | null>(() => {
+  const loadedHotel = apiHotel.value
+  if (!loadedHotel) return null
+
   const staticHotel = matchingStaticHotel.value
-  const region = getCanonicalRegion(apiHotel.value.location || '')
-  const amenities = apiHotel.value.facilities
-    ? apiHotel.value.facilities.split(',').map((f: string) => f.trim()).filter(Boolean)
+  const region = getCanonicalRegion(loadedHotel.location || '')
+  const amenities = loadedHotel.facilities
+    ? loadedHotel.facilities.split(',').map(f => f.trim()).filter(Boolean)
     : []
+  const rating = toFiniteAmount(loadedHotel.rating ?? staticHotel?.rating ?? 4) || 4
+
   return {
     ...(staticHotel || {}),
-    ...apiHotel.value,
-    id: apiHotel.value.id,
-    coverImage: resolveHotelCoverImage(staticHotel?.coverImage || apiHotel.value.imageUrl),
+    id: loadedHotel.id,
+    region: staticHotel?.region || region,
+    name: loadedHotel.name || staticHotel?.name || '',
+    coverImage: resolveHotelCoverImage(staticHotel?.coverImage || loadedHotel.imageUrl || ''),
     city: region,
-    address: apiHotel.value.location || staticHotel?.address || '',
+    address: loadedHotel.location || staticHotel?.address || '',
+    description: loadedHotel.description || staticHotel?.description || '',
     tags: amenities.length ? amenities.slice(0, 4) : (staticHotel?.tags || []),
     amenities: amenities.length ? amenities : (staticHotel?.amenities || []),
     reviewCount: staticHotel?.reviewCount || 0,
-    stars: Math.min(5, Math.max(3, Math.round(Number(apiHotel.value.rating) || staticHotel?.rating || 4))),
+    priceMin: toFiniteAmount(loadedHotel.priceMin ?? staticHotel?.priceMin ?? 0),
+    available: loadedHotel.available ?? staticHotel?.available ?? true,
+    rating,
+    stars: Math.min(5, Math.max(3, Math.round(rating))),
     lng: staticHotel?.lng || 91.0,
-    lat: staticHotel?.lat || 29.6
+    lat: staticHotel?.lat || 29.6,
+    rooms: staticHotel?.rooms || []
   }
 })
 
-const hotel = computed(() => {
+const hotel = computed<HotelItem | null>(() => {
   const rawHotel = mappedApiHotel.value || getHotelById(hotelId.value)
   return rawHotel ? localizeHotel(rawHotel, locale.value) : null
 })
@@ -399,11 +514,16 @@ const bookingCoverImage = computed(() => {
   return resolveHotelCoverImage(coverImage)
 })
 
-const selectedRoom = computed(() => {
-  const apiRoom = apiRoomTypes.value.find((r: any) => r.id === roomId.value)
-  if (apiRoom) return localizeApiRoom({ ...apiRoom, price: apiRoom.price, desc: apiRoom.amenities }, locale.value)
+const selectedRoomSource = computed<BookingRoom | null>(() => {
+  const apiRoom = apiRoomTypes.value.find(room => room.id === roomId.value)
+  if (apiRoom) return apiRoom
   const staticRoom = matchingStaticHotel.value?.rooms?.find(room => room.id === roomId.value) || getRoomById(hotelId.value, roomId.value)
-  return staticRoom ? localizeApiRoom(staticRoom, locale.value) : null
+  return staticRoom ? toBookingRoom(staticRoom) : null
+})
+
+const selectedRoom = computed<BookingRoom | null>(() => {
+  if (!selectedRoomSource.value) return null
+  return localizeApiRoom(selectedRoomSource.value, locale.value) as BookingRoom
 })
 
 const form = ref({
@@ -463,9 +583,14 @@ const totalPrice = computed(() => {
   return roomTotal
 })
 const roomSubtotal = computed(() => totalPrice.value)
-const bookingAvailabilityLabel = computed(() => hotel.value?.available === false ? '暂满' : '需二次确认')
+const totalPriceLabel = computed(() => t('common.priceCny', { price: totalPrice.value }))
+const bookingAvailabilityLabel = computed(() =>
+  hotel.value?.available === false
+    ? t('hotel.availability.full')
+    : t('hotel.availability.needsConfirm')
+)
 
-const parseRoomCapacity = (room: any) => {
+const parseRoomCapacity = (room: BookingRoom | null) => {
   const explicitCapacity = Number(room?.capacity || room?.maxGuests)
   if (Number.isFinite(explicitCapacity) && explicitCapacity > 0) return explicitCapacity
 
@@ -476,7 +601,7 @@ const parseRoomCapacity = (room: any) => {
 }
 
 const selectedRoomCapacity = computed(() =>
-  Math.min(6, Math.max(1, Math.round(parseRoomCapacity(selectedRoom.value))))
+  Math.min(6, Math.max(1, Math.round(parseRoomCapacity(selectedRoomSource.value))))
 )
 const guestOptions = computed(() =>
   Array.from({ length: selectedRoomCapacity.value }, (_, index) => index + 1)
@@ -484,24 +609,28 @@ const guestOptions = computed(() =>
 const bookingUnavailable = computed(() =>
   !hotel.value || !selectedRoom.value || hotel.value.available === false
 )
-const bookingAssuranceItems = computed(() => [
+const bookingAssuranceItems = computed<BookingAssuranceItem[]>(() => [
   {
-    title: '房态说明',
-    description: '提交后生成咨询单，客服或供应商确认房态后再推进预订。',
+    id: 'availability',
+    title: t('hotel.assurance.availability.title'),
+    description: t('hotel.assurance.availability.description'),
     className: 'bg-blue-50 text-blue-800'
   },
   {
-    title: '费用说明',
-    description: '今日无需支付，参考房费按所选晚数估算，实际价格以供应商确认为准。',
+    id: 'fee',
+    title: t('hotel.assurance.fee.title'),
+    description: t('hotel.assurance.fee.description'),
     className: 'bg-emerald-50 text-emerald-800'
   },
   {
-    title: '退改说明',
-    description: '确认前可在订单中心取消咨询；确认后的退改政策以酒店或第三方平台为准。',
+    id: 'cancellation',
+    title: t('hotel.assurance.cancellation.title'),
+    description: t('hotel.assurance.cancellation.description'),
     className: 'bg-amber-50 text-amber-800'
   },
   {
-    title: '平台提示',
+    id: 'platform',
+    title: t('hotel.assurance.platform.title'),
     description: t('hotel.noPlatformPaymentHint'),
     className: 'bg-gray-50 text-gray-700'
   }
@@ -515,17 +644,17 @@ const dateHelpId = 'hotel-booking-date-help'
 const guestHelpId = 'hotel-booking-guest-help'
 const contactHelpId = 'hotel-booking-contact-help'
 const bookingSummaryId = 'hotel-booking-summary'
-const bookingValidationMessages = {
-  roomUnavailable: '当前房型暂不可咨询，请返回酒店详情重新选择',
-  dateRequired: '请选择入住和离店日期',
-  checkInPast: '入住日期不能早于今天',
-  dateRangeInvalid: '离店日期需要晚于入住日期',
-  nightsTooLong: '单次酒店咨询最多支持 30 晚',
-  guestsTooHigh: '入住人数超过当前房型建议容量，请调整人数或在备注中说明',
-  guestNameRequired: '请填写预订人姓名',
-  phoneRequired: '请填写可联系到的电话号码',
-  securityVerificationFailed: '安全校验未通过，请稍后重试'
-}
+const bookingValidationMessages = computed(() => ({
+  roomUnavailable: t('hotel.validation.roomUnavailable'),
+  dateRequired: t('hotel.validation.dateRequired'),
+  checkInPast: t('hotel.validation.checkInPast'),
+  dateRangeInvalid: t('hotel.validation.dateRangeInvalid'),
+  nightsTooLong: t('hotel.validation.nightsTooLong', { max: MAX_BOOKING_NIGHTS }),
+  guestsTooHigh: t('hotel.validation.guestsTooHigh'),
+  guestNameRequired: t('hotel.validation.guestNameRequired'),
+  phoneRequired: t('hotel.validation.phoneRequired'),
+  securityVerificationFailed: t('hotel.validation.securityVerificationFailed')
+}))
 const phoneDigits = computed(() => form.value.phone.replace(/\D/g, ''))
 const checkInBeforeToday = computed(() =>
   Boolean(form.value.checkInDate && form.value.checkInDate < minCheckInDate)
@@ -554,6 +683,11 @@ const bookingFormDescribedBy = computed(() =>
 
 const clearHotelOrderCache = clearHotelOrderClientStorage
 
+const hasAntibotCode = (value: unknown) =>
+  isRecord(value) &&
+  typeof value.code === 'string' &&
+  value.code.startsWith('ANTIBOT_')
+
 watch(selectedRoomCapacity, capacity => {
   if (Number(form.value.guests) > capacity) {
     form.value.guests = capacity
@@ -574,35 +708,35 @@ const submitBooking = async () => {
   submitAttempted.value = true
   submitError.value = ''
   if (bookingUnavailable.value) {
-    submitError.value = bookingValidationMessages.roomUnavailable
+    submitError.value = bookingValidationMessages.value.roomUnavailable
     return
   }
   if (!form.value.checkInDate || !form.value.checkOutDate) {
-    submitError.value = bookingValidationMessages.dateRequired
+    submitError.value = bookingValidationMessages.value.dateRequired
     return
   }
   if (checkInBeforeToday.value) {
-    submitError.value = bookingValidationMessages.checkInPast
+    submitError.value = bookingValidationMessages.value.checkInPast
     return
   }
   if (nights.value <= 0) {
-    submitError.value = bookingValidationMessages.dateRangeInvalid
+    submitError.value = bookingValidationMessages.value.dateRangeInvalid
     return
   }
   if (nights.value > MAX_BOOKING_NIGHTS) {
-    submitError.value = bookingValidationMessages.nightsTooLong
+    submitError.value = bookingValidationMessages.value.nightsTooLong
     return
   }
   if (Number(form.value.guests) > selectedRoomCapacity.value) {
-    submitError.value = bookingValidationMessages.guestsTooHigh
+    submitError.value = bookingValidationMessages.value.guestsTooHigh
     return
   }
   if (!form.value.guestName.trim()) {
-    submitError.value = bookingValidationMessages.guestNameRequired
+    submitError.value = bookingValidationMessages.value.guestNameRequired
     return
   }
   if (phoneDigits.value.length < 6) {
-    submitError.value = bookingValidationMessages.phoneRequired
+    submitError.value = bookingValidationMessages.value.phoneRequired
     return
   }
   submitting.value = true
@@ -626,14 +760,10 @@ const submitBooking = async () => {
         ...(behaviorData ? { 'X-Behavior-Data': behaviorData } : {}),
       }
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     clearHotelOrderCache()
-    if (error.response) {
-      if (String(error.response?.data?.code || '').startsWith('ANTIBOT_')) {
-        submitError.value = bookingValidationMessages.securityVerificationFailed
-        return
-      }
-      submitError.value = safeClientErrorMessage(error, t('hotel.bookingFailed'))
+    if (isAxiosError(error) && hasAntibotCode(error.response?.data)) {
+      submitError.value = bookingValidationMessages.value.securityVerificationFailed
       return
     }
 
@@ -648,6 +778,6 @@ const submitBooking = async () => {
   submitAttempted.value = false
   window.dispatchEvent(new CustomEvent('hotel-orders-updated'))
   window.dispatchEvent(new CustomEvent('bookings-updated'))
-  router.push('/orders')
+  router.push({ path: '/hotel-orders', query: { created: '1' } })
 }
 </script>

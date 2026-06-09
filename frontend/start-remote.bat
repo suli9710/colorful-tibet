@@ -1,8 +1,37 @@
 @echo off
 chcp 65001 >nul
-setlocal
+setlocal EnableExtensions EnableDelayedExpansion
 
-set "REMOTE_BACKEND=http://1.15.29.168:6000"
+if "%REMOTE_BACKEND%"=="" (
+    if not "%~1"=="" set "REMOTE_BACKEND=%~1"
+)
+
+if "%REMOTE_BACKEND%"=="" (
+    echo [ERROR] REMOTE_BACKEND is required.
+    echo Set REMOTE_BACKEND to an HTTPS backend, for example:
+    echo   set REMOTE_BACKEND=https://api.example.com
+    echo Or use a local secure tunnel and point to localhost HTTP:
+    echo   set REMOTE_BACKEND=http://localhost:6000
+    pause
+    exit /b 1
+)
+
+if /I "!REMOTE_BACKEND:~0,7!"=="http://" (
+    set "REMOTE_BACKEND_LOCAL_HTTP="
+    if /I "!REMOTE_BACKEND:~0,12!"=="http://[::1]" set "REMOTE_BACKEND_LOCAL_HTTP=1"
+    if not defined REMOTE_BACKEND_LOCAL_HTTP (
+        set "REMOTE_BACKEND_AFTER_SCHEME=!REMOTE_BACKEND:~7!"
+        for /f "tokens=1 delims=/:" %%H in ("!REMOTE_BACKEND_AFTER_SCHEME!") do set "REMOTE_BACKEND_HTTP_HOST=%%H"
+        if /I "!REMOTE_BACKEND_HTTP_HOST!"=="localhost" set "REMOTE_BACKEND_LOCAL_HTTP=1"
+        if /I "!REMOTE_BACKEND_HTTP_HOST!"=="127.0.0.1" set "REMOTE_BACKEND_LOCAL_HTTP=1"
+    )
+    if not defined REMOTE_BACKEND_LOCAL_HTTP (
+        echo [ERROR] Plain HTTP remote backends are refused: !REMOTE_BACKEND!
+        echo Use HTTPS, or expose the backend through a localhost tunnel first.
+        pause
+        exit /b 1
+    )
+)
 
 echo ========================================
 echo   Frontend dev server - remote backend

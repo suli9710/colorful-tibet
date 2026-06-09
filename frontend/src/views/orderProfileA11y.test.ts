@@ -21,4 +21,30 @@ describe('order and profile keyboard accessibility guardrails', () => {
     expect(userProfileSource).toContain('focus-visible:ring-2 focus-visible:ring-tibet-gold/60')
     expect(userProfileSource).not.toContain('@click="router.push(`/community/${route.id}`)"')
   })
+
+  it('keeps account order and profile lists paginated beyond the first page', () => {
+    expect(orderCenterSource).toContain('readPaginatedResponse<Order>')
+    expect(orderCenterSource).toContain('ordersPageInfo')
+    expect(orderCenterSource).toContain('loadNextOrdersPage')
+    expect(orderCenterSource).toContain('params: { page, size: ordersPageSize')
+
+    expect(userProfileSource).toContain('hotelBookingsPageInfo')
+    expect(userProfileSource).toContain('spotCommentsPageInfo')
+    expect(userProfileSource).toContain('routeCommentsPageInfo')
+    expect(userProfileSource).toContain('body.spotCommentsPage')
+    expect(userProfileSource).toContain('body.routeCommentsPage')
+    expect(userProfileSource).toContain('loadNextHotelBookingsPage')
+    expect(userProfileSource).toContain('loadNextCommentsPage')
+  })
+
+  it('uses a roving tabindex tablist pattern in UserProfile', () => {
+    expect(userProfileSource).toContain(':tabindex="activeTab === tab.id ? 0 : -1"')
+    expect(userProfileSource).toContain(':aria-controls="profileTabPanelId(tab.id)"')
+    expect(userProfileSource).toContain('@keydown="handleProfileTabKeydown($event, index)"')
+    expect(userProfileSource).toContain('role="tabpanel"')
+    expect(userProfileSource).toContain(':aria-labelledby="profileTabId(\'routes\')"')
+    expect(userProfileSource).toContain("event.key === 'ArrowRight'")
+    expect(userProfileSource).toContain("event.key === 'Home'")
+    expect(userProfileSource).toContain("event.key === 'End'")
+  })
 })

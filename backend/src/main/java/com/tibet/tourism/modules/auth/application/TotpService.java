@@ -22,6 +22,7 @@ public class TotpService {
     private static final int OTP_MODULO = 1_000_000;
 
     public void validateSecret(String base32Secret) {
+        rejectPlaceholderSecret(base32Secret);
         byte[] decoded = decodeBase32(base32Secret);
         if (decoded.length < MIN_SECRET_BYTES) {
             throw new IllegalArgumentException("TOTP secret must contain at least 128 bits of entropy");
@@ -48,6 +49,20 @@ public class TotpService {
 
     String generateCodeForTime(String base32Secret, Instant instant) {
         return generateCode(decodeBase32(base32Secret), instant.getEpochSecond() / PERIOD_SECONDS);
+    }
+
+    private void rejectPlaceholderSecret(String base32Secret) {
+        if (!StringUtils.hasText(base32Secret)) {
+            throw new IllegalArgumentException("TOTP secret must be configured");
+        }
+
+        String normalized = base32Secret.trim().toLowerCase(Locale.ROOT);
+        if (normalized.contains("replace-with")
+                || normalized.contains("placeholder")
+                || normalized.contains("changeme")
+                || normalized.contains("change-me")) {
+            throw new IllegalArgumentException("TOTP secret must not use a development placeholder");
+        }
     }
 
     private String generateCode(byte[] secret, long timeStep) {

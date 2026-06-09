@@ -67,7 +67,7 @@ class ScenicSpotControllerPageResponseContractTest {
 
     @Test
     void spotSearchReturnsStablePageEnvelope() throws Exception {
-        when(scenicSpotService.searchSpots(eq("potala"), any(Pageable.class)))
+        when(scenicSpotService.searchSpots(eq("potala"), eq(null), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(scenicSpot()), PageRequest.of(0, 4), 1));
 
         ResultActions result = mockMvc.perform(get("/api/spots/search?keyword=potala&size=4"))
@@ -76,6 +76,18 @@ class ScenicSpotControllerPageResponseContractTest {
                 .andExpect(jsonPath("$.content[0].id").value(11));
 
         expectStablePageEnvelope(result, 0, 4, 1, 1);
+    }
+
+    @Test
+    void spotSearchAcceptsCategoryFilter() throws Exception {
+        when(scenicSpotService.searchSpots(eq("temple"), eq(ScenicSpot.Category.CULTURAL), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(scenicSpot()), PageRequest.of(0, 5), 1));
+
+        ResultActions result = mockMvc.perform(get("/api/spots/search?keyword=temple&category=CULTURAL&size=5"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].category").value("CULTURAL"));
+
+        expectStablePageEnvelope(result, 0, 5, 1, 1);
     }
 
     private static void expectStablePageEnvelope(

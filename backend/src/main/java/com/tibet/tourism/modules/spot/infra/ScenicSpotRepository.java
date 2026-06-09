@@ -40,6 +40,25 @@ public interface ScenicSpotRepository extends JpaRepository<ScenicSpot, Long> {
     @Query("SELECT s FROM ScenicSpot s WHERE s.name LIKE %:keyword%")
     Page<ScenicSpot> findByNameContaining(@Param("keyword") String name, Pageable pageable);
 
+    @Query("""
+            SELECT DISTINCT s
+            FROM ScenicSpot s
+            LEFT JOIN s.tags st
+            WHERE (:category IS NULL OR s.category = :category)
+              AND (
+                    LOWER(s.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                 OR LOWER(COALESCE(s.description, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                 OR LOWER(COALESCE(s.location, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                 OR (:keywordCategory IS NOT NULL AND s.category = :keywordCategory)
+                 OR LOWER(COALESCE(st.tag, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
+              )
+            """)
+    Page<ScenicSpot> searchByKeywordAndOptionalCategory(
+            @Param("keyword") String keyword,
+            @Param("category") ScenicSpot.Category category,
+            @Param("keywordCategory") ScenicSpot.Category keywordCategory,
+            Pageable pageable);
+
     @Query("SELECT DISTINCT s FROM ScenicSpot s LEFT JOIN FETCH s.tags WHERE s.name LIKE %:keyword%")
     List<ScenicSpot> findByNameContaining(@Param("keyword") String name);
 

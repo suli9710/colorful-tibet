@@ -32,6 +32,7 @@ import com.tibet.tourism.modules.order.web.dto.InvoiceRequest;
 import com.tibet.tourism.modules.order.web.dto.InvoiceResponse;
 import com.tibet.tourism.modules.order.web.dto.OrderItemResponse;
 import com.tibet.tourism.modules.order.web.dto.OrderResponse;
+import com.tibet.tourism.modules.order.web.dto.OrderSummaryResponse;
 import com.tibet.tourism.modules.order.web.dto.PaymentCallbackRequest;
 import com.tibet.tourism.modules.order.web.dto.PaymentTransactionResponse;
 import com.tibet.tourism.modules.order.web.dto.RefundRequest;
@@ -79,6 +80,7 @@ public class OrderCenterService {
 
     private static final Logger logger = LoggerFactory.getLogger(OrderCenterService.class);
     private static final int LOCK_MINUTES = 15;
+    private static final int EXPIRY_SWEEP_BATCH_SIZE = 100;
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
     private static final int MIN_CALLBACK_SECRET_LENGTH = 32;
     private static final String DEV_CALLBACK_SECRET = "dev-payment-callback-secret";
@@ -256,19 +258,19 @@ public class OrderCenterService {
     }
 
     @Transactional
-    public List<OrderResponse> getMyOrders(User user) {
+    public List<OrderSummaryResponse> getMyOrders(User user) {
         return getMyOrders(user, PageRequest.of(0, DEFAULT_PAGE_SIZE)).getContent();
     }
 
     @Transactional
-    public Page<OrderResponse> getMyOrders(User user, Pageable pageable) {
+    public Page<OrderSummaryResponse> getMyOrders(User user, Pageable pageable) {
         user = requireAuthenticatedUser(user);
         Pageable safePageable = safePageable(
                 pageable,
                 ORDER_PAGE_SORT_FIELDS,
                 Sort.by(Sort.Direction.DESC, "createdAt"));
-        return orderRepository.findByUserId(user.getId(), safePageable)
-                .map(order -> toResponse(expireIfNeeded(order)));
+        return orderRepository.findVisibleByUserId(user.getId(), safePageable)
+                .map(order -> toSummaryResponse(expireIfNeeded(order)));
     }
 
     @Transactional(readOnly = true)
@@ -285,7 +287,7 @@ public class OrderCenterService {
     @Transactional
     public OrderResponse getOrder(User user, Long id) {
         user = requireAuthenticatedUser(user);
-        PlatformOrder order = orderRepository.findByIdAndUserIdForUpdate(id, user.getId())
+        PlatformOrder order = orderRepository.findVisibleByIdAndUserIdForUpdate(id, user.getId())
                 .orElseThrow(() -> new NoSuchElementException("Order not found"));
         return toResponse(expireIfNeeded(order));
     }
@@ -293,7 +295,7 @@ public class OrderCenterService {
     @Transactional
     public OrderResponse cancelOrder(User user, Long id, CancelOrderRequest request) {
         user = requireAuthenticatedUser(user);
-        PlatformOrder order = orderRepository.findByIdAndUserIdForUpdate(id, user.getId())
+        PlatformOrder order = orderRepository.findVisibleByIdAndUserIdForUpdate(id, user.getId())
                 .orElseThrow(() -> new NoSuchElementException("Order not found"));
         expireIfNeeded(order);
         if (order.getStatus() == PlatformOrder.Status.CANCELLED || order.getStatus() == PlatformOrder.Status.EXPIRED) {
@@ -321,7 +323,7 @@ public class OrderCenterService {
     @Transactional
     public RefundResponse requestRefund(User user, Long id, RefundRequest request) {
         user = requireAuthenticatedUser(user);
-        PlatformOrder order = orderRepository.findByIdAndUserIdForUpdate(id, user.getId())
+        PlatformOrder order = orderRepository.findVisibleByIdAndUserIdForUpdate(id, user.getId())
                 .orElseThrow(() -> new NoSuchElementException("Order not found"));
         expireIfNeeded(order);
         if (order.getPaymentStatus() == PlatformOrder.PaymentStatus.UNPAID) {
@@ -362,7 +364,7 @@ public class OrderCenterService {
     @Transactional
     public InvoiceResponse requestInvoice(User user, Long id, InvoiceRequest request) {
         user = requireAuthenticatedUser(user);
-        PlatformOrder order = orderRepository.findByIdAndUserId(id, user.getId())
+        PlatformOrder order = orderRepository.findVisibleByIdAndUserId(id, user.getId())
                 .orElseThrow(() -> new NoSuchElementException("Order not found"));
         if (order.getPaymentStatus() == PlatformOrder.PaymentStatus.UNPAID) {
             throw new IllegalStateException("Unpaid orders cannot request invoices");
@@ -381,15 +383,16 @@ public class OrderCenterService {
     @Transactional
     public void deleteClosedOrder(User user, Long id) {
         user = requireAuthenticatedUser(user);
-        PlatformOrder order = orderRepository.findByIdAndUserIdForUpdate(id, user.getId())
+        PlatformOrder order = orderRepository.findVisibleByIdAndUserIdForUpdate(id, user.getId())
                 .orElseThrow(() -> new NoSuchElementException("Order not found"));
         expireIfNeeded(order);
         if (!isClosedOrder(order)) {
             throw new IllegalStateException("Only closed orders can be deleted");
         }
 
-        inventoryLockRepository.deleteAll(inventoryLockRepository.findByOrder(order));
-        orderRepository.delete(order);
+        order.setUserHiddenAt(LocalDateTime.now());
+        order.addAuditLog(audit(user, "USER_HIDDEN", order.getStatus().name(), order.getStatus().name(),
+                "Order hidden from user order center"));
     }
 
     @Transactional
@@ -971,14 +974,31 @@ public class OrderCenterService {
     @Transactional
     public void expirePendingOrders() {
         LocalDateTime now = LocalDateTime.now();
-        orderRepository.findByStatusAndExpiresAtBeforeForUpdate(PlatformOrder.Status.PENDING_PAYMENT, now)
-                .forEach(this::expireIfNeeded);
-        inventoryLockRepository.findExpiredLocks(InventoryLock.Status.LOCKED, now)
-                .forEach(lock -> {
-                    lock.setStatus(InventoryLock.Status.EXPIRED);
-                    lock.setActiveLockKey(null);
-                    inventoryLockRepository.save(lock);
-                });
+        Pageable batchPage = PageRequest.of(0, EXPIRY_SWEEP_BATCH_SIZE);
+        while (expirePendingOrderBatch(now, batchPage) == EXPIRY_SWEEP_BATCH_SIZE) {
+            // Continue until the first page is no longer full.
+        }
+        while (expireInventoryLockBatch(now, batchPage) == EXPIRY_SWEEP_BATCH_SIZE) {
+            // Continue until the first page is no longer full.
+        }
+    }
+
+    private int expirePendingOrderBatch(LocalDateTime now, Pageable batchPage) {
+        List<PlatformOrder> orders = orderRepository.findByStatusAndExpiresAtBeforeForUpdate(
+                PlatformOrder.Status.PENDING_PAYMENT, now, batchPage);
+        orders.forEach(this::expireIfNeeded);
+        return orders.size();
+    }
+
+    private int expireInventoryLockBatch(LocalDateTime now, Pageable batchPage) {
+        List<InventoryLock> locks = inventoryLockRepository.findExpiredLocks(
+                InventoryLock.Status.LOCKED, now, batchPage);
+        locks.forEach(lock -> {
+            lock.setStatus(InventoryLock.Status.EXPIRED);
+            lock.setActiveLockKey(null);
+            inventoryLockRepository.save(lock);
+        });
+        return locks.size();
     }
 
     private void confirmPaidOrder(PlatformOrder order, String note) {
@@ -1609,6 +1629,30 @@ public class OrderCenterService {
                 order.getRefunds().stream().map(this::toRefundResponse).toList(),
                 order.getVouchers().stream().map(this::toVoucherResponse).toList(),
                 order.getInvoices().stream().map(this::toInvoiceResponse).toList()
+        );
+    }
+
+    private OrderSummaryResponse toSummaryResponse(PlatformOrder order) {
+        return new OrderSummaryResponse(
+                order.getId(),
+                order.getOrderNo(),
+                order.getStatus().name(),
+                order.getPaymentStatus().name(),
+                order.getCurrency(),
+                order.getProductSummary(),
+                order.getTotalAmount(),
+                order.getDiscountAmount(),
+                order.getPayableAmount(),
+                PiiMasker.maskName(order.getCustomerName()),
+                PiiMasker.maskPhone(order.getCustomerPhone()),
+                order.getSourceType(),
+                order.getSourceReferenceId(),
+                order.getLockedUntil(),
+                order.getExpiresAt(),
+                order.getPaidAt(),
+                order.getConfirmedAt(),
+                order.getCancelledAt(),
+                order.getCreatedAt()
         );
     }
 

@@ -163,11 +163,11 @@ import { useAuthStore } from '../stores/auth'
 import { useAuthGuard } from '../composables/useAuthGuard'
 import { showConfirm } from '../composables/useConfirm'
 import { showToast } from '../composables/useToast'
-import { readBrowserStorage } from '../utils/browserStorage'
 import { summarizeClientError } from '../utils/errorMonitoring'
+import { toIntlLocale } from '../i18n/formatting'
 import { Heart } from 'lucide-vue-next'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
@@ -382,8 +382,7 @@ const deleteQuestion = async () => {
 }
 
 const formatDate = (dateStr: string) => {
-  const locale = readBrowserStorage('localStorage', 'locale', 'zh')
-  return new Date(dateStr).toLocaleDateString(locale === 'bo' ? 'bo-CN' : 'zh-CN')
+  return new Date(dateStr).toLocaleDateString(toIntlLocale(locale.value))
 }
 
 onMounted(async () => {

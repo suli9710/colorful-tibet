@@ -7,7 +7,7 @@ import static org.mockito.Mockito.when;
 
 import com.tibet.tourism.common.security.JwtAuthSupport;
 import com.tibet.tourism.modules.route.application.ItineraryService;
-import com.tibet.tourism.modules.route.web.dto.itinerary.ItineraryResponse;
+import com.tibet.tourism.modules.route.web.dto.itinerary.ItinerarySummaryResponse;
 import com.tibet.tourism.modules.user.domain.User;
 import jakarta.servlet.http.HttpServletRequest;
 import java.math.BigDecimal;
@@ -49,11 +49,11 @@ class ItineraryControllerPaginationTest {
     @Test
     void myItinerariesKeepsLegacyArrayBodyWithPageHeaders() {
         PageRequest pageable = PageRequest.of(1, 2);
-        ItineraryResponse itinerary = itineraryResponse(11L);
+        ItinerarySummaryResponse itinerary = itineraryResponse(11L);
         when(itineraryService.getMyItineraries(eq(user), eq(pageable)))
                 .thenReturn(new PageImpl<>(List.of(itinerary), pageable, 5));
 
-        ResponseEntity<List<ItineraryResponse>> response = controller.myItineraries(request, pageable);
+        ResponseEntity<List<ItinerarySummaryResponse>> response = controller.myItineraries(request, pageable);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).containsExactly(itinerary);
@@ -64,8 +64,8 @@ class ItineraryControllerPaginationTest {
         verify(itineraryService).getMyItineraries(user, pageable);
     }
 
-    private static ItineraryResponse itineraryResponse(Long id) {
-        return new ItineraryResponse(
+    private static ItinerarySummaryResponse itineraryResponse(Long id) {
+        return new ItinerarySummaryResponse(
                 id,
                 null,
                 "Lhasa itinerary",
@@ -77,8 +77,6 @@ class ItineraryControllerPaginationTest {
                 "standard",
                 BigDecimal.valueOf(1200),
                 "DRAFT",
-                "# Lhasa itinerary",
-                LocalDateTime.of(2026, 5, 1, 10, 0),
-                List.of());
+                LocalDateTime.of(2026, 5, 1, 10, 0));
     }
 }

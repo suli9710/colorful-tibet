@@ -25,6 +25,7 @@ import com.tibet.tourism.modules.route.web.dto.itinerary.ItineraryItemResponse;
 import com.tibet.tourism.modules.route.web.dto.itinerary.ItineraryQuoteItemResponse;
 import com.tibet.tourism.modules.route.web.dto.itinerary.ItineraryQuoteResponse;
 import com.tibet.tourism.modules.route.web.dto.itinerary.ItineraryResponse;
+import com.tibet.tourism.modules.route.web.dto.itinerary.ItinerarySummaryResponse;
 import com.tibet.tourism.modules.spot.domain.ScenicSpot;
 import com.tibet.tourism.modules.spot.infra.ScenicSpotRepository;
 import com.tibet.tourism.modules.user.domain.User;
@@ -100,7 +101,7 @@ public class ItineraryService {
     }
 
     @Transactional(readOnly = true)
-    public Page<ItineraryResponse> getMyItineraries(User user, Pageable pageable) {
+    public Page<ItinerarySummaryResponse> getMyItineraries(User user, Pageable pageable) {
         Pageable safePageable = InputSanitizer.sanitizePageable(
                 pageable,
                 MY_ITINERARIES_SORT_FIELDS,
@@ -108,7 +109,7 @@ public class ItineraryService {
                 DEFAULT_MY_ITINERARIES_PAGE_SIZE,
                 MAX_MY_ITINERARIES_PAGE_SIZE);
         return itineraryRepository.findByUserId(user.getId(), safePageable)
-                .map(this::toResponse);
+                .map(this::toSummaryResponse);
     }
 
     @Transactional(readOnly = true)
@@ -498,6 +499,24 @@ public class ItineraryService {
                 itinerary.getSourceContent(),
                 itinerary.getCreatedAt(),
                 itinerary.getItineraryDays().stream().map(this::toDayResponse).toList()
+        );
+    }
+
+    private ItinerarySummaryResponse toSummaryResponse(Itinerary itinerary) {
+        Long parentId = itinerary.getParentItinerary() == null ? null : itinerary.getParentItinerary().getId();
+        return new ItinerarySummaryResponse(
+                itinerary.getId(),
+                parentId,
+                itinerary.getTitle(),
+                itinerary.getDays(),
+                itinerary.getStartDate(),
+                itinerary.getBudget(),
+                itinerary.getPreference(),
+                itinerary.getVersionType(),
+                itinerary.getVersionLabel(),
+                money(itinerary.getTotalEstimatedCost()),
+                itinerary.getStatus().name(),
+                itinerary.getCreatedAt()
         );
     }
 

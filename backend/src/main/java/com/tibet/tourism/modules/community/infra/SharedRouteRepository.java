@@ -32,6 +32,82 @@ public interface SharedRouteRepository extends JpaRepository<SharedRoute, Long>,
 
     @Query("SELECT COALESCE(r.likeCount, 0) FROM SharedRoute r WHERE r.id = :id")
     Optional<Integer> findLikeCountById(@Param("id") Long id);
+
+    @Query(value = """
+            SELECT new com.tibet.tourism.modules.community.infra.SharedRouteSummaryRow(
+                r.id,
+                a.id,
+                a.username,
+                a.nickname,
+                a.avatar,
+                r.title,
+                r.days,
+                r.budget,
+                r.preference,
+                r.sourceType,
+                r.sourceRouteId,
+                r.price,
+                r.difficulty,
+                r.temperature,
+                r.geography,
+                r.viewCount,
+                r.likeCount,
+                r.commentCount,
+                r.createdAt,
+                r.updatedAt
+            )
+            FROM SharedRoute r
+            LEFT JOIN r.author a
+            WHERE (:days IS NULL OR r.days = :days)
+              AND (:budget IS NULL OR r.budget = :budget)
+              AND (:preference IS NULL OR r.preference = :preference)
+            """,
+            countQuery = """
+            SELECT COUNT(r)
+            FROM SharedRoute r
+            WHERE (:days IS NULL OR r.days = :days)
+              AND (:budget IS NULL OR r.budget = :budget)
+              AND (:preference IS NULL OR r.preference = :preference)
+            """)
+    Page<SharedRouteSummaryRow> findSummaries(
+            @Param("days") Integer days,
+            @Param("budget") String budget,
+            @Param("preference") String preference,
+            Pageable pageable);
+
+    @Query(value = """
+            SELECT new com.tibet.tourism.modules.community.infra.SharedRouteSummaryRow(
+                r.id,
+                a.id,
+                a.username,
+                a.nickname,
+                a.avatar,
+                r.title,
+                r.days,
+                r.budget,
+                r.preference,
+                r.sourceType,
+                r.sourceRouteId,
+                r.price,
+                r.difficulty,
+                r.temperature,
+                r.geography,
+                r.viewCount,
+                r.likeCount,
+                r.commentCount,
+                r.createdAt,
+                r.updatedAt
+            )
+            FROM SharedRoute r
+            JOIN r.author a
+            WHERE a.id = :authorId
+            """,
+            countQuery = """
+            SELECT COUNT(r)
+            FROM SharedRoute r
+            WHERE r.author.id = :authorId
+            """)
+    Page<SharedRouteSummaryRow> findSummariesByAuthorId(@Param("authorId") Long authorId, Pageable pageable);
     
     // 简单的筛选查询（更复杂的筛选将使用Specification）
     Page<SharedRoute> findByDays(Integer days, Pageable pageable);

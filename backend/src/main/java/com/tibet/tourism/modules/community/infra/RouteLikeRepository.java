@@ -35,4 +35,11 @@ public interface RouteLikeRepository extends JpaRepository<RouteLike, Long> {
     @Modifying
     @Query("DELETE FROM RouteLike rl WHERE rl.route.author.id = :userId")
     void deleteByRouteAuthorId(@Param("userId") Long userId);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(value = """
+            INSERT IGNORE INTO route_likes (route_id, user_id, created_at)
+            VALUES (:routeId, :userId, CURRENT_TIMESTAMP)
+            """, nativeQuery = true)
+    int insertIgnore(@Param("routeId") Long routeId, @Param("userId") Long userId);
 }

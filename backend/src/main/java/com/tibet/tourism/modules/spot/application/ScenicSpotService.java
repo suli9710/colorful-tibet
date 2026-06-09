@@ -55,6 +55,12 @@ public class ScenicSpotService {
     }
 
     @Transactional(readOnly = true)
+    public Page<ScenicSpot> searchSpots(String keyword, ScenicSpot.Category category, Pageable pageable) {
+        ScenicSpot.Category keywordCategory = parseCategory(keyword);
+        return scenicSpotRepository.searchByKeywordAndOptionalCategory(keyword, category, keywordCategory, pageable);
+    }
+
+    @Transactional(readOnly = true)
     public List<ScenicSpot> getSpotsByCategory(ScenicSpot.Category category) {
         return scenicSpotRepository.findByCategory(category, PageRequest.of(0, DEFAULT_LIST_LIMIT, Sort.by("id"))).getContent();
     }
@@ -88,6 +94,17 @@ public class ScenicSpotService {
     @Transactional(readOnly = true)
     public Page<ScenicSpot> getSpotsByCategory(ScenicSpot.Category category, Pageable pageable) {
         return scenicSpotRepository.findByCategory(category, pageable);
+    }
+
+    private ScenicSpot.Category parseCategory(String value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            return ScenicSpot.Category.valueOf(value.trim().toUpperCase());
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
     }
 
     @Transactional(readOnly = true)

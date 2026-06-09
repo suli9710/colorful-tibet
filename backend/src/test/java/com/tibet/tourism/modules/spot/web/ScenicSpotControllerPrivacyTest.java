@@ -5,12 +5,15 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.tibet.tourism.modules.recommendation.application.ColdStartOptimizationService;
 import com.tibet.tourism.modules.recommendation.application.ItemBasedRecommendationService;
+import com.tibet.tourism.modules.recommendation.application.RecommendationService;
 import com.tibet.tourism.modules.spot.application.ScenicSpotService;
 import com.tibet.tourism.modules.spot.domain.ScenicSpot;
 import com.tibet.tourism.modules.spot.web.dto.ScenicSpotResponse;
@@ -42,6 +45,7 @@ class ScenicSpotControllerPrivacyTest {
 
     @Mock private ColdStartOptimizationService coldStartOptimizationService;
     @Mock private ItemBasedRecommendationService itemBasedRecommendationService;
+    @Mock private RecommendationService recommendationService;
     @Mock private ScenicSpotService scenicSpotService;
     @Mock private UserRepository userRepository;
 
@@ -52,6 +56,7 @@ class ScenicSpotControllerPrivacyTest {
         controller = new ScenicSpotController();
         ReflectionTestUtils.setField(controller, "coldStartOptimizationService", coldStartOptimizationService);
         ReflectionTestUtils.setField(controller, "itemBasedRecommendationService", itemBasedRecommendationService);
+        ReflectionTestUtils.setField(controller, "recommendationService", recommendationService);
         ReflectionTestUtils.setField(controller, "scenicSpotService", scenicSpotService);
         ReflectionTestUtils.setField(controller, "userRepository", userRepository);
     }
@@ -74,13 +79,26 @@ class ScenicSpotControllerPrivacyTest {
     void publicSpotDetailSerializesWhitelistedLocalizedDtoOnly() throws Exception {
         when(scenicSpotService.getSpotById(11L)).thenReturn(scenicSpot());
 
-        ScenicSpotResponse response = controller.getSpotById(11L, "bo");
+        ScenicSpotResponse response = controller.getSpotById(11L, "bo", null);
 
         assertEquals("bo-name", response.name());
         String json = OBJECT_MAPPER.writeValueAsString(response);
         assertThat(json)
                 .contains("\"id\":11")
                 .doesNotContain("\"createdAt\"", "\"num\"");
+        verify(recommendationService, never()).recordSpotView(any(), any());
+    }
+
+    @Test
+    void authenticatedSpotDetailRecordsRecommendationBehavior() {
+        User user = user(7L, "traveler", User.Role.USER);
+        ScenicSpot spot = scenicSpot();
+        when(scenicSpotService.getSpotById(11L)).thenReturn(spot);
+        when(userRepository.findByUsername("traveler")).thenReturn(Optional.of(user));
+
+        controller.getSpotById(11L, "zh", authentication("traveler"));
+
+        verify(recommendationService).recordSpotView(user, spot);
     }
 
     @Test
