@@ -3,6 +3,7 @@ package com.tibet.tourism.common.security.antibot;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.tibet.tourism.common.security.OutboundUrlValidator;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import java.net.InetSocketAddress;
@@ -79,7 +80,8 @@ class RecaptchaServiceTest {
         try {
             String verifyUrl = "http://127.0.0.1:" + server.getAddress().getPort() + "/recaptcha/api/siteverify";
             AntibotProperties properties = enabledProperties("form-secret value+&=", verifyUrl);
-            RecaptchaService service = new RecaptchaService(properties, WebClient.builder());
+            RecaptchaService service = new RecaptchaService(
+                    properties, WebClient.builder(), new OutboundUrlValidator());
 
             OptionalDouble result = service.verify("token value+&=", "203.0.113.10");
 
@@ -129,7 +131,7 @@ class RecaptchaServiceTest {
                         .body(body)
                         .build()));
 
-        return new RecaptchaService(properties, builder);
+        return new RecaptchaService(properties, builder, new OutboundUrlValidator());
     }
 
     private static AntibotProperties enabledProperties(String secretKey, String verifyUrl) {
