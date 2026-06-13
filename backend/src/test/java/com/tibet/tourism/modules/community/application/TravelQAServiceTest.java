@@ -152,6 +152,25 @@ class TravelQAServiceTest {
         verify(questionRepository, never()).incrementViewCount(200L);
     }
 
+    @Test
+    void acceptAnswerClearsPreviouslyAcceptedSiblingBeforeAccepting() {
+        TravelQuestion question = question();
+        TravelAnswer target = new TravelAnswer();
+        target.setId(401L);
+        target.setQuestion(question);
+        target.setIsAccepted(false);
+        when(questionRepository.findById(200L)).thenReturn(Optional.of(question));
+        when(answerRepository.findById(401L)).thenReturn(Optional.of(target));
+        when(questionRepository.save(any(TravelQuestion.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(answerRepository.save(any(TravelAnswer.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        TravelAnswer result = service.acceptAnswer(200L, 401L, 7L);
+
+        assertThat(result.getIsAccepted()).isTrue();
+        assertThat(question.getIsResolved()).isTrue();
+        verify(answerRepository).clearAcceptedExcept(200L, 401L);
+    }
+
     private static TravelAnswer answer(TravelQuestion question) {
         TravelAnswer answer = new TravelAnswer();
         answer.setId(400L);
