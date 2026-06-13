@@ -5,7 +5,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.5.12</version>
+        <version>3.5.14</version>
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
     <groupId>com.tibet</groupId>
@@ -17,6 +17,9 @@
         <java.version>17</java.version>
         <lombok.version>1.18.30</lombok.version>
         <twelvemonkeys.version>3.13.0</twelvemonkeys.version>
+        <!-- Override Spring Boot-managed versions to pull CVE-patched releases. -->
+        <netty.version>4.1.135.Final</netty.version>
+        <tomcat.version>10.1.55</tomcat.version>
     </properties>
     <dependencies>
         <dependency>
