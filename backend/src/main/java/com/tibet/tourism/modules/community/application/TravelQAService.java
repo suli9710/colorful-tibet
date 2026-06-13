@@ -164,6 +164,10 @@ public class TravelQAService {
             throw new BusinessException("Answer does not belong to this question");
         }
 
+        // Enforce a single accepted answer per question: clear any previously
+        // accepted sibling before marking this one accepted.
+        answerRepository.clearAcceptedExcept(questionId, answerId);
+
         answer.setIsAccepted(true);
         question.setIsResolved(true);
 
