@@ -34,4 +34,9 @@ public interface TravelAnswerRepository extends JpaRepository<TravelAnswer, Long
     @Modifying
     @Query("DELETE FROM TravelAnswer a WHERE a.question.author.id = :userId")
     void deleteByQuestionAuthorId(@Param("userId") Long userId);
+
+    @Modifying
+    @Query("UPDATE TravelAnswer a SET a.isAccepted = false "
+            + "WHERE a.question.id = :questionId AND a.id <> :answerId AND a.isAccepted = true")
+    int clearAcceptedExcept(@Param("questionId") Long questionId, @Param("answerId") Long answerId);
 }

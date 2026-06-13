@@ -4,7 +4,6 @@ import com.tibet.tourism.common.error.ResourceNotFoundException;
 import com.tibet.tourism.common.error.UnauthorizedActionException;
 import com.tibet.tourism.common.validation.InputSanitizer;
 import com.tibet.tourism.modules.community.domain.RouteComment;
-import com.tibet.tourism.modules.community.domain.RouteLike;
 import com.tibet.tourism.modules.community.domain.SharedRoute;
 import com.tibet.tourism.modules.community.infra.CommentRepository;
 import com.tibet.tourism.modules.community.infra.RouteCommentRepository;
@@ -16,7 +15,6 @@ import com.tibet.tourism.modules.community.web.dto.SharedRouteSummaryResponse;
 import com.tibet.tourism.modules.user.domain.User;
 import com.tibet.tourism.modules.user.infra.UserRepository;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -149,14 +147,10 @@ public class SharedRouteService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        Optional<RouteLike> like = likeRepository.findByRouteAndUser(route, user);
-        if (like.isEmpty()) {
-            return new LikeResult(false, readRouteLikeCount(routeId));
+        int deleted = likeRepository.deleteByRouteIdAndUserId(routeId, user.getId());
+        if (deleted > 0) {
+            routeRepository.decrementLikeCount(routeId);
         }
-
-        likeRepository.delete(like.get());
-
-        routeRepository.decrementLikeCount(routeId);
         return new LikeResult(false, readRouteLikeCount(routeId));
     }
     

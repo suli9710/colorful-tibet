@@ -6,14 +6,20 @@ ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
     PYTHONUNBUFFERED=1 \
     HOME=/tmp
 
-RUN apt-get update && apt-get install -y --no-install-recommends curl \
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && apt-get install -y --only-upgrade libssl3t64 openssl openssl-provider-legacy \
     && rm -rf /var/lib/apt/lists/*
 
 RUN addgroup --system app && adduser --system --group app
 
 COPY requirements.txt .
+# Install hash-locked dependencies and browsers, then remove build-only tooling
+# (pip/setuptools/wheel) so the runtime image carries no vulnerable build
+# helpers such as setuptools' vendored wheel/jaraco.context copies.
 RUN pip install --no-cache-dir --require-hashes -r requirements.txt \
-    && scrapling install
+    && scrapling install \
+    && python -m pip uninstall -y pip setuptools wheel
 
 COPY . .
 RUN chown -R app:app /app /ms-playwright
