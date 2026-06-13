@@ -6,6 +6,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -20,6 +21,7 @@ public class HotelBookingPiiAuditService {
 
     private final MeterRegistry meterRegistry;
 
+    @Autowired
     public HotelBookingPiiAuditService(ObjectProvider<MeterRegistry> meterRegistryProvider) {
         this(meterRegistryProvider.getIfAvailable());
     }
