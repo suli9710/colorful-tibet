@@ -38,6 +38,11 @@ ENV NGINX_SERVER_NAME=localhost
 ENV NGINX_REDIRECT_HOST=localhost
 ENV NGINX_CERT_DOMAIN=localhost
 ENV NGINX_HTTP_ONLY=false
+# Trusted upstream proxy/CDN networks for real client IP recovery. Leave empty
+# (default) to use $remote_addr directly. When set (comma/space separated CIDRs),
+# the entrypoint renders /etc/nginx/conf.d/real-ip.conf with real_ip directives.
+ENV NGINX_REAL_IP_FROM=
+ENV NGINX_REAL_IP_HEADER=X-Forwarded-For
 
 # Expose unprivileged ports; compose maps public 80/443 to these.
 EXPOSE 8080 8443
@@ -48,4 +53,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
 USER 101:101
 
 # Render only our deployment variables and keep nginx runtime variables intact.
-CMD ["sh", "-c", "set -e; if [ \"$NGINX_HTTP_ONLY\" = \"true\" ]; then envsubst '$NGINX_SERVER_NAME $NGINX_CERT_DOMAIN $NGINX_REDIRECT_HOST' < /etc/nginx/http.conf.template > /etc/nginx/conf.d/default.conf; else cert_dir=\"/etc/nginx/certs/$NGINX_CERT_DOMAIN\"; for cert_file in fullchain.pem privkey.pem chain.pem; do if [ ! -f \"$cert_dir/$cert_file\" ]; then echo \"Missing TLS certificate file: $cert_dir/$cert_file\" >&2; exit 1; fi; done; envsubst '$NGINX_SERVER_NAME $NGINX_CERT_DOMAIN $NGINX_REDIRECT_HOST' < /etc/nginx/default.conf.template > /etc/nginx/conf.d/default.conf; fi; nginx -g 'daemon off;'"]
+CMD ["sh", "-c", "set -e; if [ \"$NGINX_HTTP_ONLY\" = \"true\" ]; then envsubst '$NGINX_SERVER_NAME $NGINX_CERT_DOMAIN $NGINX_REDIRECT_HOST' < /etc/nginx/http.conf.template > /etc/nginx/conf.d/default.conf; else cert_dir=\"/etc/nginx/certs/$NGINX_CERT_DOMAIN\"; for cert_file in fullchain.pem privkey.pem chain.pem; do if [ ! -f \"$cert_dir/$cert_file\" ]; then echo \"Missing TLS certificate file: $cert_dir/$cert_file\" >&2; exit 1; fi; done; envsubst '$NGINX_SERVER_NAME $NGINX_CERT_DOMAIN $NGINX_REDIRECT_HOST' < /etc/nginx/default.conf.template > /etc/nginx/conf.d/default.conf; fi; real_ip_conf=/etc/nginx/conf.d/real-ip.conf; : > \"$real_ip_conf\"; if [ -n \"$NGINX_REAL_IP_FROM\" ]; then { echo \"real_ip_header ${NGINX_REAL_IP_HEADER:-X-Forwarded-For};\"; echo 'real_ip_recursive on;'; for cidr in $(echo \"$NGINX_REAL_IP_FROM\" | tr ',' ' '); do [ -n \"$cidr\" ] && echo \"set_real_ip_from $cidr;\"; done; } > \"$real_ip_conf\"; fi; nginx -g 'daemon off;'"]
