@@ -69,8 +69,8 @@ const flags = computed(() =>
 .prayer-flag {
   position: relative;
   flex: 0 0 auto;
-  width: clamp(15px, 4.6vw, 28px);
-  height: clamp(22px, 6.4vw, 38px);
+  width: clamp(16px, 5vw, 30px);
+  height: clamp(24px, 7vw, 42px);
   background: var(--flag-color);
   border-radius: 1px 1px 2px 2px;
   /* Garland sag plus a small hand-strung tilt so it never reads as a flat bar. */
@@ -79,8 +79,8 @@ const flags = computed(() =>
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.4),
     0 6px 10px rgba(26, 21, 32, 0.2);
-  animation: flagFlutter 2.8s ease-in-out infinite;
-  animation-delay: calc(var(--flag-index) * -0.22s);
+  animation: flagFlutter 2.4s ease-in-out infinite;
+  animation-delay: calc(var(--flag-index) * -0.18s);
   will-change: transform;
 }
 
@@ -121,16 +121,16 @@ const flags = computed(() =>
       rotate(calc(var(--flag-tilt) * 1deg)) skewX(0deg) scaleX(1);
   }
   25% {
-    transform: translateY(var(--flag-droop)) translateX(1px)
-      rotate(calc(var(--flag-tilt) * 1deg + 7deg)) skewX(-11deg) scaleX(0.94);
+    transform: translateY(calc(var(--flag-droop) - 3px)) translateX(5px)
+      rotate(calc(var(--flag-tilt) * 1deg + 11deg)) skewX(-16deg) scaleX(0.9);
   }
   50% {
     transform: translateY(var(--flag-droop)) translateX(0)
       rotate(calc(var(--flag-tilt) * 1deg)) skewX(0deg) scaleX(1);
   }
   75% {
-    transform: translateY(var(--flag-droop)) translateX(-1px)
-      rotate(calc(var(--flag-tilt) * 1deg - 7deg)) skewX(11deg) scaleX(0.94);
+    transform: translateY(calc(var(--flag-droop) - 3px)) translateX(-5px)
+      rotate(calc(var(--flag-tilt) * 1deg - 11deg)) skewX(16deg) scaleX(0.9);
   }
   100% {
     transform: translateY(var(--flag-droop)) translateX(0)
