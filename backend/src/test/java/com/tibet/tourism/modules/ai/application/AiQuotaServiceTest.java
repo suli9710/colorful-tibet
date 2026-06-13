@@ -65,6 +65,22 @@ class AiQuotaServiceTest {
     }
 
     @Test
+    void failClosedDeniesConsumeWhenRedisFails() {
+        StringRedisTemplate redisTemplate = redisTemplate();
+        when(redisTemplate.execute(any(DefaultRedisScript.class), anyList(), any(), any()))
+                .thenThrow(new RuntimeException("redis unavailable"));
+
+        AiQuotaService service = new AiQuotaService(provider(redisTemplate));
+        ReflectionTestUtils.setField(service, "dailyLimit", 5);
+        ReflectionTestUtils.setField(service, "failClosedOnRedisOutage", true);
+
+        AiQuotaService.QuotaConsumptionResult decision = service.tryConsumeQuota(7L);
+
+        assertThat(decision.allowed()).isFalse();
+        assertThat(decision.remaining()).isZero();
+    }
+
+    @Test
     void inMemoryFallbackEnforcesLimitWhenRedisIsMissing() {
         AiQuotaService service = new AiQuotaService(provider(null));
         ReflectionTestUtils.setField(service, "dailyLimit", 1);
