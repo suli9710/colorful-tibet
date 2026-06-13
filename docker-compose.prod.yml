@@ -11,6 +11,14 @@ services:
       - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required in production}
       - REDIS_PASSWORD=${REDIS_PASSWORD:?REDIS_PASSWORD is required in production}
       - GRAFANA_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD is required in production}
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required in production}
+      - ADMIN_ENCRYPTION_KEY=${ADMIN_ENCRYPTION_KEY:?ADMIN_ENCRYPTION_KEY is required in production}
+      - CSRF_SIGNING_SECRET=${CSRF_SIGNING_SECRET:?CSRF_SIGNING_SECRET is required in production}
+      - PII_KEYS=${PII_KEYS:?PII_KEYS is required in production}
+      - PII_ACTIVE_KID=${PII_ACTIVE_KID:?PII_ACTIVE_KID is required in production}
+      - SCRAPLING_API_KEY=${SCRAPLING_API_KEY:?SCRAPLING_API_KEY is required in production}
+      - PII_ENCRYPTION_KEY=${PII_ENCRYPTION_KEY:-}
+      - PAYMENT_CALLBACK_SECRET=${PAYMENT_CALLBACK_SECRET:-}
       - MYSQL_PASSWORD=${MYSQL_PASSWORD:-}
       - TRUST_PROXY_HEADERS=${TRUST_PROXY_HEADERS:-false}
       - TRUSTED_PROXY_CIDRS=${TRUSTED_PROXY_CIDRS:-}
@@ -51,7 +59,15 @@ services:
         require_real_secret REDIS_PASSWORD "$$REDIS_PASSWORD"
         require_real_secret GRAFANA_ADMIN_PASSWORD "$$GRAFANA_ADMIN_PASSWORD"
         require_real_secret SUPER_ADMIN_TOTP_SECRET "$$SUPER_ADMIN_TOTP_SECRET"
+        require_real_secret JWT_SECRET "$$JWT_SECRET"
+        require_real_secret ADMIN_ENCRYPTION_KEY "$$ADMIN_ENCRYPTION_KEY"
+        require_real_secret CSRF_SIGNING_SECRET "$$CSRF_SIGNING_SECRET"
+        require_real_secret PII_KEYS "$$PII_KEYS"
+        require_real_secret PII_ACTIVE_KID "$$PII_ACTIVE_KID"
+        require_real_secret SCRAPLING_API_KEY "$$SCRAPLING_API_KEY"
         reject_placeholder_if_set MYSQL_PASSWORD "$$MYSQL_PASSWORD"
+        reject_placeholder_if_set PII_ENCRYPTION_KEY "$$PII_ENCRYPTION_KEY"
+        reject_placeholder_if_set PAYMENT_CALLBACK_SECRET "$$PAYMENT_CALLBACK_SECRET"
 
         redirect_host_pattern='^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$$'
         if ! printf '%s' "$$NGINX_REDIRECT_HOST" | grep -Eq "$$redirect_host_pattern"; then
@@ -113,9 +129,10 @@ services:
       - PAYMENT_CALLBACK_SECRET=${PAYMENT_CALLBACK_SECRET:-}
       - REQUIRE_STRONG_SECRETS=${REQUIRE_STRONG_SECRETS:-true}
       - PUBLIC_DOCS_ENABLED=${PUBLIC_DOCS_ENABLED:-false}
-      # Prometheus in this production compose stack scrapes without credentials.
-      # Keep backend/monitoring on trusted networks; set false only with a protected scrape path.
-      - PUBLIC_METRICS_ENABLED=${PUBLIC_METRICS_ENABLED:-true}
+      # The /actuator/prometheus endpoint is unauthenticated when this is true.
+      # Default to closed; opt in only when the scrape path is protected (mTLS,
+      # auth proxy, or a strictly trusted/isolated monitoring network).
+      - PUBLIC_METRICS_ENABLED=${PUBLIC_METRICS_ENABLED:-false}
       - SEED_CONTENT_ENABLED=${SEED_CONTENT_ENABLED:-false}
       - COOKIE_SECURE=${COOKIE_SECURE:-true}
       - SERVER_FORWARD_HEADERS_STRATEGY=${SERVER_FORWARD_HEADERS_STRATEGY:-framework}
