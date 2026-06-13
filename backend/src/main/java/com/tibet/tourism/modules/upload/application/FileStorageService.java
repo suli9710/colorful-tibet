@@ -27,6 +27,7 @@ import javax.imageio.ImageWriteParam;
 import javax.imageio.ImageWriter;
 import javax.imageio.stream.ImageInputStream;
 import javax.imageio.stream.ImageOutputStream;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -67,6 +68,7 @@ public class FileStorageService {
     private final Path uploadRoot;
     private final FileMover fileMover;
 
+    @Autowired
     public FileStorageService(@Value("${file.upload-dir:uploads}") String uploadDir) {
         this(uploadDir, (source, target, options) -> Files.move(source, target, options));
     }
