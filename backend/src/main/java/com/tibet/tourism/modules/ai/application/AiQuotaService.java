@@ -42,6 +42,10 @@ public class AiQuotaService {
     @Value("${app.security.ai-quota.cache-ttl-seconds:${AI_CACHE_TTL_SECONDS:300}}")
     private int cacheTtlSeconds;
 
+    @Value("${app.security.ai-quota.fail-closed-on-redis-outage:"
+            + "${app.security.rate-limit.fail-closed-on-redis-outage:false}}")
+    private boolean failClosedOnRedisOutage;
+
     private final ConcurrentHashMap<String, AtomicInteger> fallbackQuota = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, CacheEntry> fallbackCache = new ConcurrentHashMap<>();
     private volatile String fallbackDateKey = "";
@@ -75,6 +79,11 @@ public class AiQuotaService {
                 mirrorFallbackQuota(dateKey, userId, used);
                 return decision;
             } catch (Exception e) {
+                if (failClosedOnRedisOutage) {
+                    log.warn("Redis quota consume failed; denying request (fail-closed): {}",
+                            AiLogPrivacy.exceptionSummary(e));
+                    return new QuotaConsumptionResult(false, 0);
+                }
                 log.warn("Redis quota consume failed, using in-memory fallback: {}", AiLogPrivacy.exceptionSummary(e));
                 return tryConsumeFallbackQuota(dateKey, userId);
             }
