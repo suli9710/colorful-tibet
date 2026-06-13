@@ -50,4 +50,20 @@ class TotpServiceTest {
     void rejectsNonNumericCode() {
         assertThat(totpService.isValidCode(RFC_6238_SHA1_SECRET, "abcdef")).isFalse();
     }
+
+    @Test
+    void consumeCodeAcceptsValidCodeOnlyOncePerAccount() {
+        String code = totpService.generateCodeForTime(RFC_6238_SHA1_SECRET, Instant.now());
+
+        assertThat(totpService.consumeCode("lzh", RFC_6238_SHA1_SECRET, code)).isTrue();
+        assertThat(totpService.consumeCode("lzh", RFC_6238_SHA1_SECRET, code)).isFalse();
+    }
+
+    @Test
+    void consumeCodeReplayProtectionIsScopedPerAccount() {
+        String code = totpService.generateCodeForTime(RFC_6238_SHA1_SECRET, Instant.now());
+
+        assertThat(totpService.consumeCode("account-a", RFC_6238_SHA1_SECRET, code)).isTrue();
+        assertThat(totpService.consumeCode("account-b", RFC_6238_SHA1_SECRET, code)).isTrue();
+    }
 }
