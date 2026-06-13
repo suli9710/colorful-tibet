@@ -1,11 +1,7 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createApp, ref, type App } from 'vue'
+import { afterEach, describe, expect, it } from 'vitest'
+import { createApp, type App } from 'vue'
 import PrayerFlags from './PrayerFlags.vue'
-
-vi.mock('motion-v', () => ({
-  useReducedMotion: () => ref(false)
-}))
 
 const mounted: App[] = []
 

@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useReducedMotion } from 'motion-v'
 
 /**
  * 风马旗 / 经幡 (Lung ta prayer-flag bunting).
@@ -8,13 +7,12 @@ import { useReducedMotion } from 'motion-v'
  * Renders a rope of rectangular prayer flags in the canonical five-element
  * colour order — 蓝(天/sky) 白(风/air) 红(火/fire) 绿(水/water) 黄(土/earth) —
  * each fluttering independently like wind over a mountain pass. Purely
- * decorative, so it is hidden from assistive tech and honours reduced motion.
+ * decorative, so it is hidden from assistive tech. The flutter is disabled
+ * automatically for users who request reduced motion (CSS media query).
  */
 const props = withDefaults(defineProps<{ count?: number }>(), { count: 15 })
 
 const PALETTE = ['#2D5F8A', '#F7F3EE', '#8B2E3A', '#3BA99C', '#F2C94C']
-
-const reduced = useReducedMotion()
 
 const flags = computed(() =>
   Array.from({ length: Math.max(1, props.count) }, (_, index) => ({
@@ -25,7 +23,7 @@ const flags = computed(() =>
 </script>
 
 <template>
-  <div class="prayer-flags" :class="{ 'prayer-flags--static': reduced }" aria-hidden="true">
+  <div class="prayer-flags" aria-hidden="true">
     <span class="prayer-flags__rope"></span>
     <span
       v-for="flag in flags"
@@ -50,7 +48,7 @@ const flags = computed(() =>
   flex-wrap: nowrap;
   align-items: flex-start;
   justify-content: center;
-  gap: 4px;
+  gap: 5px;
   width: 100%;
   padding-top: 2px;
   pointer-events: none;
@@ -71,18 +69,18 @@ const flags = computed(() =>
 .prayer-flag {
   position: relative;
   flex: 0 0 auto;
-  width: clamp(14px, 4.4vw, 26px);
-  height: clamp(20px, 6vw, 34px);
+  width: clamp(15px, 4.6vw, 28px);
+  height: clamp(22px, 6.4vw, 38px);
   background: var(--flag-color);
   border-radius: 1px 1px 2px 2px;
   /* Garland sag plus a small hand-strung tilt so it never reads as a flat bar. */
-  transform: translateY(var(--flag-droop)) rotate(calc((var(--flag-tilt)) * 1deg));
+  transform: translateY(var(--flag-droop)) rotate(calc(var(--flag-tilt) * 1deg));
   transform-origin: top center;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.4),
     0 6px 10px rgba(26, 21, 32, 0.2);
-  animation: flagFlutter 3.4s ease-in-out infinite;
-  animation-delay: calc(var(--flag-index) * -0.31s);
+  animation: flagFlutter 2.8s ease-in-out infinite;
+  animation-delay: calc(var(--flag-index) * -0.22s);
   will-change: transform;
 }
 
@@ -112,23 +110,32 @@ const flags = computed(() =>
   border-radius: 1px;
 }
 
+/*
+ * Pronounced, clearly visible flutter: the flag swings from the rope and the
+ * cloth ripples (skew + horizontal sweep). Per-flag negative delays send a
+ * wave travelling along the whole string.
+ */
 @keyframes flagFlutter {
-  0%, 100% {
-    transform: translateY(var(--flag-droop)) rotate(calc(var(--flag-tilt) * 1deg)) skewX(0deg);
+  0% {
+    transform: translateY(var(--flag-droop)) translateX(0)
+      rotate(calc(var(--flag-tilt) * 1deg)) skewX(0deg) scaleX(1);
   }
   25% {
-    transform: translateY(var(--flag-droop)) rotate(calc(var(--flag-tilt) * 1deg + 2.2deg)) skewX(-4deg) scaleY(0.98);
+    transform: translateY(var(--flag-droop)) translateX(1px)
+      rotate(calc(var(--flag-tilt) * 1deg + 7deg)) skewX(-11deg) scaleX(0.94);
   }
-  55% {
-    transform: translateY(var(--flag-droop)) rotate(calc(var(--flag-tilt) * 1deg - 1.6deg)) skewX(3deg);
+  50% {
+    transform: translateY(var(--flag-droop)) translateX(0)
+      rotate(calc(var(--flag-tilt) * 1deg)) skewX(0deg) scaleX(1);
   }
-  80% {
-    transform: translateY(var(--flag-droop)) rotate(calc(var(--flag-tilt) * 1deg + 1deg)) skewX(-2deg);
+  75% {
+    transform: translateY(var(--flag-droop)) translateX(-1px)
+      rotate(calc(var(--flag-tilt) * 1deg - 7deg)) skewX(11deg) scaleX(0.94);
   }
-}
-
-.prayer-flags--static .prayer-flag {
-  animation: none;
+  100% {
+    transform: translateY(var(--flag-droop)) translateX(0)
+      rotate(calc(var(--flag-tilt) * 1deg)) skewX(0deg) scaleX(1);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
