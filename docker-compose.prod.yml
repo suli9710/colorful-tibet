@@ -347,6 +347,8 @@ services:
       - NGINX_SERVER_NAME=${NGINX_SERVER_NAME:?NGINX_SERVER_NAME is required in production}
       - NGINX_REDIRECT_HOST=${NGINX_REDIRECT_HOST:?NGINX_REDIRECT_HOST is required in production}
       - NGINX_CERT_DOMAIN=${NGINX_CERT_DOMAIN:?NGINX_CERT_DOMAIN is required in production}
+      - NGINX_REAL_IP_FROM=${NGINX_REAL_IP_FROM:-}
+      - NGINX_REAL_IP_HEADER=${NGINX_REAL_IP_HEADER:-X-Forwarded-For}
     container_name: colorful-tibet-frontend
     ports:
       - "80:8080"
