@@ -12,8 +12,9 @@ WORKDIR /app
 ARG APP_UID=10001
 ARG APP_GID=10001
 
-# Install runtime tools and create the non-root application user.
-RUN apk add --no-cache curl \
+# Install runtime tools, apply security patches for base-image OS packages,
+# and create the non-root application user.
+RUN apk add --no-cache --upgrade curl libcrypto3 libssl3 openssl \
     && addgroup -S -g "$APP_GID" app \
     && adduser -S -D -H -u "$APP_UID" -G app app \
     && mkdir -p /app/data /app/logs \

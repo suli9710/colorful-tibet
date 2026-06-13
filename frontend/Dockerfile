@@ -22,7 +22,8 @@ ENV VITE_AMAP_SECURITY_CODE=$VITE_AMAP_SECURITY_CODE
 RUN npm run build
 
 FROM nginx:alpine@sha256:8b1e78743a03dbb2c95171cc58639fef29abc8816598e27fb910ed2e621e589a
-RUN apk add --no-cache gettext \
+# Install gettext and apply security patches for base-image OS packages.
+RUN apk add --no-cache --upgrade gettext libcrypto3 libssl3 libxml2 \
     && mkdir -p /etc/nginx/certs /var/cache/nginx /var/run /run \
     && chown -R 101:101 /etc/nginx/conf.d /etc/nginx/certs /var/cache/nginx /var/run /run
 
