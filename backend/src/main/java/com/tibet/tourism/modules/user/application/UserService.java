@@ -48,8 +48,11 @@ public class UserService {
         if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
             throw new BusinessException("Old password is incorrect");
         }
-        
+
         validatePassword(newPassword);
+        if (passwordEncoder.matches(newPassword, user.getPassword())) {
+            throw new BusinessException("New password must be different from the current password");
+        }
         user.setPassword(passwordEncoder.encode(newPassword)); // BCrypt哈希
         user.setMustChangePassword(false);
         user.incrementSessionVersion();
