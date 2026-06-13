@@ -1,7 +1,7 @@
 # Code Review Issues
 
-Last updated: 2026-06-09
-Last reviewed: 2026-06-09 14:16:08 +08:00
+Last updated: 2026-06-13
+Last reviewed: 2026-06-13
 
 This file tracks issues re-checked against the current worktree. Items marked fixed have code and tests in this worktree; residual items remain candidates for the next 10-minute review cycle.
 
@@ -169,13 +169,16 @@ This file tracks issues re-checked against the current worktree. Items marked fi
 
 ## Open / Residual Issues
 
-### CT-FE-046 - Open - Profile list failures still need explicit error UX
-
-- Status: Open follow-up after CT-FE-045 closed the stale-response and pagination-race risks.
-- Risk: `UserProfile.vue` still treats some non-auth list failures as empty data after logging to the console. Users can read a transient bookings, hotel bookings, or comments failure as "no records" instead of an error. The page now guards stale responses and disables load-more during authoritative refreshes, but it does not yet provide per-list localized `role="alert"` failure states or retry controls.
-- Desired closure: add independent error state for scenic bookings, hotel bookings, and comments; keep 401 handling aligned with the auth redirect flow; show localized accessible error copy instead of silently falling into empty states; add mounted DOM coverage for failed latest requests and stale failed requests.
+- None open. CT-FE-046 was closed in the current worktree (see Recently Closed Issues).
 
 ## Recently Closed Issues
+
+### CT-FE-046 - Closed - Profile list failures now surface explicit error UX
+
+- Status: Closed in the current worktree after implementation, focused DOM regression tests, and the frontend release gate passed.
+- Implementation: `UserProfile.vue` now tracks independent `bookingsError`, `hotelBookingsError`, and `commentsError` state for scenic bookings, hotel bookings, and comments. Each list clears its error on a successful (latest) load and sets it only for non-401 failures of the latest request, so stale failed responses are ignored and 401s still flow through the auth-redirect interceptor. Empty-state list failures now render a localized `role="alert"` (`aria-live="assertive"`) message with a retry control instead of the silent "no records" empty state, and load-more (append) failures render an inline `role="alert"` retry near the pagination controls while preserving already-loaded rows. Retry reloads the first page when the list is empty or retries the next page when rows are present, with the control disabled/`aria-busy` while a request is in flight. New i18n keys `profile.bookingsLoadFailed`, `profile.hotelBookingsLoadFailed`, `profile.commentsLoadFailed`, and `profile.retryLoad` were added to `zh.json` and `bo.json`.
+- Coverage: `UserProfileDomBehavior.test.ts` adds mounted jsdom coverage for a failed latest scenic-bookings request showing the accessible error plus a working retry that recovers, a stale failed scenic-bookings refresh that is ignored after a newer refresh succeeds (no error surfaced), and failed latest hotel-bookings and comments requests rendering their localized alerts and retry controls.
+- Evidence: `npm --prefix frontend run test -- --run src/views/UserProfileDomBehavior.test.ts` passed with 9 tests. `npm --prefix frontend run typecheck` passed. `npm --prefix frontend run check` passed (typecheck, full Vitest suite, and production build).
 
 ### CT-FE-045 - Closed - Profile/account stale-response regression is guarded
 

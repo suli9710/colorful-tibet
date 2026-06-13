@@ -328,6 +328,7 @@ const createTestI18n = () => createI18n({
         admin: 'Admin',
         avatar: 'Avatar',
         bookingsCount: 'bookings',
+        bookingsLoadFailed: 'Could not load scenic bookings',
         browseHotelsLink: 'Browse hotels',
         browseSpotsLink: 'Browse spots',
         cancel: 'Cancel',
@@ -341,6 +342,7 @@ const createTestI18n = () => createI18n({
         checkOut: 'Check-out',
         commentImageAlt: 'Comment image',
         commentsCount: 'comments',
+        commentsLoadFailed: 'Could not load comments',
         confirmCancelBooking: 'Cancel scenic booking?',
         confirmCancelHotelBooking: 'Cancel hotel booking?',
         confirmChange: 'Confirm change',
@@ -360,6 +362,7 @@ const createTestI18n = () => createI18n({
         deleteSuccess: 'Deleted',
         editNickname: 'Edit nickname',
         fillAllFields: 'Fill all fields',
+        hotelBookingsLoadFailed: 'Could not load hotel bookings',
         loadFailed: 'Load failed',
         member: 'Member',
         myBookingsTab: 'Scenic bookings',
@@ -373,6 +376,7 @@ const createTestI18n = () => createI18n({
         noComments: 'No comments',
         noHotelBookings: 'No hotel bookings',
         noRoutes: 'No routes',
+        retryLoad: 'Retry',
         passwordChangeFailed: 'Password change failed',
         passwordChangeSuccess: 'Password changed',
         passwordMinLength: 'Password is too short',
@@ -844,5 +848,112 @@ describe('UserProfile stale-response DOM behavior', () => {
     expect(renderedText).not.toContain('Stale Append Route')
     expect(renderedText).not.toContain('Stale Comment Spot')
     expect(renderedText).not.toContain('Stale Route')
+  })
+})
+
+const findAlert = (root: ParentNode) =>
+  root.querySelector<HTMLElement>('[role="alert"]')
+
+describe('UserProfile list failure error UX', () => {
+  it('shows an accessible scenic bookings error with a working retry when the latest request fails', async () => {
+    const failingLoad = createDeferred<ReturnType<typeof pageResponse>>()
+
+    installProfileGetMock({
+      [endpointsMock.bookings.my]: [
+        failingLoad.promise,
+        pageResponse([scenicBooking(1, 'Recovered Scenic Booking')])
+      ]
+    })
+
+    const root = await mountUserProfile()
+    failingLoad.reject(new Error('scenic bookings boom'))
+    await settleVue()
+
+    await clickProfileTab(root, 'Scenic bookings')
+
+    const alert = findAlert(root)
+    expect(alert).toBeTruthy()
+    expect(alert?.textContent).toContain('Could not load scenic bookings')
+    expect(alert?.getAttribute('aria-live')).toBe('assertive')
+    expect(root.textContent).not.toContain('No scenic bookings')
+
+    await clickButtonByText(root, 'Retry', 6)
+
+    const renderedText = root.textContent || ''
+    expect(renderedText).toContain('Recovered Scenic Booking')
+    expect(renderedText).not.toContain('Could not load scenic bookings')
+    expect(findAlert(root)).toBeFalsy()
+  })
+
+  it('ignores a stale failed scenic bookings refresh after a newer refresh succeeds', async () => {
+    const olderRefresh = createDeferred<ReturnType<typeof pageResponse>>()
+    const newerRefresh = createDeferred<ReturnType<typeof pageResponse>>()
+
+    installProfileGetMock({
+      [endpointsMock.bookings.my]: [
+        pageResponse([scenicBooking(1, 'Initial Scenic Booking')]),
+        olderRefresh.promise,
+        newerRefresh.promise
+      ]
+    })
+
+    const root = await mountUserProfile()
+    await clickProfileTab(root, 'Scenic bookings')
+
+    expect(root.textContent).toContain('Initial Scenic Booking')
+
+    await clickButtonByText(root, 'Cancel booking', 4)
+    await clickButtonByText(root, 'Cancel booking', 4)
+
+    newerRefresh.resolve(pageResponse([scenicBooking(2, 'Fresh Scenic Booking')]))
+    await settleVue()
+
+    olderRefresh.reject(new Error('stale scenic failure'))
+    await settleVue()
+
+    const renderedText = root.textContent || ''
+    expect(renderedText).toContain('Fresh Scenic Booking')
+    expect(renderedText).not.toContain('Could not load scenic bookings')
+    expect(findAlert(root)).toBeFalsy()
+  })
+
+  it('shows an accessible hotel bookings error when the latest request fails', async () => {
+    const failingLoad = createDeferred<ReturnType<typeof pageResponse>>()
+
+    installProfileGetMock({
+      [endpointsMock.hotelBookings.my]: [failingLoad.promise]
+    })
+
+    const root = await mountUserProfile()
+    failingLoad.reject(new Error('hotel bookings boom'))
+    await settleVue()
+
+    await clickProfileTab(root, 'Hotel bookings')
+
+    const alert = findAlert(root)
+    expect(alert).toBeTruthy()
+    expect(alert?.textContent).toContain('Could not load hotel bookings')
+    expect(root.textContent).not.toContain('No hotel bookings')
+    expect(findButtonByText(root, 'Retry')).toBeTruthy()
+  })
+
+  it('shows an accessible comments error when the latest request fails', async () => {
+    const failingLoad = createDeferred<ReturnType<typeof commentsResponse>>()
+
+    installProfileGetMock({
+      [endpointsMock.auth.meComments]: [failingLoad.promise]
+    })
+
+    const root = await mountUserProfile()
+    failingLoad.reject(new Error('comments boom'))
+    await settleVue()
+
+    await clickProfileTab(root, 'Comments')
+
+    const alert = findAlert(root)
+    expect(alert).toBeTruthy()
+    expect(alert?.textContent).toContain('Could not load comments')
+    expect(root.textContent).not.toContain('No comments')
+    expect(findButtonByText(root, 'Retry')).toBeTruthy()
   })
 })

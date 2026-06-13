@@ -189,6 +189,7 @@ const bookingsPageInfo = ref<PageMetadata>({
 })
 const bookingsRefreshing = ref(false)
 const bookingsLoadingMore = ref(false)
+const bookingsError = ref(false)
 const bookingsRequestGuard = createPaginatedRequestGuard()
 const hotelBookings = ref<ProfileHotelBooking[]>([])
 const hotelBookingsPageSize = 20
@@ -200,6 +201,7 @@ const hotelBookingsPageInfo = ref<PageMetadata>({
 })
 const hotelBookingsRefreshing = ref(false)
 const hotelBookingsLoadingMore = ref(false)
+const hotelBookingsError = ref(false)
 const hotelBookingsRequestGuard = createPaginatedRequestGuard()
 const spotComments = ref<ProfileSpotComment[]>([])
 const routeComments = ref<ProfileRouteComment[]>([])
@@ -218,6 +220,7 @@ const routeCommentsPageInfo = ref<PageMetadata>({
 })
 const commentsRefreshing = ref(false)
 const commentsLoadingMore = ref(false)
+const commentsError = ref(false)
 const commentsRequestGuard = createPaginatedRequestGuard()
 const loading = ref(true)
 type ProfileTabId = 'routes' | 'bookings' | 'hotel-bookings' | 'comments'
@@ -494,6 +497,7 @@ const fetchBookings = async (page = 0, append = false) => {
     if (!isLatestPaginatedRequest(bookingsRequestGuard, requestToken)) return
 
     applyBookingsPage(response, append)
+    bookingsError.value = false
   } catch (e) {
     if (!isLatestPaginatedRequest(bookingsRequestGuard, requestToken)) return
 
@@ -501,6 +505,7 @@ const fetchBookings = async (page = 0, append = false) => {
     if (isUnauthorizedError(e)) {
       throw e
     }
+    bookingsError.value = true
     if (!append) {
       bookings.value = []
       bookingsPageInfo.value = emptyPageInfo(bookingsPageSize)
@@ -519,6 +524,15 @@ const fetchBookings = async (page = 0, append = false) => {
 const loadNextBookingsPage = async () => {
   if (bookingsLoadMoreBusy.value || !hasMoreBookings.value) return
   await fetchBookings(bookingsPageInfo.value.page + 1, true)
+}
+
+const retryBookings = async () => {
+  if (bookingsLoadMoreBusy.value) return
+  if (bookings.value.length > 0 && hasMoreBookings.value) {
+    await loadNextBookingsPage()
+  } else {
+    await fetchBookings()
+  }
 }
 
 const emptyPageInfo = (size: number): PageMetadata => ({
@@ -580,6 +594,7 @@ const fetchHotelBookings = async (page = 0, append = false) => {
     if (!isLatestPaginatedRequest(hotelBookingsRequestGuard, requestToken)) return
 
     applyHotelBookingsPage(response, append)
+    hotelBookingsError.value = false
   } catch (e) {
     if (!isLatestPaginatedRequest(hotelBookingsRequestGuard, requestToken)) return
 
@@ -587,6 +602,7 @@ const fetchHotelBookings = async (page = 0, append = false) => {
     if (isUnauthorizedError(e)) {
       throw e
     }
+    hotelBookingsError.value = true
     if (!append) {
       hotelBookings.value = []
       hotelBookingsPageInfo.value = emptyPageInfo(hotelBookingsPageSize)
@@ -605,6 +621,15 @@ const fetchHotelBookings = async (page = 0, append = false) => {
 const loadNextHotelBookingsPage = async () => {
   if (hotelBookingsLoadMoreBusy.value || !hasMoreHotelBookings.value) return
   await fetchHotelBookings(hotelBookingsPageInfo.value.page + 1, true)
+}
+
+const retryHotelBookings = async () => {
+  if (hotelBookingsLoadMoreBusy.value) return
+  if (hotelBookings.value.length > 0 && hasMoreHotelBookings.value) {
+    await loadNextHotelBookingsPage()
+  } else {
+    await fetchHotelBookings()
+  }
 }
 
 const getApiErrorMessage = (error: unknown, fallback: string) => {
@@ -697,6 +722,7 @@ const fetchMyComments = async (page = 0, append = false) => {
     if (!isLatestPaginatedRequest(commentsRequestGuard, requestToken)) return
 
     applyCommentsPage(response, append)
+    commentsError.value = false
   } catch (e: unknown) {
     if (!isLatestPaginatedRequest(commentsRequestGuard, requestToken)) return
 
@@ -704,6 +730,7 @@ const fetchMyComments = async (page = 0, append = false) => {
     if (isUnauthorizedError(e)) {
       throw e
     }
+    commentsError.value = true
     if (!append) {
       spotComments.value = []
       routeComments.value = []
@@ -724,6 +751,17 @@ const fetchMyComments = async (page = 0, append = false) => {
 const loadNextCommentsPage = async () => {
   if (commentsLoadMoreBusy.value || !hasMoreComments.value) return
   await fetchMyComments(commentsPage.value + 1, true)
+}
+
+const hasAnyComments = computed(() => spotComments.value.length > 0 || routeComments.value.length > 0)
+
+const retryComments = async () => {
+  if (commentsLoadMoreBusy.value) return
+  if (hasAnyComments.value && hasMoreComments.value) {
+    await loadNextCommentsPage()
+  } else {
+    await fetchMyComments()
+  }
 }
 
 const cancelBooking = async (id: number) => {
@@ -1456,11 +1494,29 @@ const getAvatarUrl = (): string | undefined => profileAvatarUrl.value || undefin
 
         <!-- My Bookings -->
         <div v-if="activeTab === 'bookings'" role="tabpanel" :id="profileTabPanelId('bookings')" :aria-labelledby="profileTabId('bookings')" tabindex="0" :aria-busy="bookingsLoadMoreBusy">
-          <div v-if="bookings.length === 0" class="text-center py-12">
+          <div v-if="bookings.length === 0 && !bookingsError" class="text-center py-12">
             <p class="text-gray-500 mb-4">{{ t('profile.noBookings') }}</p>
             <router-link to="/spots" class="text-tibet-gold hover:text-tibet-gold/80 font-medium">
               {{ t('profile.browseSpotsLink') }}
             </router-link>
+          </div>
+
+          <div
+            v-else-if="bookings.length === 0 && bookingsError"
+            role="alert"
+            aria-live="assertive"
+            class="rounded-2xl border border-red-200 bg-red-50 px-4 py-10 text-center"
+          >
+            <p class="mb-4 text-sm text-red-700">{{ t('profile.bookingsLoadFailed') }}</p>
+            <button
+              type="button"
+              @click="retryBookings"
+              :disabled="bookingsRefreshing"
+              :aria-busy="bookingsRefreshing"
+              class="min-h-11 rounded-xl border border-red-300 bg-white px-5 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-100 disabled:cursor-wait disabled:opacity-50"
+            >
+              {{ bookingsRefreshing ? t('common.loading') : t('profile.retryLoad') }}
+            </button>
           </div>
 
           <template v-else>
@@ -1523,6 +1579,23 @@ const getAvatarUrl = (): string | undefined => profileAvatarUrl.value || undefin
             </motion.div>
           </div>
           <div
+            v-if="bookingsError"
+            role="alert"
+            aria-live="assertive"
+            class="mt-4 flex flex-col items-center gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-4 text-center sm:flex-row sm:justify-between sm:text-left"
+          >
+            <p class="text-sm text-red-700">{{ t('profile.bookingsLoadFailed') }}</p>
+            <button
+              type="button"
+              @click="retryBookings"
+              :disabled="bookingsLoadMoreBusy"
+              :aria-busy="bookingsLoadMoreBusy"
+              class="min-h-11 rounded-xl border border-red-300 bg-white px-5 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-100 disabled:cursor-wait disabled:opacity-50"
+            >
+              {{ bookingsLoadMoreBusy ? t('common.loading') : t('profile.retryLoad') }}
+            </button>
+          </div>
+          <div
             v-if="bookingsTotalPages > 1"
             class="mt-8 flex flex-wrap items-center justify-center gap-3"
             role="navigation"
@@ -1546,11 +1619,29 @@ const getAvatarUrl = (): string | undefined => profileAvatarUrl.value || undefin
 
         <!-- My Hotel Bookings -->
         <div v-if="activeTab === 'hotel-bookings'" role="tabpanel" :id="profileTabPanelId('hotel-bookings')" :aria-labelledby="profileTabId('hotel-bookings')" tabindex="0" :aria-busy="hotelBookingsLoadMoreBusy">
-          <div v-if="hotelBookings.length === 0" class="text-center py-12">
+          <div v-if="hotelBookings.length === 0 && !hotelBookingsError" class="text-center py-12">
             <p class="text-gray-500 mb-4">{{ t('profile.noHotelBookings') }}</p>
             <router-link to="/hotels" class="text-tibet-gold hover:text-tibet-gold/80 font-medium">
               {{ t('profile.browseHotelsLink') }}
             </router-link>
+          </div>
+
+          <div
+            v-else-if="hotelBookings.length === 0 && hotelBookingsError"
+            role="alert"
+            aria-live="assertive"
+            class="rounded-2xl border border-red-200 bg-red-50 px-4 py-10 text-center"
+          >
+            <p class="mb-4 text-sm text-red-700">{{ t('profile.hotelBookingsLoadFailed') }}</p>
+            <button
+              type="button"
+              @click="retryHotelBookings"
+              :disabled="hotelBookingsRefreshing"
+              :aria-busy="hotelBookingsRefreshing"
+              class="min-h-11 rounded-xl border border-red-300 bg-white px-5 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-100 disabled:cursor-wait disabled:opacity-50"
+            >
+              {{ hotelBookingsRefreshing ? t('common.loading') : t('profile.retryLoad') }}
+            </button>
           </div>
 
           <div v-else class="space-y-4">
@@ -1616,6 +1707,23 @@ const getAvatarUrl = (): string | undefined => profileAvatarUrl.value || undefin
             </motion.div>
           </div>
           <div
+            v-if="hotelBookingsError"
+            role="alert"
+            aria-live="assertive"
+            class="mt-4 flex flex-col items-center gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-4 text-center sm:flex-row sm:justify-between sm:text-left"
+          >
+            <p class="text-sm text-red-700">{{ t('profile.hotelBookingsLoadFailed') }}</p>
+            <button
+              type="button"
+              @click="retryHotelBookings"
+              :disabled="hotelBookingsLoadMoreBusy"
+              :aria-busy="hotelBookingsLoadMoreBusy"
+              class="min-h-11 rounded-xl border border-red-300 bg-white px-5 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-100 disabled:cursor-wait disabled:opacity-50"
+            >
+              {{ hotelBookingsLoadMoreBusy ? t('common.loading') : t('profile.retryLoad') }}
+            </button>
+          </div>
+          <div
             v-if="hotelBookingsTotalPages > 1"
             class="mt-8 flex flex-wrap items-center justify-center gap-3"
             role="navigation"
@@ -1638,11 +1746,29 @@ const getAvatarUrl = (): string | undefined => profileAvatarUrl.value || undefin
 
         <!-- My Comments -->
         <div v-if="activeTab === 'comments'" role="tabpanel" :id="profileTabPanelId('comments')" :aria-labelledby="profileTabId('comments')" tabindex="0" :aria-busy="commentsLoadMoreBusy">
-          <div v-if="spotComments.length === 0 && routeComments.length === 0" class="text-center py-12">
+          <div v-if="!hasAnyComments && !commentsError" class="text-center py-12">
             <p class="text-gray-500 mb-4">{{ t('profile.noComments') }}</p>
             <router-link to="/spots" class="text-tibet-gold hover:text-tibet-gold/80 font-medium">
               {{ t('profile.browseSpotsLink') }}
             </router-link>
+          </div>
+
+          <div
+            v-else-if="!hasAnyComments && commentsError"
+            role="alert"
+            aria-live="assertive"
+            class="rounded-2xl border border-red-200 bg-red-50 px-4 py-10 text-center"
+          >
+            <p class="mb-4 text-sm text-red-700">{{ t('profile.commentsLoadFailed') }}</p>
+            <button
+              type="button"
+              @click="retryComments"
+              :disabled="commentsRefreshing"
+              :aria-busy="commentsRefreshing"
+              class="min-h-11 rounded-xl border border-red-300 bg-white px-5 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-100 disabled:cursor-wait disabled:opacity-50"
+            >
+              {{ commentsRefreshing ? t('common.loading') : t('profile.retryLoad') }}
+            </button>
           </div>
 
           <div v-else class="space-y-6">
@@ -1735,6 +1861,23 @@ const getAvatarUrl = (): string | undefined => profileAvatarUrl.value || undefin
               </div>
             </div>
 
+            <div
+              v-if="commentsError"
+              role="alert"
+              aria-live="assertive"
+              class="mt-4 flex flex-col items-center gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-4 text-center sm:flex-row sm:justify-between sm:text-left"
+            >
+              <p class="text-sm text-red-700">{{ t('profile.commentsLoadFailed') }}</p>
+              <button
+                type="button"
+                @click="retryComments"
+                :disabled="commentsLoadMoreBusy"
+                :aria-busy="commentsLoadMoreBusy"
+                class="min-h-11 rounded-xl border border-red-300 bg-white px-5 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-100 disabled:cursor-wait disabled:opacity-50"
+              >
+                {{ commentsLoadMoreBusy ? t('common.loading') : t('profile.retryLoad') }}
+              </button>
+            </div>
             <div
               v-if="commentsTotalPages > 1"
               class="mt-8 flex flex-wrap items-center justify-center gap-3"
