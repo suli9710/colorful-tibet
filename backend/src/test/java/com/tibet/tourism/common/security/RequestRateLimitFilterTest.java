@@ -301,6 +301,31 @@ class RequestRateLimitFilterTest {
     }
 
     @Test
+    @DisplayName("fail-closed rejects sensitive buckets when Redis is unavailable")
+    void failClosedRejectsSensitiveBucketsOnRedisOutage() throws Exception {
+        RequestRateLimitFilter redisFilter = redisBackedFilter(new FailingRedisTemplate(), new SimpleMeterRegistry());
+        setField(redisFilter, "failClosedOnRedisOutage", true);
+
+        MockHttpServletResponse blocked = doFilter(redisFilter, apiRequest("POST", "/api/auth/login"));
+
+        assertThat(blocked.getStatus()).isEqualTo(429);
+        assertThat(blocked.getContentAsString()).contains("Too Many Requests");
+        assertThat(blocked.getHeader(HttpHeaders.RETRY_AFTER)).isNotNull();
+    }
+
+    @Test
+    @DisplayName("fail-closed still serves non-sensitive buckets from in-memory fallback")
+    void failClosedStillServesNonSensitiveBucketsOnRedisOutage() throws Exception {
+        RequestRateLimitFilter redisFilter = redisBackedFilter(new FailingRedisTemplate(), new SimpleMeterRegistry());
+        setField(redisFilter, "failClosedOnRedisOutage", true);
+
+        MockHttpServletResponse response = doFilter(redisFilter, apiRequest("GET", "/api/spots"));
+
+        assertThat(response.getStatus()).isEqualTo(200);
+        assertThat(redisFilter.isRedisFallbackActive()).isTrue();
+    }
+
+    @Test
     @DisplayName("rate limit headers are set on every response")
     void rateLimitHeadersAreSet() throws Exception {
         MockHttpServletResponse response = doFilter(apiRequest("GET", "/api/spots"));
