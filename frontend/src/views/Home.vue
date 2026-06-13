@@ -38,6 +38,11 @@
       <!-- Layer 6: Floating mist -->
       <div class="hero-mist z-6"></div>
 
+      <!-- Layer 7: Prayer-flag bunting strung across the mountain pass -->
+      <div class="hero-prayer-flags pointer-events-none absolute inset-x-0 top-0 z-[7] px-1 sm:px-6">
+        <PrayerFlags :count="17" />
+      </div>
+
       <!-- Layer 8: Content overlay -->
       <div class="relative z-10 text-center px-4 max-w-5xl mx-auto">
         <div :key="`hero-content-${currentSlide}`" class="hero-content-fade">
@@ -88,6 +93,7 @@
         v-if="!prefersReducedMotion"
         class="absolute bottom-12 left-1/2 z-10 hidden -translate-x-1/2 flex-col items-center gap-2 text-xs text-white/70 md:flex"
       >
+        <span class="h-1.5 w-1.5 rounded-full bg-tibet-yellow shadow-[0_0_10px_rgba(242,201,76,0.7)] animate-bounce-subtle"></span>
         <span class="h-10 w-px bg-gradient-to-b from-white/70 to-transparent"></span>
       </div>
     </div>
@@ -262,6 +268,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion-v'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import api, { endpoints } from '../api'
+import PrayerFlags from '../components/PrayerFlags.vue'
 import { useAuthStore } from '../stores/auth'
 import { summarizeClientError } from '../utils/errorMonitoring'
 import {
@@ -545,6 +552,13 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* Drape the prayer-flag bunting like a string tied between two poles. */
+.hero-prayer-flags {
+  transform: rotate(-1.5deg);
+  transform-origin: top center;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.25));
+}
+
 .hero-content-fade {
   animation: heroContentFade 320ms ease-out both;
 }
