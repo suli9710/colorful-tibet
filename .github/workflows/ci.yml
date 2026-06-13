@@ -180,6 +180,49 @@ jobs:
           ignore-unfixed: true
           exit-code: '1'
 
+  backend-context:
+    name: Backend context boot
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      mysql:
+        image: mysql:8.4@sha256:c36050afdca850f23cef85703f84c7531a5ae155a11b5ee1c60acb09937c4084
+        env:
+          MYSQL_ROOT_PASSWORD: ci-root-password
+          MYSQL_DATABASE: colorful_tibet_test
+          MYSQL_USER: colorful_tibet_app
+          MYSQL_PASSWORD: ci-app-password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pci-root-password"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Set up Java
+        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Boot Spring context against MySQL (Flyway + wiring + startup validators)
+        env:
+          RUN_CONTEXT_TESTS: 'true'
+          MYSQL_TEST_HOST: 127.0.0.1
+          MYSQL_TEST_PORT: '3306'
+          MYSQL_TEST_DATABASE: colorful_tibet_test
+          MYSQL_TEST_USERNAME: colorful_tibet_app
+          MYSQL_TEST_PASSWORD: ci-app-password
+          MYSQL_TEST_ALLOW_PUBLIC_KEY_RETRIEVAL: 'true'
+        run: mvn -q test -Dtest=ApplicationContextSmokeTest
+
   scrapler:
     name: Scrapler tests
     runs-on: ubuntu-latest
