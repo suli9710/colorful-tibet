@@ -81,6 +81,9 @@ public class RequestRateLimitFilter extends OncePerRequestFilter {
     @Value("${app.security.rate-limit.redis-enabled:true}")
     private boolean redisEnabled;
 
+    @Value("${app.security.rate-limit.fail-closed-on-redis-outage:false}")
+    private boolean failClosedOnRedisOutage;
+
     @Value("${app.security.rate-limit.default.requests:300}")
     private int defaultRequests;
 
@@ -171,9 +174,20 @@ public class RequestRateLimitFilter extends OncePerRequestFilter {
             } catch (Exception e) {
                 recordRedisFallback("exception", SensitiveLogSanitizer.exceptionSummary(e));
             }
+            // Redis was expected for shared rate limiting but is unavailable. For abuse- and
+            // cost-sensitive buckets, fail closed instead of dropping to per-node in-memory
+            // counters that an attacker can multiply by rotating across instances.
+            if (failClosedOnRedisOutage && rule.sensitive()) {
+                return deniedDecision(rule, now);
+            }
         }
 
         return tryAcquireInMemory(request, rule, now);
+    }
+
+    private RateDecision deniedDecision(LimitRule rule, long now) {
+        long retryAfter = Math.max(1, rule.windowMillis() / 1000);
+        return new RateDecision(false, 0, retryAfter, (now + retryAfter * 1000) / 1000);
     }
 
     private void recordRedisFallback(String reason, String detail) {
@@ -243,27 +257,27 @@ public class RequestRateLimitFilter extends OncePerRequestFilter {
     private LimitRule resolveRule(String path, String method) {
         String normalized = path.toLowerCase();
         if (normalized.startsWith("/api/auth/register")) {
-            return new LimitRule("register", registerRequests, configuredWindowMillis(registerWindowSeconds));
+            return new LimitRule("register", registerRequests, configuredWindowMillis(registerWindowSeconds), true);
         }
         if (normalized.startsWith("/api/auth/login")) {
-            return new LimitRule("auth", authRequests, configuredWindowMillis(authWindowSeconds));
+            return new LimitRule("auth", authRequests, configuredWindowMillis(authWindowSeconds), true);
         }
         if ("GET".equalsIgnoreCase(method) && normalized.startsWith("/api/routes/generate/jobs/")) {
-            return new LimitRule("default", defaultRequests, configuredWindowMillis(defaultWindowSeconds));
+            return new LimitRule("default", defaultRequests, configuredWindowMillis(defaultWindowSeconds), false);
         }
         if (normalized.startsWith("/api/routes/generate")) {
-            return new LimitRule("ai", aiRequests, configuredWindowMillis(aiWindowSeconds));
+            return new LimitRule("ai", aiRequests, configuredWindowMillis(aiWindowSeconds), true);
         }
         if (normalized.startsWith("/api/guide/chat")) {
-            return new LimitRule("guide-chat", guideChatRequests, configuredWindowMillis(guideChatWindowSeconds));
+            return new LimitRule("guide-chat", guideChatRequests, configuredWindowMillis(guideChatWindowSeconds), true);
         }
         if (normalized.contains("/upload-image") || normalized.endsWith("/upload-avatar")) {
-            return new LimitRule("upload", uploadRequests, configuredWindowMillis(uploadWindowSeconds));
+            return new LimitRule("upload", uploadRequests, configuredWindowMillis(uploadWindowSeconds), false);
         }
         if (normalized.startsWith("/api/admin/")) {
-            return new LimitRule("admin", adminRequests, configuredWindowMillis(adminWindowSeconds));
+            return new LimitRule("admin", adminRequests, configuredWindowMillis(adminWindowSeconds), false);
         }
-        return new LimitRule("default", defaultRequests, configuredWindowMillis(defaultWindowSeconds));
+        return new LimitRule("default", defaultRequests, configuredWindowMillis(defaultWindowSeconds), false);
     }
 
     private long configuredWindowMillis(long windowSeconds) {
@@ -297,7 +311,7 @@ public class RequestRateLimitFilter extends OncePerRequestFilter {
         }
     }
 
-    private record LimitRule(String name, int maxRequests, long windowMillis) {
+    private record LimitRule(String name, int maxRequests, long windowMillis, boolean sensitive) {
         private static final int MIN_REQUESTS = 1;
 
         private LimitRule {

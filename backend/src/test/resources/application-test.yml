@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: jdbc:mysql://${MYSQL_TEST_HOST:${MYSQL_HOST:localhost}}:${MYSQL_TEST_PORT:${MYSQL_PORT:3306}}/${MYSQL_TEST_DATABASE:colorful_tibet_test}?useUnicode=true&characterEncoding=utf8&sslMode=${MYSQL_TEST_SSL_MODE:DISABLED}&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=false
+    url: jdbc:mysql://${MYSQL_TEST_HOST:${MYSQL_HOST:localhost}}:${MYSQL_TEST_PORT:${MYSQL_PORT:3306}}/${MYSQL_TEST_DATABASE:colorful_tibet_test}?useUnicode=true&characterEncoding=utf8&sslMode=${MYSQL_TEST_SSL_MODE:DISABLED}&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=${MYSQL_TEST_ALLOW_PUBLIC_KEY_RETRIEVAL:false}
     driver-class-name: com.mysql.cj.jdbc.Driver
     username: ${MYSQL_TEST_USERNAME:${MYSQL_USERNAME:colorful_tibet_app}}
     password: ${MYSQL_TEST_PASSWORD:${MYSQL_PASSWORD:}}
