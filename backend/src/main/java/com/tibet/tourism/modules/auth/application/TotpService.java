@@ -6,6 +6,9 @@ import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.Locale;
+import java.util.Map;
+import java.util.OptionalLong;
+import java.util.concurrent.ConcurrentHashMap;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import org.springframework.stereotype.Service;
@@ -21,6 +24,10 @@ public class TotpService {
     private static final int MIN_SECRET_BYTES = 16;
     private static final int OTP_MODULO = 1_000_000;
 
+    // Tracks the latest time step already consumed per account so a captured code
+    // cannot be replayed within its ~90s validity window.
+    private final Map<String, Long> lastConsumedStep = new ConcurrentHashMap<>();
+
     public void validateSecret(String base32Secret) {
         rejectPlaceholderSecret(base32Secret);
         byte[] decoded = decodeBase32(base32Secret);
@@ -30,21 +37,48 @@ public class TotpService {
     }
 
     public boolean isValidCode(String base32Secret, String providedCode) {
-        if (!StringUtils.hasText(providedCode) || !providedCode.matches("\\d{" + DIGITS + "}")) {
+        return matchStep(base32Secret, providedCode).isPresent();
+    }
+
+    /**
+     * Validates a code and, on success, atomically marks its time step as consumed for the
+     * given account so the same (or an older) step cannot be reused. Returns false when the
+     * code is invalid or has already been consumed (replay).
+     */
+    public boolean consumeCode(String accountKey, String base32Secret, String providedCode) {
+        OptionalLong matched = matchStep(base32Secret, providedCode);
+        if (matched.isEmpty()) {
             return false;
+        }
+        long matchedStep = matched.getAsLong();
+        boolean[] accepted = {false};
+        lastConsumedStep.compute(accountKey, (key, previous) -> {
+            if (previous != null && previous >= matchedStep) {
+                return previous;
+            }
+            accepted[0] = true;
+            return matchedStep;
+        });
+        return accepted[0];
+    }
+
+    private OptionalLong matchStep(String base32Secret, String providedCode) {
+        if (!StringUtils.hasText(providedCode) || !providedCode.matches("\\d{" + DIGITS + "}")) {
+            return OptionalLong.empty();
         }
 
         byte[] secret = decodeBase32(base32Secret);
         long currentStep = Instant.now().getEpochSecond() / PERIOD_SECONDS;
         for (int offset = -ACCEPTED_WINDOW_STEPS; offset <= ACCEPTED_WINDOW_STEPS; offset++) {
-            String expected = generateCode(secret, currentStep + offset);
+            long step = currentStep + offset;
+            String expected = generateCode(secret, step);
             if (MessageDigest.isEqual(
                     expected.getBytes(StandardCharsets.UTF_8),
                     providedCode.getBytes(StandardCharsets.UTF_8))) {
-                return true;
+                return OptionalLong.of(step);
             }
         }
-        return false;
+        return OptionalLong.empty();
     }
 
     String generateCodeForTime(String base32Secret, Instant instant) {

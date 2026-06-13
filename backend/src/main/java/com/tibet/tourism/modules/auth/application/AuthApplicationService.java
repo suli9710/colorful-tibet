@@ -22,6 +22,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.OptionalDouble;
 import java.util.regex.Pattern;
@@ -328,8 +329,9 @@ public class AuthApplicationService {
         if (!StringUtils.hasText(provided)) {
             throw new SecondaryAuthRequiredException("Secondary authentication required");
         }
-        if (!totpService.isValidCode(superAdminTotpSecret, provided.trim())) {
-            logger.warn("Rejected super-admin login with invalid TOTP code: user={}",
+        String totpAccountKey = user.getUsername().toLowerCase(Locale.ROOT);
+        if (!totpService.consumeCode(totpAccountKey, superAdminTotpSecret, provided.trim())) {
+            logger.warn("Rejected super-admin login with invalid or replayed TOTP code: user={}",
                     userLogLabel(user.getUsername()));
             LoginAttemptService.LoginAttemptDecision failure = loginAttemptService.recordFailure(user.getUsername(), clientIp);
             if (!failure.allowed()) {
