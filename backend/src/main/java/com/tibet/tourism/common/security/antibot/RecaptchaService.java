@@ -1,7 +1,9 @@
 package com.tibet.tourism.common.security.antibot;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.tibet.tourism.common.security.OutboundUrlValidator;
 import com.tibet.tourism.common.security.PiiMasker;
 import com.tibet.tourism.common.security.SensitiveLogSanitizer;
+import jakarta.annotation.PostConstruct;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -24,10 +26,24 @@ public class RecaptchaService {
 
     private final AntibotProperties properties;
     private final WebClient webClient;
+    private final OutboundUrlValidator outboundUrlValidator;
 
-    public RecaptchaService(AntibotProperties properties, WebClient.Builder webClientBuilder) {
+    public RecaptchaService(
+            AntibotProperties properties,
+            WebClient.Builder webClientBuilder,
+            OutboundUrlValidator outboundUrlValidator) {
         this.properties = properties;
         this.webClient = webClientBuilder.build();
+        this.outboundUrlValidator = outboundUrlValidator;
+    }
+
+    @PostConstruct
+    void validateConfiguration() {
+        AntibotProperties.Recaptcha cfg = properties.getRecaptcha();
+        if (properties.isEnabled() && cfg.isEnabled()) {
+            outboundUrlValidator.validateHttpsUrl(
+                    "app.security.antibot.recaptcha.verify-url", cfg.getVerifyUrl());
+        }
     }
 
     public OptionalDouble verify(String token, String remoteIp) {
