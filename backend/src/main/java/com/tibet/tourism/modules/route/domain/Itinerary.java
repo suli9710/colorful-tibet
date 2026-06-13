@@ -25,7 +25,6 @@ public class Itinerary {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "parent_itinerary_id")
-    @BatchSize(size = 50)
     private Itinerary parentItinerary;
 
     @Column(nullable = false, length = 160)
