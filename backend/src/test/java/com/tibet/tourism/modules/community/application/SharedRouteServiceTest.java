@@ -182,6 +182,38 @@ class SharedRouteServiceTest {
     }
 
     @Test
+    void unlikeRouteDecrementsCountWhenALikeRowIsDeleted() {
+        User user = user();
+        SharedRoute route = sharedRoute(user);
+        when(routeRepository.findById(100L)).thenReturn(Optional.of(route));
+        when(userRepository.findById(7L)).thenReturn(Optional.of(user));
+        when(likeRepository.deleteByRouteIdAndUserId(100L, 7L)).thenReturn(1);
+        when(routeRepository.findLikeCountById(100L)).thenReturn(Optional.of(2));
+
+        SharedRouteService.LikeResult result = service.unlikeRoute(100L, 7L);
+
+        assertThat(result.liked()).isFalse();
+        assertThat(result.likeCount()).isEqualTo(2);
+        verify(routeRepository).decrementLikeCount(100L);
+    }
+
+    @Test
+    void unlikeRouteWithoutAnExistingLikeDoesNotDecrement() {
+        User user = user();
+        SharedRoute route = sharedRoute(user);
+        when(routeRepository.findById(100L)).thenReturn(Optional.of(route));
+        when(userRepository.findById(7L)).thenReturn(Optional.of(user));
+        when(likeRepository.deleteByRouteIdAndUserId(100L, 7L)).thenReturn(0);
+        when(routeRepository.findLikeCountById(100L)).thenReturn(Optional.of(5));
+
+        SharedRouteService.LikeResult result = service.unlikeRoute(100L, 7L);
+
+        assertThat(result.liked()).isFalse();
+        assertThat(result.likeCount()).isEqualTo(5);
+        verify(routeRepository, never()).decrementLikeCount(100L);
+    }
+
+    @Test
     void deleteRouteCleansChildRowsBeforeDeletingOwnedRoute() {
         User author = user();
         SharedRoute route = sharedRoute(author);
