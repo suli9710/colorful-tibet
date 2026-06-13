@@ -209,6 +209,36 @@ class HotelBookingServiceTest {
     }
 
     @Test
+    void adminConfirmRechecksAvailabilityAndMirrorsWhenNoConflict() {
+        HotelBooking booking = pendingBookingWithDates(99L, 6L, "2026-09-01", "2026-09-03");
+        when(hotelBookingRepository.findById(99L)).thenReturn(Optional.of(booking));
+        when(hotelBookingRepository.save(booking)).thenReturn(booking);
+        when(hotelBookingRepository.findOverlappingActiveBookingsForUpdate(
+                eq(6L), any(), eq(LocalDate.parse("2026-09-01")), eq(LocalDate.parse("2026-09-03"))))
+                .thenReturn(List.of(booking));
+
+        hotelBookingService.updateStatus(admin, 99L, "confirmed");
+
+        assertEquals(HotelBooking.Status.CONFIRMED, booking.getStatus());
+        verify(orderCenterService).createFromLegacyHotelBooking(booking);
+    }
+
+    @Test
+    void adminConfirmRejectedWhenAnotherActiveBookingOverlaps() {
+        HotelBooking booking = pendingBookingWithDates(99L, 6L, "2026-09-01", "2026-09-03");
+        HotelBooking conflicting = pendingBookingWithDates(100L, 6L, "2026-09-01", "2026-09-03");
+        when(hotelBookingRepository.findById(99L)).thenReturn(Optional.of(booking));
+        when(hotelBookingRepository.save(booking)).thenReturn(booking);
+        when(hotelBookingRepository.findOverlappingActiveBookingsForUpdate(
+                eq(6L), any(), eq(LocalDate.parse("2026-09-01")), eq(LocalDate.parse("2026-09-03"))))
+                .thenReturn(List.of(booking, conflicting));
+
+        assertThrows(IllegalStateException.class, () -> hotelBookingService.updateStatus(admin, 99L, "confirmed"));
+
+        verify(orderCenterService, never()).createFromLegacyHotelBooking(any());
+    }
+
+    @Test
     void adminCanDeleteActiveHotelBooking() {
         HotelBooking booking = booking(99L, user, HotelBooking.Status.PENDING);
         when(hotelBookingRepository.findById(99L)).thenReturn(Optional.of(booking));
@@ -356,6 +386,14 @@ class HotelBookingServiceTest {
         booking.setId(id);
         booking.setUser(owner);
         booking.setStatus(status);
+        return booking;
+    }
+
+    private HotelBooking pendingBookingWithDates(Long id, Long roomTypeId, String checkIn, String checkOut) {
+        HotelBooking booking = booking(id, user, HotelBooking.Status.PENDING);
+        booking.setRoomTypeId(roomTypeId);
+        booking.setCheckInDate(LocalDate.parse(checkIn));
+        booking.setCheckOutDate(LocalDate.parse(checkOut));
         return booking;
     }
 
