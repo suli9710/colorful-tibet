@@ -13,13 +13,13 @@ RUN apt-get update \
 
 RUN addgroup --system app && adduser --system --group app
 
-# Patch base-image Python build tooling flagged by image scanners (not part of
-# the hash-locked application requirements).
-RUN pip install --no-cache-dir --upgrade "wheel==0.46.2" "jaraco.context==6.1.0"
-
 COPY requirements.txt .
+# Install hash-locked dependencies and browsers, then remove build-only tooling
+# (pip/setuptools/wheel) so the runtime image carries no vulnerable build
+# helpers such as setuptools' vendored wheel/jaraco.context copies.
 RUN pip install --no-cache-dir --require-hashes -r requirements.txt \
-    && scrapling install
+    && scrapling install \
+    && python -m pip uninstall -y pip setuptools wheel
 
 COPY . .
 RUN chown -R app:app /app /ms-playwright
