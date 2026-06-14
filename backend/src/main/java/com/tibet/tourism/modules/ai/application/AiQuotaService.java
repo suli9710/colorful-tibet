@@ -9,6 +9,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.core.env.Environment;
@@ -53,6 +54,7 @@ public class AiQuotaService {
     private final ConcurrentHashMap<String, CacheEntry> fallbackCache = new ConcurrentHashMap<>();
     private volatile String fallbackDateKey = "";
 
+    @Autowired
     public AiQuotaService(ObjectProvider<StringRedisTemplate> redisTemplateProvider,
                           CacheKeyHasher cacheKeyHasher,
                           Environment environment) {

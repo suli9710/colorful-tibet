@@ -20,14 +20,14 @@ export const REQUIRED_IMAGE_REFS = [
   { source: 'docker-compose.yml:3', image: 'mysql:8.4' },
   { source: 'docker-compose.yml:118', image: 'redis:7-alpine' },
   { source: 'docker-compose.prod.yml:6', image: 'alpine:3.21' },
-  { source: 'docker-compose.prod.yml:338', image: 'redis:7-alpine' },
-  { source: 'docker-compose.prod.yml:374', image: 'mysql:8.4' },
-  { source: 'docker-compose.prod.yml:502', image: 'prom/prometheus:v2.55.1' },
-  { source: 'docker-compose.prod.yml:526', image: 'prom/alertmanager:v0.27.0' },
-  { source: 'docker-compose.prod.yml:564', image: 'grafana/grafana:11.4.0' },
-  { source: 'docker-compose.prod.yml:590', image: 'openzipkin/zipkin:3.4' },
-  { source: '.github/workflows/ci.yml:134', image: 'prom/prometheus:v2.55.1' },
-  { source: '.github/workflows/ci.yml:138', image: 'prom/prometheus:v2.55.1' }
+  { source: 'docker-compose.prod.yml:346', image: 'redis:7-alpine' },
+  { source: 'docker-compose.prod.yml:382', image: 'mysql:8.4' },
+  { source: 'docker-compose.prod.yml:512', image: 'prom/prometheus:v2.55.1' },
+  { source: 'docker-compose.prod.yml:543', image: 'prom/alertmanager:v0.27.0' },
+  { source: 'docker-compose.prod.yml:589', image: 'grafana/grafana:11.4.0' },
+  { source: 'docker-compose.prod.yml:623', image: 'openzipkin/zipkin:3.4' },
+  { source: '.github/workflows/ci.yml:137', image: 'prom/prometheus:v2.55.1' },
+  { source: '.github/workflows/ci.yml:142', image: 'prom/prometheus:v2.55.1' }
 ]
 
 export const splitDockerImageRef = (imageRef) => {

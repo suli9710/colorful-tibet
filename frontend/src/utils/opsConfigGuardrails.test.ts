@@ -16,8 +16,9 @@ const envValue = (source: string, name: string) => {
 }
 
 const serviceBlock = (composeSource: string, serviceName: string) => {
+  const normalized = composeSource.replace(/\r\n/g, '\n')
   const pattern = new RegExp(`\\n  ${serviceName}:\\n[\\s\\S]*?(?=\\n  [a-zA-Z0-9_-]+:\\n|\\nnetworks:|\\nvolumes:|$)`)
-  const match = composeSource.match(pattern)
+  const match = normalized.match(pattern)
   if (!match) {
     throw new Error(`Missing compose service: ${serviceName}`)
   }

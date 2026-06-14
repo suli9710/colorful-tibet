@@ -502,6 +502,19 @@ const createTestI18n = () =>
           publishedAt: '发布于',
           submitting: '提交中'
         },
+        heritage: {
+          anonymous: '匿名用户',
+          commentPlaceholder: '分享你对这个非遗项目的感受...',
+          commentsTitle: '用户评论',
+          deleteComment: '删除',
+          interaction: {
+            like: '点赞',
+            liked: '已点赞'
+          },
+          loginToComment: '登录后可以评论',
+          noComments: '暂无评论，快来发表第一条吧',
+          submitComment: '发表'
+        },
         spotDetail: {
           addPhoto: '添加照片',
           backToSpots: '返回景点',
