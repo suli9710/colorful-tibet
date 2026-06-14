@@ -145,7 +145,8 @@ class AdminPageResponseContractTest {
                                 travelAnswerRepository,
                                 questionLikeRepository),
                         new AdminNewsController(newsRepository, translationService),
-                        new AdminHotelController(hotelRepository, roomTypeRepository),
+                        new AdminHotelController(hotelRepository, roomTypeRepository,
+                                org.mockito.Mockito.mock(com.tibet.tourism.modules.hotel.infra.HotelBookingRepository.class)),
                         new AdminScenicSpotController(
                                 scenicSpotRepository,
                                 spotTagRepository,

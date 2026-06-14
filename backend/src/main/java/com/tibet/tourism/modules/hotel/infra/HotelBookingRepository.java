@@ -87,4 +87,8 @@ public interface HotelBookingRepository extends JpaRepository<HotelBooking, Long
 
     // 根据用户ID删除所有酒店预订
     void deleteByUserId(Long userId);
+
+    // 统计某酒店下的所有预订（含软删除行），用于删除酒店前的外键安全检查
+    @Query("SELECT COUNT(hb) FROM HotelBooking hb WHERE hb.hotel.id = :hotelId")
+    long countByHotelId(@Param("hotelId") Long hotelId);
 }
