@@ -94,7 +94,7 @@ public class AiRouteGenerationJobService {
     public AiRouteGenerationJobService(AiRouteService aiRouteService,
                                        AiQuotaService aiQuotaService,
                                        AiRouteRecordService aiRouteRecordService,
-                                       @Qualifier("taskExecutor") Executor taskExecutor,
+                                       @Qualifier("aiGenerationExecutor") Executor taskExecutor,
                                        ObjectMapper objectMapper,
                                        ObjectProvider<StringRedisTemplate> redisTemplateProvider) {
         this.aiRouteService = aiRouteService;
@@ -728,7 +728,12 @@ public class AiRouteGenerationJobService {
                     if (event == null) {
                         continue;
                     }
-                    sendStoredRedisEvent(emitter, event);
+                    if (!sendStoredRedisEvent(emitter, event)) {
+                        // Client disconnected (send failed); stop relaying so the pooled thread is
+                        // freed immediately instead of blocking until the 30-minute SSE timeout.
+                        active.set(false);
+                        return;
+                    }
                     if (isTerminalRedisEvent(event)) {
                         active.set(false);
                         emitter.complete();
@@ -882,11 +887,11 @@ public class AiRouteGenerationJobService {
         return null;
     }
 
-    private void sendStoredRedisEvent(SseEmitter emitter, RedisJobEvent event) {
+    private boolean sendStoredRedisEvent(SseEmitter emitter, RedisJobEvent event) {
         if (event == null) {
-            return;
+            return true;
         }
-        sendSerializedEvent(emitter, event.type(), event.json());
+        return sendSerializedEvent(emitter, event.type(), event.json());
     }
 
     private void sendTerminalEvents(SseEmitter emitter, RouteJob job) {
@@ -917,11 +922,14 @@ public class AiRouteGenerationJobService {
         return objectMapper.writeValueAsString(event);
     }
 
-    private void sendSerializedEvent(SseEmitter emitter, String type, String eventJson) {
+    private boolean sendSerializedEvent(SseEmitter emitter, String type, String eventJson) {
         try {
             emitter.send(SseEmitter.event().data(eventJson));
-        } catch (IOException e) {
+            return true;
+        } catch (IOException | RuntimeException e) {
+            // IOException = client disconnected; IllegalStateException = emitter already completed.
             log.debug("Failed to send AI route job SSE event type={}: {}", type, AiLogPrivacy.exceptionSummary(e));
+            return false;
         }
     }
 
