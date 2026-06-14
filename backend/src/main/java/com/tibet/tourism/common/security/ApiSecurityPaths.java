@@ -52,7 +52,13 @@ public final class ApiSecurityPaths {
 
     private static final String[] ADMIN_API_PATHS = {
             "/api/admin/**",
-            "/api/spots/admin/**"
+            "/api/spots/admin/**",
+            // Admin-only endpoints that previously relied solely on method-level @PreAuthorize.
+            // Listing them here adds URL-pattern defense-in-depth so a dropped annotation cannot
+            // silently downgrade them to any authenticated user. (Only all-ADMIN paths are added;
+            // mixed user/admin paths like /api/hotel-bookings stay annotation-gated.)
+            "/api/prices/**",
+            "/api/spots/recommendations/debug"
     };
 
     private ApiSecurityPaths() {
