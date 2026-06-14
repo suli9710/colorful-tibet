@@ -133,14 +133,10 @@ public class AiGuideChatController {
     }
 
     private String resolveAnonymousClientKey(HttpServletRequest request) {
-        String fingerprint = request.getHeader("X-Device-Fingerprint");
-        if (fingerprint != null && !fingerprint.isBlank() && fingerprint.length() <= 256) {
-            return "fp#" + PiiMasker.shortHash(fingerprint);
-        }
+        // 匿名配额按 IP 计量。绝不能让客户端可控的 X-Device-Fingerprint 头单独决定配额桶，
+        // 否则只需轮换该头即可绕过匿名限流/每日配额（见配置 anonymous-daily-quota-per-ip）。
         String remoteAddr = request.getRemoteAddr();
-        String userAgent = request.getHeader("User-Agent");
-        return "ip#" + PiiMasker.shortHash(remoteAddr)
-                + ":ua#" + PiiMasker.shortHash(userAgent);
+        return "ip#" + PiiMasker.shortHash(remoteAddr);
     }
 
     private String limitMessage(String reason) {

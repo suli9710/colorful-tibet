@@ -122,22 +122,23 @@ public class CompanionInferenceService {
         double confidence;
         String reason;
         
+        // 票数区间使用连续的上界判断，避免出现 1.2~1.8 这类落到默认分支被误判为团队的情况
         if (avgTickets <= 1.2) {
             // 平均票数 <= 1.2，推断为独自旅行
             companionType = "ALONE";
             confidence = 0.85;
             reason = String.format("平均预订票数%.1f张，推断为独自旅行", avgTickets);
-        } else if (avgTickets >= 1.8 && avgTickets <= 2.5) {
-            // 平均票数 1.8-2.5，推断为情侣
+        } else if (avgTickets <= 2.5) {
+            // 平均票数 1.2-2.5，推断为情侣
             companionType = "COUPLE";
             confidence = 0.80;
             reason = String.format("平均预订票数%.1f张，推断为情侣出行", avgTickets);
-        } else if (avgTickets >= 2.5 && avgTickets <= 4.5) {
+        } else if (avgTickets <= 4.5) {
             // 平均票数 2.5-4.5，推断为家庭
             companionType = "FAMILY";
             confidence = 0.75;
             reason = String.format("平均预订票数%.1f张，推断为家庭出行", avgTickets);
-        } else if (avgTickets >= 4.5 && avgTickets <= 8.0) {
+        } else if (avgTickets <= 8.0) {
             // 平均票数 4.5-8.0，推断为朋友
             companionType = "FRIENDS";
             confidence = 0.70;

@@ -33,6 +33,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -212,5 +213,29 @@ class CurrentUserApplicationServiceTest {
 
         verify(userRepository, never()).findById(7L);
         verify(userRepository, never()).save(any(User.class));
+    }
+
+    @Test
+    void updateNicknameRejectsNicknameMatchingAnotherUsername() {
+        when(userRepository.findById(7L)).thenReturn(Optional.of(user));
+        when(userRepository.existsByUsernameIgnoreCase("admin")).thenReturn(true);
+
+        assertThatThrownBy(() -> service.updateNickname(7L, "admin"))
+                .isInstanceOf(DataIntegrityViolationException.class);
+
+        verify(userRepository, never()).saveAndFlush(any(User.class));
+    }
+
+    @Test
+    void updateNicknameAllowsNicknameMatchingOwnUsername() {
+        when(userRepository.findById(7L)).thenReturn(Optional.of(user));
+        when(userRepository.existsByNickname("login-name")).thenReturn(false);
+
+        String nickname = service.updateNickname(7L, "login-name");
+
+        assertThat(nickname).isEqualTo("login-name");
+        assertThat(user.getNickname()).isEqualTo("login-name");
+        verify(userRepository).saveAndFlush(user);
+        verify(userRepository, never()).existsByUsernameIgnoreCase(any());
     }
 }
