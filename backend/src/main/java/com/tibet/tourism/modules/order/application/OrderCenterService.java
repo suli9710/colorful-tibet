@@ -364,7 +364,9 @@ public class OrderCenterService {
     @Transactional
     public InvoiceResponse requestInvoice(User user, Long id, InvoiceRequest request) {
         user = requireAuthenticatedUser(user);
-        PlatformOrder order = orderRepository.findVisibleByIdAndUserId(id, user.getId())
+        // Lock the row like the other mutating order operations (cancel/refund/delete) since this
+        // adds an invoice + audit log; the non-locking read allowed a duplicate-invoice race.
+        PlatformOrder order = orderRepository.findVisibleByIdAndUserIdForUpdate(id, user.getId())
                 .orElseThrow(() -> new NoSuchElementException("Order not found"));
         if (order.getPaymentStatus() == PlatformOrder.PaymentStatus.UNPAID) {
             throw new IllegalStateException("Unpaid orders cannot request invoices");
@@ -719,6 +721,16 @@ public class OrderCenterService {
     public void cancelLegacyMirror(User actor, String sourceType, Long sourceReferenceId, String reason) {
         orderRepository.findBySourceTypeAndSourceReferenceId(sourceType, sourceReferenceId).ifPresent(order -> {
             if (order.getStatus() == PlatformOrder.Status.CANCELLED || order.getStatus() == PlatformOrder.Status.EXPIRED) {
+                return;
+            }
+            // Never silently cancel an already-paid/confirmed mirror order: doing so would strip the
+            // user's order and vouchers with no refund record (e.g. the stale-pending sweep firing
+            // after payment succeeded). Such orders must go through the refund flow instead.
+            if (order.getPaymentStatus() == PlatformOrder.PaymentStatus.PAID
+                    || order.getStatus() == PlatformOrder.Status.PAID
+                    || order.getStatus() == PlatformOrder.Status.CONFIRMED) {
+                logger.warn("Skip cancelling already-paid legacy mirror order: orderNo={}, status={}, paymentStatus={}, reason={}",
+                        order.getOrderNo(), order.getStatus(), order.getPaymentStatus(), reason);
                 return;
             }
             PlatformOrder.Status from = order.getStatus();

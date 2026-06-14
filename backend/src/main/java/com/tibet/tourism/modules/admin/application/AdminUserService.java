@@ -265,6 +265,11 @@ public class AdminUserService {
             auditDelete(actor, targetId, targetRef, RESULT_DENIED, "protected_account", beforeRole);
             return new DeleteUserResult(false, 400, "不能删除超级管理员账号");
         }
+        if (isReservedSystemAccount(targetUser)) {
+            // "official" 是官方内容（OFFICIAL 共享路线等）的系统作者账号，删除会级联清除全部官方内容。
+            auditDelete(actor, targetId, targetRef, RESULT_DENIED, "protected_account", beforeRole);
+            return new DeleteUserResult(false, 400, "不能删除系统账号");
+        }
         if (sameUsername(operatorUsername, targetUser.getUsername())) {
             auditDelete(actor, targetId, targetRef, RESULT_DENIED, "self_delete", beforeRole);
             return new DeleteUserResult(false, 400, "不能删除当前登录账号");
@@ -308,6 +313,14 @@ public class AdminUserService {
 
     private boolean isSuperAdminAccount(User user) {
         return user != null && isSuperAdminUsername(user.getUsername());
+    }
+
+    private static final String RESERVED_OFFICIAL_USERNAME = "official";
+
+    private boolean isReservedSystemAccount(User user) {
+        return user != null
+                && StringUtils.hasText(user.getUsername())
+                && RESERVED_OFFICIAL_USERNAME.equalsIgnoreCase(user.getUsername().trim());
     }
 
     private boolean requiresSuperAdminToUnlock(User targetUser) {

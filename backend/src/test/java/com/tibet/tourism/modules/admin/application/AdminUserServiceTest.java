@@ -291,6 +291,22 @@ class AdminUserServiceTest {
     }
 
     @Test
+    void cannotDeleteReservedOfficialSystemAccount() {
+        User official = user(30L, "official", User.Role.USER);
+
+        AdminUserService.DeleteUserResult result = service.deleteUser(official, auth("lzh"));
+
+        assertFalse(result.success());
+        assertEquals(400, result.status());
+        verify(userRepository, never()).delete(official);
+        verify(sharedRouteRepository, never()).deleteByAuthor(official);
+        AdminAuditLog audit = captureOnlyAudit();
+        assertEquals("admin_user_delete", audit.getAction());
+        assertEquals("denied", audit.getResult());
+        assertEquals("protected_account", audit.getReason());
+    }
+
+    @Test
     void actionPolicyUsesConfiguredSuperAdminUsername() {
         ReflectionTestUtils.setField(service, "superAdminUsername", "configured-root");
         User protectedAdmin = user(21L, "configured-root", User.Role.ADMIN);

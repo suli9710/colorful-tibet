@@ -4,6 +4,7 @@ import com.tibet.tourism.common.validation.InputSanitizer;
 import com.tibet.tourism.modules.admin.web.dto.HotelRequest;
 import com.tibet.tourism.modules.hotel.domain.Hotel;
 import com.tibet.tourism.modules.hotel.domain.RoomType;
+import com.tibet.tourism.modules.hotel.infra.HotelBookingRepository;
 import com.tibet.tourism.modules.hotel.infra.HotelRepository;
 import com.tibet.tourism.modules.hotel.infra.RoomTypeRepository;
 import jakarta.validation.constraints.DecimalMin;
@@ -18,8 +19,10 @@ import java.util.Map;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import static com.tibet.tourism.common.validation.RequestParseUtils.safeImageUrl;
 
@@ -39,10 +42,14 @@ public class AdminHotelController {
 
     private final HotelRepository hotelRepository;
     private final RoomTypeRepository roomTypeRepository;
+    private final HotelBookingRepository hotelBookingRepository;
 
-    public AdminHotelController(HotelRepository hotelRepository, RoomTypeRepository roomTypeRepository) {
+    public AdminHotelController(HotelRepository hotelRepository,
+                               RoomTypeRepository roomTypeRepository,
+                               HotelBookingRepository hotelBookingRepository) {
         this.hotelRepository = hotelRepository;
         this.roomTypeRepository = roomTypeRepository;
+        this.hotelBookingRepository = hotelBookingRepository;
     }
 
     @GetMapping("/hotels")
@@ -88,10 +95,19 @@ public class AdminHotelController {
     }
 
     @DeleteMapping("/hotels/{id}")
+    @Transactional
     public ResponseEntity<?> deleteHotel(@PathVariable Long id) {
         if (!hotelRepository.existsById(id)) {
             return ResponseEntity.notFound().build();
         }
+        // hotel_bookings 与 hotels 之间是 RESTRICT 外键：存在预订记录时直接 deleteById 会抛
+        // DataIntegrityViolationException(500)。预订属于订单/PII 历史，不能随酒店级联删除，
+        // 因此存在预订时拒绝删除；否则先清理房型再删除酒店。
+        if (hotelBookingRepository.countByHotelId(id) > 0) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(Map.of("error", "该酒店存在预订记录，无法删除"));
+        }
+        roomTypeRepository.deleteByHotelId(id);
         hotelRepository.deleteById(id);
         return ResponseEntity.ok(Map.of("message", "删除成功"));
     }
