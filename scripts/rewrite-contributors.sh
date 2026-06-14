@@ -1,5 +1,4 @@
 #!/bin/bash
-set -euo pipefail
 export FILTER_BRANCH_SQUELCH_WARNING=1
 cd "$(dirname "$0")/.."
 
@@ -18,5 +17,4 @@ if [ "$GIT_COMMITTER_EMAIL" = "$OLD_EMAIL1" ] || [ "$GIT_COMMITTER_EMAIL" = "$OL
 fi
 ' -- --all
 
-echo "Authors after rewrite:"
 git shortlog -sne --all
