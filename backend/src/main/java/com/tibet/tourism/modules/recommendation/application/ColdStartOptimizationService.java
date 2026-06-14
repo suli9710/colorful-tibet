@@ -90,7 +90,8 @@ public class ColdStartOptimizationService {
             List<ScenicSpot> citySpots = allSpots.stream()
                     .filter(spot -> spot.getLocation() != null && 
                             spot.getLocation().contains(user.getCity()))
-                    .sorted(Comparator.comparing(ScenicSpot::getVisitCount).reversed())
+                    .sorted(Comparator.comparingInt((ScenicSpot spotToRank) ->
+                            spotToRank.getVisitCount() != null ? spotToRank.getVisitCount() : 0).reversed())
                     .limit(5)
                     .collect(Collectors.toList());
             recommendations.addAll(citySpots);
@@ -160,7 +161,8 @@ public class ColdStartOptimizationService {
         // 去重并排序
         return candidates.stream()
                 .distinct()
-                .sorted(Comparator.comparing(ScenicSpot::getVisitCount).reversed())
+                .sorted(Comparator.comparingInt((ScenicSpot spotToRank) ->
+                        spotToRank.getVisitCount() != null ? spotToRank.getVisitCount() : 0).reversed())
                 .limit(10)
                 .collect(Collectors.toList());
     }
@@ -401,7 +403,8 @@ public class ColdStartOptimizationService {
                             .collect(Collectors.toSet());
                     return tagSet.stream().anyMatch(spotTags::contains);
                 })
-                .sorted(Comparator.comparing(ScenicSpot::getVisitCount).reversed())
+                .sorted(Comparator.comparingInt((ScenicSpot spotToRank) ->
+                        spotToRank.getVisitCount() != null ? spotToRank.getVisitCount() : 0).reversed())
                 .limit(limit)
                 .collect(Collectors.toList());
     }
