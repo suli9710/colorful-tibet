@@ -143,7 +143,8 @@ class AdminResponseContractTest {
         when(hotelRepository.findAll(any(Pageable.class))).thenReturn(pageOf(hotel));
         when(roomTypeRepository.findByHotelIdOrderBySortOrderAsc(3L)).thenReturn(List.of(roomType));
 
-        AdminHotelController controller = new AdminHotelController(hotelRepository, roomTypeRepository);
+        AdminHotelController controller = new AdminHotelController(hotelRepository, roomTypeRepository,
+                org.mockito.Mockito.mock(com.tibet.tourism.modules.hotel.infra.HotelBookingRepository.class));
 
         String hotelsJson = json(controller.getAllHotels(PageRequest.of(0, 10)).getBody());
         String roomTypesJson = json(controller.getRoomTypes(3L).getBody());
