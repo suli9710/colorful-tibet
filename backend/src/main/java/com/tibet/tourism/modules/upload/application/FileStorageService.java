@@ -252,8 +252,10 @@ public class FileStorageService {
             return null;
         }
         String value = contentType.trim().toLowerCase(Locale.ROOT);
+        // 允许列表只接受裸类型（如 image/jpeg）。带参数或包含控制字符的内容类型一律视为非法，
+        // 返回 null 使其在 ALLOWED_IMAGE_TYPES 校验中被拒绝。
         if (value.indexOf(';') >= 0 || containsAsciiControl(value)) {
-            return value;
+            return null;
         }
         return value;
     }
