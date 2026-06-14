@@ -11,6 +11,7 @@ import com.tibet.tourism.modules.order.domain.Booking;
 import com.tibet.tourism.modules.order.infra.BookingRepository;
 import com.tibet.tourism.modules.user.infra.UserVisitHistoryRepository;
 import java.util.Collections;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -50,5 +51,22 @@ class CompanionInferenceServiceTest {
         verify(bookingRepository, never()).findByUserId(42L);
         verify(historyRepository, times(2)).findRecentByUserId(42L);
         verify(historyRepository, never()).findByUserId(42L);
+    }
+
+    @Test
+    void bookingPatternBetweenOneAndTwoTicketsInfersCoupleNotGroup() {
+        Booking single = new Booking();
+        single.setTicketCount(1);
+        Booking pair = new Booking();
+        pair.setTicketCount(2);
+        when(bookingRepository.findByUserId(eq(42L), org.mockito.ArgumentMatchers.any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(single, pair)));
+
+        CompanionInferenceService.CompanionInference inference =
+                (CompanionInferenceService.CompanionInference)
+                        ReflectionTestUtils.invokeMethod(service, "inferFromBookings", 42L);
+
+        // 平均票数 1.5 之前会落到默认分支被误判为 GROUP，修复后应为 COUPLE
+        assertEquals("COUPLE", inference.getCompanionType());
     }
 }
