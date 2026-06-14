@@ -32,6 +32,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
@@ -130,6 +131,40 @@ class AiRouteGenerationJobServiceTest {
 
         assertEquals("# Tibet route", completedSnapshot.content());
         verify(aiQuotaService).cacheRoute("cache-key", "# Tibet route");
+    }
+
+    @Test
+    void startJobRethrowsAndRollsBackWhenGenerationPoolRejects() {
+        Executor rejectingExecutor = command -> {
+            throw new RejectedExecutionException("ai generation pool saturated");
+        };
+        AiRouteGenerationJobService service = new AiRouteGenerationJobService(
+                aiRouteService,
+                aiQuotaService,
+                aiRouteRecordService,
+                rejectingExecutor,
+                new ObjectMapper()
+        );
+
+        User user = new User();
+        user.setId(7L);
+        AiRouteGenerateRequest request = new AiRouteGenerateRequest();
+        request.setDays(5);
+        request.setBudget("comfort");
+        request.setPreference("natural");
+
+        when(aiQuotaService.buildCacheKey(7L, 5, "comfort", "natural", "zh")).thenReturn("cache-key");
+        when(aiQuotaService.getCachedRoute("cache-key")).thenReturn(null);
+        when(aiQuotaService.tryConsumeQuota(7L)).thenReturn(new AiQuotaService.QuotaConsumptionResult(true, 19));
+        when(aiRouteRecordService.createRunningRecord(eq(user), any(), eq(5), eq("comfort"), eq("natural"), eq("zh")))
+                .thenReturn(record(55L));
+
+        // A saturated generation pool must surface as RejectedExecutionException (mapped to HTTP 503
+        // by the controller) instead of running the long AI job on the calling Tomcat thread.
+        assertThrows(RejectedExecutionException.class, () -> service.startJob(request, user, "zh"));
+        // The half-started job is rolled back to a FAILED record rather than left RUNNING.
+        verify(aiRouteRecordService).recordFailedRoute(
+                eq(user), any(), eq(5), eq("comfort"), eq("natural"), eq("zh"), anyString());
     }
 
     @Test

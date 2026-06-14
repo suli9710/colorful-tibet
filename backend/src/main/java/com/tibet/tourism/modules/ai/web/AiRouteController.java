@@ -21,6 +21,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -152,6 +153,12 @@ public class AiRouteController {
         } catch (AiRouteQuotaExceededException e) {
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                     .body(Map.of("error", "今日 AI 路线生成次数已用完，请明天再试", "remaining", e.getRemaining()));
+        } catch (java.util.concurrent.RejectedExecutionException e) {
+            // AI generation pool is saturated; tell the client to retry instead of returning 500.
+            logger.warn("AI route job rejected, generation pool saturated: {}", exceptionSummary(e));
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .header(HttpHeaders.RETRY_AFTER, "5")
+                    .body(Map.of("error", "AI 路线生成繁忙，请稍后重试"));
         } catch (Exception e) {
             logger.error("AI route job start failed: {}", exceptionSummary(e));
             return ResponseEntity.internalServerError().body(Map.of("error", "AI route generation failed"));
