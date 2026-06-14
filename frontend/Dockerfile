@@ -23,6 +23,7 @@ RUN npm run build
 
 FROM nginx:alpine@sha256:8b1e78743a03dbb2c95171cc58639fef29abc8816598e27fb910ed2e621e589a
 RUN apk add --no-cache gettext \
+    && apk upgrade --no-cache \
     && mkdir -p /etc/nginx/certs /var/cache/nginx /var/run /run \
     && chown -R 101:101 /etc/nginx/conf.d /etc/nginx/certs /var/cache/nginx /var/run /run
 

@@ -12,6 +12,7 @@ import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -50,6 +51,7 @@ public class GuideChatUsageService {
     @Value("${app.security.guide-chat.window-seconds:${app.security.ai-guide.window-seconds:${AI_GUIDE_WINDOW_SECONDS:600}}}")
     private int windowSeconds;
 
+    @Autowired
     public GuideChatUsageService(ObjectProvider<StringRedisTemplate> redisTemplateProvider,
                                  CacheKeyHasher cacheKeyHasher,
                                  Environment environment) {

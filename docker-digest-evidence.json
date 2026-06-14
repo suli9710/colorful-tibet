@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-06-08T20:43:42.787Z",
+  "generatedAt": "2026-06-14T19:36:57.002Z",
   "resolver": "scripts/resolve-docker-image-digests.mjs",
-  "verifier": "codex@local",
+  "verifier": "ci-fix@local",
   "targetPlatforms": [
     "multi-platform-index"
   ],
@@ -29,10 +29,10 @@
     {
       "source": "frontend/Dockerfile:2",
       "image": "node:22-alpine",
-      "pinned": "node:22-alpine@sha256:968df39aedcea65eeb078fb336ed7191baf48f972b4479711397108be0966920",
+      "pinned": "node:22-alpine@sha256:9385cd9f3001dfc3431e8ead12c43e9e1f87cc1b9b5c6cfd0f73865d405b27c4",
       "repository": "library/node",
       "tag": "22-alpine",
-      "digest": "sha256:968df39aedcea65eeb078fb336ed7191baf48f972b4479711397108be0966920"
+      "digest": "sha256:9385cd9f3001dfc3431e8ead12c43e9e1f87cc1b9b5c6cfd0f73865d405b27c4"
     },
     {
       "source": "frontend/Dockerfile:24",
@@ -45,10 +45,10 @@
     {
       "source": "scrapler/Dockerfile:1",
       "image": "python:3.11-slim",
-      "pinned": "python:3.11-slim@sha256:a3ab0b966bc4e91546a033e22093cb840908979487a9fc0e6e38295747e49ac0",
+      "pinned": "python:3.11-slim@sha256:ae52c5bef62a6bdd42cd1e8dffef86b9cd284bde9427da79839de7a4b983e7ca",
       "repository": "library/python",
       "tag": "3.11-slim",
-      "digest": "sha256:a3ab0b966bc4e91546a033e22093cb840908979487a9fc0e6e38295747e49ac0"
+      "digest": "sha256:ae52c5bef62a6bdd42cd1e8dffef86b9cd284bde9427da79839de7a4b983e7ca"
     },
     {
       "source": "docker-compose.yml:3",
@@ -75,7 +75,7 @@
       "digest": "sha256:48b0309ca019d89d40f670aa1bc06e426dc0931948452e8491e3d65087abc07d"
     },
     {
-      "source": "docker-compose.prod.yml:338",
+      "source": "docker-compose.prod.yml:346",
       "image": "redis:7-alpine",
       "pinned": "redis:7-alpine@sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99",
       "repository": "library/redis",
@@ -83,7 +83,7 @@
       "digest": "sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99"
     },
     {
-      "source": "docker-compose.prod.yml:374",
+      "source": "docker-compose.prod.yml:382",
       "image": "mysql:8.4",
       "pinned": "mysql:8.4@sha256:c36050afdca850f23cef85703f84c7531a5ae155a11b5ee1c60acb09937c4084",
       "repository": "library/mysql",
@@ -91,7 +91,7 @@
       "digest": "sha256:c36050afdca850f23cef85703f84c7531a5ae155a11b5ee1c60acb09937c4084"
     },
     {
-      "source": "docker-compose.prod.yml:502",
+      "source": "docker-compose.prod.yml:512",
       "image": "prom/prometheus:v2.55.1",
       "pinned": "prom/prometheus:v2.55.1@sha256:2659f4c2ebb718e7695cb9b25ffa7d6be64db013daba13e05c875451cf51b0d3",
       "repository": "prom/prometheus",
@@ -99,7 +99,7 @@
       "digest": "sha256:2659f4c2ebb718e7695cb9b25ffa7d6be64db013daba13e05c875451cf51b0d3"
     },
     {
-      "source": "docker-compose.prod.yml:526",
+      "source": "docker-compose.prod.yml:543",
       "image": "prom/alertmanager:v0.27.0",
       "pinned": "prom/alertmanager:v0.27.0@sha256:e13b6ed5cb929eeaee733479dce55e10eb3bc2e9c4586c705a4e8da41e5eacf5",
       "repository": "prom/alertmanager",
@@ -107,7 +107,7 @@
       "digest": "sha256:e13b6ed5cb929eeaee733479dce55e10eb3bc2e9c4586c705a4e8da41e5eacf5"
     },
     {
-      "source": "docker-compose.prod.yml:564",
+      "source": "docker-compose.prod.yml:589",
       "image": "grafana/grafana:11.4.0",
       "pinned": "grafana/grafana:11.4.0@sha256:d8ea37798ccc41061a62ab080f2676dda6bf7815558499f901bdb0f533a456fb",
       "repository": "grafana/grafana",
@@ -115,7 +115,7 @@
       "digest": "sha256:d8ea37798ccc41061a62ab080f2676dda6bf7815558499f901bdb0f533a456fb"
     },
     {
-      "source": "docker-compose.prod.yml:590",
+      "source": "docker-compose.prod.yml:623",
       "image": "openzipkin/zipkin:3.4",
       "pinned": "openzipkin/zipkin:3.4@sha256:c2830e93d95de43f0d10e00a3784a9ee101cdf4909370196c8802514fd7f1954",
       "repository": "openzipkin/zipkin",
@@ -123,7 +123,7 @@
       "digest": "sha256:c2830e93d95de43f0d10e00a3784a9ee101cdf4909370196c8802514fd7f1954"
     },
     {
-      "source": ".github/workflows/ci.yml:134",
+      "source": ".github/workflows/ci.yml:137",
       "image": "prom/prometheus:v2.55.1",
       "pinned": "prom/prometheus:v2.55.1@sha256:2659f4c2ebb718e7695cb9b25ffa7d6be64db013daba13e05c875451cf51b0d3",
       "repository": "prom/prometheus",
@@ -131,7 +131,7 @@
       "digest": "sha256:2659f4c2ebb718e7695cb9b25ffa7d6be64db013daba13e05c875451cf51b0d3"
     },
     {
-      "source": ".github/workflows/ci.yml:138",
+      "source": ".github/workflows/ci.yml:142",
       "image": "prom/prometheus:v2.55.1",
       "pinned": "prom/prometheus:v2.55.1@sha256:2659f4c2ebb718e7695cb9b25ffa7d6be64db013daba13e05c875451cf51b0d3",
       "repository": "prom/prometheus",
