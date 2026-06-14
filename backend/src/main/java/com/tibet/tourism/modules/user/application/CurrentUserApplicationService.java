@@ -139,6 +139,16 @@ public class CurrentUserApplicationService {
     public String updateNickname(Long userId, String rawNickname) {
         String nickname = InputSanitizer.requiredPlainText(rawNickname, 32, "nickname");
 
+        User user = getUser(userId);
+
+        // 禁止把昵称设置为他人的登录名，避免在评论/公开资料中冒充其他账户（含管理员）
+        String ownUsername = user.getUsername();
+        boolean matchesOwnUsername =
+                StringUtils.hasText(ownUsername) && nickname.equalsIgnoreCase(ownUsername.trim());
+        if (!matchesOwnUsername && Boolean.TRUE.equals(userRepository.existsByUsernameIgnoreCase(nickname))) {
+            throw new DataIntegrityViolationException("Nickname already exists");
+        }
+
         if (userRepository.existsByNickname(nickname)) {
             User existingNicknameUser = userRepository.findByNickname(nickname).orElse(null);
             if (existingNicknameUser != null && !existingNicknameUser.getId().equals(userId)) {
@@ -146,7 +156,6 @@ public class CurrentUserApplicationService {
             }
         }
 
-        User user = getUser(userId);
         user.setNickname(nickname);
         userRepository.saveAndFlush(user);
         return nickname;
