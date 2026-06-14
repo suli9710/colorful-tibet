@@ -160,11 +160,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { motion, useReducedMotion } from 'motion-v'
-import api, { endpoints } from '../api'
+import api, { endpoints, type RegisterRequest } from '../api'
 import { useToast } from '../composables/useToast'
 import { safeClientErrorMessage, summarizeClientError } from '../utils/errorMonitoring'
 import {
@@ -203,11 +203,12 @@ const registerErrorId = 'register-form-error'
 const confirmPassword = ref('')
 const recaptchaContainer = ref<HTMLElement | null>(null)
 const recaptchaWidgetId = ref<number | null>(null)
-const form = ref({
+const form = ref<RegisterRequest>({
   username: '',
   nickname: '',
   password: ''
 })
+let registerUnmounted = false
 const registerFieldInvalid = computed(() => registerErrorMessage.value ? 'true' : undefined)
 const describedBy = (helpId: string) => computed(() => [
   helpId,
@@ -245,12 +246,13 @@ const handleRegister = async () => {
         throw new RecaptchaError()
       }
     }
-    await api.post(endpoints.auth.register, form.value, {
+    const payload: RegisterRequest = { ...form.value }
+    await api.post<void>(endpoints.auth.register, payload, {
       headers: recaptchaToken ? { 'X-Recaptcha-Token': recaptchaToken } : {}
     })
     showToast(t('register.registerSuccess'), 'success')
     router.push('/login')
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (isRecaptchaError(error)) {
       const message = t('security.recaptchaFailed')
       registerErrorMessage.value = message
@@ -271,9 +273,23 @@ onMounted(async () => {
   if (!isRecaptchaV2Enabled()) return
   await nextTick()
   if (!recaptchaContainer.value) return
-  recaptchaWidgetId.value = await renderRecaptchaCheckbox(recaptchaContainer.value, {
-    onExpired: () => resetRecaptchaWidget(recaptchaWidgetId.value),
-    onError: () => resetRecaptchaWidget(recaptchaWidgetId.value)
-  })
+  try {
+    const widgetId = await renderRecaptchaCheckbox(recaptchaContainer.value, {
+      onExpired: () => resetRecaptchaWidget(recaptchaWidgetId.value),
+      onError: () => resetRecaptchaWidget(recaptchaWidgetId.value)
+    })
+    if (registerUnmounted) return
+    recaptchaWidgetId.value = widgetId
+  } catch (error: unknown) {
+    if (registerUnmounted) return
+    console.error('Failed to render registration reCAPTCHA:', summarizeClientError(error))
+    const message = t('security.recaptchaFailed')
+    registerErrorMessage.value = message
+    showToast(message, 'error')
+  }
+})
+
+onUnmounted(() => {
+  registerUnmounted = true
 })
 </script>

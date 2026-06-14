@@ -148,6 +148,7 @@
       </motion.div>
 
       <div v-else-if="routeLoadError" class="rounded-2xl border border-red-100 bg-red-50 px-5 py-8 text-center text-red-700" role="alert">
+        <h1 class="mb-2 text-xl font-bold">{{ t('common.error') }}</h1>
         <p class="mb-4 font-medium">{{ routeLoadError }}</p>
         <button
           type="button"
@@ -159,14 +160,14 @@
       </div>
 
       <div v-else-if="routeNotFound" class="text-center py-12 text-gray-500">
-        {{ t('routeDetail.notFound') }}
+        <h1 class="text-xl font-bold">{{ t('routeDetail.notFound') }}</h1>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { renderMarkdownToSafeHtml } from '../utils/sanitize'
@@ -193,7 +194,6 @@ const { t, locale } = useI18n()
 const currentRoute = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
-const routeId = Number(currentRoute.params.id)
 
 const loading = ref(true)
 const routeLoadError = ref('')
@@ -214,6 +214,10 @@ const isLiked = ref(false)
 const liking = ref(false)
 const newComment = ref('')
 const submitting = ref(false)
+let routeDetailRequestId = 0
+let commentsRequestId = 0
+let likeStatusRequestId = 0
+let routeLikeMutationId = 0
 const currentUser = computed(() => auth.user)
 
 const renderedContent = computed(() => {
@@ -227,6 +231,15 @@ const hasMoreComments = computed(() => hasNextPage(commentsPageInfo.value))
 const redirectToLogin = () => {
   router.push({ path: '/login', query: { redirect: currentRoute.fullPath } })
 }
+
+const currentRouteId = () => Number(currentRoute.params.id)
+const isCurrentRouteId = (routeId: number) => currentRouteId() === routeId
+const isCurrentRouteDetailRequest = (requestId: number, routeId: number) =>
+  requestId === routeDetailRequestId && isCurrentRouteId(routeId)
+const isCurrentCommentsRequest = (requestId: number, routeId: number) =>
+  requestId === commentsRequestId && isCurrentRouteId(routeId) && routeData.value?.id === routeId
+const isCurrentRouteLikeMutation = (mutationId: number, routeId: number) =>
+  mutationId === routeLikeMutationId && isCurrentRouteId(routeId) && routeData.value?.id === routeId
 
 const applyCommentsPage = (response: PaginatedHttpResponse, append = false) => {
   const page = readPaginatedResponse<RouteCommentResponse>(response, {
@@ -253,33 +266,42 @@ const resetComments = () => {
   }
 }
 
-const fetchCommentsPage = async (page = 0, append = false) => {
+const fetchCommentsPage = async (page = 0, append = false, routeId = routeData.value?.id, requestId = commentsRequestId) => {
+  if (!routeId) return
   const response = await api.get<unknown>(endpoints.routes.sharedComments(routeId), {
     params: { page, size: routeCommentsPageSize }
   })
+  if (!isCurrentCommentsRequest(requestId, routeId)) return
   applyCommentsPage(response, append)
 }
 
-const loadInitialComments = async () => {
+const loadInitialComments = async (routeId = routeData.value?.id) => {
+  if (!routeId) return
+  const requestId = ++commentsRequestId
   commentsLoading.value = true
   commentsLoadError.value = ''
   try {
-    await fetchCommentsPage(0)
+    await fetchCommentsPage(0, false, routeId, requestId)
   } catch (error) {
+    if (!isCurrentCommentsRequest(requestId, routeId)) return
     console.error('Failed to load route comments:', summarizeClientError(error))
     resetComments()
     commentsLoadError.value = t('routeDetail.commentsLoadFailed')
   } finally {
-    commentsLoading.value = false
+    if (isCurrentCommentsRequest(requestId, routeId)) {
+      commentsLoading.value = false
+    }
   }
 }
 
 const retryLoadComments = () => {
   if (!routeData.value || commentsLoading.value) return
-  loadInitialComments()
+  loadInitialComments(routeData.value.id)
 }
 
-const loadLikeStatus = async () => {
+const loadLikeStatus = async (routeId = routeData.value?.id) => {
+  if (!routeId) return
+  const requestId = ++likeStatusRequestId
   if (!currentUser.value) {
     isLiked.value = false
     return
@@ -287,8 +309,10 @@ const loadLikeStatus = async () => {
 
   try {
     const likeRes = await api.get<RouteLikeStatusResponse>(endpoints.routes.sharedLikeStatus(routeId), { skipAuthRedirect: true })
+    if (requestId !== likeStatusRequestId || !isCurrentRouteId(routeId) || routeData.value?.id !== routeId) return
     isLiked.value = Boolean(likeRes.data.liked)
   } catch {
+    if (requestId !== likeStatusRequestId || !isCurrentRouteId(routeId) || routeData.value?.id !== routeId) return
     isLiked.value = false
   }
 }
@@ -312,9 +336,10 @@ const isNotFoundError = (error: unknown) => responseStatus(error) === 404
 const applyRouteLikeResult = (
   responseData: RouteLikeMutationResponse | undefined,
   fallbackLiked: boolean,
-  fallbackLikeCount: number
+  fallbackLikeCount: number,
+  routeId: number
 ) => {
-  if (!routeData.value) return
+  if (!routeData.value || routeData.value.id !== routeId) return
   isLiked.value = typeof responseData?.liked === 'boolean' ? responseData.liked : fallbackLiked
   const nextLikeCount = Number(responseData?.likeCount)
   routeData.value.likeCount = Number.isFinite(nextLikeCount)
@@ -323,12 +348,21 @@ const applyRouteLikeResult = (
 }
 
 const loadRouteDetail = async () => {
+  const requestId = ++routeDetailRequestId
+  const routeId = currentRouteId()
+  commentsRequestId += 1
+  likeStatusRequestId += 1
+  routeLikeMutationId += 1
   loading.value = true
+  liking.value = false
+  commentsLoading.value = false
+  commentsLoadingMore.value = false
   routeLoadError.value = ''
   routeNotFound.value = false
   commentsLoadError.value = ''
   try {
     const routeRes = await api.get<SharedRouteResponse | null>(endpoints.routes.sharedDetail(routeId))
+    if (!isCurrentRouteDetailRequest(requestId, routeId)) return
     if (!routeRes.data) {
       routeData.value = null
       routeNotFound.value = true
@@ -338,8 +372,9 @@ const loadRouteDetail = async () => {
 
     routeData.value = routeRes.data
     loading.value = false
-    await Promise.all([loadInitialComments(), loadLikeStatus()])
+    await Promise.all([loadInitialComments(routeId), loadLikeStatus(routeId)])
   } catch (error) {
+    if (!isCurrentRouteDetailRequest(requestId, routeId)) return
     console.error('Failed to load route detail:', summarizeClientError(error))
     routeData.value = null
     resetComments()
@@ -349,12 +384,16 @@ const loadRouteDetail = async () => {
       routeLoadError.value = t('routeDetail.loadFailed')
     }
   } finally {
-    loading.value = false
+    if (isCurrentRouteDetailRequest(requestId, routeId)) {
+      loading.value = false
+    }
   }
 }
 
 const toggleLike = async () => {
   if (liking.value || !routeData.value) return
+  const routeId = routeData.value.id
+  const mutationId = ++routeLikeMutationId
   liking.value = true
 
   try {
@@ -363,14 +402,17 @@ const toggleLike = async () => {
       redirectToLogin()
       return
     }
+    if (!isCurrentRouteLikeMutation(mutationId, routeId)) return
 
     const previousLikeCount = Number(routeData.value.likeCount) || 0
     if (isLiked.value) {
       const response = await api.delete<RouteLikeMutationResponse>(endpoints.routes.sharedLike(routeId))
-      applyRouteLikeResult(response.data, false, previousLikeCount - 1)
+      if (!isCurrentRouteLikeMutation(mutationId, routeId)) return
+      applyRouteLikeResult(response.data, false, previousLikeCount - 1, routeId)
     } else {
       const response = await api.post<RouteLikeMutationResponse>(endpoints.routes.sharedLike(routeId))
-      applyRouteLikeResult(response.data, true, previousLikeCount + 1)
+      if (!isCurrentRouteLikeMutation(mutationId, routeId)) return
+      applyRouteLikeResult(response.data, true, previousLikeCount + 1, routeId)
     }
   } catch (error) {
     if (responseStatus(error) === 401) {
@@ -380,26 +422,34 @@ const toggleLike = async () => {
       showToast(t('routeDetail.operationFailed'), 'error')
     }
   } finally {
-    liking.value = false
+    if (mutationId === routeLikeMutationId) {
+      liking.value = false
+    }
   }
 }
 
 const loadNextCommentsPage = async () => {
-  if (commentsLoadingMore.value || !hasMoreComments.value) return
+  if (commentsLoadingMore.value || !hasMoreComments.value || !routeData.value) return
+  const routeId = routeData.value.id
+  const requestId = ++commentsRequestId
   commentsLoadingMore.value = true
   try {
-    await fetchCommentsPage(commentsPageInfo.value.page + 1, true)
+    await fetchCommentsPage(commentsPageInfo.value.page + 1, true, routeId, requestId)
   } catch (error) {
+    if (!isCurrentCommentsRequest(requestId, routeId)) return
     console.error('Failed to load more route comments:', summarizeClientError(error))
     showToast(t('routeDetail.commentFailed'), 'error')
   } finally {
-    commentsLoadingMore.value = false
+    if (isCurrentCommentsRequest(requestId, routeId)) {
+      commentsLoadingMore.value = false
+    }
   }
 }
 
 const submitComment = async () => {
   const content = newComment.value.trim()
-  if (!content || submitting.value) return
+  if (!content || submitting.value || !routeData.value) return
+  const routeId = routeData.value.id
   submitting.value = true
   try {
     if (!(await auth.ensureSession())) {
@@ -407,10 +457,12 @@ const submitComment = async () => {
       redirectToLogin()
       return
     }
+    if (!isCurrentRouteId(routeId) || routeData.value?.id !== routeId) return
 
     const response = await api.post<RouteCommentResponse>(endpoints.routes.sharedComments(routeId), {
       content
     })
+    if (!isCurrentRouteId(routeId) || routeData.value?.id !== routeId) return
     
     comments.value = [response.data, ...comments.value.filter(comment => comment.id !== response.data.id)]
     if (routeData.value) {
@@ -434,7 +486,9 @@ const submitComment = async () => {
       showToast(t('routeDetail.commentFailed'), 'error')
     }
   } finally {
-    submitting.value = false
+    if (isCurrentRouteId(routeId)) {
+      submitting.value = false
+    }
   }
 }
 
@@ -452,6 +506,8 @@ const routeAuthorName = (route: SharedRouteResponse | null | undefined) => {
 }
 
 const deleteComment = async (comment: RouteCommentResponse) => {
+  const routeId = routeData.value?.id
+  if (!routeId) return
   const confirmed = await showConfirm({
     message: t('routeDetail.confirmDeleteComment'),
     confirmLabel: t('common.delete'),
@@ -459,9 +515,11 @@ const deleteComment = async (comment: RouteCommentResponse) => {
     tone: 'danger'
   })
   if (!confirmed) return
+  if (!isCurrentRouteId(routeId) || routeData.value?.id !== routeId) return
 
   try {
     await api.delete(endpoints.routes.deleteSharedComment(routeId, comment.id))
+    if (!isCurrentRouteId(routeId) || routeData.value?.id !== routeId) return
     comments.value = comments.value.filter(item => item.id !== comment.id)
     const route = routeData.value
     if (route && route.commentCount > 0) {
@@ -492,6 +550,15 @@ onMounted(async () => {
   await auth.refreshSession()
   loadRouteDetail()
 })
+
+watch(
+  () => currentRoute.params.id,
+  (id, oldId) => {
+    if (String(id ?? '') !== String(oldId ?? '')) {
+      loadRouteDetail()
+    }
+  }
+)
 </script>
 
 <style scoped>

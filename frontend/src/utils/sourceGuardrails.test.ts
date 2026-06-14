@@ -32,6 +32,7 @@ const dynamicLeafletOwnerFiles = [
   '../views/ScenicSpotDetail.vue'
 ] as const
 const userVisibleDataDisplayFiles = [
+  '../components/HeatMap.vue',
   '../data/hotelImages.ts',
   '../data/hotelTranslations.ts',
   '../views/CreateRoute.vue',
@@ -191,7 +192,7 @@ describe('frontend source guardrails', () => {
     }
   })
 
-  it('keeps user-visible route and hotel display files off broad production any', () => {
+  it('keeps user-visible data display files off broad production any', () => {
     for (const filePath of userVisibleDataDisplayFiles) {
       const source = getSourceModule(filePath)
 

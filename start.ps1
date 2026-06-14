@@ -6,6 +6,7 @@ $ProjectDir = (Resolve-Path -LiteralPath $PSScriptRoot).Path
 $PreferredWslDistro = "Ubuntu"
 $StartupStateDir = Join-Path $ProjectDir ".startup"
 $StartupFingerprintFile = Join-Path $StartupStateDir "docker-build-inputs.sha256"
+$EnvFile = Join-Path $ProjectDir ".env"
 
 $Script:LastStdOut = ""
 $Script:LastStdErr = ""
@@ -295,7 +296,6 @@ function Get-ComposeStatus {
     if (-not (Invoke-WslBash -Command (Get-ProjectCommand -Command "docker compose ps --format json"))) {
         return @()
     }
-
     $json = $Script:LastStdOut.Trim()
     if ([string]::IsNullOrWhiteSpace($json)) {
         return @()
@@ -321,13 +321,92 @@ function Get-ComposeStatus {
     }
 }
 
+function New-RandomHexSecret {
+    param([int]$ByteCount = 48)
+
+    $bytes = New-Object byte[] $ByteCount
+    $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+    try {
+        $rng.GetBytes($bytes)
+    }
+    finally {
+        $rng.Dispose()
+    }
+
+    return ([System.BitConverter]::ToString($bytes) -replace "-", "").ToLowerInvariant()
+}
+
+function New-RandomBase64Key {
+    param([int]$ByteCount = 32)
+
+    $bytes = New-Object byte[] $ByteCount
+    $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+    try {
+        $rng.GetBytes($bytes)
+    }
+    finally {
+        $rng.Dispose()
+    }
+
+    return [Convert]::ToBase64String($bytes)
+}
+
+function New-RandomBase32Secret {
+    param([int]$Length = 32)
+
+    $alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
+    $bytes = New-Object byte[] $Length
+    $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+    try {
+        $rng.GetBytes($bytes)
+    }
+    finally {
+        $rng.Dispose()
+    }
+
+    $chars = foreach ($b in $bytes) { $alphabet[$b % $alphabet.Length] }
+    return -join $chars
+}
+
+function Initialize-EnvFile {
+    if (Test-Path -LiteralPath $EnvFile -PathType Leaf) {
+        Write-Host "  已找到 .env 配置文件" -ForegroundColor Green
+        return
+    }
+
+    Write-Host "  未找到 .env，自动生成本地开发配置(随机密钥)..." -ForegroundColor Gray
+
+    $lines = @(
+        "# 本文件由 start.ps1 自动生成，仅用于本地开发(.env 已被 git 忽略)。",
+        "# 只包含 docker-compose.yml 必填的密钥变量，其余变量使用 compose 内置的本地默认值。",
+        "# 生产部署请参考 .env.example 完整配置。",
+        "SPRING_PROFILES_ACTIVE=local",
+        "MYSQL_ROOT_PASSWORD=$(New-RandomHexSecret -ByteCount 24)",
+        "MYSQL_PASSWORD=$(New-RandomHexSecret -ByteCount 24)",
+        "JWT_SECRET=$(New-RandomHexSecret)",
+        "CSRF_SIGNING_SECRET=$(New-RandomHexSecret)",
+        "CACHE_KEY_HMAC_SECRET=$(New-RandomHexSecret)",
+        "ADMIN_ENCRYPTION_KEY=$(New-RandomHexSecret)",
+        "PII_KEYS=v1:$(New-RandomBase64Key)",
+        "PII_ACTIVE_KID=v1",
+        "PII_ENCRYPTION_KEY=$(New-RandomHexSecret)",
+        "PAYMENT_CALLBACK_SECRET=$(New-RandomHexSecret)",
+        "SUPER_ADMIN_TOTP_SECRET=$(New-RandomBase32Secret)"
+    )
+
+    $utf8NoBom = New-Object System.Text.UTF8Encoding $false
+    [System.IO.File]::WriteAllText($EnvFile, (($lines -join "`n") + "`n"), $utf8NoBom)
+
+    Write-Host "  已生成 .env(超级管理员 TOTP 密钥见 .env 中 SUPER_ADMIN_TOTP_SECRET)" -ForegroundColor Green
+}
+
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "  七彩西藏 Colorful Tibet — 项目启动" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
 # ── 1. 检查 WSL ──
-Write-Host "[1/4] 检查 WSL 状态..." -ForegroundColor Yellow
+Write-Host "[1/5] 检查 WSL 状态..." -ForegroundColor Yellow
 
 $distros = Get-WslDistros
 if ($distros.Count -eq 0) {
@@ -366,6 +445,10 @@ else {
     Write-Host "  未检测到 AI 环境变量；AI 路线会使用本地兜底方案" -ForegroundColor Yellow
 }
 
+# ── 2. 检查 / 生成 .env ──
+Write-Host "[2/5] 检查 .env 配置..." -ForegroundColor Yellow
+Initialize-EnvFile
+
 # ── 辅助函数: 等待 Docker 就绪 ──
 function Wait-DockerReady {
     for ($retries = 1; $retries -le 15; $retries++) {
@@ -378,8 +461,8 @@ function Wait-DockerReady {
     return $false
 }
 
-# ── 2. 检测 / 启动 Docker Daemon ──
-Write-Host "[2/4] 检测 Docker 守护进程..." -ForegroundColor Yellow
+# ── 3. 检测 / 启动 Docker Daemon ──
+Write-Host "[3/5] 检测 Docker 守护进程..." -ForegroundColor Yellow
 
 $dockerOk = $false
 if (Invoke-WslBash -Command "docker ps >/dev/null") { $dockerOk = $true }
@@ -409,8 +492,8 @@ if (-not $dockerOk) {
 }
 Write-Host "  Docker 守护进程就绪" -ForegroundColor Green
 
-# ── 3. 启动项目容器 ──
-Write-Host "[3/4] 启动项目容器..." -ForegroundColor Yellow
+# ── 4. 启动项目容器 ──
+Write-Host "[4/5] 启动项目容器..." -ForegroundColor Yellow
 
 $startupFingerprint = Get-StartupFingerprint
 $startupFingerprintChanged = Test-StartupFingerprintChanged -Fingerprint $startupFingerprint
@@ -449,7 +532,7 @@ Write-Host "  容器已启动，等待健康检查..." -ForegroundColor Gray
 # 等待所有容器就绪
 $retries = 0
 $requiredServices = @("mysql", "redis", "scrapling", "backend", "frontend")
-$healthCheckedServices = @("mysql", "redis", "scrapling", "backend")
+$healthCheckedServices = @("mysql", "redis", "scrapling", "backend", "frontend")
 do {
     Start-Sleep -Seconds 3
     $retries++
@@ -472,8 +555,8 @@ do {
     Write-Host "  等待服务就绪... ($retries/20)" -ForegroundColor Gray
 } while ($retries -lt 20)
 
-# ── 4. 显示状态 ──
-Write-Host "[4/4] 服务状态:" -ForegroundColor Yellow
+# ── 5. 显示状态 ──
+Write-Host "[5/5] 服务状态:" -ForegroundColor Yellow
 Write-Host ""
 
 if (Invoke-WslBash -Command (Get-ProjectCommand -Command "docker compose ps")) {

@@ -203,6 +203,26 @@ function Require-Base64KeySet {
     }
 }
 
+function Require-Base32TotpSecret {
+    param(
+        [hashtable] $EnvValues,
+        [string] $Name
+    )
+
+    $value = Get-EnvValue $EnvValues $Name
+    if ([string]::IsNullOrWhiteSpace($value)) {
+        Add-Issue "$Name must be set for $Stage."
+        return
+    }
+    if (Test-Placeholder $value) {
+        Add-Issue "$Name still looks like a placeholder: '$value'."
+        return
+    }
+    if ($value -notmatch '^[A-Z2-7]{32,}$') {
+        Add-Issue "$Name must be a Base32 secret with at least 32 characters."
+    }
+}
+
 function Invoke-CheckedCommand {
     param(
         [string] $FilePath,
@@ -240,6 +260,9 @@ Require-Exact $EnvValues "RATE_LIMIT_REDIS_ENABLED" "true"
 Require-Exact $EnvValues "RATE_LIMIT_REDIS_FAIL_CLOSED" "true"
 Require-Exact $EnvValues "BRUTE_FORCE_REDIS_ENABLED" "true"
 Require-Exact $EnvValues "BRUTE_FORCE_REDIS_FAIL_CLOSED" "true"
+Require-Exact $EnvValues "ANTIBOT_ENABLED" "true"
+Require-Exact $EnvValues "RECAPTCHA_ENABLED" "true"
+Require-Exact $EnvValues "REGISTRATION_RECAPTCHA_REQUIRED" "true"
 Require-Exact $EnvValues "SCRAPLING_ALLOW_UNAUTHENTICATED" "false"
 
 foreach ($name in @(
@@ -256,7 +279,9 @@ foreach ($name in @(
     "RECAPTCHA_SITE_KEY",
     "RECAPTCHA_SECRET_KEY",
     "VITE_AMAP_KEY",
-    "VITE_AMAP_SECURITY_CODE"
+    "VITE_AMAP_SECURITY_CODE",
+    "GRAFANA_ADMIN_PASSWORD",
+    "ALERTMANAGER_WEBHOOK_URL"
 )) {
     Require-RealValue $EnvValues $name
 }
@@ -276,6 +301,7 @@ if ($dbSslMode -notin @("REQUIRED", "VERIFY_IDENTITY")) {
 }
 
 Require-Base64KeySet (Get-EnvValue $EnvValues "PII_KEYS") (Get-EnvValue $EnvValues "PII_ACTIVE_KID")
+Require-Base32TotpSecret $EnvValues "SUPER_ADMIN_TOTP_SECRET"
 
 $piiMigration = (Get-EnvValue $EnvValues "PII_MIGRATION_ENABLED" "false").ToLowerInvariant()
 if ($piiMigration -eq "true") {

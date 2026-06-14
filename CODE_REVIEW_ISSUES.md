@@ -1,12 +1,15 @@
 # Code Review Issues
 
-Last updated: 2026-06-09
-Last reviewed: 2026-06-09 18:15:00 +08:00
+Last updated: 2026-06-12
+Last reviewed: 2026-06-12 00:00:00 +08:00
 
-This file tracks issues re-checked against the current worktree. Items marked fixed have code and tests in this worktree; residual items remain candidates for the next 10-minute review cycle.
+This file tracks issues re-checked against the current worktree. Items marked fixed have code and tests in this worktree; residual items remain candidates for the next review cycle.
 
 ## Verification Snapshot
 
+- 8-agent cross-review on 2026-06-12: eight readonly review agents completed a full-repository matrix pass with at least four agents per code segment (see `.cursor/review-matrix.json`). All eight agents reported **zero High-severity** findings; prior 2026-06-10 hardening (payment integrity, CSRF/PII, Redis fail-closed, stale-response guards, XSS, ops preflight) was independently confirmed. The cycle opened **26 Medium** residuals (CT-FE-067 through CT-FE-077, CT-BE-043 through CT-BE-050, CT-OPS-035 through CT-OPS-041) plus a consolidated Low/deferred list. Cross-agent consensus covered `ScenicSpotDetail` stale races, login step-up fail-open, `HotelBooking` submit scoping, admin list truncation/audit gaps, ops gate drift, pagination envelope inconsistency, and FE/BE product-integration contradictions (itinerary book, hotel inquiry, Scrapler publish, OrderCenter refund/invoice). No validation rerun was executed in this documentation-only cycle.
+- Product-hardening multi-agent cycle on 2026-06-10 01:10 +08:00: 4 development agents, 1 testing agent, and 1 review agent completed. Closed CT-FE-061 through CT-FE-066, CT-BE-042, CT-OPS-033, and CT-OPS-034 in the current worktree. The review agent found no High issues and three Medium findings; all three were fixed locally with regression tests: HeatMap fallback zoom can no longer reintroduce an invalid `geo` option, QuestionDetail like mutations cannot write into a different route question after navigation, and Heritage same-item like toggles ignore older out-of-order completions. This cycle also hardened AdminCommunityPanel stale refresh/save/delete paths, Heritage comment duplicate actions, hotel browsing and booking stale/fail-closed flows, login/register/Q&A DTO typing, backend mutation rate-limit fail-closed coverage, production host/TOTP/preflight checks, and Docker digest evidence validation. Validation passed focused frontend regression suites (6 files / 85 tests), `opsConfigGuardrails.test.ts` (9 tests), frontend typecheck, `npm run test:ops` (37 tests), `npm run check:supply-chain-pins`, full `npm run check` (backend compile/test, frontend typecheck plus 49 files / 329 tests plus production build, Scrapler 16 tests), and final diff hygiene checks with only LF-to-CRLF working-copy warnings.
+- Product-hardening multi-agent cycle on 2026-06-09 19:10 +08:00: 4 development agents, 1 testing agent, and 1 review agent completed. Closed CT-FE-058, CT-FE-059, CT-FE-060, and CT-OPS-032 in the current worktree. Admin community management now exposes per-tab partial load failures through accessible alerts instead of silently rendering empty or stale data; HotelBooking API hotel/room responses are scoped to the latest route hotel id so an older response cannot make users view one hotel while submitting another; Heritage detail, comment pagination, and like-status requests are scoped to the current selected item so older modal responses cannot overwrite the active item; and the supply-chain pin checker now uses a stable ESM direct-execution guard so evidence-only CLI tests cannot pass with empty output. The review agent found no High issues and its three Medium findings were addressed locally. Validation passed focused frontend guardrail suites for admin/community, route/hotel, and heritage i18n/stale safety (3 files / 22 tests), frontend typecheck, focused order/hotel/favorites/security suites from the development agents, focused backend guide-chat/security coverage, `npm run test:ops` (33 tests), `npm run check:supply-chain-pins`, full `npm run check` (backend compile/test, frontend typecheck plus 49 files / 312 tests plus production build, Scrapler 16 tests), and `git diff --check` with only LF-to-CRLF working-copy warnings.
 - Product-hardening multi-agent cycle on 2026-06-09 18:15 +08:00: 4 development agents and 1 review agent completed; the parallel testing agent was started but did not return before local full validation completed. Closed CT-FE-056, CT-FE-057, CT-BE-040, CT-BE-041, CT-OPS-030, and CT-OPS-031 in the current worktree. RouteCommunity filters now reset pagination and ignore stale route/Q&A responses; Admin hotel-order status changes now expose accessible row-level busy/error/rollback behavior; guide-chat usage keys use HMAC labels and production usage accounting fails closed when Redis is unavailable; production rate limiting and brute-force protection now require Redis and fail closed for sensitive paths when Redis is missing or unavailable; production Nginx rejects unmatched HTTPS hosts and validates rendered host variables; and production metrics default to non-public with preflight/static ops tests guarding the setting. Validation passed focused frontend suites for RouteCommunity and AdminDashboard hotel orders, focused backend security coverage, `npm run test:ops` (30 tests), full `npm run check` (backend compile/test, frontend typecheck plus 49 files / 304 tests plus production build, Scrapler 16 tests), and `git diff --check` with only LF-to-CRLF working-copy warnings.
 - Product-hardening follow-up on 2026-06-09 17:18 +08:00: local follow-up closed the review agent's remaining high/medium findings plus stale test drift. `CACHE_KEY_HMAC_SECRET` is now an independent production-required secret with placeholder and length validation across backend, compose, upload, preflight, docs, and guardrails. Recommendation/AI Redis values no longer store raw similar-user/user identifiers. AI route quota and pending-start controls fail closed in production when Redis is unavailable. `QuestionDetail.vue` separates detail and answer failures, retries them independently, reloads on route-param changes, and ignores stale detail/answer/like-status responses. `UserProfile.vue` no longer reports a successful password change as failed by reloading stale session-gated profile details. AdminDashboard's remaining spot/news/carousel/route/hotel loaders preserve rows on transient failures and ignore stale refreshes. Validation passed focused frontend stale/UX coverage (4 files / 42 tests), `sourceGuardrails.test.ts` (19 tests), `opsConfigGuardrails.test.ts` (9 tests), focused backend AI/privacy/production-safety coverage, full `mvn -q -f backend/pom.xml test`, full `npm run check` (backend compile/test, frontend typecheck plus 49 files / 301 tests plus production build, Scrapler 16 tests), and `git diff --check` with only LF-to-CRLF working-copy warnings.
 - Product-hardening multi-agent cycle on 2026-06-09 16:16 +08:00: 4 development agents, 1 testing agent, and 1 review agent completed. Closed CT-SEC-PII-002, CT-FE-050, and CT-FE-051, and also addressed review follow-ups for AI route/quota Redis key privacy plus AdminDashboard/AdminHeritage stale-response gaps. Redis/cache keys for IP geolocation, recommendation profiles, AI quota, and AI route cache/locks now use keyed HMAC labels instead of raw IP, user ID, or preference tuples. AdminDashboard user and hotel-order lists now preserve rows on failures, expose retryable error states, and ignore stale refresh responses. RouteCommunity route/question lists and AdminHeritagePanel relation/top-level item lists now ignore stale success/failure responses. UserProfile forced-password-change UX now has mounted DOM coverage. Validation passed focused backend privacy/AI coverage, focused frontend UX/stale suites (6 files / 76 tests), `npm run test:ops` (18 tests), full `npm run check` (backend compile/test, frontend typecheck plus 48 files / 287 tests plus production build, Scrapler 16 tests), and final `git diff --check` with only LF-to-CRLF warnings.
@@ -53,6 +56,19 @@ This file tracks issues re-checked against the current worktree. Items marked fi
 
 ## Fixed This Cycle
 
+- CT-FE-061: `HeatMap.vue` now normalizes runtime API/chart payloads, escapes tooltip HTML, rejects untrusted remote geo fallback URLs, labels the chart/zoom control for assistive tech, ignores stale chart reloads, and keeps fallback zoom from writing invalid `geo` options.
+- CT-FE-062: Hotel list/detail browsing now uses stronger typed API normalization, stale-response guards, retryable failure states, and safer user-facing fallbacks.
+- CT-FE-063: Login, Register, and QuestionDetail now use typed DTO/error handling instead of broad assumptions, and QuestionDetail like mutations are scoped to the initiating question id.
+- CT-FE-064: Admin community management now guards stale refresh/save/delete flows, prevents duplicate deletes, keeps row action buttons accessible, and preserves successful tab data on partial failures.
+- CT-FE-065: Heritage detail/comment/like flows now guard stale writes, duplicate comment submit/delete actions, cross-item like completions, and same-item out-of-order like toggles.
+- CT-FE-066: HotelBooking now fails closed unless authoritative API hotel and room data are loaded for the current route id; retryable alerts remain visible and submit/mobile actions stay disabled when API data is unavailable.
+- CT-BE-042: `RequestRateLimitFilter` now treats unmatched API mutation methods as sensitive mutation traffic and has regression coverage for Redis strict fail-closed, fallback, disabled-rate-limit, and health-check behavior.
+- CT-OPS-033: Production compose, deploy preflight, and upload scripts now fail closed on unsafe Nginx host inputs, weak TOTP secrets, placeholder infrastructure secrets, and unsafe proxy/scrapling overrides.
+- CT-OPS-034: Supply-chain pin validation now requires resolver metadata plus `sha256` digest evidence, and the direct runner stays stable under CLI and Node test execution.
+- CT-FE-058: Admin community management now reports partial per-tab load failures with sanitized accessible alerts while preserving successful tab data.
+- CT-FE-059: HotelBooking now scopes hotel detail and room-type API responses to the latest route hotel id so stale responses cannot mix displayed hotel/room data with current submit parameters.
+- CT-FE-060: Heritage detail modals now guard detail, comments, inheritors, events, comment pagination, and like-status writes with current selected-item request tokens.
+- CT-OPS-032: `scripts/check-supply-chain-pins.mjs` now uses a stable ESM direct-execution guard so evidence-only CLI audits reliably emit success/failure output under Node's test runner.
 - CT-FE-056: `RouteCommunity` now resets route/question pagination when filters, tags, or sort change after browsing later pages, and ignores stale route/Q&A responses.
 - CT-FE-057: Admin hotel-order status changes now have accessible labels, row-level pending state, failure messages, and visible rollback to the original status on API failure.
 - CT-BE-040: Guide-chat usage accounting now uses HMAC labels for quota identity keys and fails closed in production when the Redis usage backend is missing or unavailable.
@@ -185,9 +201,282 @@ This file tracks issues re-checked against the current worktree. Items marked fi
 
 ## Open / Residual Issues
 
-No open residual issues are currently tracked after the 2026-06-09 17:18 product-hardening follow-up.
+26 Medium residuals opened by the 2026-06-12 8-agent cross-review. No High-severity items. Prior closed tickets through CT-FE-066 / CT-BE-042 / CT-OPS-034 remain fixed unless explicitly reopened below.
+
+### P0 — Correctness / security (fix first)
+
+### CT-FE-067 - Open - ScenicSpotDetail stale route/detail/comment/like races
+
+- Severity: Medium | Priority: P0 | Agents: 1, 3
+- Evidence: `frontend/src/views/ScenicSpotDetail.vue` watches `locale` but not `route.params.id`; `fetchSpotDetail` / `fetchComments` / `toggleLike` lack request-generation guards.
+- Risk: Fast navigation between spot ids can apply older detail, comments, or like mutations to the wrong spot.
+- Fix direction: Mirror `QuestionDetail.vue` / `Heritage.vue` — watch route id, bump request tokens, ignore stale completions.
+
+### CT-FE-068 - Open - HotelBooking submit not scoped to active hotel at submit start
+
+- Severity: Medium | Priority: P0 | Agent: 2
+- Evidence: `HotelBooking.vue` load path pins `bookingDataRequestId` + `requestedHotelId`; `submitBooking` reads live `hotelId`/`roomId` and always redirects on success.
+- Risk: In-flight submit after route change can book or redirect for a superseded hotel.
+- Fix direction: Pin `{ hotelId, roomId }` and a submit token at start; block redirect unless still current.
+
+### CT-BE-043 - Open - Login step-up fails open when reCAPTCHA unavailable
+
+- Severity: Medium | Priority: P0 | Agents: 1, 7
+- Evidence: `AuthApplicationService.enforceAccountStepUpIfNeeded` returns when `!isRecaptchaConfigured()` instead of rejecting login under `stepUpRequired()`.
+- Risk: Misconfigured dev/staging can authenticate brute-force targets without step-up; production compose mitigates but app path is not fail-closed.
+- Fix direction: Throw `AuthForbiddenException` or 503 under strict/production intent when step-up is required but reCAPTCHA is missing.
+
+### P1 — Operations / data / admin
+
+### CT-FE-069 - Open - ScenicSpotDetail comment submit lacks in-flight duplicate guard
+
+- Severity: Medium | Priority: P1 | Agents: 1, 3
+- Evidence: `submitComment` does not check `submittingComment` before setting it true (contrast `Heritage.vue`).
+- Fix direction: Early return when `submittingComment` or `uploadingCommentImage`; add Vitest coverage.
+
+### CT-FE-070 - Open - OrderCenter cancel not tied to selection revision
+
+- Severity: Medium | Priority: P1 | Agent: 2
+- Evidence: `submitCancelAction` captures `selectedOrder` but does not verify `selectedOrderRevision` after await; list/detail loads use tokens.
+- Fix direction: Capture revision at start; refresh UI only if unchanged, else non-blocking toast.
+
+### CT-FE-071 - Open - Admin panels truncate beyond first 100 records
+
+- Severity: Medium | Priority: P1 | Agent: 3
+- Evidence: `AdminCommunityPanel.vue`, `AdminDashboard.vue`, `AdminHeritagePanel.vue` fetch `page: 0, size: 100` only; `PageResponse` metadata discarded via `toArray()`.
+- Risk: Moderation blind spot for collections >100 rows.
+- Fix direction: Consume pagination metadata; add load-more or page controls per tab.
+
+### CT-BE-044 - Open - AI route records lack UNIQUE (user_id, job_id)
+
+- Severity: Medium | Priority: P1 | Agent: 5
+- Evidence: `V16__create_ai_route_records.sql` indexes `job_id` only; `AiRouteRecordService.createRunningRecord` uses find-or-create without DB uniqueness.
+- Fix direction: Migration adds `UNIQUE (user_id, job_id)` with dedupe for existing rows.
+
+### CT-BE-045 - Open - Profile /me/comments dual-feed uses single page index
+
+- Severity: Medium | Priority: P1 | Agent: 5
+- Evidence: `CurrentUserApplicationService` pages spot and route comments with the same `Pageable`; `UserProfile.vue` merges with `Math.max`.
+- Fix direction: Separate `spotPage`/`routePage` params or return one merged sorted `PageResponse`.
+
+### CT-BE-046 - Open - Admin list endpoints use raw Pageable
+
+- Severity: Medium | Priority: P1 | Agents: 3, 5
+- Evidence: `AdminCommunityController`, `AdminUserController`, `AdminHeritageController` pass client `Pageable` without `InputSanitizer.sanitizePageable`.
+- Fix direction: Wrap with allowlisted sort fields and max size; extend `AdminPageResponseContractTest`.
+
+### CT-BE-047 - Open - Admin community/content mutations lack audit trail
+
+- Severity: Medium | Priority: P1 | Agents: 3, 6
+- Evidence: `AdminAuditLog` used only in `AdminUserService`; `AdminCommunityController` / `AdminHeritageController` mutate without persistent audit rows.
+- Fix direction: Persist audit entries for community/heritage/news/carousel admin mutations.
+
+### CT-OPS-035 - Open - Root npm run check omits ops/supply-chain gates
+
+- Severity: Medium | Priority: P1 | Agent: 4
+- Evidence: `package.json` `check` runs backend/frontend/scrapler only; CI runs `test:ops` and `check:supply-chain-pins` separately.
+- Fix direction: Include ops gates in `npm run check` or document/enforce `npm run check && npm run test:ops && npm run check:supply-chain-pins` as release gate.
+
+### CT-OPS-036 - Open - CORS_ALLOWED_ORIGINS not fail-closed in production preflight
+
+- Severity: Medium | Priority: P1 | Agent: 4
+- Evidence: Blank CORS skips registration in `WebMvcConfig`; `deploy-preflight.ps1` does not require `CORS_ALLOWED_ORIGINS` for split-origin deployments.
+- Fix direction: Fail closed when cross-origin clients expected; add preflight/validator check.
+
+### CT-OPS-037 - Open - Empty SCRAPLING_ALLOWED_DOMAINS allowed in production
+
+- Severity: Medium | Priority: P1 | Agent: 4
+- Evidence: `scrapler/scraper.py` only enforces allowlist when non-empty; production preflight requires API key but not domain list.
+- Fix direction: Require non-empty allowlist in production preflight/compose validation.
+
+### CT-OPS-040 - Open - upload-server.ps1 can skip all local validation
+
+- Severity: Medium | Priority: P1 | Agents: 4, 7
+- Evidence: `-SkipLocalChecks` bypasses frontend typecheck/build and backend `mvn test` before upload.
+- Fix direction: Restrict switch to test harness only or require explicit release override with audit log.
+
+### CT-OPS-041 - Open - PAYMENT_CALLBACK_SECRET weaker binding on backend service
+
+- Severity: Medium | Priority: P1 | Agent: 4
+- Evidence: Preflight requires secret; backend service env allows `${PAYMENT_CALLBACK_SECRET:-}` empty injection if preflight bypassed.
+- Fix direction: Align backend service interpolation with `:?` required form.
+
+### P2 — Architecture / product integration / privacy
+
+### CT-FE-072 - Open - Legacy generateRouteStream treats clean EOF as success
+
+- Severity: Medium | Priority: P2 | Agent: 2
+- Evidence: `stream.ts` `generateRouteStream` calls `onDone` on clean EOF; job stream correctly calls `onInterrupted`.
+- Fix direction: Align behavior or deprecate `/api/routes/generate/stream`.
+
+### CT-FE-073 - Open - Frontend auth/profile API typing remains loose
+
+- Severity: Medium | Priority: P2 | Agent: 7
+- Evidence: `LoginResponse` is `Record<string, unknown>` intersection; no dedicated `/me` profile type; `RawAuthUser` in auth store.
+- Fix direction: Add `CurrentUserProfileResponse`; narrow login contract.
+
+### CT-FE-074 - Open - restoreFromStorage does not hydrate session state
+
+- Severity: Medium | Priority: P2 | Agent: 7
+- Evidence: `stores/auth.ts` `restoreFromStorage()` returns boolean from snapshot read without setting `user.value`.
+- Fix direction: Hydrate from sanitized snapshot or rename to `hasStoredSnapshot()` and audit callers.
+
+### CT-FE-075 - Open - RoutePlanner book buttons bypass backend itinerary book API
+
+- Severity: Medium | Priority: P2 | Agent: 8
+- Evidence: `ItineraryController` book endpoint exists; `RoutePlanner.vue` calls `openExternalBooking()` only; `endpoints.ts` omits book path.
+- Fix direction: Wire POST bookings or remove `BOOKED` UI if external-only is intentional.
+
+### CT-FE-076 - Open - Internal hotel booking page orphaned in normal navigation
+
+- Severity: Medium | Priority: P2 | Agent: 8
+- Evidence: `/hotel-booking/:id` wired with API submit; `HotelDetail.vue` Book opens external OTA only.
+- Fix direction: Link internal flow from hotel browse/detail or deprecate page with matching copy.
+
+### CT-BE-048 - Open - Scrapler price pipeline never auto-publishes
+
+- Severity: Medium | Priority: P2 | Agent: 8
+- Evidence: `scrapler/main.py` `PriceResponse` lacks `publishable`/`referenceOnly`; `PriceFetchService` defaults to reference-only.
+- Fix direction: Derive publish flags from confidence/evidence thresholds when appropriate.
+
+### CT-FE-077 - Open - OrderCenter UI missing refund/invoice flows
+
+- Severity: Medium | Priority: P2 | Agent: 8
+- Evidence: `OrderCenterController` exposes refund/invoice; `endpoints.ts` and `OrderCenter.vue` use cancel/delete only.
+- Fix direction: Add UI + registry entries or document admin-only lifecycle.
+
+### CT-BE-049 - Open - AI Redis cache/streams store plaintext route content
+
+- Severity: Medium | Priority: P2 | Agent: 6
+- Evidence: `AiQuotaService.cacheRoute` and `AiRouteGenerationJobService` Redis events store full itinerary text.
+- Fix direction: Encrypt at rest, shorten TTL, or cache opaque record ids only.
+
+### CT-BE-050 - Open - Itinerary versioning ignores traveler count
+
+- Severity: Medium | Priority: P2 | Agent: 6
+- Evidence: `ItineraryService.createVersion` passes hardcoded `2`; `itineraries` table has no `travelers` column.
+- Fix direction: Migration + entity field; persist on generate and pass through `createVersion`.
+
+### CT-OPS-038 - Open - Scrapler follows redirects without re-validating hosts
+
+- Severity: Medium | Priority: P2 | Agent: 6
+- Evidence: `scrapler/scraper.py` `fetch_with_httpx` uses `follow_redirects=True` without post-redirect SSRF checks.
+- Fix direction: Disable redirects or validate each hop like initial URL.
+
+### CT-OPS-039 - Open - Scrapler /health unauthenticated and exposes config
+
+- Severity: Medium | Priority: P2 | Agents: 2, 6
+- Evidence: `scrapler/main.py` `/health` returns mode, providers, maxSources without API key.
+- Fix direction: Return minimal `{status: ok}` externally or require auth.
+
+### Low / deferred (no individual CT id yet)
+
+- Login lockout copy hardcoded Chinese in `Login.vue` (Agents 1, 7); add i18n keys.
+- `allowed_login_fingerprint_hash` column exists without login enforcement (`V8`, `User.java`).
+- Heritage like toggle lacks UI in-flight lock; RouteCommunity/AdminHeritage save handlers rely on `:disabled` only.
+- TOTP codes reusable within acceptance window (~90s); optional replay cache.
+- `UserService` / `AdminStatsService` thin direct test coverage.
+- Frontend composables `useAuthGuard`, `routeGeneration` store, `useBehaviorTracker` lack dedicated tests.
+- Pagination envelope split on `/api/bookings/my`, `/api/itineraries/my` (Agents 5, 8).
+- `HotelBooking.vue` invalid route params default to hotel/room id `1`.
+- `FavoriteController.addFavorite` TOCTOU mitigated by unique constraint only.
+- CI Node 24 (lint) vs Node 22 (build/test) version split.
+- Deploy preflight `-SkipDigestEvidence` / `-SkipComposeConfig` operator escape hatches.
+- Recommendation debug DTO still exposes raw numeric `userId` (admin-only).
+- GuideChatPanel in-flight requests not aborted on unmount.
 
 ## Recently Closed Issues
+
+### CT-OPS-034 - Closed - Supply-chain evidence validation rejects hollow digest metadata
+
+- Status: Closed in the current worktree after ops validation and full validation passed.
+- Implementation: `scripts/check-supply-chain-pins.mjs` now validates resolver metadata and `digestAlgorithm=sha256` alongside digest records, while `scripts/resolve-docker-image-digests.mjs` emits the auditable metadata shape.
+- Coverage: `check-supply-chain-pins.test.mjs`, resolver tests, `npm run test:ops`, and `npm run check:supply-chain-pins`.
+- Evidence: `npm run test:ops` passed with 37 tests; `npm run check:supply-chain-pins` emitted `Supply-chain release pins are complete.`
+
+### CT-OPS-033 - Closed - Production preflight rejects unsafe edge hosts and weak operator secrets
+
+- Status: Closed in the current worktree after ops guardrails, compose tests, and full validation passed.
+- Implementation: `docker-compose.prod.yml`, `scripts/deploy-preflight.ps1`, and `upload-server.ps1` now validate `NGINX_SERVER_NAME`, `NGINX_REDIRECT_HOST`, and `NGINX_CERT_DOMAIN` before use, reject weak Base32 `SUPER_ADMIN_TOTP_SECRET` values, and keep broad proxy trust plus unauthenticated Scrapling access fail-closed.
+- Coverage: `deploy-preflight.test.mjs`, `production-security-defaults.test.mjs`, `production-compose-config.test.mjs`, and `opsConfigGuardrails.test.ts`.
+- Evidence: `npm run test:ops` passed with 37 tests; `opsConfigGuardrails.test.ts` passed with 9 tests.
+
+### CT-BE-042 - Closed - Unmatched API mutations fail closed when rate-limit Redis is unavailable
+
+- Status: Closed in the current worktree after backend security validation and full validation passed.
+- Implementation: `RequestRateLimitFilter` routes unmatched `POST`, `PUT`, `PATCH`, and `DELETE /api/**` traffic through a sensitive `mutation` rule, while non-sensitive GET and health-check traffic are not incorrectly blocked.
+- Coverage: `RequestRateLimitFilterTest` covers strict Redis outage 503 behavior, non-strict fallback, disabled rate limiting, and `/actuator/health` passthrough.
+- Evidence: `mvn -q -f backend/pom.xml test` passed as part of full `npm run check`.
+
+### CT-FE-066 - Closed - HotelBooking requires current authoritative API data before submit
+
+- Status: Closed in the current worktree after route/hotel guardrails, typecheck, and full validation passed.
+- Implementation: `HotelBooking.vue` clears stale API data on route changes, scopes hotel/room responses to the active route id, displays retryable `role="alert"` failure states, and disables desktop/mobile submit actions until current API hotel and room data are available.
+- Coverage: `routeHotelA11y.test.ts` asserts fail-closed behavior and stale route response isolation.
+- Evidence: focused route/hotel tests passed, and full frontend validation passed with 49 files / 329 tests plus production build.
+
+### CT-FE-065 - Closed - Heritage detail mutations ignore stale and out-of-order completions
+
+- Status: Closed in the current worktree after review follow-up and focused frontend validation passed.
+- Implementation: `Heritage.vue` now guards detail, comments, pagination, like status, comment submit/delete, cross-item like completions, and same-item concurrent like completions with current item and request-token checks.
+- Coverage: `communityPagination.test.ts` covers stale cross-item likes, same-item out-of-order likes, duplicate comment submit protection, and paged comments; `i18nCoverage.test.ts` keeps the selected-item guards in place.
+- Evidence: focused frontend regression suites passed with 85 tests; full frontend validation passed with 329 tests.
+
+### CT-FE-064 - Closed - Admin community actions are stale-safe and accessible
+
+- Status: Closed in the current worktree after admin guardrails and full validation passed.
+- Implementation: `AdminCommunityPanel.vue` now uses request generations for community refreshes, snapshot checks around saves, duplicate delete guards, `aria-label` / `aria-busy` on row actions, and per-tab failure state preservation.
+- Coverage: `adminA11y.test.ts` and source guardrails assert the stale, deletion, and accessible action behavior.
+- Evidence: focused frontend regression suites passed; full frontend validation passed.
+
+### CT-FE-063 - Closed - Auth and Q&A views use typed responses and scoped mutations
+
+- Status: Closed in the current worktree after review follow-up and typecheck passed.
+- Implementation: `frontend/src/api/types.ts`, `Login.vue`, `Register.vue`, and `QuestionDetail.vue` now use typed DTO/error handling; `QuestionDetail.vue` invalidates pending like mutations when the route question changes and applies responses only to the initiating question id.
+- Coverage: `communityPagination.test.ts` covers stale question-like completions after route id changes; frontend typecheck covers the DTO contract.
+- Evidence: focused frontend regression suites, frontend typecheck, and full `npm run check` passed.
+
+### CT-FE-062 - Closed - Hotel browsing handles stale and malformed data safely
+
+- Status: Closed in the current worktree after route/hotel validation and full validation passed.
+- Implementation: `HotelList.vue` and `HotelDetail.vue` normalize API hotel/room payloads, ignore stale responses after filter/route changes, preserve user-visible retry states, and avoid unsafe assumptions about optional fields.
+- Coverage: `routeHotelA11y.test.ts` covers the current route/hotel stale and failure paths.
+- Evidence: focused route/hotel tests passed, and full frontend validation passed.
+
+### CT-FE-061 - Closed - HeatMap runtime callbacks and fallback mode are safe
+
+- Status: Closed in the current worktree after review follow-up and focused validation passed.
+- Implementation: `HeatMap.vue` now validates chart callback inputs, escapes tooltip names, rejects untrusted remote geo fallback URLs, ignores stale heatmap reloads, labels the canvas/range control for assistive tech, and only writes `geo.zoom` when a map is actually loaded.
+- Coverage: `HeatMap.test.ts` covers hostile tooltip escaping, malformed callback values, valid click routing, stale reloads, untrusted remote fallback URLs, accessibility labels, and no-geo zoom behavior in map fallback mode.
+- Evidence: `HeatMap.test.ts` passed as part of focused regression suites and full frontend validation.
+
+### CT-OPS-032 - Closed - Supply-chain pin checker CLI entrypoint is stable
+
+- Status: Closed in the current worktree after ops validation and full validation passed.
+- Implementation: `scripts/check-supply-chain-pins.mjs` now uses `pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url` for its direct-execution guard, keeping imports side-effect free while making CLI execution reliable under Node's test runner and normal `npm run check:supply-chain-pins`.
+- Coverage: `check-supply-chain-pins.test.mjs` evidence-only CLI audit now passes and asserts the success output; `npm run check:supply-chain-pins` also emits `Supply-chain release pins are complete.`
+- Evidence: `npm run test:ops` passed with 33 tests. Full `npm run check` and `git diff --check` passed.
+
+### CT-FE-060 - Closed - Heritage detail modal ignores stale item responses
+
+- Status: Closed in the current worktree after focused frontend guardrails and full validation passed.
+- Implementation: `Heritage.vue` now increments request tokens for detail and comment-page requests, checks the active selected item before writing detail, comments, inheritors, events, loading flags, and like status, and invalidates pending detail/comment requests when opening a new item.
+- Coverage: `i18nCoverage.test.ts` asserts the selected-item request guards remain present. The full frontend suite passed after the change.
+- Evidence: `npm --prefix frontend run test -- --run src/components/adminA11y.test.ts src/views/routeHotelA11y.test.ts src/views/i18nCoverage.test.ts` passed with 22 tests. Full `npm run check` passed with 49 frontend files / 312 tests.
+
+### CT-FE-059 - Closed - HotelBooking route changes cannot mix stale API data with current submit parameters
+
+- Status: Closed in the current worktree after focused frontend guardrails and full validation passed.
+- Implementation: `HotelBooking.vue` captures a request id and requested hotel id before fetching hotel detail and room types, then ignores success/failure responses when a newer request or route hotel id has superseded them.
+- Coverage: `routeHotelA11y.test.ts` asserts HotelBooking keeps API loads scoped to the latest route id.
+- Evidence: focused route/hotel guardrails, frontend typecheck, and full `npm run check` passed.
+
+### CT-FE-058 - Closed - Admin community partial load failures are visible per tab
+
+- Status: Closed in the current worktree after focused frontend guardrails and full validation passed.
+- Implementation: `AdminCommunityPanel.vue` tracks `communityTabErrors` separately from the all-tabs `communityError`; partially failed admin community fetches now show a sanitized `role="alert"` message for the active failed tab while preserving successful tab data.
+- Coverage: `adminA11y.test.ts` asserts per-tab errors, alert semantics, and sanitized `safeClientErrorMessage` handling stay in place.
+- Evidence: focused admin/community guardrails, frontend typecheck, and full `npm run check` passed.
 
 ### CT-OPS-031 - Closed - Production metrics and Redis protection defaults are fail-closed
 

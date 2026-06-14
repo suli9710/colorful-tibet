@@ -176,11 +176,63 @@ BACKEND_APP_GID=${BACKEND_APP_GID:-10001}
 case "$BACKEND_APP_UID" in ''|*[!0-9]*) echo "Invalid BACKEND_APP_UID: $BACKEND_APP_UID" >&2; exit 1 ;; esac
 case "$BACKEND_APP_GID" in ''|*[!0-9]*) echo "Invalid BACKEND_APP_GID: $BACKEND_APP_GID" >&2; exit 1 ;; esac
 
+DNS_HOST_PATTERN='^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$'
+
+is_placeholder_secret() {
+  printf '%s' "$1" | grep -Eiq 'change-me|changeme|replace-with|placeholder|example\.com|local-dev|local-'
+}
+
+is_dns_host_value() {
+  printf '%s' "$1" | grep -Eq "$DNS_HOST_PATTERN"
+}
+
+require_single_host_value() {
+  local name="$1"
+  local value="$2"
+  if [ -z "$value" ]; then
+    echo "Refusing deployment: $name must be configured." >&2
+    exit 1
+  fi
+  if ! is_dns_host_value "$value"; then
+    echo "Refusing deployment: $name must be a single DNS host without scheme, path, port, comma, whitespace, or control characters." >&2
+    exit 1
+  fi
+  if is_placeholder_secret "$value"; then
+    echo "Refusing deployment: $name must not contain placeholder values." >&2
+    exit 1
+  fi
+}
+
+require_server_name_list_value() {
+  local name="$1"
+  local value="$2"
+  if [ -z "$value" ]; then
+    echo "Refusing deployment: $name must be configured." >&2
+    exit 1
+  fi
+  if printf '%s' "$value" | grep -Eq '[[:cntrl:],/]'; then
+    echo "Refusing deployment: $name entries must be DNS hosts separated by single spaces only." >&2
+    exit 1
+  fi
+  if is_placeholder_secret "$value"; then
+    echo "Refusing deployment: $name must not contain placeholder values." >&2
+    exit 1
+  fi
+  for host_name in $value; do
+    if ! is_dns_host_value "$host_name"; then
+      echo "Refusing deployment: $name entry '$host_name' must be a DNS host without scheme, path, port, comma, wildcard, or control characters." >&2
+      exit 1
+    fi
+  done
+}
+
+NGINX_SERVER_NAME=$(grep -E '^NGINX_SERVER_NAME=' "$PROJECT_DIR/.env" | tail -n 1 | cut -d= -f2- || true)
+NGINX_REDIRECT_HOST=$(grep -E '^NGINX_REDIRECT_HOST=' "$PROJECT_DIR/.env" | tail -n 1 | cut -d= -f2- || true)
 NGINX_CERT_DOMAIN=$(grep -E '^NGINX_CERT_DOMAIN=' "$PROJECT_DIR/.env" | tail -n 1 | cut -d= -f2- || true)
-if [ -z "$NGINX_CERT_DOMAIN" ]; then
-  echo "Refusing deployment: NGINX_CERT_DOMAIN must be configured." >&2
-  exit 1
-fi
+require_server_name_list_value NGINX_SERVER_NAME "$NGINX_SERVER_NAME"
+require_single_host_value NGINX_REDIRECT_HOST "$NGINX_REDIRECT_HOST"
+require_single_host_value NGINX_CERT_DOMAIN "$NGINX_CERT_DOMAIN"
+
 LE_CERT_DIR="/etc/letsencrypt/live/$NGINX_CERT_DOMAIN"
 for cert_file in fullchain.pem privkey.pem chain.pem; do
   if [ ! -f "$LE_CERT_DIR/$cert_file" ]; then
@@ -192,10 +244,6 @@ done
 get_env_value() {
   local name="$1"
   grep -E "^${name}=" "$PROJECT_DIR/.env" | tail -n 1 | cut -d= -f2- || true
-}
-
-is_placeholder_secret() {
-  printf '%s' "$1" | grep -Eiq 'change-me|changeme|replace-with|placeholder'
 }
 
 require_real_secret() {
@@ -222,7 +270,39 @@ reject_placeholder_secret_if_present() {
   fi
 }
 
-for secret_name in DB_PASSWORD MYSQL_ROOT_PASSWORD REDIS_PASSWORD GRAFANA_ADMIN_PASSWORD CACHE_KEY_HMAC_SECRET; do
+require_exact_env() {
+  local name="$1"
+  local expected="$2"
+  local actual
+  actual=$(get_env_value "$name")
+  if [ -z "$actual" ]; then
+    actual="$expected"
+  fi
+  if [ "$actual" != "$expected" ]; then
+    echo "Refusing deployment: $name must be $expected for production, got '$actual'." >&2
+    exit 1
+  fi
+}
+
+for secret_name in \
+  DB_PASSWORD \
+  MYSQL_ROOT_PASSWORD \
+  REDIS_PASSWORD \
+  GRAFANA_ADMIN_PASSWORD \
+  JWT_SECRET \
+  ADMIN_ENCRYPTION_KEY \
+  CSRF_SIGNING_SECRET \
+  CACHE_KEY_HMAC_SECRET \
+  PAYMENT_CALLBACK_SECRET \
+  PII_KEYS \
+  PII_ACTIVE_KID \
+  SUPER_ADMIN_TOTP_SECRET \
+  SCRAPLING_API_KEY \
+  RECAPTCHA_SITE_KEY \
+  RECAPTCHA_SECRET_KEY \
+  VITE_AMAP_KEY \
+  VITE_AMAP_SECURITY_CODE \
+  ALERTMANAGER_WEBHOOK_URL; do
   require_real_secret "$secret_name"
 done
 reject_placeholder_secret_if_present MYSQL_PASSWORD
@@ -232,12 +312,24 @@ if [ "${#CACHE_KEY_HMAC_SECRET_VALUE}" -lt 64 ]; then
   exit 1
 fi
 
-NGINX_REDIRECT_HOST_VALUE=$(get_env_value NGINX_REDIRECT_HOST)
-NGINX_REDIRECT_HOST_PATTERN='^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$'
-if ! printf '%s' "$NGINX_REDIRECT_HOST_VALUE" | grep -Eq "$NGINX_REDIRECT_HOST_PATTERN"; then
-  echo "Refusing deployment: NGINX_REDIRECT_HOST must be a single canonical host without scheme, path, port, comma, whitespace, or control characters." >&2
-  exit 1
-fi
+require_exact_env SPRING_PROFILES_ACTIVE prod
+require_exact_env SPRING_FLYWAY_ENABLED true
+require_exact_env SPRING_JPA_HIBERNATE_DDL_AUTO validate
+require_exact_env REQUIRE_STRONG_SECRETS true
+require_exact_env COOKIE_SECURE true
+require_exact_env PAYMENT_MOCK_CALLBACK_ENABLED false
+require_exact_env SEED_DEMO_USERS false
+require_exact_env SEED_CONTENT_ENABLED false
+require_exact_env DB_ALLOW_PUBLIC_KEY_RETRIEVAL false
+require_exact_env PUBLIC_METRICS_ENABLED false
+require_exact_env RATE_LIMIT_REDIS_ENABLED true
+require_exact_env RATE_LIMIT_REDIS_FAIL_CLOSED true
+require_exact_env BRUTE_FORCE_REDIS_ENABLED true
+require_exact_env BRUTE_FORCE_REDIS_FAIL_CLOSED true
+require_exact_env ANTIBOT_ENABLED true
+require_exact_env RECAPTCHA_ENABLED true
+require_exact_env REGISTRATION_RECAPTCHA_REQUIRED true
+require_exact_env SCRAPLING_ALLOW_UNAUTHENTICATED false
 
 TRUST_PROXY_HEADERS_VALUE=$(get_env_value TRUST_PROXY_HEADERS | tr '[:upper:]' '[:lower:]')
 TRUSTED_PROXY_CIDRS_VALUE=$(get_env_value TRUSTED_PROXY_CIDRS | tr -d '[:space:]')
@@ -252,19 +344,15 @@ if [ "$TRUST_PROXY_HEADERS_VALUE" = "true" ]; then
   fi
 fi
 
+DB_SSL_MODE_VALUE=$(get_env_value DB_SSL_MODE)
+DB_SSL_MODE_VALUE=${DB_SSL_MODE_VALUE:-REQUIRED}
+case "$DB_SSL_MODE_VALUE" in
+  REQUIRED|VERIFY_IDENTITY) ;;
+  *) echo "Refusing deployment: DB_SSL_MODE must be REQUIRED or VERIFY_IDENTITY for production, got '$DB_SSL_MODE_VALUE'." >&2; exit 1 ;;
+esac
+
 if ! grep -Eq '^(DOUBAO_API_KEY|ARK_API_KEY)=[^[:space:]]+' "$PROJECT_DIR/.env"; then
   echo "WARNING: DOUBAO_API_KEY/ARK_API_KEY is empty; AI route generation will use local fallback routes." >&2
-fi
-
-SCRAPLING_API_KEY_VALUE=$(grep -E '^SCRAPLING_API_KEY=' "$PROJECT_DIR/.env" | tail -n 1 | cut -d= -f2- || true)
-if [ -z "$SCRAPLING_API_KEY_VALUE" ]; then
-  echo "Refusing deployment: SCRAPLING_API_KEY must be configured for production scrapler access." >&2
-  exit 1
-fi
-
-if printf '%s' "$SCRAPLING_API_KEY_VALUE" | grep -Eiq 'change-me|changeme|replace-with|placeholder'; then
-  echo "Refusing deployment: SCRAPLING_API_KEY must not contain placeholder values." >&2
-  exit 1
 fi
 
 if grep -qx 'SUPER_ADMIN_SECONDARY_PASSWORD=lzh031224' "$PROJECT_DIR/.env"; then

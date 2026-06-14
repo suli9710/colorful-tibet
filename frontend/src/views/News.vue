@@ -242,6 +242,7 @@
       <MotionModal
         :show="Boolean(selectedItem)"
         modal-key="news-detail-modal"
+        labelled-by="news-detail-title"
         panel-class="tibet-card-elevated rounded-2xl max-w-4xl max-h-[90dvh] overflow-y-auto p-0"
         @close="closeDetail"
       >
@@ -264,7 +265,7 @@
                   <span class="bg-tibet-red/10 text-tibet-red border border-tibet-red/15 px-3 py-1 rounded-full text-sm font-medium">{{ getCategoryLabel(selectedItem.category) }}</span>
                   <span class="text-tibet-brown/50 text-sm">{{ formatNewsMeta(selectedItem) }}</span>
                 </div>
-                <h2 class="text-2xl font-bold leading-tight text-tibet-dark mb-4 sm:text-3xl sm:mb-6">{{ selectedItem.title }}</h2>
+                <h2 id="news-detail-title" class="text-2xl font-bold leading-tight text-tibet-dark mb-4 sm:text-3xl sm:mb-6">{{ selectedItem.title }}</h2>
                 <div class="prose max-w-none text-sm leading-7 text-tibet-brown/75 whitespace-pre-line sm:text-base">
                   {{ selectedItem.content }}
                 </div>

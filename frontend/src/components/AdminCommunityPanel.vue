@@ -53,11 +53,20 @@
         {{ t('admin.loadingCommunity') }}
       </div>
 
-      <div v-else-if="communityError" class="rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+      <div v-else-if="communityError" class="rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert" aria-live="assertive" aria-atomic="true">
         {{ communityError }}
       </div>
 
       <div v-else class="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+        <div
+          v-if="activeCommunityTabError"
+          class="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
+          role="alert"
+          aria-live="assertive"
+          aria-atomic="true"
+        >
+          {{ activeCommunityTabError }}
+        </div>
         <table v-if="activeTab === 'routes'" class="min-w-full divide-y divide-stone-200">
           <thead class="bg-stone-50">
             <tr>
@@ -83,10 +92,25 @@
               <td class="px-4 py-3 text-sm text-stone-600 max-w-[320px]">{{ contentPreview(route.content) }}</td>
               <td class="px-4 py-3 text-sm text-stone-500 whitespace-nowrap">{{ formatDateTime(route.createdAt) }}</td>
               <td class="px-4 py-3 text-right whitespace-nowrap">
-                <button :title="t('common.edit')" @click="openEditItem('route', route)" class="inline-flex p-2 rounded-lg text-blue-600 hover:bg-blue-50">
+                <button
+                  type="button"
+                  :title="t('common.edit')"
+                  :aria-label="`${t('common.edit')} ${route.title || route.id}`.trim()"
+                  :disabled="savingCommunity"
+                  @click="openEditItem('route', route)"
+                  class="inline-flex p-2 rounded-lg text-blue-600 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
                   <Edit3 class="w-4 h-4" />
                 </button>
-                <button :title="t('common.delete')" @click="deleteCommunityItem('route', route.id)" class="inline-flex p-2 rounded-lg text-red-600 hover:bg-red-50">
+                <button
+                  type="button"
+                  :title="t('common.delete')"
+                  :aria-label="`${t('common.delete')} ${route.title || route.id}`.trim()"
+                  :disabled="savingCommunity || isDeletingCommunityItem('route', route.id)"
+                  :aria-busy="isDeletingCommunityItem('route', route.id)"
+                  @click="deleteCommunityItem('route', route.id)"
+                  class="inline-flex p-2 rounded-lg text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
                   <Trash2 class="w-4 h-4" />
                 </button>
               </td>
@@ -124,10 +148,25 @@
               <td class="px-4 py-3 text-sm text-stone-600 max-w-[320px]">{{ contentPreview(question.content) }}</td>
               <td class="px-4 py-3 text-sm text-stone-500 whitespace-nowrap">{{ formatDateTime(question.createdAt) }}</td>
               <td class="px-4 py-3 text-right whitespace-nowrap">
-                <button :title="t('common.edit')" @click="openEditItem('question', question)" class="inline-flex p-2 rounded-lg text-blue-600 hover:bg-blue-50">
+                <button
+                  type="button"
+                  :title="t('common.edit')"
+                  :aria-label="`${t('common.edit')} ${question.title || question.id}`.trim()"
+                  :disabled="savingCommunity"
+                  @click="openEditItem('question', question)"
+                  class="inline-flex p-2 rounded-lg text-blue-600 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
                   <Edit3 class="w-4 h-4" />
                 </button>
-                <button :title="t('common.delete')" @click="deleteCommunityItem('question', question.id)" class="inline-flex p-2 rounded-lg text-red-600 hover:bg-red-50">
+                <button
+                  type="button"
+                  :title="t('common.delete')"
+                  :aria-label="`${t('common.delete')} ${question.title || question.id}`.trim()"
+                  :disabled="savingCommunity || isDeletingCommunityItem('question', question.id)"
+                  :aria-busy="isDeletingCommunityItem('question', question.id)"
+                  @click="deleteCommunityItem('question', question.id)"
+                  class="inline-flex p-2 rounded-lg text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
                   <Trash2 class="w-4 h-4" />
                 </button>
               </td>
@@ -158,10 +197,25 @@
               <td class="px-4 py-3 text-sm text-stone-600 max-w-[360px]">{{ contentPreview(comment.content) }}</td>
               <td class="px-4 py-3 text-sm text-stone-500 whitespace-nowrap">{{ formatDateTime(comment.createdAt) }}</td>
               <td class="px-4 py-3 text-right whitespace-nowrap">
-                <button :title="t('common.edit')" @click="openEditItem('comment', comment)" class="inline-flex p-2 rounded-lg text-blue-600 hover:bg-blue-50">
+                <button
+                  type="button"
+                  :title="t('common.edit')"
+                  :aria-label="`${t('common.edit')} ${comment.routeTitle || comment.id}`.trim()"
+                  :disabled="savingCommunity"
+                  @click="openEditItem('comment', comment)"
+                  class="inline-flex p-2 rounded-lg text-blue-600 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
                   <Edit3 class="w-4 h-4" />
                 </button>
-                <button :title="t('common.delete')" @click="deleteCommunityItem('comment', comment.id)" class="inline-flex p-2 rounded-lg text-red-600 hover:bg-red-50">
+                <button
+                  type="button"
+                  :title="t('common.delete')"
+                  :aria-label="`${t('common.delete')} ${comment.routeTitle || comment.id}`.trim()"
+                  :disabled="savingCommunity || isDeletingCommunityItem('comment', comment.id)"
+                  :aria-busy="isDeletingCommunityItem('comment', comment.id)"
+                  @click="deleteCommunityItem('comment', comment.id)"
+                  class="inline-flex p-2 rounded-lg text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
                   <Trash2 class="w-4 h-4" />
                 </button>
               </td>
@@ -197,10 +251,25 @@
               <td class="px-4 py-3 text-sm text-stone-600 max-w-[360px]">{{ contentPreview(comment.content) }}</td>
               <td class="px-4 py-3 text-sm text-stone-500 whitespace-nowrap">{{ formatDateTime(comment.createdAt) }}</td>
               <td class="px-4 py-3 text-right whitespace-nowrap">
-                <button :title="t('common.edit')" @click="openEditItem('spotComment', comment)" class="inline-flex p-2 rounded-lg text-blue-600 hover:bg-blue-50">
+                <button
+                  type="button"
+                  :title="t('common.edit')"
+                  :aria-label="`${t('common.edit')} ${comment.spotName || comment.id}`.trim()"
+                  :disabled="savingCommunity"
+                  @click="openEditItem('spotComment', comment)"
+                  class="inline-flex p-2 rounded-lg text-blue-600 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
                   <Edit3 class="w-4 h-4" />
                 </button>
-                <button :title="t('common.delete')" @click="deleteCommunityItem('spotComment', comment.id)" class="inline-flex p-2 rounded-lg text-red-600 hover:bg-red-50">
+                <button
+                  type="button"
+                  :title="t('common.delete')"
+                  :aria-label="`${t('common.delete')} ${comment.spotName || comment.id}`.trim()"
+                  :disabled="savingCommunity || isDeletingCommunityItem('spotComment', comment.id)"
+                  :aria-busy="isDeletingCommunityItem('spotComment', comment.id)"
+                  @click="deleteCommunityItem('spotComment', comment.id)"
+                  class="inline-flex p-2 rounded-lg text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
                   <Trash2 class="w-4 h-4" />
                 </button>
               </td>
@@ -237,10 +306,25 @@
               <td class="px-4 py-3 text-sm text-stone-600 max-w-[360px]">{{ contentPreview(answer.content) }}</td>
               <td class="px-4 py-3 text-sm text-stone-500 whitespace-nowrap">{{ formatDateTime(answer.createdAt) }}</td>
               <td class="px-4 py-3 text-right whitespace-nowrap">
-                <button :title="t('common.edit')" @click="openEditItem('answer', answer)" class="inline-flex p-2 rounded-lg text-blue-600 hover:bg-blue-50">
+                <button
+                  type="button"
+                  :title="t('common.edit')"
+                  :aria-label="`${t('common.edit')} ${answer.questionTitle || answer.id}`.trim()"
+                  :disabled="savingCommunity"
+                  @click="openEditItem('answer', answer)"
+                  class="inline-flex p-2 rounded-lg text-blue-600 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
                   <Edit3 class="w-4 h-4" />
                 </button>
-                <button :title="t('common.delete')" @click="deleteCommunityItem('answer', answer.id)" class="inline-flex p-2 rounded-lg text-red-600 hover:bg-red-50">
+                <button
+                  type="button"
+                  :title="t('common.delete')"
+                  :aria-label="`${t('common.delete')} ${answer.questionTitle || answer.id}`.trim()"
+                  :disabled="savingCommunity || isDeletingCommunityItem('answer', answer.id)"
+                  :aria-busy="isDeletingCommunityItem('answer', answer.id)"
+                  @click="deleteCommunityItem('answer', answer.id)"
+                  class="inline-flex p-2 rounded-lg text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
                   <Trash2 class="w-4 h-4" />
                 </button>
               </td>
@@ -263,7 +347,7 @@
       panel-class="max-w-2xl rounded-2xl bg-white p-4 sm:p-8 max-h-[88dvh] overflow-y-auto"
       @close="closeCommunityModal"
     >
-      <form @submit.prevent="saveCommunityItem" class="space-y-5">
+      <form @submit.prevent="saveCommunityItem" class="space-y-5" :aria-busy="savingCommunity">
         <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
           <div>
             <p class="text-xs font-semibold uppercase tracking-wide text-rose-600">{{ typeLabel(editingType) }}</p>
@@ -459,6 +543,16 @@ const activeTab = ref<CommunityTab>('routes')
 const loadingCommunity = ref(false)
 const savingCommunity = ref(false)
 const communityError = ref('')
+const emptyCommunityTabErrors = (): Record<CommunityTab, string> => ({
+  routes: '',
+  questions: '',
+  comments: '',
+  spotComments: '',
+  answers: ''
+})
+const communityTabErrors = ref<Record<CommunityTab, string>>(emptyCommunityTabErrors())
+const deletingCommunityKeys = ref<ReadonlySet<string>>(new Set())
+let communityRequestId = 0
 
 const communityRoutes = ref<AdminCommunityRoute[]>([])
 const communityQuestions = ref<AdminCommunityQuestion[]>([])
@@ -492,6 +586,7 @@ const communityTabs = computed<CommunityTabConfig[]>(() => [
 const totalCommunityItems = computed(() =>
   communityRoutes.value.length + communityQuestions.value.length + communityComments.value.length + communitySpotComments.value.length + communityAnswers.value.length
 )
+const activeCommunityTabError = computed(() => communityTabErrors.value[activeTab.value] || '')
 
 const activeDateLocale = computed(() => locale.value === 'bo' ? 'bo-CN' : 'zh-CN')
 
@@ -531,9 +626,13 @@ const fetchCommunityList = async <T>(url: string) => {
   return toArray<T>(response.data)
 }
 
+const isCurrentCommunityRequest = (requestId: number) => requestId === communityRequestId
+
 const fetchCommunityContent = async () => {
+  const requestId = ++communityRequestId
   loadingCommunity.value = true
   communityError.value = ''
+  communityTabErrors.value = emptyCommunityTabErrors()
   const results = await Promise.allSettled([
     fetchCommunityList<AdminCommunityRoute>(endpoints.adminCommunity.routes),
     fetchCommunityList<AdminCommunityQuestion>(endpoints.adminCommunity.questions),
@@ -541,6 +640,8 @@ const fetchCommunityContent = async () => {
     fetchCommunityList<AdminCommunitySpotComment>(endpoints.adminCommunity.spotComments),
     fetchCommunityList<AdminCommunityAnswer>(endpoints.adminCommunity.answers)
   ])
+  if (!isCurrentCommunityRequest(requestId)) return
+
   const resultEntries = [
     { key: 'routes', result: results[0] },
     { key: 'questions', result: results[1] },
@@ -566,9 +667,17 @@ const fetchCommunityContent = async () => {
     if (failed.length === resultEntries.length) {
       const firstError: unknown = failed[0].result.status === 'rejected' ? failed[0].result.reason : null
       communityError.value = safeClientErrorMessage(firstError, t('admin.loadCommunityFailed'))
+    } else {
+      communityTabErrors.value = failed.reduce<Record<CommunityTab, string>>((errors, { result, request }) => {
+        const error = result.status === 'rejected' ? result.reason : null
+        errors[request.key] = safeClientErrorMessage(error, t('admin.loadCommunityFailed'))
+        return errors
+      }, emptyCommunityTabErrors())
     }
   }
-  loadingCommunity.value = false
+  if (isCurrentCommunityRequest(requestId)) {
+    loadingCommunity.value = false
+  }
 }
 
 const authorName = (author?: CommunityAuthor | null) => {
@@ -605,6 +714,7 @@ const typeLabel = (type: CommunityType) => {
 }
 
 const openEditItem = (type: CommunityType, item: CommunityItem) => {
+  if (savingCommunity.value) return
   editingType.value = type
   editingItem.value = item
   communityForm.value = {
@@ -622,48 +732,77 @@ const openEditItem = (type: CommunityType, item: CommunityItem) => {
 }
 
 const closeCommunityModal = () => {
+  if (savingCommunity.value) return
   showCommunityModal.value = false
   editingItem.value = null
 }
 
+const forceCloseCommunityModal = () => {
+  showCommunityModal.value = false
+  editingItem.value = null
+}
+
+const isEditingCommunityItem = (type: CommunityType, id: number) =>
+  editingType.value === type && editingItem.value?.id === id
+
+const communityActionKey = (type: CommunityType, id: number) => `${type}:${id}`
+
+const isDeletingCommunityItem = (type: CommunityType, id: number) =>
+  deletingCommunityKeys.value.has(communityActionKey(type, id))
+
+const setCommunityItemDeleting = (type: CommunityType, id: number, deleting: boolean) => {
+  const next = new Set(deletingCommunityKeys.value)
+  const key = communityActionKey(type, id)
+  if (deleting) {
+    next.add(key)
+  } else {
+    next.delete(key)
+  }
+  deletingCommunityKeys.value = next
+}
+
 const saveCommunityItem = async () => {
-  if (!editingItem.value) return
+  if (!editingItem.value || savingCommunity.value) return
+  const type = editingType.value
+  const itemId = editingItem.value.id
+  const form = { ...communityForm.value }
   savingCommunity.value = true
   try {
-    const id = editingItem.value.id
-    if (editingType.value === 'route') {
-      await api.put(endpoints.adminCommunity.updateRoute(id), {
-        title: communityForm.value.title,
-        content: communityForm.value.content,
-        days: communityForm.value.days,
-        budget: communityForm.value.budget,
-        preference: communityForm.value.preference
+    if (type === 'route') {
+      await api.put(endpoints.adminCommunity.updateRoute(itemId), {
+        title: form.title,
+        content: form.content,
+        days: form.days,
+        budget: form.budget,
+        preference: form.preference
       })
-    } else if (editingType.value === 'question') {
-      await api.put(endpoints.adminCommunity.updateQuestion(id), {
-        title: communityForm.value.title,
-        content: communityForm.value.content,
-        tags: communityForm.value.tags,
-        isResolved: communityForm.value.isResolved
+    } else if (type === 'question') {
+      await api.put(endpoints.adminCommunity.updateQuestion(itemId), {
+        title: form.title,
+        content: form.content,
+        tags: form.tags,
+        isResolved: form.isResolved
       })
-    } else if (editingType.value === 'comment') {
-      await api.put(endpoints.adminCommunity.updateComment(id), {
-        content: communityForm.value.content
+    } else if (type === 'comment') {
+      await api.put(endpoints.adminCommunity.updateComment(itemId), {
+        content: form.content
       })
-    } else if (editingType.value === 'spotComment') {
-      await api.put(endpoints.adminCommunity.updateSpotComment(id), {
-        content: communityForm.value.content,
-        rating: communityForm.value.rating
+    } else if (type === 'spotComment') {
+      await api.put(endpoints.adminCommunity.updateSpotComment(itemId), {
+        content: form.content,
+        rating: form.rating
       })
     } else {
-      await api.put(endpoints.adminCommunity.updateAnswer(id), {
-        content: communityForm.value.content,
-        isAccepted: communityForm.value.isAccepted
+      await api.put(endpoints.adminCommunity.updateAnswer(itemId), {
+        content: form.content,
+        isAccepted: form.isAccepted
       })
     }
 
     await fetchCommunityContent()
-    closeCommunityModal()
+    if (isEditingCommunityItem(type, itemId)) {
+      forceCloseCommunityModal()
+    }
     showToast(t('admin.saveSuccess'), 'success')
   } catch (error: unknown) {
     console.error('Failed to save community item:', summarizeClientError(error))
@@ -674,13 +813,15 @@ const saveCommunityItem = async () => {
 }
 
 const deleteCommunityItem = async (type: CommunityType, id: number) => {
-  const confirmed = await showConfirm({
-    message: t('admin.confirmDeleteCommunityItem', { type: typeLabel(type) }),
-    tone: 'danger'
-  })
-  if (!confirmed) return
-
+  if (savingCommunity.value || isDeletingCommunityItem(type, id)) return
+  setCommunityItemDeleting(type, id, true)
   try {
+    const confirmed = await showConfirm({
+      message: t('admin.confirmDeleteCommunityItem', { type: typeLabel(type) }),
+      tone: 'danger'
+    })
+    if (!confirmed) return
+
     if (type === 'route') {
       await api.delete(endpoints.adminCommunity.deleteRoute(id))
     } else if (type === 'question') {
@@ -697,6 +838,8 @@ const deleteCommunityItem = async (type: CommunityType, id: number) => {
   } catch (error: unknown) {
     console.error('Failed to delete community item:', summarizeClientError(error))
     showToast(safeClientErrorMessage(error, t('admin.deleteFailed')), 'error')
+  } finally {
+    setCommunityItemDeleting(type, id, false)
   }
 }
 

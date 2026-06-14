@@ -1,0 +1,164 @@
+[
+  {
+    "id": 3,
+    "categoryKey": "traditionalMusic",
+    "name": "门巴族萨玛民歌",
+    "description": "西藏门巴族传统音乐形式，流行于错那市勒布区"
+  },
+  {
+    "id": 4,
+    "categoryKey": "traditionalMusic",
+    "name": "古尔鲁",
+    "description": "民间文学与宗教音乐的结合，源于吐蕃时期的口头诗歌，属曲艺类"
+  },
+  {
+    "id": 5,
+    "categoryKey": "traditionalMusic",
+    "name": "工布扎念博咚",
+    "description": "工布地区传统弹拨乐器音乐"
+  },
+  {
+    "id": 10,
+    "categoryKey": "traditionalDance",
+    "name": "日喀则甲谐",
+    "description": "大型传统歌舞，具有浓郁的西藏地方特色"
+  },
+  {
+    "id": 11,
+    "categoryKey": "traditionalDance",
+    "name": "日喀则斯马卓",
+    "description": "民间鼓舞，又称 \"后藏鼓舞\""
+  },
+  {
+    "id": 12,
+    "categoryKey": "traditionalDance",
+    "name": "山南久河卓舞",
+    "description": "传统腰鼓舞，流行于山南市琼结县"
+  },
+  {
+    "id": 13,
+    "categoryKey": "traditionalDance",
+    "name": "古格宣舞",
+    "description": "阿里地区传统宫廷舞蹈，融合藏戏、舞蹈、说唱等传统民间艺术"
+  },
+  {
+    "id": 14,
+    "categoryKey": "traditionalDance",
+    "name": "拉萨囊玛",
+    "description": "兼具音乐与舞蹈特点的艺术形式"
+  },
+  {
+    "id": 15,
+    "categoryKey": "traditionalDance",
+    "name": "协荣仲孜",
+    "description": "大型表演性舞蹈，流行于拉萨市堆龙德庆区"
+  },
+  {
+    "id": 16,
+    "categoryKey": "traditionalDance",
+    "name": "阿古顿巴卓舞",
+    "description": "流行于西藏部分地区的传统舞蹈"
+  },
+  {
+    "id": 17,
+    "categoryKey": "traditionalDance",
+    "name": "热振曲卓",
+    "description": "热振地区传统舞蹈形式"
+  },
+  {
+    "id": 18,
+    "categoryKey": "traditionalDance",
+    "name": "堆谐 (拉孜堆谐)",
+    "description": "\"藏式踢踏舞\"，流行于日喀则拉孜县"
+  },
+  {
+    "id": 19,
+    "categoryKey": "traditionalDance",
+    "name": "谐钦",
+    "description": ""
+  },
+  {
+    "id": 20,
+    "categoryKey": "traditionalDance",
+    "name": "南木林土布加谐钦",
+    "description": ""
+  },
+  {
+    "id": 21,
+    "categoryKey": "traditionalDance",
+    "name": "拉萨纳如谐钦",
+    "description": ""
+  },
+  {
+    "id": 22,
+    "categoryKey": "traditionalDance",
+    "name": "尼玛乡谐钦",
+    "description": ""
+  },
+  {
+    "id": 23,
+    "categoryKey": "traditionalDance",
+    "name": "阿谐",
+    "description": "传统劳动歌舞，流行于西藏部分地区"
+  },
+  {
+    "id": 24,
+    "categoryKey": "traditionalDance",
+    "name": "芒康三弦舞",
+    "description": "以三弦琴伴奏的传统舞蹈，流行于西藏芒康地区"
+  },
+  {
+    "id": 25,
+    "categoryKey": "traditionalDance",
+    "name": "米纳羌姆",
+    "description": "传统宗教舞蹈，流行于西藏部分地区"
+  },
+  {
+    "id": 26,
+    "categoryKey": "traditionalDance",
+    "name": "果尔孜舞",
+    "description": "有 1300 多年历史的传统舞蹈，传承沿袭传统的口口相传"
+  },
+  {
+    "id": 27,
+    "categoryKey": "traditionalDance",
+    "name": "陈塘夏尔巴歌舞",
+    "description": "定结县陈塘地区夏尔巴人传统歌舞"
+  },
+  {
+    "id": 28,
+    "categoryKey": "traditionalDance",
+    "name": "嘉黎 \"阿古顿巴\" 卓舞",
+    "description": "那曲市嘉黎县传统舞蹈"
+  },
+  {
+    "id": 29,
+    "categoryKey": "traditionalDance",
+    "name": "普兰 \"宣\" 服饰舞蹈",
+    "description": "阿里地区普兰县传统舞蹈，融合了独特的服饰文化"
+  },
+  {
+    "id": 32,
+    "categoryKey": "traditionalDrama",
+    "name": "日喀则迥巴",
+    "description": ""
+  },
+  {
+    "id": 33,
+    "categoryKey": "traditionalDrama",
+    "name": "日喀则南木林湘巴",
+    "description": ""
+  },
+  {
+    "id": 34,
+    "categoryKey": "traditionalDrama",
+    "name": "日喀则仁布江嘎尔",
+    "description": ""
+  },
+  {
+    "id": 35,
+    "categoryKey": "traditionalDrama",
+    "name": "山南雅隆扎西雪巴",
+    "description": ""
+  }
+]

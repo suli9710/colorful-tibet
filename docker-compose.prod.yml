@@ -17,22 +17,36 @@ services:
       - CACHE_KEY_HMAC_SECRET=${CACHE_KEY_HMAC_SECRET:?CACHE_KEY_HMAC_SECRET is required in production}
       - PII_KEYS=${PII_KEYS:?PII_KEYS is required in production}
       - PII_ACTIVE_KID=${PII_ACTIVE_KID:?PII_ACTIVE_KID is required in production}
-      - SCRAPLING_API_KEY=${SCRAPLING_API_KEY:?SCRAPLING_API_KEY is required in production}
       - PII_ENCRYPTION_KEY=${PII_ENCRYPTION_KEY:-}
-      - PAYMENT_CALLBACK_SECRET=${PAYMENT_CALLBACK_SECRET:-}
+      - PAYMENT_CALLBACK_SECRET=${PAYMENT_CALLBACK_SECRET:?PAYMENT_CALLBACK_SECRET is required in production}
       - MYSQL_PASSWORD=${MYSQL_PASSWORD:-}
+      - ALERTMANAGER_WEBHOOK_URL=${ALERTMANAGER_WEBHOOK_URL:?ALERTMANAGER_WEBHOOK_URL is required in production}
       - TRUST_PROXY_HEADERS=${TRUST_PROXY_HEADERS:-false}
       - TRUSTED_PROXY_CIDRS=${TRUSTED_PROXY_CIDRS:-}
+      - NGINX_SERVER_NAME=${NGINX_SERVER_NAME:?NGINX_SERVER_NAME is required in production}
       - NGINX_REDIRECT_HOST=${NGINX_REDIRECT_HOST:?NGINX_REDIRECT_HOST is required in production}
+      - NGINX_CERT_DOMAIN=${NGINX_CERT_DOMAIN:?NGINX_CERT_DOMAIN is required in production}
       - SUPER_ADMIN_TOTP_SECRET=${SUPER_ADMIN_TOTP_SECRET:?SUPER_ADMIN_TOTP_SECRET is required in production}
+      - SCRAPLING_API_KEY=${SCRAPLING_API_KEY:?SCRAPLING_API_KEY is required in production}
+      - RECAPTCHA_SITE_KEY=${RECAPTCHA_SITE_KEY:?RECAPTCHA_SITE_KEY is required in production}
+      - RECAPTCHA_SECRET_KEY=${RECAPTCHA_SECRET_KEY:?RECAPTCHA_SECRET_KEY is required in production}
+      - VITE_AMAP_KEY=${VITE_AMAP_KEY:?VITE_AMAP_KEY is required in production}
+      - VITE_AMAP_SECURITY_CODE=${VITE_AMAP_SECURITY_CODE:?VITE_AMAP_SECURITY_CODE is required in production}
+      - SPRING_FLYWAY_ENABLED=${SPRING_FLYWAY_ENABLED:-true}
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=${SPRING_JPA_HIBERNATE_DDL_AUTO:-validate}
       - REQUIRE_STRONG_SECRETS=${REQUIRE_STRONG_SECRETS:-true}
       - COOKIE_SECURE=${COOKIE_SECURE:-true}
       - PAYMENT_MOCK_CALLBACK_ENABLED=${PAYMENT_MOCK_CALLBACK_ENABLED:-false}
+      - SEED_DEMO_USERS=${SEED_DEMO_USERS:-false}
+      - SEED_CONTENT_ENABLED=${SEED_CONTENT_ENABLED:-false}
       - PUBLIC_METRICS_ENABLED=${PUBLIC_METRICS_ENABLED:-false}
       - RATE_LIMIT_REDIS_ENABLED=${RATE_LIMIT_REDIS_ENABLED:-true}
       - RATE_LIMIT_REDIS_FAIL_CLOSED=${RATE_LIMIT_REDIS_FAIL_CLOSED:-true}
       - BRUTE_FORCE_REDIS_ENABLED=${BRUTE_FORCE_REDIS_ENABLED:-true}
       - BRUTE_FORCE_REDIS_FAIL_CLOSED=${BRUTE_FORCE_REDIS_FAIL_CLOSED:-true}
+      - ANTIBOT_ENABLED=${ANTIBOT_ENABLED:-true}
+      - RECAPTCHA_ENABLED=${RECAPTCHA_ENABLED:-true}
+      - REGISTRATION_RECAPTCHA_REQUIRED=${REGISTRATION_RECAPTCHA_REQUIRED:-true}
       - DB_SSL_MODE=${DB_SSL_MODE:-REQUIRED}
       - DB_ALLOW_PUBLIC_KEY_RETRIEVAL=${DB_ALLOW_PUBLIC_KEY_RETRIEVAL:-false}
       - SCRAPLING_ALLOW_UNAUTHENTICATED=${SCRAPLING_ALLOW_UNAUTHENTICATED:-false}
@@ -41,7 +55,7 @@ services:
       - -ec
       - |
         is_placeholder() {
-          printf '%s' "$$1" | grep -Eiq 'change-me|changeme|replace-with|placeholder'
+          printf '%s' "$$1" | grep -Eiq 'change-me|changeme|replace-with|placeholder|example\.com|local-dev|local-'
         }
 
         require_real_secret() {
@@ -66,6 +80,50 @@ services:
           fi
         }
 
+        is_dns_host() {
+          printf '%s' "$$1" | grep -Eq '^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$$'
+        }
+
+        require_single_host() {
+          name="$$1"
+          value="$$2"
+          if [ -z "$$value" ]; then
+            echo "Refusing production compose: $$name must be configured." >&2
+            exit 1
+          fi
+          if ! is_dns_host "$$value"; then
+            echo "Refusing production compose: $$name must be a single DNS host without scheme, path, port, comma, whitespace, or control characters." >&2
+            exit 1
+          fi
+          if is_placeholder "$$value"; then
+            echo "Refusing production compose: $$name must not contain placeholder values." >&2
+            exit 1
+          fi
+        }
+
+        require_server_names() {
+          name="$$1"
+          value="$$2"
+          if [ -z "$$value" ]; then
+            echo "Refusing production compose: $$name must be configured." >&2
+            exit 1
+          fi
+          if printf '%s' "$$value" | grep -Eq '[[:cntrl:],/]'; then
+            echo "Refusing production compose: $$name entries must be DNS hosts separated by single spaces only." >&2
+            exit 1
+          fi
+          if is_placeholder "$$value"; then
+            echo "Refusing production compose: $$name must not contain placeholder values." >&2
+            exit 1
+          fi
+          for host in $$value; do
+            if ! is_dns_host "$$host"; then
+              echo "Refusing production compose: $$name entry '$$host' must be a DNS host without scheme, path, port, comma, wildcard, or control characters." >&2
+              exit 1
+            fi
+          done
+        }
+
         require_exact() {
           name="$$1"
           value="$$2"
@@ -80,30 +138,50 @@ services:
         require_real_secret MYSQL_ROOT_PASSWORD "$$MYSQL_ROOT_PASSWORD"
         require_real_secret REDIS_PASSWORD "$$REDIS_PASSWORD"
         require_real_secret GRAFANA_ADMIN_PASSWORD "$$GRAFANA_ADMIN_PASSWORD"
+        require_real_secret JWT_SECRET "$$JWT_SECRET"
+        require_real_secret ADMIN_ENCRYPTION_KEY "$$ADMIN_ENCRYPTION_KEY"
+        require_real_secret CSRF_SIGNING_SECRET "$$CSRF_SIGNING_SECRET"
         require_real_secret CACHE_KEY_HMAC_SECRET "$$CACHE_KEY_HMAC_SECRET"
+        require_real_secret PAYMENT_CALLBACK_SECRET "$$PAYMENT_CALLBACK_SECRET"
+        require_real_secret PII_KEYS "$$PII_KEYS"
+        require_real_secret PII_ACTIVE_KID "$$PII_ACTIVE_KID"
         require_real_secret SUPER_ADMIN_TOTP_SECRET "$$SUPER_ADMIN_TOTP_SECRET"
         require_real_secret JWT_SECRET "$$JWT_SECRET"
         require_real_secret ADMIN_ENCRYPTION_KEY "$$ADMIN_ENCRYPTION_KEY"
         require_real_secret CSRF_SIGNING_SECRET "$$CSRF_SIGNING_SECRET"
-        require_real_secret PII_KEYS "$$PII_KEYS"
-        require_real_secret PII_ACTIVE_KID "$$PII_ACTIVE_KID"
         require_real_secret SCRAPLING_API_KEY "$$SCRAPLING_API_KEY"
+        require_real_secret RECAPTCHA_SITE_KEY "$$RECAPTCHA_SITE_KEY"
+        require_real_secret RECAPTCHA_SECRET_KEY "$$RECAPTCHA_SECRET_KEY"
+        require_real_secret VITE_AMAP_KEY "$$VITE_AMAP_KEY"
+        require_real_secret VITE_AMAP_SECURITY_CODE "$$VITE_AMAP_SECURITY_CODE"
+        require_real_secret ALERTMANAGER_WEBHOOK_URL "$$ALERTMANAGER_WEBHOOK_URL"
         reject_placeholder_if_set MYSQL_PASSWORD "$$MYSQL_PASSWORD"
         reject_placeholder_if_set PII_ENCRYPTION_KEY "$$PII_ENCRYPTION_KEY"
         reject_placeholder_if_set PAYMENT_CALLBACK_SECRET "$$PAYMENT_CALLBACK_SECRET"
+        if ! printf '%s' "$$SUPER_ADMIN_TOTP_SECRET" | grep -Eq '^[A-Z2-7]{32,}$$'; then
+          echo "Refusing production compose: SUPER_ADMIN_TOTP_SECRET must be a Base32 secret with at least 32 characters." >&2
+          exit 1
+        fi
         if [ "$${#CACHE_KEY_HMAC_SECRET}" -lt 64 ]; then
           echo "Refusing production compose: CACHE_KEY_HMAC_SECRET must be at least 64 characters." >&2
           exit 1
         fi
 
+        require_exact SPRING_FLYWAY_ENABLED "$$SPRING_FLYWAY_ENABLED" true
+        require_exact SPRING_JPA_HIBERNATE_DDL_AUTO "$$SPRING_JPA_HIBERNATE_DDL_AUTO" validate
         require_exact REQUIRE_STRONG_SECRETS "$$REQUIRE_STRONG_SECRETS" true
         require_exact COOKIE_SECURE "$$COOKIE_SECURE" true
         require_exact PAYMENT_MOCK_CALLBACK_ENABLED "$$PAYMENT_MOCK_CALLBACK_ENABLED" false
+        require_exact SEED_DEMO_USERS "$$SEED_DEMO_USERS" false
+        require_exact SEED_CONTENT_ENABLED "$$SEED_CONTENT_ENABLED" false
         require_exact PUBLIC_METRICS_ENABLED "$$PUBLIC_METRICS_ENABLED" false
         require_exact RATE_LIMIT_REDIS_ENABLED "$$RATE_LIMIT_REDIS_ENABLED" true
         require_exact RATE_LIMIT_REDIS_FAIL_CLOSED "$$RATE_LIMIT_REDIS_FAIL_CLOSED" true
         require_exact BRUTE_FORCE_REDIS_ENABLED "$$BRUTE_FORCE_REDIS_ENABLED" true
         require_exact BRUTE_FORCE_REDIS_FAIL_CLOSED "$$BRUTE_FORCE_REDIS_FAIL_CLOSED" true
+        require_exact ANTIBOT_ENABLED "$$ANTIBOT_ENABLED" true
+        require_exact RECAPTCHA_ENABLED "$$RECAPTCHA_ENABLED" true
+        require_exact REGISTRATION_RECAPTCHA_REQUIRED "$$REGISTRATION_RECAPTCHA_REQUIRED" true
         require_exact DB_ALLOW_PUBLIC_KEY_RETRIEVAL "$$DB_ALLOW_PUBLIC_KEY_RETRIEVAL" false
         require_exact SCRAPLING_ALLOW_UNAUTHENTICATED "$$SCRAPLING_ALLOW_UNAUTHENTICATED" false
         if [ "$$DB_SSL_MODE" != "REQUIRED" ] && [ "$$DB_SSL_MODE" != "VERIFY_IDENTITY" ]; then
@@ -111,11 +189,9 @@ services:
           exit 1
         fi
 
-        redirect_host_pattern='^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$$'
-        if ! printf '%s' "$$NGINX_REDIRECT_HOST" | grep -Eq "$$redirect_host_pattern"; then
-          echo "Refusing production compose: NGINX_REDIRECT_HOST must be a single canonical host without scheme, path, port, comma, whitespace, or control characters." >&2
-          exit 1
-        fi
+        require_server_names NGINX_SERVER_NAME "$$NGINX_SERVER_NAME"
+        require_single_host NGINX_REDIRECT_HOST "$$NGINX_REDIRECT_HOST"
+        require_single_host NGINX_CERT_DOMAIN "$$NGINX_CERT_DOMAIN"
 
         proxy_headers="$$(printf '%s' "$$TRUST_PROXY_HEADERS" | tr '[:upper:]' '[:lower:]')"
         trusted_cidrs="$$(printf '%s' "$$TRUSTED_PROXY_CIDRS" | tr -d '[:space:]')"
@@ -444,6 +520,13 @@ services:
       - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./monitoring/prometheus/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
       - prometheus_data:/prometheus
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=64m,mode=1777
     depends_on:
       - backend
       - alertmanager
@@ -483,6 +566,14 @@ services:
         /bin/alertmanager --config.file=/tmp/alertmanager.yml
     environment:
       - ALERTMANAGER_WEBHOOK_URL=${ALERTMANAGER_WEBHOOK_URL:?ALERTMANAGER_WEBHOOK_URL is required in production}
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=16m,mode=1777
+      - /alertmanager:rw,noexec,nosuid,nodev,size=32m,mode=0755
     ports:
       - "127.0.0.1:9093:9093"
     restart: unless-stopped
@@ -501,6 +592,14 @@ services:
       - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD is required in production}
       - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_LOG_MODE=console
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=64m,uid=472,gid=472,mode=1777
     ports:
       - "127.0.0.1:3000:3000"
     volumes:
@@ -523,6 +622,13 @@ services:
   zipkin:
     image: openzipkin/zipkin:3.4@sha256:c2830e93d95de43f0d10e00a3784a9ee101cdf4909370196c8802514fd7f1954
     container_name: colorful-tibet-zipkin
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=256m,mode=1777
     ports:
       - "127.0.0.1:9411:9411"
     restart: unless-stopped

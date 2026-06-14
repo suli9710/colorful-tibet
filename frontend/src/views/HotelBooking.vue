@@ -50,6 +50,34 @@
           :aria-describedby="bookingFormDescribedBy"
           @submit.prevent="submitBooking"
         >
+          <div
+            v-if="bookingDataLoading"
+            class="rounded-2xl bg-tibet-gold/10 px-4 py-3 text-center text-sm font-medium text-tibet-brown/70"
+            role="status"
+            aria-live="polite"
+            aria-busy="true"
+          >
+            {{ t('common.loading') }}
+          </div>
+          <div
+            v-if="bookingDataLoadError"
+            :id="bookingDataErrorId"
+            class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800"
+            role="alert"
+            aria-live="assertive"
+          >
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <span>{{ bookingDataLoadError }}</span>
+              <button
+                type="button"
+                class="inline-flex min-h-10 items-center justify-center rounded-full bg-tibet-red px-4 py-2 text-sm font-semibold text-tibet-yellow transition-colors hover:bg-tibet-red/90 disabled:cursor-not-allowed disabled:opacity-60"
+                :disabled="bookingDataLoading"
+                @click="loadBookingData"
+              >
+                {{ bookingDataLoading ? t('common.loading') : t('common.retry') }}
+              </button>
+            </div>
+          </div>
           <motion.div
             class="bg-white rounded-3xl p-5 border border-tibet-gold/20 shadow-sm sm:p-7"
             :initial="cardInitial"
@@ -316,7 +344,7 @@ import { AnimatePresence, motion } from 'motion-v'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { isAxiosError } from 'axios'
-import { getHotelById, getRoomById, hotels, type HotelItem, type HotelRoom } from '../data/hotels'
+import { getHotelById, hotels, type HotelItem, type HotelRoom } from '../data/hotels'
 import { applyHotelImageFallback, resolveHotelCoverImage } from '../data/hotelImages'
 import { getCanonicalRegion, localizeApiRoom, localizeHotel } from '../data/hotelTranslations'
 import api, { endpoints } from '../api'
@@ -369,6 +397,9 @@ interface BookingAssuranceItem {
 
 const apiHotel = ref<ApiHotelResponse | null>(null)
 const apiRoomTypes = ref<BookingRoom[]>([])
+const bookingDataLoading = ref(false)
+const bookingDataLoadError = ref('')
+let bookingDataRequestId = 0
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null
@@ -434,27 +465,43 @@ const normalizeApiRoom = (value: unknown): BookingRoom | null => {
   }
 }
 
-const toBookingRoom = (room: HotelRoom): BookingRoom => ({
-  ...room,
-  amenities: room.desc
-})
-
 const normalizeApiRooms = (value: unknown) =>
   Array.isArray(value)
     ? value.map(normalizeApiRoom).filter((room): room is BookingRoom => room !== null)
     : []
 
 const loadBookingData = async () => {
+  const requestId = ++bookingDataRequestId
+  const requestedHotelId = hotelId.value
+  bookingDataLoading.value = true
+  bookingDataLoadError.value = ''
   apiHotel.value = null
   apiRoomTypes.value = []
   try {
     const [hotelRes, roomRes] = await Promise.all([
-      api.get<unknown>(endpoints.hotels.detail(hotelId.value)),
-      api.get<unknown>(endpoints.hotels.roomTypes(hotelId.value))
+      api.get<unknown>(endpoints.hotels.detail(requestedHotelId)),
+      api.get<unknown>(endpoints.hotels.roomTypes(requestedHotelId))
     ])
-    apiHotel.value = normalizeApiHotel(hotelRes.data)
-    apiRoomTypes.value = normalizeApiRooms(roomRes.data)
-  } catch { /* fallback */ }
+    if (requestId !== bookingDataRequestId || requestedHotelId !== hotelId.value) return
+
+    const nextHotel = normalizeApiHotel(hotelRes.data)
+    const nextRooms = normalizeApiRooms(roomRes.data)
+    if (!nextHotel || nextRooms.length === 0) {
+      throw new Error('Authoritative hotel booking data unavailable')
+    }
+
+    apiHotel.value = nextHotel
+    apiRoomTypes.value = nextRooms
+  } catch {
+    if (requestId !== bookingDataRequestId || requestedHotelId !== hotelId.value) return
+    apiHotel.value = null
+    apiRoomTypes.value = []
+    bookingDataLoadError.value = t('toast.pageLoadFailed')
+  } finally {
+    if (requestId === bookingDataRequestId && requestedHotelId === hotelId.value) {
+      bookingDataLoading.value = false
+    }
+  }
 }
 
 watch(
@@ -515,10 +562,10 @@ const bookingCoverImage = computed(() => {
 })
 
 const selectedRoomSource = computed<BookingRoom | null>(() => {
+  if (!apiHotel.value || bookingDataLoadError.value) return null
+
   const apiRoom = apiRoomTypes.value.find(room => room.id === roomId.value)
-  if (apiRoom) return apiRoom
-  const staticRoom = matchingStaticHotel.value?.rooms?.find(room => room.id === roomId.value) || getRoomById(hotelId.value, roomId.value)
-  return staticRoom ? toBookingRoom(staticRoom) : null
+  return apiRoom || null
 })
 
 const selectedRoom = computed<BookingRoom | null>(() => {
@@ -607,7 +654,12 @@ const guestOptions = computed(() =>
   Array.from({ length: selectedRoomCapacity.value }, (_, index) => index + 1)
 )
 const bookingUnavailable = computed(() =>
-  !hotel.value || !selectedRoom.value || hotel.value.available === false
+  bookingDataLoading.value ||
+  Boolean(bookingDataLoadError.value) ||
+  !apiHotel.value ||
+  !hotel.value ||
+  !selectedRoom.value ||
+  hotel.value.available === false
 )
 const bookingAssuranceItems = computed<BookingAssuranceItem[]>(() => [
   {
@@ -640,6 +692,7 @@ const submitting = ref(false)
 const submitError = ref('')
 const submitAttempted = ref(false)
 const bookingErrorId = 'hotel-booking-error-message'
+const bookingDataErrorId = 'hotel-booking-data-error-message'
 const dateHelpId = 'hotel-booking-date-help'
 const guestHelpId = 'hotel-booking-guest-help'
 const contactHelpId = 'hotel-booking-contact-help'
@@ -677,6 +730,7 @@ const bookingFormDescribedBy = computed(() =>
     guestHelpId,
     contactHelpId,
     selectedRoom.value ? bookingSummaryId : '',
+    bookingDataLoadError.value ? bookingDataErrorId : '',
     submitError.value ? bookingErrorId : ''
   ].filter(Boolean).join(' ')
 )

@@ -1,0 +1,514 @@
+{
+  "heritageContent": {
+    "national": {
+      "noDescription": "（暂无补充说明，后续可在后台完善这一条目的详细介绍。）",
+      "categories": {
+        "folkLiterature": {
+          "items": [
+            {
+              "id": 1,
+              "name": "格萨尔",
+              "description": "世界最长的史诗，被誉为 \"活形态史诗\"，由艺人口头传唱，2009 年入选联合国教科文组织人类非遗代表作名录"
+            }
+          ]
+        },
+        "traditionalMusic": {
+          "items": [
+            {
+              "id": 2,
+              "name": "那曲山歌",
+              "description": "西藏高原地区传统民歌形式"
+            },
+            {
+              "id": 3,
+              "name": "门巴族萨玛民歌",
+              "description": "西藏门巴族传统音乐形式，流行于错那市勒布区"
+            },
+            {
+              "id": 4,
+              "name": "古尔鲁",
+              "description": "民间文学与宗教音乐的结合，源于吐蕃时期的口头诗歌，属曲艺类"
+            },
+            {
+              "id": 5,
+              "name": "工布扎念博咚",
+              "description": "工布地区传统弹拨乐器音乐"
+            },
+            {
+              "id": 6,
+              "name": "拉萨囊玛",
+              "description": "西藏古典音乐，融合了藏族传统音乐与内地音乐元素"
+            }
+          ]
+        },
+        "traditionalDance": {
+          "items": [
+            {
+              "id": 7,
+              "name": "热巴舞 (丁青热巴)",
+              "description": "昌都丁青县传统舞蹈，历史可追溯至公元 11 世纪，融合歌舞、杂技的综合性表演"
+            },
+            {
+              "id": 8,
+              "name": "芒康弦子",
+              "description": "以弦乐伴奏的集体舞，流行于西藏芒康地区"
+            },
+            {
+              "id": 9,
+              "name": "锅庄舞",
+              "description": "包括昌都锅庄舞、那曲锅庄等多个地区流派，藏族传统集体舞"
+            },
+            {
+              "id": 10,
+              "name": "日喀则甲谐",
+              "description": "大型传统歌舞，具有浓郁的西藏地方特色"
+            },
+            {
+              "id": 11,
+              "name": "日喀则斯马卓",
+              "description": "民间鼓舞，又称 \"后藏鼓舞\""
+            },
+            {
+              "id": 12,
+              "name": "山南久河卓舞",
+              "description": "传统腰鼓舞，流行于山南市琼结县"
+            },
+            {
+              "id": 13,
+              "name": "古格宣舞",
+              "description": "阿里地区传统宫廷舞蹈，融合藏戏、舞蹈、说唱等传统民间艺术"
+            },
+            {
+              "id": 14,
+              "name": "拉萨囊玛",
+              "description": "兼具音乐与舞蹈特点的艺术形式"
+            },
+            {
+              "id": 15,
+              "name": "协荣仲孜",
+              "description": "大型表演性舞蹈，流行于拉萨市堆龙德庆区"
+            },
+            {
+              "id": 16,
+              "name": "阿古顿巴卓舞",
+              "description": "流行于西藏部分地区的传统舞蹈"
+            },
+            {
+              "id": 17,
+              "name": "热振曲卓",
+              "description": "热振地区传统舞蹈形式"
+            },
+            {
+              "id": 18,
+              "name": "堆谐 (拉孜堆谐)",
+              "description": "\"藏式踢踏舞\"，流行于日喀则拉孜县"
+            },
+            {
+              "id": 19,
+              "name": "谐钦",
+              "description": ""
+            },
+            {
+              "id": 20,
+              "name": "南木林土布加谐钦",
+              "description": ""
+            },
+            {
+              "id": 21,
+              "name": "拉萨纳如谐钦",
+              "description": ""
+            },
+            {
+              "id": 22,
+              "name": "尼玛乡谐钦",
+              "description": ""
+            },
+            {
+              "id": 23,
+              "name": "阿谐",
+              "description": "传统劳动歌舞，流行于西藏部分地区"
+            },
+            {
+              "id": 24,
+              "name": "芒康三弦舞",
+              "description": "以三弦琴伴奏的传统舞蹈，流行于西藏芒康地区"
+            },
+            {
+              "id": 25,
+              "name": "米纳羌姆",
+              "description": "传统宗教舞蹈，流行于西藏部分地区"
+            },
+            {
+              "id": 26,
+              "name": "果尔孜舞",
+              "description": "有 1300 多年历史的传统舞蹈，传承沿袭传统的口口相传"
+            },
+            {
+              "id": 27,
+              "name": "陈塘夏尔巴歌舞",
+              "description": "定结县陈塘地区夏尔巴人传统歌舞"
+            },
+            {
+              "id": 28,
+              "name": "嘉黎 \"阿古顿巴\" 卓舞",
+              "description": "那曲市嘉黎县传统舞蹈"
+            },
+            {
+              "id": 29,
+              "name": "普兰 \"宣\" 服饰舞蹈",
+              "description": "阿里地区普兰县传统舞蹈，融合了独特的服饰文化"
+            }
+          ]
+        },
+        "traditionalDrama": {
+          "items": [
+            {
+              "id": 30,
+              "name": "藏戏",
+              "description": "包括多个流派，2009 年入选联合国教科文组织人类非遗代表作名录"
+            },
+            {
+              "id": 31,
+              "name": "拉萨觉木隆",
+              "description": ""
+            },
+            {
+              "id": 32,
+              "name": "日喀则迥巴",
+              "description": ""
+            },
+            {
+              "id": 33,
+              "name": "日喀则南木林湘巴",
+              "description": ""
+            },
+            {
+              "id": 34,
+              "name": "日喀则仁布江嘎尔",
+              "description": ""
+            },
+            {
+              "id": 35,
+              "name": "山南雅隆扎西雪巴",
+              "description": ""
+            },
+            {
+              "id": 36,
+              "name": "山南琼结卡卓扎西宾顿",
+              "description": ""
+            },
+            {
+              "id": 37,
+              "name": "山南门巴戏",
+              "description": "山南地区错那县勒布区门巴族传统戏剧，2007 年重组戏班后形成 9 人演出团体"
+            },
+            {
+              "id": 38,
+              "name": "巴贡",
+              "description": "传统戏剧形式，流行于西藏部分地区"
+            }
+          ]
+        },
+        "traditionalSports": {
+          "items": [
+            {
+              "id": 39,
+              "name": "藏族传统马术",
+              "description": "西藏传统体育竞技项目，展示藏族精湛的骑马技艺"
+            }
+          ]
+        },
+        "traditionalCraft": {
+          "items": [
+            {
+              "id": 40,
+              "name": "藏族唐卡",
+              "description": "包括多个画派，西藏传统绘画艺术"
+            },
+            {
+              "id": 41,
+              "name": "勉唐画派",
+              "description": "形成于 15 世纪，由勉拉・顿珠嘉措创立，以线条工整、色彩明快著称"
+            },
+            {
+              "id": 42,
+              "name": "钦泽画派",
+              "description": ""
+            },
+            {
+              "id": 43,
+              "name": "噶玛嘎孜画派",
+              "description": ""
+            },
+            {
+              "id": 44,
+              "name": "齐吾岗派",
+              "description": ""
+            },
+            {
+              "id": 45,
+              "name": "拉萨堆绣唐卡",
+              "description": ""
+            },
+            {
+              "id": 46,
+              "name": "康勉萨唐卡",
+              "description": ""
+            },
+            {
+              "id": 47,
+              "name": "藏族金属锻造技艺",
+              "description": "包括多个流派和工艺"
+            },
+            {
+              "id": 48,
+              "name": "藏族锻铜技艺",
+              "description": ""
+            },
+            {
+              "id": 49,
+              "name": "藏刀锻制技艺",
+              "description": ""
+            },
+            {
+              "id": 50,
+              "name": "孜东铜器锻制技艺",
+              "description": ""
+            },
+            {
+              "id": 51,
+              "name": "扎西吉彩金银锻铜技艺",
+              "description": ""
+            },
+            {
+              "id": 52,
+              "name": "擦擦制作技艺",
+              "description": "传统佛教艺术品制作技艺"
+            },
+            {
+              "id": 53,
+              "name": "传统帐篷编制技艺",
+              "description": "那曲市巴青县传统帐篷制作技艺"
+            },
+            {
+              "id": 54,
+              "name": "藏族邦典、卡垫织造技艺",
+              "description": "西藏传统纺织工艺，生产邦典（围裙）和卡垫（地毯）"
+            },
+            {
+              "id": 55,
+              "name": "拉萨甲米水磨坊",
+              "description": "传统水利磨面技术，展示了藏族人民的智慧和创造力"
+            },
+            {
+              "id": 56,
+              "name": "藏族雕版印刷技艺",
+              "description": "传统印刷工艺，保存了大量藏文典籍"
+            },
+            {
+              "id": 57,
+              "name": "藏刀锻制技艺",
+              "description": "日喀则市谢通门县传统刀具制作技艺"
+            },
+            {
+              "id": 58,
+              "name": "藏族造纸技艺",
+              "description": "传统手工造纸技术，使用当地特有的植物原料"
+            },
+            {
+              "id": 59,
+              "name": "藏族传统泥塑技艺",
+              "description": "西藏传统雕塑工艺，用于制作佛像和工艺品"
+            },
+            {
+              "id": 60,
+              "name": "藏香制作技艺",
+              "description": "传统香料制作技艺，具有独特的配方和工艺"
+            },
+            {
+              "id": 61,
+              "name": "泽帖尔编制技艺",
+              "description": "山南市乃东区传统毛纺织技艺，被誉为 \"西藏氆氇中的佳品\""
+            },
+            {
+              "id": 62,
+              "name": "藏族扎囊木雕",
+              "description": "扎囊县传统木雕工艺，用于制作佛像和家具"
+            },
+            {
+              "id": 63,
+              "name": "晒盐技艺",
+              "description": "芒康县传统制盐工艺，展示了藏族人民与自然和谐共处的智慧"
+            },
+            {
+              "id": 64,
+              "name": "墨脱石锅制作技艺",
+              "description": "林芝市墨脱县传统厨具制作技艺，2015 年成为国家批准保护的地理标志产品"
+            },
+            {
+              "id": 65,
+              "name": "藏族传统榨油技艺",
+              "description": "日喀则市江孜县传统榨油工艺，使用传统的木制榨油设备"
+            }
+          ]
+        },
+        "traditionalMedicine": {
+          "items": [
+            {
+              "id": 66,
+              "name": "藏医药浴法",
+              "description": "以藏医学理论为基础，结合雪域高原药材、温泉资源和浴疗经验形成的外治疗法，2018 年入选联合国教科文组织人类非遗代表作名录"
+            }
+          ]
+        },
+        "folkCustom": {
+          "items": [
+            {
+              "id": 67,
+              "name": "雪顿节",
+              "description": "以展佛、藏戏汇演、民俗游艺等活动为核心的藏族重要节庆"
+            },
+            {
+              "id": 68,
+              "name": "望果节",
+              "description": "西藏农区秋收前后举行的农耕民俗节日，以绕田巡游、祈愿丰收、歌舞竞技等活动传承乡土共同体记忆"
+            }
+          ]
+        }
+      }
+    },
+    "representative": {
+      "medicine": {
+        "key": "medicine",
+        "id": 10001,
+        "name": "藏药",
+        "description": "源自雪域高原的传统医学体系，吸收了藏族本土经验与印度、汉地医学精华，以丸、散、膏、丹等剂型闻名。",
+        "categoryKey": "traditionalMedicine",
+        "significance": "体现了藏族人民与高原自然环境长期博弈中形成的健康智慧，是中华传统医学宝库的重要组成部分。",
+        "imageUrl": "/heritage/藏药.jpg",
+        "baikeUrl": "https://baike.baidu.com/item/%E8%97%8F%E5%8C%BB%E8%8D%AF%E6%B5%B4%E6%B3%95"
+      },
+      "gesar": {
+        "key": "gesar",
+        "id": 10002,
+        "name": "格萨尔史诗",
+        "description": "被誉为”世界上最长的史诗”，通过艺人口耳相传、即兴说唱的方式一代代流传下来。",
+        "categoryKey": "folkLiterature",
+        "significance": "记录了藏族社会的历史记忆、英雄理想与价值观，是中华民族口头传统中的璀璨明珠。",
+        "imageUrl": "/heritage/格萨尔史诗.jpg",
+        "baikeUrl": "https://baike.baidu.com/item/%E6%A0%BC%E8%90%A8%E5%B0%94%E7%8E%8B%E4%BC%A0"
+      },
+      "tibetanOpera": {
+        "key": "tibetanOpera",
+        "id": 10003,
+        "name": "藏戏",
+        "description": "被誉为”藏文化的活化石”，集歌舞、说唱、表演于一体，常在寺院法会和民间节日中演出。",
+        "categoryKey": "traditionalDrama",
+        "significance": "藏戏综合了宗教仪式、历史故事与民间传说，是研究藏族社会生活与信仰体系的重要窗口。",
+        "imageUrl": "/heritage/藏戏.jpg",
+        "baikeUrl": "https://baike.baidu.com/item/%E8%97%8F%E6%88%8F"
+      },
+      "thangka": {
+        "key": "thangka",
+        "id": 10004,
+        "name": "藏族唐卡",
+        "description": "以矿物颜料在布、纸或丝绸上绘制的宗教卷轴画，色彩瑰丽、构图严谨，多悬挂于寺院与居室。",
+        "categoryKey": "traditionalCraft",
+        "significance": "唐卡承载着藏传佛教教义、历史人物与宇宙观，被视为”可以卷起来带走的宫殿壁画”，是西藏艺术的代表符号之一。",
+        "imageUrl": "/heritage/唐卡.jpg",
+        "baikeUrl": "https://baike.baidu.com/item/%E5%94%90%E5%8D%A1"
+      }
+    },
+    "experienceSpots": [
+      {
+        "name": "拉萨非遗体验中心（八廓街）",
+        "city": "拉萨",
+        "address": "拉萨市城关区八廓街步行街附近",
+        "lat": 29.653,
+        "lng": 91.117,
+        "tag": "藏",
+        "brief": "非遗集合体验空间，可预约藏戏、唐卡、藏香等项目体验",
+        "highlight": "一站式打卡多种非遗项目"
+      },
+      {
+        "name": "罗布林卡唐卡工坊",
+        "city": "拉萨",
+        "address": "拉萨市城关区罗布林卡景区周边传统手工街区",
+        "lat": 29.642,
+        "lng": 91.071,
+        "tag": "画",
+        "brief": "专注藏族唐卡绘制与展示的工作室，支持短时体验与深度课程",
+        "highlight": "亲手绘制一幅简易唐卡或吉祥纹样"
+      },
+      {
+        "name": "日喀则藏戏传习中心",
+        "city": "日喀则",
+        "address": "日喀则市桑珠孜区传统文化街区内",
+        "lat": 29.268,
+        "lng": 88.882,
+        "tag": "戏",
+        "brief": "定期排练和展演藏戏的传习点，游客可预约观摩与互动体验",
+        "highlight": "近距离观看一场完整的藏戏表演"
+      },
+      {
+        "name": "林芝藏药文化体验馆",
+        "city": "林芝",
+        "address": "林芝市巴宜区林芝镇附近康养文化街区",
+        "lat": 29.654,
+        "lng": 94.362,
+        "tag": "药",
+        "brief": "结合藏药展示、讲解与简易调养体验的综合空间",
+        "highlight": "了解常见藏药材与传统养生方式"
+      }
+    ],
+    "imageAliases": {
+      "格萨尔史诗": "/heritage/格萨尔史诗.jpg",
+      "格萨尔": "/heritage/格萨尔史诗.jpg",
+      "藏戏": "/heritage/藏戏.jpg",
+      "藏族唐卡": "/heritage/唐卡.jpg",
+      "唐卡": "/heritage/唐卡.jpg",
+      "藏医药浴法": "/heritage/藏药.jpg",
+      "藏药": "/heritage/藏药.jpg",
+      "拉萨囊玛": "/heritage/拉萨囊玛.jpg",
+      "拉萨朗玛": "/heritage/拉萨囊玛.jpg",
+      "囊玛": "/heritage/拉萨囊玛.jpg",
+      "那曲山歌": "/heritage/那曲山歌.jpeg",
+      "藏族山歌": "/heritage/那曲山歌.jpeg",
+      "藏北民歌": "/heritage/那曲山歌.jpeg",
+      "热巴舞": "/heritage/热巴舞.jpg",
+      "锅庄舞": "/heritage/锅庄舞.jpg",
+      "弦子舞": "/heritage/弦子舞.jpg",
+      "门巴戏": "/heritage/门巴戏.jpg",
+      "藏族传统马术": "/heritage/藏族传统马术.jpg",
+      "马术": "/heritage/藏族传统马术.jpg",
+      "藏香制作技艺": "/heritage/藏香制作技艺.jpg",
+      "藏香": "/heritage/藏香制作技艺.jpg",
+      "藏刀锻制技艺": "/heritage/藏刀锻制技艺.jpg",
+      "藏刀": "/heritage/藏刀锻制技艺.jpg",
+      "藏族邦典/卡垫织造技艺": "/heritage/藏族邦典卡垫织造技艺.jpg",
+      "藏族邦典卡垫织造技艺": "/heritage/藏族邦典卡垫织造技艺.jpg",
+      "邦典": "/heritage/藏族邦典卡垫织造技艺.jpg",
+      "卡垫": "/heritage/藏族邦典卡垫织造技艺.jpg",
+      "藏族雕版印刷技艺": "/heritage/藏族雕版印刷技艺.jpg",
+      "雕版印刷": "/heritage/藏族雕版印刷技艺.jpg",
+      "藏族造纸技艺": "/heritage/藏族造纸技艺.jpg",
+      "藏纸": "/heritage/藏族造纸技艺.jpg",
+      "雪顿节": "/heritage/雪顿节.jpg",
+      "望果节": "/heritage/望果节.jpg",
+      "藏族金属锻造技艺": "/heritage/藏族金属锻造技艺.jpg",
+      "金属锻造": "/heritage/藏族金属锻造技艺.jpg",
+      "墨脱石锅制作技艺": "/heritage/墨脱石锅制作技艺.jpg",
+      "墨脱石锅": "/heritage/墨脱石锅制作技艺.jpg",
+      "羌姆": "/heritage/羌姆.jpg",
+      "གེ་སར": "/heritage/格萨尔史诗.jpg",
+      "བོད་ཟློས་གར": "/heritage/藏戏.jpg",
+      "ཐང་ཀ": "/heritage/唐卡.jpg",
+      "བོད་སྨན": "/heritage/藏药.jpg"
+    },
+    "aliases": {
+      "thangkaBackendName": "唐卡",
+      "thangkaDisplayName": "藏族唐卡"
+    },
+    "eventMonthSuffix": "月"
+  }
+}

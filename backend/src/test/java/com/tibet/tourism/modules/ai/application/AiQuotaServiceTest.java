@@ -87,9 +87,9 @@ class AiQuotaServiceTest {
         when(redisTemplate.execute(any(DefaultRedisScript.class), anyList(), any(), any()))
                 .thenThrow(new RuntimeException("redis unavailable"));
 
-        AiQuotaService service = new AiQuotaService(provider(redisTemplate));
+        AiQuotaService service = new AiQuotaService(provider(redisTemplate), CACHE_KEY_HASHER);
         ReflectionTestUtils.setField(service, "dailyLimit", 5);
-        ReflectionTestUtils.setField(service, "failClosedOnRedisOutage", true);
+        ReflectionTestUtils.setField(service, "productionSafetyRequired", true);
 
         AiQuotaService.QuotaConsumptionResult decision = service.tryConsumeQuota(7L);
 

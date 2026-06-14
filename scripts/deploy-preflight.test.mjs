@@ -41,27 +41,32 @@ const baseEnv = (overrides = {}) => {
     RATE_LIMIT_REDIS_FAIL_CLOSED: 'true',
     BRUTE_FORCE_REDIS_ENABLED: 'true',
     BRUTE_FORCE_REDIS_FAIL_CLOSED: 'true',
+    ANTIBOT_ENABLED: 'true',
+    RECAPTCHA_ENABLED: 'true',
+    REGISTRATION_RECAPTCHA_REQUIRED: 'true',
     SCRAPLING_ALLOW_UNAUTHENTICATED: 'false',
     JWT_SECRET: 'a'.repeat(64),
     CSRF_SIGNING_SECRET: 'b'.repeat(64),
     CACHE_KEY_HMAC_SECRET: 'c'.repeat(64),
     ADMIN_ENCRYPTION_KEY: 'd'.repeat(64),
     PAYMENT_CALLBACK_SECRET: 'e'.repeat(64),
+    PII_KEYS: 'k1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
+    PII_ACTIVE_KID: 'k1',
     DB_PASSWORD: 'db-password-prod',
     MYSQL_ROOT_PASSWORD: 'mysql-root-prod',
     REDIS_PASSWORD: 'redis-password-prod',
-    SUPER_ADMIN_TOTP_SECRET: 'JBSWY3DPEHPK3PXP',
+    SUPER_ADMIN_TOTP_SECRET: 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ',
     SCRAPLING_API_KEY: 'scrapling-prod-key',
     RECAPTCHA_SITE_KEY: 'recaptcha-site-key',
     RECAPTCHA_SECRET_KEY: 'recaptcha-secret-key',
     VITE_AMAP_KEY: 'amap-key',
     VITE_AMAP_SECURITY_CODE: 'amap-security-code',
+    GRAFANA_ADMIN_PASSWORD: 'grafana-admin-password',
+    ALERTMANAGER_WEBHOOK_URL: 'https://alerts.colorfultibet.cn/webhook',
     NGINX_SERVER_NAME: 'colorfultibet.cn www.colorfultibet.cn',
     NGINX_REDIRECT_HOST: 'colorfultibet.cn',
     NGINX_CERT_DOMAIN: 'colorfultibet.cn',
     DB_SSL_MODE: 'REQUIRED',
-    PII_KEYS: 'k1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
-    PII_ACTIVE_KID: 'k1',
     PII_MIGRATION_ENABLED: 'false',
     ...overrides
   }
@@ -132,9 +137,33 @@ describe('deploy preflight script', () => {
   })
 
   it('requires an independent cache key HMAC secret before production deploy', () => {
-    assert.match(source, /CACHE_KEY_HMAC_SECRET/)
+    const requiredSecrets = [
+      'JWT_SECRET',
+      'CSRF_SIGNING_SECRET',
+      'CACHE_KEY_HMAC_SECRET',
+      'ADMIN_ENCRYPTION_KEY',
+      'PAYMENT_CALLBACK_SECRET',
+      'DB_PASSWORD',
+      'MYSQL_ROOT_PASSWORD',
+      'REDIS_PASSWORD',
+      'SUPER_ADMIN_TOTP_SECRET',
+      'SCRAPLING_API_KEY',
+      'RECAPTCHA_SITE_KEY',
+      'RECAPTCHA_SECRET_KEY',
+      'VITE_AMAP_KEY',
+      'VITE_AMAP_SECURITY_CODE',
+      'GRAFANA_ADMIN_PASSWORD',
+      'ALERTMANAGER_WEBHOOK_URL'
+    ]
+
+    for (const name of requiredSecrets) {
+      assert.match(source, new RegExp(`"${name}"`))
+    }
+
     assert.match(source, /Require-RealValue \$EnvValues \$name/)
     assert.match(source, /CACHE_KEY_HMAC_SECRET must be at least 64 characters/)
+    assert.match(source, /Require-Base32TotpSecret \$EnvValues "SUPER_ADMIN_TOTP_SECRET"/)
+    assert.match(source, /must be a Base32 secret with at least 32 characters/)
   })
 
   it('keeps production metrics and Redis-backed protections fail-closed', () => {
@@ -143,7 +172,36 @@ describe('deploy preflight script', () => {
     assert.match(source, /Require-Exact \$EnvValues "RATE_LIMIT_REDIS_FAIL_CLOSED" "true"/)
     assert.match(source, /Require-Exact \$EnvValues "BRUTE_FORCE_REDIS_ENABLED" "true"/)
     assert.match(source, /Require-Exact \$EnvValues "BRUTE_FORCE_REDIS_FAIL_CLOSED" "true"/)
+    assert.match(source, /Require-Exact \$EnvValues "ANTIBOT_ENABLED" "true"/)
+    assert.match(source, /Require-Exact \$EnvValues "RECAPTCHA_ENABLED" "true"/)
+    assert.match(source, /Require-Exact \$EnvValues "REGISTRATION_RECAPTCHA_REQUIRED" "true"/)
     assert.match(source, /Require-Exact \$EnvValues "SCRAPLING_ALLOW_UNAUTHENTICATED" "false"/)
+  })
+
+  it('rejects disabled production reCAPTCHA in a release preflight run', function () {
+    const result = runPreflightWithEnv(baseEnv({
+      RECAPTCHA_ENABLED: 'false'
+    }))
+    if (result.error && result.error.code === 'ENOENT') {
+      this.skip('PowerShell is not available in this environment')
+      return
+    }
+
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /RECAPTCHA_ENABLED must be true/)
+  })
+
+  it('rejects weak production TOTP secrets in a release preflight run', function () {
+    const result = runPreflightWithEnv(baseEnv({
+      SUPER_ADMIN_TOTP_SECRET: 'JBSWY3DPEHPK3PXP'
+    }))
+    if (result.error && result.error.code === 'ENOENT') {
+      this.skip('PowerShell is not available in this environment')
+      return
+    }
+
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /SUPER_ADMIN_TOTP_SECRET must be a Base32 secret/)
   })
 
   it('rejects anonymous production metrics in a release preflight run', function () {

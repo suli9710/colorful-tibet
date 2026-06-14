@@ -45,6 +45,8 @@ class RequestRateLimitFilterTest {
         setField(targetFilter, "defaultWindowSeconds", 60L);
         setField(targetFilter, "authRequests", 3);
         setField(targetFilter, "authWindowSeconds", 60L);
+        setField(targetFilter, "registerRequests", 2);
+        setField(targetFilter, "registerWindowSeconds", 3600L);
         setField(targetFilter, "aiRequests", 2);
         setField(targetFilter, "aiWindowSeconds", 600L);
         setField(targetFilter, "guideChatRequests", 2);
@@ -299,6 +301,54 @@ class RequestRateLimitFilterTest {
     }
 
     @Test
+    @DisplayName("Redis failures fail closed for order mutations when strict mode is enabled")
+    void redisFailuresFailClosedForOrderMutationsWhenStrict() throws Exception {
+        RequestRateLimitFilter redisFilter = redisBackedFilter(new FailingRedisTemplate(), new SimpleMeterRegistry());
+        setField(redisFilter, "redisFailClosed", true);
+
+        MockHttpServletResponse createOrder = doFilter(redisFilter, apiRequest("POST", "/api/orders"));
+        MockHttpServletResponse paymentCallback =
+                doFilter(redisFilter, apiRequest("POST", "/api/payments/callbacks/mock"));
+
+        assertThat(createOrder.getStatus()).isEqualTo(503);
+        assertThat(createOrder.getContentAsString())
+                .contains("Rate limit verification is temporarily unavailable");
+        assertThat(paymentCallback.getStatus()).isEqualTo(503);
+        assertThat(paymentCallback.getContentAsString())
+                .contains("Rate limit verification is temporarily unavailable");
+    }
+
+    @Test
+    @DisplayName("Redis failures fail closed for every unmatched API mutation method when strict mode is enabled")
+    void redisFailuresFailClosedForUnmatchedApiMutationMethodsWhenStrict() throws Exception {
+        RequestRateLimitFilter redisFilter = redisBackedFilter(new FailingRedisTemplate(), new SimpleMeterRegistry());
+        setField(redisFilter, "redisFailClosed", true);
+
+        for (String method : List.of("POST", "PUT", "PATCH", "DELETE")) {
+            MockHttpServletResponse response =
+                    doFilter(redisFilter, apiRequest(method, "/api/community/posts/42"));
+
+            assertThat(response.getStatus()).isEqualTo(503);
+            assertThat(response.getContentAsString())
+                    .contains("Rate limit verification is temporarily unavailable");
+            assertThat(response.getHeader("Retry-After")).isEqualTo("60");
+        }
+    }
+
+    @Test
+    @DisplayName("Redis failures fail closed for hotel inquiry mutations when strict mode is enabled")
+    void redisFailuresFailClosedForHotelInquiryMutationsWhenStrict() throws Exception {
+        RequestRateLimitFilter redisFilter = redisBackedFilter(new FailingRedisTemplate(), new SimpleMeterRegistry());
+        setField(redisFilter, "redisFailClosed", true);
+
+        MockHttpServletResponse response = doFilter(redisFilter, apiRequest("POST", "/api/hotel-bookings"));
+
+        assertThat(response.getStatus()).isEqualTo(503);
+        assertThat(response.getContentAsString())
+                .contains("Rate limit verification is temporarily unavailable");
+    }
+
+    @Test
     @DisplayName("missing Redis backend fails closed for sensitive routes when strict mode is enabled")
     void missingRedisBackendFailsClosedForSensitiveRoutesWhenStrict() throws Exception {
         setField("redisEnabled", true);
@@ -312,6 +362,34 @@ class RequestRateLimitFilterTest {
     }
 
     @Test
+    @DisplayName("Redis failures fall back for sensitive mutations when strict mode is disabled")
+    void redisFailuresFallbackForSensitiveMutationsWhenStrictModeDisabled() throws Exception {
+        RequestRateLimitFilter redisFilter = redisBackedFilter(new FailingRedisTemplate(), new SimpleMeterRegistry());
+        setField(redisFilter, "redisFailClosed", false);
+
+        MockHttpServletResponse response = doFilter(redisFilter, apiRequest("POST", "/api/orders"));
+
+        assertThat(response.getStatus()).isEqualTo(200);
+        assertThat(redisFilter.isRedisFallbackActive()).isTrue();
+        assertThat(redisFilter.redisFallbackEvents()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("disabled rate limiting bypasses Redis strict fail-closed")
+    void disabledRateLimitingBypassesRedisStrictFailClosed() throws Exception {
+        RequestRateLimitFilter redisFilter = redisBackedFilter(new FailingRedisTemplate(), new SimpleMeterRegistry());
+        setField(redisFilter, "redisFailClosed", true);
+        setField(redisFilter, "enabled", false);
+
+        MockHttpServletResponse response = doFilter(redisFilter, apiRequest("POST", "/api/auth/login"));
+
+        assertThat(response.getStatus()).isEqualTo(200);
+        assertThat(response.getHeader("X-RateLimit-Limit")).isNull();
+        assertThat(redisFilter.isRedisFallbackActive()).isFalse();
+        assertThat(redisFilter.redisFallbackEvents()).isZero();
+    }
+
+    @Test
     @DisplayName("Redis failures keep default reads available when strict mode only guards sensitive routes")
     void redisFailuresKeepDefaultReadsAvailableWhenStrict() throws Exception {
         RequestRateLimitFilter redisFilter = redisBackedFilter(new FailingRedisTemplate(), new SimpleMeterRegistry());
@@ -321,6 +399,22 @@ class RequestRateLimitFilterTest {
 
         assertThat(response.getStatus()).isEqualTo(200);
         assertThat(redisFilter.isRedisFallbackActive()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Redis failures do not intercept actuator health checks when strict mode is enabled")
+    void redisFailuresDoNotInterceptActuatorHealthChecksWhenStrict() throws Exception {
+        RequestRateLimitFilter redisFilter = redisBackedFilter(new FailingRedisTemplate(), new SimpleMeterRegistry());
+        setField(redisFilter, "redisFailClosed", true);
+
+        for (int i = 0; i < 20; i++) {
+            MockHttpServletResponse response = doFilter(redisFilter, apiRequest("GET", "/actuator/health"));
+
+            assertThat(response.getStatus()).isEqualTo(200);
+            assertThat(response.getHeader("X-RateLimit-Limit")).isNull();
+        }
+        assertThat(redisFilter.isRedisFallbackActive()).isFalse();
+        assertThat(redisFilter.redisFallbackEvents()).isZero();
     }
 
     @Test
@@ -346,20 +440,20 @@ class RequestRateLimitFilterTest {
     @DisplayName("fail-closed rejects sensitive buckets when Redis is unavailable")
     void failClosedRejectsSensitiveBucketsOnRedisOutage() throws Exception {
         RequestRateLimitFilter redisFilter = redisBackedFilter(new FailingRedisTemplate(), new SimpleMeterRegistry());
-        setField(redisFilter, "failClosedOnRedisOutage", true);
+        setField(redisFilter, "redisFailClosed", true);
 
         MockHttpServletResponse blocked = doFilter(redisFilter, apiRequest("POST", "/api/auth/login"));
 
-        assertThat(blocked.getStatus()).isEqualTo(429);
-        assertThat(blocked.getContentAsString()).contains("Too Many Requests");
-        assertThat(blocked.getHeader(HttpHeaders.RETRY_AFTER)).isNotNull();
+        assertThat(blocked.getStatus()).isEqualTo(503);
+        assertThat(blocked.getContentAsString()).contains("Rate limit verification is temporarily unavailable");
+        assertThat(blocked.getHeader(HttpHeaders.RETRY_AFTER)).isEqualTo("60");
     }
 
     @Test
     @DisplayName("fail-closed still serves non-sensitive buckets from in-memory fallback")
     void failClosedStillServesNonSensitiveBucketsOnRedisOutage() throws Exception {
         RequestRateLimitFilter redisFilter = redisBackedFilter(new FailingRedisTemplate(), new SimpleMeterRegistry());
-        setField(redisFilter, "failClosedOnRedisOutage", true);
+        setField(redisFilter, "redisFailClosed", true);
 
         MockHttpServletResponse response = doFilter(redisFilter, apiRequest("GET", "/api/spots"));
 

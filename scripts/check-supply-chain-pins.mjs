@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { REQUIRED_IMAGE_REFS } from './resolve-docker-image-digests.mjs'
 
 const DEFAULT_PATHS = {
@@ -402,6 +402,12 @@ export const validateDockerDigestEvidence = (evidence) => {
   if (evidence.schemaVersion !== 1) {
     addEvidenceFinding(findings, 'Evidence schemaVersion must be 1.')
   }
+  if (evidence.resolver !== 'scripts/resolve-docker-image-digests.mjs') {
+    addEvidenceFinding(findings, 'Evidence resolver must be scripts/resolve-docker-image-digests.mjs.')
+  }
+  if (evidence.digestAlgorithm !== 'sha256') {
+    addEvidenceFinding(findings, 'Evidence digestAlgorithm must be sha256.')
+  }
 
   const generatedAt = Date.parse(evidence.generatedAt)
   if (!evidence.generatedAt || Number.isNaN(generatedAt)) {
@@ -506,8 +512,7 @@ export const formatSupplyChainPinFindings = (findings) => {
   return output.join('\n')
 }
 
-const main = () => {
-  const args = process.argv.slice(2)
+export const runSupplyChainPinGate = (args = process.argv.slice(2)) => {
   const evidenceOnly = args.includes('--evidence-only')
   const evidenceIndex = args.findIndex((arg) => arg === '--evidence' || arg.startsWith('--evidence='))
   const evidencePath =
@@ -527,14 +532,28 @@ const main = () => {
     findings.push(...loadDockerDigestEvidenceFindings(path.resolve(repoRoot, evidencePath)))
   }
   const output = formatSupplyChainPinFindings(findings)
+  return {
+    exitCode: findings.length > 0 ? 1 : 0,
+    findings,
+    output: output || 'Supply-chain release pins are complete.'
+  }
+}
+
+const main = () => {
+  const result = runSupplyChainPinGate()
+  const output = result.output
   if (output) {
-    console.error(output)
+    if (result.exitCode > 0) {
+      console.error(output)
+    } else {
+      console.log(output)
+    }
   } else {
     console.log('Supply-chain release pins are complete.')
   }
-  process.exitCode = findings.length > 0 ? 1 : 0
+  process.exitCode = result.exitCode
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === scriptPath) {
+if (process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url) {
   main()
 }

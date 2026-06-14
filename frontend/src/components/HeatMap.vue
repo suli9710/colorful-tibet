@@ -3,7 +3,7 @@ import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useReducedMotion } from 'motion-v'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
-import type { ECharts } from '@/lib/echartsHeatMap'
+import type { ECharts, EChartsOption } from '@/lib/echartsHeatMap'
 import api, { endpoints } from '@/api'
 import { summarizeClientError } from '@/utils/errorMonitoring'
 
@@ -17,10 +17,13 @@ let chart: ECharts | null = null
 const zoomLevel = ref(1.0)
 let mapLoaded = false
 let resizeObserver: ResizeObserver | null = null
+let chartDataRequestId = 0
+let componentDisposed = false
 type EChartsKit = ReturnType<typeof import('@/lib/echartsHeatMap').ensureHeatMapECharts>
 let echartsLoader: Promise<EChartsKit> | null = null
 const LOCAL_TIBET_GEO_JSON_URL = '/geo/540000_full.json'
 const DEFAULT_REMOTE_TIBET_GEO_JSON_URL = 'https://geo.datav.aliyun.com/areas_v3/bound/540000_full.json'
+const TRUSTED_REMOTE_GEO_FALLBACK_ORIGINS = new Set(['https://geo.datav.aliyun.com'])
 
 const loadECharts = async () => {
   if (!echartsLoader) {
@@ -36,6 +39,59 @@ interface HeatmapChartPoint {
   value: [number, number, number]
 }
 
+type HeatmapValue = HeatmapChartPoint['value']
+
+interface HeatmapChartPayload {
+  id?: unknown
+  name?: unknown
+}
+
+interface HeatmapClickParams {
+  componentType?: unknown
+  data?: unknown
+}
+
+interface HeatmapTooltipParams {
+  value?: unknown
+  name?: unknown
+  data?: unknown
+}
+
+interface HeatmapSeriesOption {
+  name: string
+  type: 'scatter' | 'effectScatter'
+  coordinateSystem?: 'geo' | 'cartesian2d'
+  data: HeatmapChartPoint[]
+  cursor: 'pointer'
+  symbolSize: (value: unknown) => number
+  label: Record<string, unknown>
+  itemStyle: Record<string, unknown>
+  emphasis?: Record<string, unknown>
+  showEffectOn?: 'emphasis' | 'render'
+  rippleEffect?: Record<string, unknown>
+  zlevel?: number
+}
+
+interface HeatmapChartOption extends EChartsOption {
+  animation: boolean
+  animationDuration: number
+  title: Record<string, unknown>
+  tooltip: {
+    trigger: 'item'
+    formatter: (params: unknown) => string
+    backgroundColor: string
+    borderColor: string
+    borderWidth: number
+    textStyle: Record<string, unknown>
+    padding: [number, number]
+  }
+  series: [HeatmapSeriesOption, HeatmapSeriesOption]
+  geo?: EChartsOption['geo']
+  grid?: EChartsOption['grid']
+  xAxis?: EChartsOption['xAxis']
+  yAxis?: EChartsOption['yAxis']
+}
+
 const HTML_ESCAPE_MAP: Record<string, string> = {
   '&': '&amp;',
   '<': '&lt;',
@@ -46,6 +102,58 @@ const HTML_ESCAPE_MAP: Record<string, string> = {
 
 const escapeTooltipHtml = (value: unknown): string =>
   String(value ?? '').replace(/[&<>"']/g, char => HTML_ESCAPE_MAP[char] || char)
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null
+
+const readText = (value: unknown): string | undefined => {
+  if (typeof value === 'string') {
+    const trimmedValue = value.trim()
+    return trimmedValue || undefined
+  }
+
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value)
+
+  return undefined
+}
+
+const readHeatmapValue = (value: unknown): HeatmapValue | null => {
+  if (!Array.isArray(value) || value.length < 3) return null
+
+  const longitude = Number(value[0])
+  const latitude = Number(value[1])
+  const heat = Number(value[2])
+
+  if (!Number.isFinite(longitude) || !Number.isFinite(latitude) || !Number.isFinite(heat)) {
+    return null
+  }
+
+  return [longitude, latitude, heat]
+}
+
+const readHeatmapPayload = (payload: unknown): HeatmapChartPayload =>
+  isRecord(payload) ? { id: payload.id, name: payload.name } : {}
+
+const readTooltipParams = (params: unknown): HeatmapTooltipParams =>
+  isRecord(params) ? params : {}
+
+const readSpotName = (params: HeatmapTooltipParams): unknown => {
+  const payload = readHeatmapPayload(params.data)
+
+  return params.name || payload.name || ''
+}
+
+const hasNavigableSpotId = (spotId: unknown): spotId is number | string =>
+  (typeof spotId === 'number' && Number.isFinite(spotId)) ||
+  (typeof spotId === 'string' && spotId.trim().length > 0)
+
+const getHeatmapSymbolSize = (value: unknown, divisor: number, min: number, max: number): number => {
+  const heat = readHeatmapValue(value)?.[2] ?? 0
+
+  if (heat <= 0) return min
+
+  return Math.max(Math.min(heat / divisor, max), min)
+}
 
 const fallbackHeatmapData: HeatmapChartPoint[] = [
   { id: 1, name: '布达拉宫', value: [91.1167, 29.653, 19850] },
@@ -67,33 +175,32 @@ const getHeatLevel = (heat: number): string => {
   return t('heatmap.heatLevel.spot')
 }
 
-interface HeatmapPoint {
-  id?: number | string
-  name: string
-  longitude: number
-  latitude: number
-  visitCount: number
+const normalizeHeatmapPoint = (point: unknown): HeatmapChartPoint | null => {
+  if (!isRecord(point)) return null
+
+  const longitude = Number(point.longitude)
+  const latitude = Number(point.latitude)
+  const visitCount = Number(point.visitCount)
+  const name = readText(point.name)
+  if (!name || !Number.isFinite(longitude) || !Number.isFinite(latitude)) return null
+
+  return {
+    ...(hasNavigableSpotId(point.id) ? { id: point.id } : {}),
+    name,
+    value: [
+      longitude,
+      latitude,
+      Number.isFinite(visitCount) && visitCount > 0 ? visitCount : 1
+    ]
+  }
 }
 
 const getHeatmapData = async (): Promise<HeatmapChartPoint[]> => {
   try {
-    const response = await api.get(endpoints.spots.heatmap, { params: { limit: 100 } })
-    const points = Array.isArray(response.data) ? response.data as HeatmapPoint[] : []
-
+    const response = await api.get<unknown>(endpoints.spots.heatmap, { params: { limit: 100 } })
+    const points = Array.isArray(response.data) ? response.data : []
     const data = points
-      .map((point): HeatmapChartPoint | null => {
-        const longitude = Number(point.longitude)
-        const latitude = Number(point.latitude)
-        const visitCount = Number(point.visitCount) || 1
-
-        if (!Number.isFinite(longitude) || !Number.isFinite(latitude)) return null
-
-        return {
-          id: point.id,
-          name: point.name,
-          value: [longitude, latitude, visitCount]
-        }
-      })
+      .map(normalizeHeatmapPoint)
       .filter((point): point is HeatmapChartPoint => point !== null)
 
     if (data.length) return data
@@ -116,10 +223,13 @@ const goToSpot = (spotId?: number | string) => {
   router.push(`/spots/${encodeURIComponent(String(spotId))}`)
 }
 
-const handleChartClick = (params: any) => {
-  if (params?.componentType !== 'series') return
+const handleChartClick = (params: HeatmapClickParams) => {
+  if (!isRecord(params) || params.componentType !== 'series') return
 
-  goToSpot(params.data?.id)
+  const payload = readHeatmapPayload(params.data)
+  if (!hasNavigableSpotId(payload.id)) return
+
+  goToSpot(payload.id)
 }
 
 const isTruthyEnvValue = (value: string | undefined): boolean =>
@@ -131,6 +241,24 @@ const isRemoteGeoFallbackEnabled = (): boolean =>
 const getRemoteGeoFallbackUrl = (): string =>
   String(import.meta.env.VITE_HEATMAP_REMOTE_GEO_FALLBACK_URL || DEFAULT_REMOTE_TIBET_GEO_JSON_URL).trim()
 
+const getTrustedRemoteGeoFallbackUrl = (): string => {
+  const remoteGeoFallbackUrl = getRemoteGeoFallbackUrl()
+  if (!remoteGeoFallbackUrl) return ''
+
+  try {
+    const url = new URL(remoteGeoFallbackUrl)
+    if (url.protocol !== 'https:' || !TRUSTED_REMOTE_GEO_FALLBACK_ORIGINS.has(url.origin)) {
+      console.warn('Remote Tibet map fallback URL is not trusted; skipping remote geo JSON fallback.')
+      return ''
+    }
+
+    return url.toString()
+  } catch {
+    console.warn('Remote Tibet map fallback URL is invalid; skipping remote geo JSON fallback.')
+    return ''
+  }
+}
+
 const loadTibetMapJson = async () => {
   const localResponse = await fetch(LOCAL_TIBET_GEO_JSON_URL)
   if (localResponse.ok) return localResponse.json()
@@ -140,7 +268,7 @@ const loadTibetMapJson = async () => {
     return null
   }
 
-  const remoteGeoFallbackUrl = getRemoteGeoFallbackUrl()
+  const remoteGeoFallbackUrl = getTrustedRemoteGeoFallbackUrl()
   if (!remoteGeoFallbackUrl) return null
 
   const remoteResponse = await fetch(remoteGeoFallbackUrl)
@@ -150,11 +278,13 @@ const loadTibetMapJson = async () => {
 }
 
 const loadChartData = async () => {
-  if (!chartRef.value || !chart) return
+  const requestId = ++chartDataRequestId
+  if (componentDisposed || !chartRef.value || !chart) return
 
   const data = await getHeatmapData()
+  if (requestId !== chartDataRequestId || componentDisposed || !chartRef.value || !chart) return
 
-  const option: any = {
+  const option: HeatmapChartOption = {
     animation: !prefersReducedMotion.value,
     animationDuration: 300,
     title: {
@@ -169,15 +299,17 @@ const loadChartData = async () => {
     },
     tooltip: {
       trigger: 'item',
-      formatter: function (params: any) {
-        const heat = params.value[2]
+      formatter: function (rawParams: unknown) {
+        const params = readTooltipParams(rawParams)
+        const heat = readHeatmapValue(params.value)?.[2] ?? 0
         const level = getHeatLevel(heat)
-        const spotName = escapeTooltipHtml(params.name || params.data?.name || '')
+        const payload = readHeatmapPayload(params.data)
+        const spotName = escapeTooltipHtml(readSpotName(params))
         const heatText = escapeTooltipHtml(heat)
         const levelText = escapeTooltipHtml(level)
         const accessHeatLabel = escapeTooltipHtml(t('heatmap.accessHeat'))
         const heatLevelLabel = escapeTooltipHtml(t('heatmap.heatLevelLabel'))
-        const clickHint = params.data?.id
+        const clickHint = hasNavigableSpotId(payload.id)
           ? `<br/><span style="color: #fde68a">${escapeTooltipHtml(t('heatmap.clickToView'))}</span>`
           : ''
         return `<strong style="font-size: 14px">${spotName}</strong><br/>${accessHeatLabel}: ${heatText}<br/>${heatLevelLabel}: ${levelText}${clickHint}`
@@ -195,12 +327,11 @@ const loadChartData = async () => {
       {
         name: t('heatmap.heatLevel.spot'),
         type: 'scatter',
-        coordinateSystem: mapLoaded ? 'geo' : undefined,
+        coordinateSystem: mapLoaded ? 'geo' : 'cartesian2d',
         data,
         cursor: 'pointer',
-        symbolSize: function (val: any) {
-          const size = val[2] > 0 ? Math.max(Math.min(val[2] / 100, 25), 6) : 6
-          return size
+        symbolSize: function (value: unknown) {
+          return getHeatmapSymbolSize(value, 100, 6, 25)
         },
         label: {
           formatter: '{b}',
@@ -227,11 +358,11 @@ const loadChartData = async () => {
       {
         name: t('home.hotSpotsDistribution'),
         type: 'effectScatter',
-        coordinateSystem: mapLoaded ? 'geo' : undefined,
+        coordinateSystem: mapLoaded ? 'geo' : 'cartesian2d',
         data: getEffectData(data),
         cursor: 'pointer',
-        symbolSize: function (val: any) {
-          return Math.max(Math.min(val[2] / 80, 30), 18)
+        symbolSize: function (value: unknown) {
+          return getHeatmapSymbolSize(value, 80, 18, 30)
         },
         showEffectOn: prefersReducedMotion.value ? 'emphasis' : 'render',
         rippleEffect: {
@@ -290,39 +421,45 @@ const loadChartData = async () => {
       }
     }
   } else {
-    option.geo = {
-      roam: 'move',
-      center: [90.0, 30.5],
-      zoom: zoomLevel.value,
-      scaleLimit: {
-        min: 0.5,
-        max: 5
-      },
-      map: undefined,
-      itemStyle: {
-        areaColor: 'transparent',
-        borderColor: 'transparent'
-      }
+    option.grid = {
+      left: 40,
+      right: 40,
+      top: 80,
+      bottom: 40
     }
-    option.series[0].coordinateSystem = 'geo'
-    option.series[1].coordinateSystem = 'geo'
+    option.xAxis = {
+      type: 'value',
+      min: 78,
+      max: 99,
+      show: false
+    }
+    option.yAxis = {
+      type: 'value',
+      min: 26,
+      max: 37,
+      show: false
+    }
   }
 
   chart.setOption(option)
 }
 
 onMounted(async () => {
+  componentDisposed = false
   try {
     chartError.value = false
 
     if (chartRef.value) {
       const { init, registerMap } = await loadECharts()
+      if (componentDisposed || !chartRef.value) return
+
       chart = init(chartRef.value)
       chart.off('click', handleChartClick)
       chart.on('click', handleChartClick)
 
       try {
         const mapJson = await loadTibetMapJson()
+        if (componentDisposed) return
         if (mapJson && typeof mapJson === 'object') {
           registerMap('tibet', mapJson)
           mapLoaded = true
@@ -334,9 +471,12 @@ onMounted(async () => {
       await loadChartData()
     }
   } catch (error) {
+    if (componentDisposed) return
     chartError.value = true
     console.warn('Failed to initialize heatmap chart:', summarizeClientError(error))
   }
+
+  if (componentDisposed) return
 
   if (chartRef.value && typeof ResizeObserver !== 'undefined') {
     resizeObserver = new ResizeObserver(handleResize)
@@ -347,7 +487,7 @@ onMounted(async () => {
 })
 
 watch(zoomLevel, (newZoom) => {
-  if (chart) {
+  if (chart && mapLoaded) {
     chart.setOption({
       geo: {
         zoom: newZoom
@@ -357,11 +497,11 @@ watch(zoomLevel, (newZoom) => {
 }, { immediate: false })
 
 watch(locale, () => {
-  loadChartData()
+  void loadChartData()
 })
 
 watch(prefersReducedMotion, () => {
-  loadChartData()
+  void loadChartData()
 })
 
 const handleResize = () => {
@@ -374,23 +514,30 @@ const handleZoomChange = (event: Event) => {
 }
 
 onUnmounted(() => {
+  componentDisposed = true
+  chartDataRequestId += 1
   if (resizeObserver) {
     resizeObserver.disconnect()
     resizeObserver = null
   } else {
     window.removeEventListener('resize', handleResize)
   }
-  chart?.off('click', handleChartClick)
-  chart?.dispose()
+  const disposedChart = chart
+  chart = null
+  mapLoaded = false
+  disposedChart?.off('click', handleChartClick)
+  disposedChart?.dispose()
 })
 </script>
 
 <template>
   <div class="relative h-[360px] w-full rounded-2xl border border-tibet-gold/25 bg-white shadow-lg sm:h-[520px] lg:h-[600px]">
-    <div ref="chartRef" class="w-full h-full"></div>
+    <div ref="chartRef" class="w-full h-full" role="img" :aria-label="t('heatmap.title')"></div>
     <div
       v-if="chartError"
       class="absolute inset-4 flex items-center justify-center rounded-xl border border-tibet-gold/20 bg-tibet-cream/80 text-center text-tibet-brown"
+      role="alert"
+      aria-live="assertive"
     >
       <div>
         <p class="text-lg font-semibold">{{ t('spotDetail.mapLoadFailed') }}</p>
@@ -398,15 +545,17 @@ onUnmounted(() => {
     </div>
     <div class="absolute inset-x-3 bottom-3 rounded-lg border border-tibet-gold/25 bg-white/90 p-3 shadow-lg backdrop-blur-sm sm:inset-x-auto sm:left-4 sm:bottom-4 sm:min-w-[200px] sm:p-4">
       <div class="flex items-center justify-between mb-2">
-        <span class="text-sm font-medium text-gray-700">{{ t('heatmap.zoomLevel') }}</span>
+        <label for="heatmap-zoom-slider" class="text-sm font-medium text-gray-700">{{ t('heatmap.zoomLevel') }}</label>
         <span class="text-sm font-bold text-blue-600">{{ zoomLevel.toFixed(1) }}x</span>
       </div>
       <input
+        id="heatmap-zoom-slider"
         type="range"
         min="0.5"
         max="5"
         step="0.1"
         :value="zoomLevel"
+        :aria-valuetext="`${zoomLevel.toFixed(1)}x`"
         @input="handleZoomChange"
         class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
       />

@@ -115,13 +115,13 @@ docker compose up -d --build
 - MySQL：`127.0.0.1:3307`
 - Redis：`127.0.0.1:6380`
 
-Windows 环境也可以使用项目脚本：
+Windows 环境也可以双击 `start.bat`（或运行 `.\start.ps1`）一键启动：脚本会自动检查 WSL 和 Docker，并在缺少 `.env` 时自动生成一份仅含本地随机密钥的开发配置，无需手动复制 `.env.example`。
 
 ```powershell
 .\start.ps1
 ```
 
-停止服务：
+停止服务（或运行 `stop.bat`）：
 
 ```powershell
 docker compose down

@@ -17,10 +17,11 @@
       >
         <form @submit.prevent="submitRoute" class="space-y-6 sm:space-y-8">
           <MotionBlock :delay="0.16">
-            <label class="block text-sm font-medium text-tibet-dark/80 mb-2">
+            <label for="create-route-title" class="block text-sm font-medium text-tibet-dark/80 mb-2">
               {{ t('createRoute.routeTitle') }} <span class="text-red-500">*</span>
             </label>
             <input 
+              id="create-route-title"
               v-model="form.title" 
               type="text" 
               :placeholder="t('createRoute.titlePlaceholder')"
@@ -33,13 +34,16 @@
 
           <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
             <MotionBlock :index="1" :delay="0.16">
-              <label class="block text-sm font-medium text-tibet-dark/80 mb-2">
+              <span id="create-route-days-label" class="block text-sm font-medium text-tibet-dark/80 mb-2">
                 {{ t('createRoute.plannedDays') }} <span class="text-red-500">*</span>
-              </label>
-              <div class="flex items-center space-x-4">
+              </span>
+              <div class="flex items-center space-x-4" role="group" aria-labelledby="create-route-days-label">
                 <motion.button
                   type="button" 
-                  @click="form.days > 1 && form.days--" 
+                  @click="form.days > 1 && form.days--"
+                  :disabled="form.days <= 1"
+                  :aria-label="t('createRoute.decreaseDays')"
+                  aria-controls="create-route-days-value"
                   class="w-10 h-10 rounded-full bg-tibet-gold/5 hover:bg-tibet-gold/15 flex items-center justify-center text-tibet-brown/80 transition-colors"
                   :whileHover="{ y: -2, scale: 1.06 }"
                   :whileTap="{ scale: 0.9 }"
@@ -47,8 +51,10 @@
                   -
                 </motion.button>
                 <motion.span
+                  id="create-route-days-value"
                   :key="form.days"
                   class="text-xl font-bold text-tibet-dark w-8 text-center"
+                  aria-live="polite"
                   :initial="{ opacity: 0, y: -8 }"
                   :animate="{ opacity: 1, y: 0 }"
                   :transition="{ duration: 0.2, ease: motionEase }"
@@ -57,7 +63,10 @@
                 </motion.span>
                 <motion.button
                   type="button" 
-                  @click="form.days < 30 && form.days++" 
+                  @click="form.days < 30 && form.days++"
+                  :disabled="form.days >= 30"
+                  :aria-label="t('createRoute.increaseDays')"
+                  aria-controls="create-route-days-value"
                   class="w-10 h-10 rounded-full bg-tibet-gold/5 hover:bg-tibet-gold/15 flex items-center justify-center text-tibet-brown/80 transition-colors"
                   :whileHover="{ y: -2, scale: 1.06 }"
                   :whileTap="{ scale: 0.9 }"
@@ -68,10 +77,11 @@
             </MotionBlock>
 
             <MotionBlock :index="2" :delay="0.16">
-              <label class="block text-sm font-medium text-tibet-dark/80 mb-2">
+              <label for="create-route-budget" class="block text-sm font-medium text-tibet-dark/80 mb-2">
                 {{ t('createRoute.budgetRange') }} <span class="text-red-500">*</span>
               </label>
               <select 
+                id="create-route-budget"
                 v-model="form.budget" 
                 class="w-full px-4 py-3 rounded-xl bg-white/50 border border-tibet-gold/25 focus:border-tibet-gold focus:ring-2 focus:ring-blue-100 outline-none transition-all appearance-none"
                 required
@@ -82,10 +92,11 @@
             </MotionBlock>
 
             <MotionBlock :index="3" :delay="0.16">
-              <label class="block text-sm font-medium text-tibet-dark/80 mb-2">
+              <label for="create-route-preference" class="block text-sm font-medium text-tibet-dark/80 mb-2">
                 {{ t('createRoute.preference') }} <span class="text-red-500">*</span>
               </label>
               <select 
+                id="create-route-preference"
                 v-model="form.preference" 
                 class="w-full px-4 py-3 rounded-xl bg-white/50 border border-tibet-gold/25 focus:border-tibet-gold focus:ring-2 focus:ring-blue-100 outline-none transition-all appearance-none"
                 required
@@ -97,10 +108,11 @@
           </div>
 
           <MotionBlock :index="4" :delay="0.16">
-            <label class="block text-sm font-medium text-tibet-dark/80 mb-2">
+            <label for="create-route-content" class="block text-sm font-medium text-tibet-dark/80 mb-2">
               {{ t('createRoute.routeContent') }} <span class="text-red-500">*</span>
             </label>
             <textarea 
+              id="create-route-content"
               v-model="form.content" 
               rows="15"
               :placeholder="t('createRoute.contentPlaceholder')"
@@ -214,10 +226,12 @@ const preferenceOptions = computed(() => [
 ])
 
 const submitRoute = async () => {
-  if (!(await requireAuth())) return
+  if (submitting.value) return
 
   submitting.value = true
   try {
+    if (!(await requireAuth())) return
+
     await api.post(endpoints.routes.share, {
       title: form.value.title,
       content: form.value.content,

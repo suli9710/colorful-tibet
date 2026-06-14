@@ -1,6 +1,8 @@
 import { createI18n } from 'vue-i18n'
 import zh from './locales/zh.json'
 import bo from './locales/bo.json'
+import heritageContentZh from './locales/heritage-content.zh.json'
+import heritageContentBo from './locales/heritage-content.bo.json'
 import extraMessages from './locales/extra.json'
 import securityMessages from './locales/security.json'
 import { readBrowserStorage } from '../utils/browserStorage'
@@ -47,8 +49,14 @@ const i18n = createI18n({
   locale: savedLocale,
   fallbackLocale: 'zh',
   messages: {
-    zh: mergeMessages(mergeMessages(zh, extraMessages.zh), securityMessages.zh),
-    bo: mergeMessages(mergeMessages(bo, extraMessages.bo), securityMessages.bo)
+    zh: mergeMessages(
+      mergeMessages(mergeMessages(zh, heritageContentZh), extraMessages.zh),
+      securityMessages.zh
+    ),
+    bo: mergeMessages(
+      mergeMessages(mergeMessages(bo, heritageContentBo), extraMessages.bo),
+      securityMessages.bo
+    )
   }
 })
 

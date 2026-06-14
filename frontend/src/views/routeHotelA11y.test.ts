@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import createRouteSource from './CreateRoute.vue?raw'
 import hotelBookingSource from './HotelBooking.vue?raw'
 import hotelDetailSource from './HotelDetail.vue?raw'
 import hotelOrdersSource from './HotelOrders.vue?raw'
@@ -27,8 +28,30 @@ describe('route planner and hotel flow UX accessibility guardrails', () => {
     expect(routePlannerSource).toContain('if (!result.value || sharing.value) return')
     expect(routeDetailSource).toContain('const liking = ref(false)')
     expect(routeDetailSource).toContain('if (liking.value || !routeData.value) return')
-    expect(routeDetailSource).toContain('if (!content || submitting.value) return')
+    expect(routeDetailSource).toContain('if (!content || submitting.value || !routeData.value) return')
     expect(routeDetailSource).toContain(':aria-label="t(\'routeDetail.commentPlaceholder\')"')
+    expect(routeDetailSource).toContain('let routeDetailRequestId = 0')
+    expect(routeDetailSource).toContain('let commentsRequestId = 0')
+    expect(routeDetailSource).toContain('let likeStatusRequestId = 0')
+    expect(routeDetailSource).toContain('let routeLikeMutationId = 0')
+    expect(routeDetailSource).toContain('const isCurrentRouteDetailRequest = (requestId: number, routeId: number) =>')
+    expect(routeDetailSource).toContain('const isCurrentCommentsRequest = (requestId: number, routeId: number) =>')
+    expect(routeDetailSource).toContain('const isCurrentRouteLikeMutation = (mutationId: number, routeId: number) =>')
+    expect(routeDetailSource).toContain('watch(')
+  })
+
+  it('keeps shared route creation forms labelled and guarded before auth checks', () => {
+    expect(createRouteSource).toContain('for="create-route-title"')
+    expect(createRouteSource).toContain('id="create-route-title"')
+    expect(createRouteSource).toContain('role="group" aria-labelledby="create-route-days-label"')
+    expect(createRouteSource).toContain(':aria-label="t(\'createRoute.decreaseDays\')"')
+    expect(createRouteSource).toContain(':aria-label="t(\'createRoute.increaseDays\')"')
+    expect(createRouteSource).toContain('aria-controls="create-route-days-value"')
+    expect(createRouteSource).toContain('for="create-route-budget"')
+    expect(createRouteSource).toContain('for="create-route-preference"')
+    expect(createRouteSource).toContain('for="create-route-content"')
+    expect(createRouteSource).toContain('if (submitting.value) return')
+    expect(createRouteSource.indexOf('if (submitting.value) return')).toBeLessThan(createRouteSource.indexOf('await requireAuth()'))
   })
 
   it('keeps official shared route authors labelled as official', () => {
@@ -97,6 +120,30 @@ describe('route planner and hotel flow UX accessibility guardrails', () => {
     expect(hotelBookingSource).toContain("t('hotel.validation.nightsTooLong'")
     expect(hotelBookingSource).toContain('phoneDigits')
     expect(hotelBookingSource).not.toMatch(/\b\w+\.response\??\.\s*data\??\.\s*(?:error|message)\b/)
+  })
+
+  it('keeps hotel booking API loads scoped to the latest route id', () => {
+    expect(hotelBookingSource).toContain('let bookingDataRequestId = 0')
+    expect(hotelBookingSource).toContain('const requestId = ++bookingDataRequestId')
+    expect(hotelBookingSource).toContain('const requestedHotelId = hotelId.value')
+    expect(hotelBookingSource).toContain('endpoints.hotels.detail(requestedHotelId)')
+    expect(hotelBookingSource).toContain('endpoints.hotels.roomTypes(requestedHotelId)')
+    expect(hotelBookingSource).toContain('if (requestId !== bookingDataRequestId || requestedHotelId !== hotelId.value) return')
+  })
+
+  it('keeps hotel booking fail-closed when authoritative API data is unavailable', () => {
+    expect(hotelBookingSource).toContain('const bookingDataLoading = ref(false)')
+    expect(hotelBookingSource).toContain("const bookingDataErrorId = 'hotel-booking-data-error-message'")
+    expect(hotelBookingSource).toContain('v-if="bookingDataLoadError"')
+    expect(hotelBookingSource).toContain('role="alert"')
+    expect(hotelBookingSource).toContain('@click="loadBookingData"')
+    expect(hotelBookingSource).toContain("bookingDataLoadError.value = t('toast.pageLoadFailed')")
+    expect(hotelBookingSource).toContain('if (!nextHotel || nextRooms.length === 0)')
+    expect(hotelBookingSource).toContain('if (!apiHotel.value || bookingDataLoadError.value) return null')
+    expect(hotelBookingSource).toContain('bookingDataLoading.value ||')
+    expect(hotelBookingSource).toContain('Boolean(bookingDataLoadError.value) ||')
+    expect(hotelBookingSource).toContain('!apiHotel.value ||')
+    expect(hotelBookingSource).not.toContain('getRoomById')
   })
 
   it('routes completed hotel inquiries to the hotel order list with confirmation feedback', () => {

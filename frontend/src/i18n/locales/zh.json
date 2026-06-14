@@ -38,7 +38,8 @@
     "loginRequired": "请先登录后继续操作",
     "priceCny": "¥{price}",
     "freeTicket": "免票",
-    "pendingConfirm": "待确认"
+    "pendingConfirm": "待确认",
+    "skipToContent": "跳到主要内容"
   },
   "toast": {
     "regionLabel": "通知消息",
@@ -50,7 +51,8 @@
     "goTo": "前往{label}",
     "spots": "景点",
     "ai": "AI",
-    "mine": "我的"
+    "mine": "我的",
+    "currentPage": "当前页面"
   },
   "guideChat": {
     "title": "西藏小导游",
@@ -180,6 +182,66 @@
     "learnMore": "了解更多",
     "viewOnBaike": "在百度百科查看详情",
     "openBaike": "打开百科",
+    "searchPlaceholder": "搜索非遗项目...",
+    "search": "搜索",
+    "clearSearch": "清除",
+    "loginToViewDetail": "登录后可查看完整非遗故事、传承人、活动与评论",
+    "inheritors": "代表性传承人",
+    "relatedEvents": "相关活动",
+    "commentsTitle": "用户评论",
+    "rating": "评分",
+    "commentPlaceholder": "分享你对这个非遗项目的感受...",
+    "submitComment": "发表",
+    "loginToComment": "登录后可以评论",
+    "deleteComment": "删除",
+    "noComments": "暂无评论，快来发表第一条吧",
+    "loadingLabel": "正在加载非遗内容",
+    "anonymous": "匿名用户",
+    "videoUnsupported": "您的浏览器不支持视频播放",
+    "library": {
+      "eyebrow": "Heritage Knowledge Base",
+      "title": "非遗项目库",
+      "subtitle": "项目热度、传承人故事、活动日历与用户讨论集中呈现。",
+      "refresh": "刷新"
+    },
+    "stats": {
+      "items": "收录项目",
+      "views": "累计浏览",
+      "interactions": "互动量",
+      "inheritors": "传承人档案"
+    },
+    "filter": {
+      "all": "全部"
+    },
+    "sort": {
+      "hot": "综合热度",
+      "views": "浏览最多",
+      "likes": "点赞最多",
+      "comments": "评论最多",
+      "latest": "最新收录",
+      "name": "名称排序"
+    },
+    "fallback": {
+      "itemCategory": "非遗项目",
+      "itemDescription": "项目简介正在完善。",
+      "noStory": "暂无传承故事"
+    },
+    "empty": {
+      "noResults": "没有匹配的非遗项目",
+      "noResultsHint": "清空关键词或切换分类后再查看。",
+      "noInheritors": "暂无可展示的传承人档案",
+      "noEvents": "暂无近期活动"
+    },
+    "sidebar": {
+      "inheritorsEyebrow": "Inheritors",
+      "inheritorsTitle": "传承人档案",
+      "eventsEyebrow": "Calendar",
+      "eventsTitle": "活动日历"
+    },
+    "interaction": {
+      "liked": "已点赞",
+      "like": "点赞"
+    },
     "category": {
       "folkLiterature": "民间文学",
       "traditionalMusic": "传统音乐",
@@ -767,6 +829,8 @@
     "routeTitle": "行程标题",
     "titlePlaceholder": "例如：7天西藏自然风光之旅",
     "plannedDays": "计划天数",
+    "decreaseDays": "减少计划天数",
+    "increaseDays": "增加计划天数",
     "budgetRange": "预算范围",
     "selectBudget": "请选择预算",
     "preference": "游玩偏好",

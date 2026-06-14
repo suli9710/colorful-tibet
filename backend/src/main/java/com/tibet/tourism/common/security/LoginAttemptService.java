@@ -1,5 +1,6 @@
 package com.tibet.tourism.common.security;
 import java.util.Arrays;
+import java.util.List;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.HexFormat;
@@ -11,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -26,6 +28,24 @@ public class LoginAttemptService {
     private static final long MAX_LOCK_SECONDS = 7 * 24 * 60 * 60;
     private static final long BACKEND_UNAVAILABLE_RETRY_SECONDS = 60;
     private static final int MAX_INMEMORY_ENTRIES = 10_000;
+    static final String INCREMENT_ATTEMPT_LUA =
+            """
+            local current = redis.call('GET', KEYS[1])
+            local failures = 0
+            if current then
+              local sep = string.find(current, ':', 1, true)
+              if sep then
+                failures = tonumber(string.sub(current, 1, sep - 1)) or 0
+              end
+            end
+            failures = failures + 1
+            local newValue = failures .. ':' .. ARGV[1]
+            redis.call('SET', KEYS[1], newValue, 'EX', tonumber(ARGV[2]))
+            return newValue
+            """;
+    private static final RedisScript<String> INCREMENT_ATTEMPT_SCRIPT = RedisScript.of(
+            INCREMENT_ATTEMPT_LUA,
+            String.class);
 
     private final StringRedisTemplate redisTemplate;
     private final ConcurrentHashMap<String, AttemptRecord> memory = new ConcurrentHashMap<>();
@@ -244,14 +264,43 @@ public class LoginAttemptService {
     }
 
     private AttemptRecord incrementRecord(String key, long now) {
-        AttemptRecord redisRecord = readFromRedis(key);
+        AttemptRecord redisRecord = incrementRecordInRedis(key, now);
+        if (redisRecord != null) {
+            memory.put(key, redisRecord);
+            return redisRecord;
+        }
+
         AttemptRecord newRecord = memory.compute(key, (k, existing) -> {
-            AttemptRecord base = mergeMaxFailures(redisRecord, existing);
-            int newFailures = (base == null) ? 1 : base.failures + 1;
+            int newFailures = (existing == null) ? 1 : existing.failures + 1;
             return new AttemptRecord(newFailures, now);
         });
         syncToRedis(key, newRecord);
         return newRecord;
+    }
+
+    private AttemptRecord incrementRecordInRedis(String key, long now) {
+        if (!redisEnabled) {
+            return null;
+        }
+        if (redisTemplate == null) {
+            failClosedIfRedisUnavailable(null);
+            return null;
+        }
+        try {
+            String result = redisTemplate.execute(
+                    INCREMENT_ATTEMPT_SCRIPT,
+                    List.of(REDIS_PREFIX + key),
+                    String.valueOf(now),
+                    String.valueOf(MAX_LOCK_SECONDS));
+            return fromRedisValue(result);
+        } catch (Exception e) {
+            logger.debug("Redis unavailable for brute-force increment; falling back to in-memory: {}",
+                    SensitiveLogSanitizer.exceptionSummary(e));
+            if (redisFailClosed) {
+                throw new ProtectionBackendUnavailableException(e);
+            }
+            return null;
+        }
     }
 
     private AttemptRecord getRecord(String key) {
@@ -281,29 +330,6 @@ public class LoginAttemptService {
             }
         }
         return memory.get(key);
-    }
-
-    private AttemptRecord readFromRedis(String key) {
-        if (redisEnabled) {
-            if (redisTemplate == null) {
-                failClosedIfRedisUnavailable(null);
-                return null;
-            }
-            try {
-                String value = redisTemplate.opsForValue().get(REDIS_PREFIX + key);
-                if (value != null) {
-                    return fromRedisValue(value);
-                }
-            } catch (Exception e) {
-                logger.debug("Redis read failed for brute-force keyHash={}: {}",
-                        shortHash(key),
-                        SensitiveLogSanitizer.exceptionSummary(e));
-                if (redisFailClosed) {
-                    throw new ProtectionBackendUnavailableException(e);
-                }
-            }
-        }
-        return null;
     }
 
     private void syncToRedis(String key, AttemptRecord record) {

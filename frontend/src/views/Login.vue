@@ -148,7 +148,7 @@ import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { motion, useReducedMotion } from 'motion-v'
-import api, { clearTokenCache, endpoints } from '../api'
+import api, { clearTokenCache, endpoints, type LoginRequest, type LoginResponse } from '../api'
 import { useAuthStore } from '../stores/auth'
 import { safeClientErrorMessage, summarizeClientError } from '../utils/errorMonitoring'
 import { getRecaptchaToken, isRecaptchaError, isRecaptchaV3Enabled } from '../utils/recaptcha'
@@ -233,15 +233,46 @@ function parseRetryAfter(value: unknown): number {
 }
 
 function readRetrySecondsFromBody(value: unknown): number {
-  if (typeof value !== 'object' || value === null) {
-    return 0
-  }
+  if (!isRecord(value)) return 0
 
-  const retrySeconds = (value as Record<string, unknown>).retryAfterSeconds
-    ?? (value as Record<string, unknown>).retryAfter
-    ?? (value as Record<string, unknown>).lockRemainingSeconds
+  const retrySeconds = value.retryAfterSeconds
+    ?? value.retryAfter
+    ?? value.lockRemainingSeconds
 
   return parseRetryAfter(retrySeconds)
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+
+const responseRecord = (error: unknown) => {
+  if (!isRecord(error) || !isRecord(error.response)) return undefined
+  return error.response
+}
+
+const responseStatus = (error: unknown) => {
+  const status = responseRecord(error)?.status
+  if (typeof status === 'number' && Number.isFinite(status)) return status
+  if (typeof status === 'string' && status.trim()) {
+    const parsed = Number(status)
+    return Number.isFinite(parsed) ? parsed : undefined
+  }
+  return undefined
+}
+
+const responseData = (error: unknown) => responseRecord(error)?.data
+const responseHeader = (error: unknown, name: string) => {
+  const headers = responseRecord(error)?.headers
+  if (!isRecord(headers)) return undefined
+  const matchingKey = Object.keys(headers).find(key => key.toLowerCase() === name.toLowerCase())
+  return matchingKey ? headers[matchingKey] : undefined
+}
+
+const requiresSecondaryAuth = (error: unknown) => {
+  const data = responseData(error)
+  return responseStatus(error) === 449
+    && isRecord(data)
+    && data.requiresSecondaryAuth === true
 }
 
 const handleLogin = async () => {
@@ -250,13 +281,13 @@ const handleLogin = async () => {
   errorMessage.value = ''
   loading.value = true
   try {
-    const payload = {
+    const payload: LoginRequest = {
       username: form.value.username,
       password: form.value.password,
       ...(requiresSecondaryPassword.value ? { secondaryPassword: form.value.secondaryPassword } : {})
     }
     const recaptchaToken = isRecaptchaV3Enabled() ? await getRecaptchaToken('login') : ''
-    const { data: user } = await api.post(endpoints.auth.login, payload, {
+    const { data: user } = await api.post<LoginResponse>(endpoints.auth.login, payload, {
       headers: recaptchaToken ? { 'X-Recaptcha-Token': recaptchaToken } : {}
     })
 
@@ -269,12 +300,12 @@ const handleLogin = async () => {
     }
 
     router.push(resolvePostLoginRedirect(route.query.redirect, user.role))
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (isRecaptchaError(error)) {
       errorMessage.value = t('security.recaptchaFailed')
       return
     }
-    if (error.response?.status === 449 && error.response?.data?.requiresSecondaryAuth) {
+    if (requiresSecondaryAuth(error)) {
       requiresSecondaryPassword.value = true
       errorMessage.value = `${t('profile.fillAllFields')}: ${t('login.secondaryPassword')}`
       return
@@ -283,8 +314,8 @@ const handleLogin = async () => {
     const msg = safeClientErrorMessage(error, t('login.loginFailed'))
     errorMessage.value = msg
 
-    const lockSeconds = parseRetryAfter(error.response?.headers?.['retry-after'])
-      || readRetrySecondsFromBody(error.response?.data)
+    const lockSeconds = parseRetryAfter(responseHeader(error, 'retry-after'))
+      || readRetrySecondsFromBody(responseData(error))
     if (lockSeconds > 0) {
       startCountdown(lockSeconds)
     }

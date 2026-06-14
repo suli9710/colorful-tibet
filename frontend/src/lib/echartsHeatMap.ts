@@ -1,6 +1,6 @@
 import { init, registerMap, use } from 'echarts/core'
 import { EffectScatterChart, ScatterChart } from 'echarts/charts'
-import { GeoComponent, TitleComponent, TooltipComponent } from 'echarts/components'
+import { GeoComponent, GridComponent, TitleComponent, TooltipComponent } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 
 let registered = false
@@ -11,6 +11,7 @@ export const ensureHeatMapECharts = () => {
       EffectScatterChart,
       ScatterChart,
       GeoComponent,
+      GridComponent,
       TitleComponent,
       TooltipComponent,
       CanvasRenderer
@@ -25,3 +26,4 @@ export const ensureHeatMapECharts = () => {
 }
 
 export type { ECharts } from 'echarts/core'
+export type { EChartsOption } from 'echarts'

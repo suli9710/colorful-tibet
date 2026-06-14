@@ -295,7 +295,17 @@ public class RequestRateLimitFilter extends OncePerRequestFilter {
         if (normalized.startsWith("/api/admin/")) {
             return new LimitRule("admin", adminRequests, configuredWindowMillis(adminWindowSeconds), true);
         }
+        if (isStateChangingMethod(method)) {
+            return new LimitRule("mutation", defaultRequests, configuredWindowMillis(defaultWindowSeconds), true);
+        }
         return new LimitRule("default", defaultRequests, configuredWindowMillis(defaultWindowSeconds), false);
+    }
+
+    private boolean isStateChangingMethod(String method) {
+        return "POST".equalsIgnoreCase(method)
+                || "PUT".equalsIgnoreCase(method)
+                || "PATCH".equalsIgnoreCase(method)
+                || "DELETE".equalsIgnoreCase(method);
     }
 
     private long configuredWindowMillis(long windowSeconds) {

@@ -105,6 +105,30 @@ describe('critical flow i18n coverage', () => {
     }
   })
 
+  it('keeps heritage detail requests scoped to the currently selected item', () => {
+    expect(heritageSource).toContain('let detailRequestId = 0')
+    expect(heritageSource).toContain('let commentsPageRequestId = 0')
+    expect(heritageSource).toContain('type PaginatedHttpResponse')
+    expect(heritageSource).toContain('const isCurrentDetailRequest = (requestId: number, itemId: number) =>')
+    expect(heritageSource).toContain('const isCurrentCommentsPageRequest = (requestId: number, itemId: number) =>')
+    expect(heritageSource).toContain('const isSelectedHeritageItem = (itemId: number) =>')
+    expect(heritageSource).toContain('const applyItemCommentsPage = (response: PaginatedHttpResponse | null | undefined, append = false) =>')
+    expect(heritageSource).toContain('const requestId = ++detailRequestId')
+    expect(heritageSource).toContain('if (!isCurrentDetailRequest(requestId, itemId)) return')
+    expect(heritageSource).toContain('const requestId = ++commentsPageRequestId')
+    expect(heritageSource).toContain('if (!isCurrentCommentsPageRequest(requestId, itemId)) return')
+    expect(heritageSource).toContain('if (!isSelectedHeritageItem(itemId)) return')
+    expect(heritageSource).toContain('if (!selectedItem.value || !authStore.isLoggedIn || !newCommentContent.value.trim() || submittingComment.value) return')
+    expect(heritageSource).toContain('const deletingCommentIds = ref<ReadonlySet<number>>(new Set())')
+    expect(heritageSource).toContain('const isDeletingComment = (commentId: number) =>')
+    expect(heritageSource).toContain('const setDeletingComment = (commentId: number, deleting: boolean) =>')
+    expect(heritageSource).toContain('if (!selectedItem.value || isDeletingComment(commentId)) return')
+    expect(heritageSource).toContain(':aria-busy="isDeletingComment(comment.id)"')
+    expect(heritageSource).toContain('detailRequestId += 1')
+    expect(heritageSource).toContain('commentsPageRequestId += 1')
+    expect(heritageSource).not.toContain('const applyItemCommentsPage = (response: any')
+  })
+
   it('keeps consultation center labels, states, and actions behind i18n keys', () => {
     expect(orderCenterSource).toContain("t('orderCenter.title')")
     expect(orderCenterSource).toContain("t('orderCenter.emptyTitle')")
@@ -164,6 +188,15 @@ describe('critical flow i18n coverage', () => {
 
     expect(userProfileSource).toContain("t('profile.commentImageAlt')")
     expect(userProfileSource).not.toContain('alt="评论图片"')
+  })
+
+  it('keeps global navigation accessibility keys present in supported locales', () => {
+    for (const [localeName, messages] of baseLocaleMessages) {
+      expect(getMessage(messages, 'common.skipToContent'), `${localeName} common.skipToContent`).not.toBeUndefined()
+      expect(getMessage(messages, 'mobileNav.currentPage'), `${localeName} mobileNav.currentPage`).not.toBeUndefined()
+      expect(getMessage(messages, 'createRoute.decreaseDays'), `${localeName} createRoute.decreaseDays`).not.toBeUndefined()
+      expect(getMessage(messages, 'createRoute.increaseDays'), `${localeName} createRoute.increaseDays`).not.toBeUndefined()
+    }
   })
 
   it('keeps route planner itinerary, pause/resume, and travel kit copy localized', () => {

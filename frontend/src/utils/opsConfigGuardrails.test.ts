@@ -69,16 +69,39 @@ describe('ops configuration guardrails', () => {
   it('runs production preflight before services that consume infrastructure secrets', () => {
     const prodCompose = readRepoFile('docker-compose.prod.yml')
     const uploadServer = readRepoFile('upload-server.ps1')
+    const requiredSecrets = [
+      'DB_PASSWORD',
+      'MYSQL_ROOT_PASSWORD',
+      'REDIS_PASSWORD',
+      'GRAFANA_ADMIN_PASSWORD',
+      'JWT_SECRET',
+      'ADMIN_ENCRYPTION_KEY',
+      'CSRF_SIGNING_SECRET',
+      'CACHE_KEY_HMAC_SECRET',
+      'PAYMENT_CALLBACK_SECRET',
+      'PII_KEYS',
+      'PII_ACTIVE_KID',
+      'SUPER_ADMIN_TOTP_SECRET',
+      'SCRAPLING_API_KEY',
+      'RECAPTCHA_SITE_KEY',
+      'RECAPTCHA_SECRET_KEY',
+      'VITE_AMAP_KEY',
+      'VITE_AMAP_SECURITY_CODE',
+      'ALERTMANAGER_WEBHOOK_URL'
+    ] as const
 
     expect(prodCompose).toContain('production-preflight:')
-    for (const variableName of ['DB_PASSWORD', 'MYSQL_ROOT_PASSWORD', 'REDIS_PASSWORD', 'GRAFANA_ADMIN_PASSWORD', 'CACHE_KEY_HMAC_SECRET']) {
+    for (const variableName of requiredSecrets) {
       expect(prodCompose, variableName).toContain(`require_real_secret ${variableName}`)
+      expect(uploadServer, variableName).toContain(variableName)
     }
     expect(prodCompose).toContain('CACHE_KEY_HMAC_SECRET must be at least 64 characters')
     expect(prodCompose).toContain('reject_placeholder_if_set MYSQL_PASSWORD')
-    expect(prodCompose).toContain('NGINX_REDIRECT_HOST must be a single canonical host without scheme, path, port, comma, whitespace, or control characters')
-    expect(uploadServer).toContain('NGINX_REDIRECT_HOST must be a single canonical host without scheme, path, port, comma, whitespace, or control characters')
-    expect(uploadServer).toContain('for secret_name in DB_PASSWORD MYSQL_ROOT_PASSWORD REDIS_PASSWORD GRAFANA_ADMIN_PASSWORD CACHE_KEY_HMAC_SECRET; do')
+    expect(prodCompose).toContain('require_single_host NGINX_REDIRECT_HOST "$$NGINX_REDIRECT_HOST"')
+    expect(prodCompose).toContain('must be a single DNS host without scheme, path, port, comma, whitespace, or control characters')
+    expect(uploadServer).toContain('require_single_host_value NGINX_REDIRECT_HOST "$NGINX_REDIRECT_HOST"')
+    expect(uploadServer).toContain('must be a single DNS host without scheme, path, port, comma, whitespace, or control characters')
+    expect(uploadServer).toContain('for secret_name in \\')
     expect(uploadServer).toContain('CACHE_KEY_HMAC_SECRET must be at least 64 characters')
     expect(uploadServer).toContain('TRUSTED_PROXY_CIDRS must not trust broad private ranges')
   })
@@ -122,8 +145,10 @@ describe('ops configuration guardrails', () => {
     expect(frontendDockerfile).toContain('ENV NGINX_REDIRECT_HOST=localhost')
     expect(frontendDockerfile).toContain('$NGINX_REDIRECT_HOST')
     expect(prodCompose).toContain('NGINX_REDIRECT_HOST=${NGINX_REDIRECT_HOST:?NGINX_REDIRECT_HOST is required in production}')
-    expect(prodCompose).toContain('redirect_host_pattern=')
-    expect(prodCompose).toContain('NGINX_REDIRECT_HOST must be a single canonical host without scheme, path, port, comma, whitespace, or control characters')
+    expect(prodCompose).toContain('is_dns_host()')
+    expect(prodCompose).toContain('require_server_names NGINX_SERVER_NAME "$$NGINX_SERVER_NAME"')
+    expect(prodCompose).toContain('require_single_host NGINX_REDIRECT_HOST "$$NGINX_REDIRECT_HOST"')
+    expect(prodCompose).toContain('must be a single DNS host without scheme, path, port, comma, whitespace, or control characters')
   })
 
   it('keeps scrapler runtime requirements exact-pinned in the hash-locked requirements file', () => {

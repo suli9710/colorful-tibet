@@ -23,7 +23,7 @@
             <input
               v-model="searchKeyword"
               type="text"
-              :placeholder="t('heritage.searchPlaceholder', '搜索非遗项目...')"
+              :placeholder="t('heritage.searchPlaceholder')"
               class="w-full pl-10 pr-4 py-3 sm:py-2.5 rounded-xl border border-stone-200 bg-white/80 backdrop-blur text-sm text-stone-700 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-tibet-red/30 focus:border-tibet-red/40 transition"
             />
             <svg xmlns="http://www.w3.org/2000/svg" class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -35,7 +35,7 @@
             class="mobile-touch-target px-4 py-2.5 rounded-xl bg-tibet-red text-white text-sm font-medium hover:bg-tibet-red/90 transition disabled:opacity-50"
             :disabled="searchLoading"
           >
-            {{ searchLoading ? '...' : t('heritage.search', '搜索') }}
+            {{ searchLoading ? '...' : t('heritage.search') }}
           </button>
           <button
             v-if="searchKeyword"
@@ -43,7 +43,7 @@
             class="mobile-touch-target px-3 py-2.5 rounded-xl border border-stone-200 text-sm text-stone-500 hover:bg-stone-50 transition"
             @click="searchKeyword = ''; handleSearch()"
           >
-            {{ t('heritage.clearSearch', '清除') }}
+            {{ t('heritage.clearSearch') }}
           </button>
         </form>
       </div>
@@ -75,10 +75,10 @@
         <div class="tibet-panel rounded-2xl p-4 sm:p-6">
           <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-5">
             <div>
-              <p class="text-xs font-semibold uppercase tracking-[0.2em] text-tibet-red/70 mb-2">Heritage Knowledge Base</p>
-              <h2 class="text-2xl font-bold text-tibet-dark">非遗项目库</h2>
+              <p class="text-xs font-semibold uppercase tracking-[0.2em] text-tibet-red/70 mb-2">{{ t('heritage.library.eyebrow') }}</p>
+              <h2 class="text-2xl font-bold text-tibet-dark">{{ t('heritage.library.title') }}</h2>
               <p class="mt-1 text-sm text-tibet-brown/60">
-                项目热度、传承人故事、活动日历与用户讨论集中呈现。
+                {{ t('heritage.library.subtitle') }}
               </p>
             </div>
             <button
@@ -88,35 +88,35 @@
               @click="refreshHeritageModule"
             >
               <RefreshCw class="h-4 w-4" :class="{ 'animate-spin': searchLoading }" />
-              刷新
+              {{ t('heritage.library.refresh') }}
             </button>
           </div>
 
           <div class="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3 mb-5">
             <div class="rounded-xl border border-stone-200 bg-white/70 px-3 py-3 sm:px-4">
               <div class="flex items-center justify-between gap-2">
-                <p class="text-xs text-stone-500">收录项目</p>
+                <p class="text-xs text-stone-500">{{ t('heritage.stats.items') }}</p>
                 <BookOpen class="h-4 w-4 text-tibet-red" />
               </div>
               <p class="mt-2 text-xl font-bold text-stone-900 sm:text-2xl">{{ formatCompact(heritageItems.length) }}</p>
             </div>
             <div class="rounded-xl border border-stone-200 bg-white/70 px-3 py-3 sm:px-4">
               <div class="flex items-center justify-between gap-2">
-                <p class="text-xs text-stone-500">累计浏览</p>
+                <p class="text-xs text-stone-500">{{ t('heritage.stats.views') }}</p>
                 <Eye class="h-4 w-4 text-blue-600" />
               </div>
               <p class="mt-2 text-xl font-bold text-stone-900 sm:text-2xl">{{ formatCompact(totalViews) }}</p>
             </div>
             <div class="rounded-xl border border-stone-200 bg-white/70 px-3 py-3 sm:px-4">
               <div class="flex items-center justify-between gap-2">
-                <p class="text-xs text-stone-500">互动量</p>
+                <p class="text-xs text-stone-500">{{ t('heritage.stats.interactions') }}</p>
                 <MessageCircle class="h-4 w-4 text-emerald-600" />
               </div>
               <p class="mt-2 text-xl font-bold text-stone-900 sm:text-2xl">{{ formatCompact(totalInteractions) }}</p>
             </div>
             <div class="rounded-xl border border-stone-200 bg-white/70 px-3 py-3 sm:px-4">
               <div class="flex items-center justify-between gap-2">
-                <p class="text-xs text-stone-500">传承人档案</p>
+                <p class="text-xs text-stone-500">{{ t('heritage.stats.inheritors') }}</p>
                 <UserRound class="h-4 w-4 text-amber-600" />
               </div>
               <p class="mt-2 text-xl font-bold text-stone-900 sm:text-2xl">{{ formatCompact(featuredInheritors.length) }}</p>
@@ -131,7 +131,7 @@
                 :class="selectedCategory === 'all' ? 'border-tibet-red bg-tibet-red text-white' : 'border-stone-200 bg-white/70 text-stone-600 hover:border-tibet-red/30 hover:text-tibet-red'"
                 @click="selectedCategory = 'all'"
               >
-                全部
+                {{ t('heritage.filter.all') }}
               </button>
               <button
                 v-for="category in categoryOptions"
@@ -193,7 +193,7 @@
                     </div>
                   </div>
                   <div class="absolute left-3 top-3 max-w-[75%] rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur">
-                    <span class="line-clamp-1">{{ item.category || '非遗项目' }}</span>
+                    <span class="line-clamp-1">{{ item.category || t('heritage.fallback.itemCategory') }}</span>
                   </div>
                   <div v-if="item.videoUrl" class="absolute bottom-3 right-3 rounded-full bg-white/90 p-2 text-tibet-red shadow-sm">
                     <Video class="h-4 w-4" />
@@ -207,7 +207,7 @@
                     <ArrowUpRight class="mt-1 h-4 w-4 shrink-0 text-stone-300 transition group-hover:text-tibet-red" />
                   </div>
                   <p class="line-clamp-2 min-h-[2.5rem] text-sm leading-relaxed text-stone-600">
-                    {{ item.description || '项目简介正在完善。' }}
+                    {{ item.description || t('heritage.fallback.itemDescription') }}
                   </p>
                   <div class="mt-3 flex flex-wrap items-center gap-3 text-xs text-stone-500">
                     <span class="inline-flex items-center gap-1">
@@ -239,8 +239,8 @@
               :transition="{ duration: 0.22, ease: motionEase }"
             >
               <Search class="mx-auto h-8 w-8 text-stone-300" />
-              <p class="mt-3 text-sm font-medium text-stone-700">没有匹配的非遗项目</p>
-              <p class="mt-1 text-xs text-stone-400">清空关键词或切换分类后再查看。</p>
+              <p class="mt-3 text-sm font-medium text-stone-700">{{ t('heritage.empty.noResults') }}</p>
+              <p class="mt-1 text-xs text-stone-400">{{ t('heritage.empty.noResultsHint') }}</p>
             </motion.div>
           </AnimatePresence>
         </div>
@@ -249,8 +249,8 @@
           <div class="tibet-panel rounded-2xl p-4 sm:p-5">
             <div class="mb-4 flex items-center justify-between gap-3">
               <div>
-                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-tibet-red/60">Inheritors</p>
-                <h3 class="mt-1 text-lg font-bold text-stone-900">传承人档案</h3>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-tibet-red/60">{{ t('heritage.sidebar.inheritorsEyebrow') }}</p>
+                <h3 class="mt-1 text-lg font-bold text-stone-900">{{ t('heritage.sidebar.inheritorsTitle') }}</h3>
               </div>
               <UserRound class="h-5 w-5 text-tibet-red" />
             </div>
@@ -285,24 +285,24 @@
                     </span>
                   </div>
                   <p class="mt-0.5 text-[11px] text-stone-400">
-                    {{ heritageNameById[inheritor.heritageItemId] || inheritor.region || '非遗项目' }}
+                    {{ heritageNameById[inheritor.heritageItemId] || inheritor.region || t('heritage.fallback.itemCategory') }}
                   </p>
                   <p class="mt-1 line-clamp-2 text-xs leading-relaxed text-stone-600">
-                    {{ inheritor.story || inheritor.bio || '暂无传承故事' }}
+                    {{ inheritor.story || inheritor.bio || t('heritage.fallback.noStory') }}
                   </p>
                 </div>
               </button>
             </div>
             <p v-else class="rounded-xl border border-dashed border-stone-200 bg-white/60 px-4 py-5 text-center text-xs text-stone-400">
-              暂无可展示的传承人档案
+              {{ t('heritage.empty.noInheritors') }}
             </p>
           </div>
 
           <div class="tibet-panel rounded-2xl p-4 sm:p-5">
             <div class="mb-4 flex items-center justify-between gap-3">
               <div>
-                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-tibet-red/60">Calendar</p>
-                <h3 class="mt-1 text-lg font-bold text-stone-900">活动日历</h3>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-tibet-red/60">{{ t('heritage.sidebar.eventsEyebrow') }}</p>
+                <h3 class="mt-1 text-lg font-bold text-stone-900">{{ t('heritage.sidebar.eventsTitle') }}</h3>
               </div>
               <CalendarDays class="h-5 w-5 text-tibet-red" />
             </div>
@@ -326,7 +326,7 @@
               </button>
             </div>
             <p v-else class="rounded-xl border border-dashed border-stone-200 bg-white/60 px-4 py-5 text-center text-xs text-stone-400">
-              暂无近期活动
+              {{ t('heritage.empty.noEvents') }}
             </p>
           </div>
         </aside>
@@ -372,14 +372,14 @@
               :transition="cardTransition(index, 0.08)"
               :whileHover="{ y: -5, scale: 1.012 }"
               :whileTap="{ scale: 0.985 }"
-              @click="toggleCategory(category.name)"
+              @click="toggleCategory(category.key)"
             >
               <div class="flex items-center gap-4 w-full">
                 <!-- 图标 -->
                 <div class="flex-shrink-0">
                   <motion.div
                     class="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-tibet-red via-tibet-gold to-tibet-yellow text-white flex items-center justify-center shadow-sm group-hover:shadow-md"
-                    :animate="activeCategory === category.name ? { rotate: -4, scale: 1.06 } : { rotate: 0, scale: 1 }"
+                    :animate="activeCategory === category.key ? { rotate: -4, scale: 1.06 } : { rotate: 0, scale: 1 }"
                     :transition="softSpring"
                   >
                     <span class="text-xl sm:text-2xl">
@@ -405,7 +405,7 @@
 
                 <motion.span
                   class="ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-tibet-gold/25 bg-white/70 text-lg leading-none text-tibet-red"
-                  :animate="activeCategory === category.name ? { rotate: 45, scale: 1.04 } : { rotate: 0, scale: 1 }"
+                  :animate="activeCategory === category.key ? { rotate: 45, scale: 1.04 } : { rotate: 0, scale: 1 }"
                   :transition="softSpring"
                   aria-hidden="true"
                 >
@@ -416,8 +416,8 @@
               <!-- 卡片内部可滚动的国家级非遗项目列表 -->
               <AnimatePresence>
                 <motion.div
-                  v-if="activeCategory === category.name"
-                  :key="category.name + '-items'"
+                  v-if="activeCategory === category.key"
+                  :key="category.key + '-items'"
                   layout
                   class="mt-1 w-full origin-top rounded-xl bg-tibet-white/70 border border-tibet-gold/25 px-3 py-2 max-h-44 overflow-y-auto text-xs sm:text-sm text-tibet-brown/80 space-y-2"
                   :initial="{ opacity: 0, y: -10, scaleY: 0.96 }"
@@ -426,10 +426,10 @@
                   :transition="{ duration: 0.28, ease: motionEase }"
                 >
                   <p class="text-[11px] text-tibet-brown/45">
-                    {{ t('heritage.nationalItems') }} · {{ getItemsByCategory(category.name).length }} {{ t('heritage.items') }}
+                    {{ t('heritage.nationalItems') }} · {{ getItemsByCategory(category.key).length }} {{ t('heritage.items') }}
                   </p>
                   <motion.div
-                    v-for="(item, itemIndex) in getItemsByCategory(category.name)"
+                    v-for="(item, itemIndex) in getItemsByCategory(category.key)"
                     :key="item.id"
                     class="border-b border-tibet-gold/15 last:border-b-0 pb-1.5 last:pb-0"
                     :initial="{ opacity: 0, x: -8 }"
@@ -460,7 +460,7 @@
                     </p>
                   </motion.div>
                   <p
-                    v-if="!getItemsByCategory(category.name).length"
+                    v-if="!getItemsByCategory(category.key).length"
                     class="text-[11px] text-stone-400"
                   >
                     {{ t('heritage.noItemsInCategory') }}
@@ -587,6 +587,7 @@
             <motion.button
               type="button"
               class="absolute top-3 right-3 bg-black/50 text-white p-2 rounded-full hover:bg-black/70 transition sm:top-4 sm:right-4"
+              :aria-label="t('common.closeMenu')"
               :whileHover="{ rotate: 90, scale: 1.08 }"
               :whileTap="{ scale: 0.92 }"
               @click="selectedItem = null"
@@ -624,13 +625,13 @@
             class="mx-4 mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 sm:mx-6"
           >
             <p class="font-medium">
-              {{ t('heritage.loginToViewDetail', '登录后可查看完整非遗故事、传承人、活动与评论') }}
+              {{ t('heritage.loginToViewDetail') }}
             </p>
             <router-link
               to="/login"
               class="mt-2 inline-flex rounded-lg bg-tibet-red px-3 py-1.5 text-xs font-medium text-white hover:bg-tibet-red/90"
             >
-              {{ t('common.login', '登录') }}
+              {{ t('common.login') }}
             </router-link>
           </div>
 
@@ -660,7 +661,7 @@
               @click="toggleLike"
             >
               <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" :fill="liked ? 'currentColor' : 'none'" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg>
-              {{ liked ? '已点赞' : '点赞' }}
+              {{ liked ? t('heritage.interaction.liked') : t('heritage.interaction.like') }}
             </button>
           </div>
 
@@ -705,7 +706,7 @@
                   preload="metadata"
                   class="w-full max-h-[320px]"
                 >
-                  您的浏览器不支持视频播放
+                  {{ t('heritage.videoUnsupported') }}
                 </video>
               </div>
 
@@ -906,7 +907,7 @@
             <!-- 传承人 -->
             <div v-if="!detailAuthRequired && itemInheritors.length" class="border-t border-dashed border-stone-200 pt-4">
               <h4 class="text-sm font-semibold text-stone-900 mb-3">
-                {{ t('heritage.inheritors', '代表性传承人') }}
+                {{ t('heritage.inheritors') }}
               </h4>
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div
@@ -935,7 +936,7 @@
             <!-- 相关活动 -->
             <div v-if="!detailAuthRequired && itemEvents.length" class="border-t border-dashed border-stone-200 pt-4">
               <h4 class="text-sm font-semibold text-stone-900 mb-3">
-                {{ t('heritage.relatedEvents', '相关活动') }}
+                {{ t('heritage.relatedEvents') }}
               </h4>
               <div class="space-y-2">
                 <div
@@ -957,13 +958,13 @@
             <!-- 评论区 -->
             <div v-if="selectedItem.id < 10000 && !detailAuthRequired" class="border-t border-dashed border-stone-200 pt-4">
               <h4 class="text-sm font-semibold text-stone-900 mb-3">
-                {{ t('heritage.commentsTitle', '用户评论') }} ({{ selectedItem.commentCount || 0 }})
+                {{ t('heritage.commentsTitle') }} ({{ selectedItem.commentCount || 0 }})
               </h4>
 
               <!-- 发表评论 -->
               <div v-if="authStore.isLoggedIn" class="mb-4 space-y-2">
                 <div class="flex items-center gap-1 mb-1">
-                  <span class="text-xs text-stone-500">{{ t('heritage.rating', '评分') }}:</span>
+                  <span class="text-xs text-stone-500">{{ t('heritage.rating') }}:</span>
                   <button
                     v-for="star in 5"
                     :key="star"
@@ -980,7 +981,7 @@
                     v-model="newCommentContent"
                     type="text"
                     maxlength="1000"
-                    :placeholder="t('heritage.commentPlaceholder', '分享你对这个非遗项目的感受...')"
+                    :placeholder="t('heritage.commentPlaceholder')"
                     class="flex-1 px-3 py-2 rounded-lg border border-stone-200 text-sm focus:outline-none focus:ring-1 focus:ring-tibet-red/30"
                     @keydown.enter.prevent="submitComment"
                   />
@@ -990,12 +991,12 @@
                     :disabled="submittingComment || !newCommentContent.trim()"
                     @click="submitComment"
                   >
-                    {{ submittingComment ? '...' : t('heritage.submitComment', '发表') }}
+                    {{ submittingComment ? '...' : t('heritage.submitComment') }}
                   </button>
                 </div>
               </div>
               <p v-else class="text-xs text-stone-400 mb-3">
-                {{ t('heritage.loginToComment', '登录后可以评论') }}
+                {{ t('heritage.loginToComment') }}
               </p>
 
               <!-- 评论列表 -->
@@ -1024,10 +1025,12 @@
                       <button
                         v-if="comment.owner"
                         type="button"
-                        class="text-[10px] text-red-400 hover:text-red-600 transition"
+                        class="text-[10px] text-red-400 hover:text-red-600 transition disabled:cursor-wait disabled:opacity-60"
+                        :disabled="isDeletingComment(comment.id)"
+                        :aria-busy="isDeletingComment(comment.id)"
                         @click="deleteComment(comment.id)"
                       >
-                        {{ t('heritage.deleteComment', '删除') }}
+                        {{ t('heritage.deleteComment') }}
                       </button>
                     </div>
                   </div>
@@ -1046,12 +1049,12 @@
                     :aria-busy="commentsLoadingMore"
                     @click="loadNextItemCommentsPage"
                   >
-                    {{ commentsLoadingMore ? t('common.loading') : t('community.nextPage', '加载更多') }}
+                    {{ commentsLoadingMore ? t('common.loading') : t('community.nextPage') }}
                   </button>
                 </div>
               </div>
               <p v-else class="text-xs text-stone-400 text-center py-3">
-                {{ t('heritage.noComments', '暂无评论，快来发表第一条吧') }}
+                {{ t('heritage.noComments') }}
               </p>
             </div>
           </motion.div>
@@ -1065,7 +1068,7 @@
           class="flex h-64 flex-col items-center justify-center gap-3 text-sm text-tibet-brown/60"
           role="status"
           aria-live="polite"
-          :aria-label="t('heritage.loadingLabel', '正在加载非遗内容')"
+          :aria-label="t('heritage.loadingLabel')"
           :initial="{ opacity: 0 }"
           :animate="{ opacity: 1 }"
           :exit="{ opacity: 0 }"
@@ -1076,7 +1079,7 @@
             :animate="{ rotate: 360 }"
             :transition="{ duration: 1, repeat: Infinity, ease: 'linear' }"
           ></motion.div>
-          <span>{{ t('heritage.loadingLabel', '正在加载非遗内容') }}</span>
+          <span>{{ t('heritage.loadingLabel') }}</span>
         </motion.div>
       </AnimatePresence>
 
@@ -1103,7 +1106,7 @@ import {
 } from 'lucide-vue-next'
 import MotionModal from '../components/motion/MotionModal.vue'
 import api, { endpoints } from '../api'
-import { hasNextPage, mergeUniqueById, readPaginatedResponse, type PageMetadata } from '../api/endpoints'
+import { hasNextPage, mergeUniqueById, readPaginatedResponse, type PageMetadata, type PaginatedHttpResponse } from '../api/endpoints'
 import type {
   HeritageCommentItem,
   HeritageEventItem,
@@ -1129,54 +1132,119 @@ import {
   softSpring
 } from '../motion/presets'
 
-const { t, locale } = useI18n()
+const { t, tm, locale } = useI18n()
 const { showToast } = useToast()
 const activeIntlLocale = computed(() => toIntlLocale(locale.value))
 
+type HeritageCategoryKey =
+  | 'folkLiterature'
+  | 'traditionalMusic'
+  | 'traditionalDance'
+  | 'traditionalDrama'
+  | 'traditionalSports'
+  | 'traditionalCraft'
+  | 'traditionalMedicine'
+  | 'folkCustom'
+
+interface HeritageContentNationalItem {
+  id: number
+  name: string
+  description: string
+}
+
+interface HeritageContentRepresentativeItem {
+  key: string
+  id: number
+  name: string
+  description: string
+  categoryKey: HeritageCategoryKey
+  significance: string
+  imageUrl: string
+  baikeUrl: string
+}
+
+interface ExperienceSpot {
+  name: string
+  city: string
+  address: string
+  lat: number
+  lng: number
+  tag: string
+  brief: string
+  highlight: string
+}
+
+interface HeritageContentMessages {
+  national: {
+    noDescription: string
+    categories: Record<HeritageCategoryKey, { items: HeritageContentNationalItem[] }>
+  }
+  representative: Record<string, HeritageContentRepresentativeItem>
+  experienceSpots: ExperienceSpot[]
+  imageAliases: Record<string, string>
+  aliases: {
+    thangkaBackendName: string
+    thangkaDisplayName: string
+  }
+  eventMonthSuffix: string
+}
+
+const heritageContent = computed(
+  () => tm('heritageContent') as HeritageContentMessages
+)
+
 const heritageCategories = computed(() => [
   {
+    key: 'folkLiterature' as const,
     name: t('heritage.category.folkLiterature'),
     prefix: t('heritage.category.folkLiterature'),
     icon: '📜',
     layout: 'lg:-mt-4 lg:ml-4 z-20'
   },
   {
+    key: 'traditionalMusic' as const,
     name: t('heritage.category.traditionalMusic'),
     prefix: t('heritage.category.traditionalMusic'),
     icon: '🥁',
     layout: 'lg:mt-8 z-30'
   },
   {
+    key: 'traditionalDance' as const,
     name: t('heritage.category.traditionalDance'),
     prefix: t('heritage.category.traditionalDance'),
     icon: '💃',
     layout: 'lg:-mt-10 lg:-mr-4 z-40'
   },
   {
+    key: 'traditionalDrama' as const,
     name: t('heritage.category.traditionalDrama'),
     prefix: t('heritage.category.traditionalDrama'),
     icon: '🎭',
     layout: 'lg:-mt-2 lg:ml-8 z-30'
   },
   {
+    key: 'traditionalSports' as const,
     name: t('heritage.category.traditionalSports'),
     prefix: t('heritage.category.traditionalSports'),
     icon: '🏹',
     layout: 'lg:mt-10 z-20'
   },
   {
+    key: 'traditionalCraft' as const,
     name: t('heritage.category.traditionalCraft'),
     prefix: t('heritage.category.traditionalCraft'),
     icon: '🧶',
     layout: 'lg:-mt-6 lg:-mr-6 z-30'
   },
   {
+    key: 'traditionalMedicine' as const,
     name: t('heritage.category.traditionalMedicine'),
     prefix: t('heritage.category.traditionalMedicine'),
     icon: '🌿',
     layout: 'lg:mt-6 z-20'
   },
   {
+    key: 'folkCustom' as const,
     name: t('heritage.category.folkCustom'),
     prefix: t('heritage.category.folkCustom'),
     icon: '🏔️',
@@ -1234,9 +1302,13 @@ const itemInheritors = ref<HeritageInheritorItem[]>([])
 const itemEvents = ref<HeritageEventItem[]>([])
 const detailAuthRequired = ref(false)
 const liked = ref(false)
+let detailRequestId = 0
+let commentsPageRequestId = 0
+let likeMutationRequestId = 0
 const newCommentContent = ref('')
 const newCommentRating = ref(5)
 const submittingComment = ref(false)
+const deletingCommentIds = ref<ReadonlySet<number>>(new Set())
 const upcomingEvents = ref<HeritageEventItem[]>([])
 const featuredInheritors = ref<HeritageInheritorItem[]>([])
 const featuredInheritorsLoading = ref(false)
@@ -1254,65 +1326,46 @@ const resetItemCommentsPageInfo = () => {
   itemCommentsPageInfo.value = emptyHeritageCommentsPage()
 }
 
+const isCurrentDetailRequest = (requestId: number, itemId: number) =>
+  requestId === detailRequestId && selectedItem.value?.id === itemId
+
+const isCurrentCommentsPageRequest = (requestId: number, itemId: number) =>
+  requestId === commentsPageRequestId && selectedItem.value?.id === itemId
+
+const isSelectedHeritageItem = (itemId: number) =>
+  selectedItem.value?.id === itemId
+
+const isDeletingComment = (commentId: number) => deletingCommentIds.value.has(commentId)
+
+const setDeletingComment = (commentId: number, deleting: boolean) => {
+  const next = new Set(deletingCommentIds.value)
+  if (deleting) {
+    next.add(commentId)
+  } else {
+    next.delete(commentId)
+  }
+  deletingCommentIds.value = next
+}
+
 const genericHeritageImagePatterns = [
   'images.unsplash.com/photo-1559827291'
 ]
 
-const heritageImageByName: Record<string, string> = {
-  格萨尔史诗: '/heritage/格萨尔史诗.jpg',
-  格萨尔: '/heritage/格萨尔史诗.jpg',
-  藏戏: '/heritage/藏戏.jpg',
-  藏族唐卡: '/heritage/唐卡.jpg',
-  唐卡: '/heritage/唐卡.jpg',
-  藏医药浴法: '/heritage/藏药.jpg',
-  藏药: '/heritage/藏药.jpg',
-  拉萨囊玛: '/heritage/拉萨囊玛.jpg',
-  拉萨朗玛: '/heritage/拉萨囊玛.jpg',
-  囊玛: '/heritage/拉萨囊玛.jpg',
-  那曲山歌: '/heritage/那曲山歌.jpeg',
-  藏族山歌: '/heritage/那曲山歌.jpeg',
-  藏北民歌: '/heritage/那曲山歌.jpeg',
-  热巴舞: '/heritage/热巴舞.jpg',
-  锅庄舞: '/heritage/锅庄舞.jpg',
-  弦子舞: '/heritage/弦子舞.jpg',
-  门巴戏: '/heritage/门巴戏.jpg',
-  藏族传统马术: '/heritage/藏族传统马术.jpg',
-  马术: '/heritage/藏族传统马术.jpg',
-  藏香制作技艺: '/heritage/藏香制作技艺.jpg',
-  藏香: '/heritage/藏香制作技艺.jpg',
-  藏刀锻制技艺: '/heritage/藏刀锻制技艺.jpg',
-  藏刀: '/heritage/藏刀锻制技艺.jpg',
-  '藏族邦典/卡垫织造技艺': '/heritage/藏族邦典卡垫织造技艺.jpg',
-  藏族邦典卡垫织造技艺: '/heritage/藏族邦典卡垫织造技艺.jpg',
-  邦典: '/heritage/藏族邦典卡垫织造技艺.jpg',
-  卡垫: '/heritage/藏族邦典卡垫织造技艺.jpg',
-  藏族雕版印刷技艺: '/heritage/藏族雕版印刷技艺.jpg',
-  雕版印刷: '/heritage/藏族雕版印刷技艺.jpg',
-  藏族造纸技艺: '/heritage/藏族造纸技艺.jpg',
-  藏纸: '/heritage/藏族造纸技艺.jpg',
-  雪顿节: '/heritage/雪顿节.jpg',
-  望果节: '/heritage/望果节.jpg',
-  藏族金属锻造技艺: '/heritage/藏族金属锻造技艺.jpg',
-  金属锻造: '/heritage/藏族金属锻造技艺.jpg',
-  墨脱石锅制作技艺: '/heritage/墨脱石锅制作技艺.jpg',
-  墨脱石锅: '/heritage/墨脱石锅制作技艺.jpg',
-  羌姆: '/heritage/羌姆.jpg',
-  'གེ་སར': '/heritage/格萨尔史诗.jpg',
-  'བོད་ཟློས་གར': '/heritage/藏戏.jpg',
-  'ཐང་ཀ': '/heritage/唐卡.jpg',
-  'བོད་སྨན': '/heritage/藏药.jpg'
-}
+const heritageImageByName = computed<Record<string, string>>(
+  () => heritageContent.value?.imageAliases ?? {}
+)
 
 const isGenericHeritageImage = (imageUrl?: string | null): boolean =>
   !imageUrl || genericHeritageImagePatterns.some(pattern => imageUrl.includes(pattern))
 
 const findMappedHeritageImage = (name?: string | null): string => {
   if (!name) return ''
+  const aliases = heritageImageByName.value
   const normalizedName = name.replace(/[（）()《》“”"·/、\s]/g, '')
-  const direct = heritageImageByName[name] || heritageImageByName[normalizedName]
+  const direct = aliases[name] || aliases[normalizedName]
   if (direct) return direct
 
-  const match = Object.entries(heritageImageByName).find(([key]) => {
+  const match = Object.entries(aliases).find(([key]) => {
     const normalizedKey = key.replace(/[（）()《》“”"·/、\s]/g, '')
     return normalizedName.includes(normalizedKey) || normalizedKey.includes(normalizedName)
   })
@@ -1357,226 +1410,9 @@ const loadLeaflet = async () => {
   return leafletLoader
 }
 
-interface ExperienceSpot {
-  name: string
-  city: string
-  address: string
-  lat: number
-  lng: number
-  tag: string
-  brief: string
-  highlight: string
-}
-
-// 西藏本地线下体验点（示例数据，可在后台扩展为可配置）
-const experienceSpotsZh: ExperienceSpot[] = [
-  {
-    name: '拉萨非遗体验中心（八廓街）',
-    city: '拉萨',
-    address: '拉萨市城关区八廓街步行街附近',
-    lat: 29.653,
-    lng: 91.117,
-    tag: '藏',
-    brief: '非遗集合体验空间，可预约藏戏、唐卡、藏香等项目体验',
-    highlight: '一站式打卡多种非遗项目'
-  },
-  {
-    name: '罗布林卡唐卡工坊',
-    city: '拉萨',
-    address: '拉萨市城关区罗布林卡景区周边传统手工街区',
-    lat: 29.642,
-    lng: 91.071,
-    tag: '画',
-    brief: '专注藏族唐卡绘制与展示的工作室，支持短时体验与深度课程',
-    highlight: '亲手绘制一幅简易唐卡或吉祥纹样'
-  },
-  {
-    name: '日喀则藏戏传习中心',
-    city: '日喀则',
-    address: '日喀则市桑珠孜区传统文化街区内',
-    lat: 29.268,
-    lng: 88.882,
-    tag: '戏',
-    brief: '定期排练和展演藏戏的传习点，游客可预约观摩与互动体验',
-    highlight: '近距离观看一场完整的藏戏表演'
-  },
-  {
-    name: '林芝藏药文化体验馆',
-    city: '林芝',
-    address: '林芝市巴宜区林芝镇附近康养文化街区',
-    lat: 29.654,
-    lng: 94.362,
-    tag: '药',
-    brief: '结合藏药展示、讲解与简易调养体验的综合空间',
-    highlight: '了解常见藏药材与传统养生方式'
-  }
-]
-
-const experienceSpotsBo: ExperienceSpot[] = [
-  {
-    name: 'ལྷ་ས་རིག་གནས་ཤུལ་བཞག་ཉམས་མྱོང་ལྟེ་གནས། བར་སྐོར།',
-    city: 'ལྷ་ས།',
-    address: 'ལྷ་ས་ཁྲེང་ཀོན་ཆུས། བར་སྐོར་རྐང་ཐང་ལམ་ཉེ་འགྲམ།',
-    lat: 29.653,
-    lng: 91.117,
-    tag: 'བོད།',
-    brief: 'བོད་ཟློས་གར། ཐང་ཀ བོད་སྤོས་སོགས་རིག་གནས་ཤུལ་བཞག་ཉམས་མྱོང་ས་ཚིགས།',
-    highlight: 'ས་ཚིགས་གཅིག་ཏུ་རིག་གནས་ཤུལ་བཞག་མང་པོ་ཉམས་མྱོང་།'
-  },
-  {
-    name: 'ནོར་བུ་གླིང་ཁ་ཐང་ཀའི་ལས་ཁང་།',
-    city: 'ལྷ་ས།',
-    address: 'ལྷ་ས་ཁྲེང་ཀོན་ཆུས། ནོར་བུ་གླིང་ཁ་ཉེ་འགྲམ་གྱི་ལག་ཤེས་སྲང་ལམ།',
-    lat: 29.642,
-    lng: 91.071,
-    tag: 'རིས།',
-    brief: 'ཐང་ཀ་འབྲི་བ་དང་བཤམས་སྟོན་ལ་ཆེད་དུ་གནས་པའི་ལས་ཁང་།',
-    highlight: 'རང་གིས་ཐང་ཀའི་རི་མོ་དམར་པོ་ཞིག་ཚོད་འབྲི།'
-  },
-  {
-    name: 'གཞིས་ཀ་རྩེ་བོད་ཟློས་གར་སྦྱོང་བརྡར་ལྟེ་གནས།',
-    city: 'གཞིས་ཀ་རྩེ།',
-    address: 'གཞིས་ཀ་རྩེ་བསམ་འགྲུབ་རྩེ་ཆུས། རིག་གནས་སྲང་ལམ་ནང་།',
-    lat: 29.268,
-    lng: 88.882,
-    tag: 'ཟློས།',
-    brief: 'བོད་ཟློས་གར་སྦྱོང་བརྡར་དང་འཁྲབ་སྟོན་བྱེད་པའི་ས་ཚིགས།',
-    highlight: 'ཉེ་ས་ནས་བོད་ཟློས་གར་ཆ་ཚང་ཞིག་ལྟ།'
-  },
-  {
-    name: 'ཉིང་ཁྲི་བོད་སྨན་རིག་གནས་ཉམས་མྱོང་ཁང་།',
-    city: 'ཉིང་ཁྲི།',
-    address: 'ཉིང་ཁྲི་བ་ཡི་ཆུས། བོད་སྨན་དང་བདེ་ཐང་རིག་གནས་ས་ཁུལ།',
-    lat: 29.654,
-    lng: 94.362,
-    tag: 'སྨན།',
-    brief: 'བོད་སྨན་བཤམས་སྟོན། འགྲེལ་བཤད། སྟབས་བདེའི་གསོ་རིག་ཉམས་མྱོང་ཟུང་འབྲེལ།',
-    highlight: 'བོད་སྨན་རྒྱུ་ཆ་དང་སྲོལ་རྒྱུན་བདེ་ཐང་ཐབས་ལམ་ཤེས་པ།'
-  }
-]
-
-const experienceSpots = computed(() => locale.value === 'bo' ? experienceSpotsBo : experienceSpotsZh)
-
-// 代表性项目中要固定展示的几个核心项目
-const representativeItems = computed<HeritageItem[]>(() => {
-  const extraZh: HeritageItem[] = [
-    {
-      id: 10001,
-      name: '藏药',
-      description: '源自雪域高原的传统医学体系，吸收了藏族本土经验与印度、汉地医学精华，以丸、散、膏、丹等剂型闻名。',
-      category: t('heritage.category.traditionalMedicine'),
-      imageUrl: '/heritage/藏药.jpg',
-      videoUrl: '',
-      originStory: '',
-      significance: '体现了藏族人民与高原自然环境长期博弈中形成的健康智慧，是中华传统医学宝库的重要组成部分。',
-      baikeUrl: 'https://baike.baidu.com/item/%E8%97%8F%E5%8C%BB%E8%8D%AF%E6%B5%B4%E6%B3%95'
-    },
-    {
-      id: 10002,
-      name: '格萨尔史诗',
-      description: '被誉为”世界上最长的史诗”，通过艺人口耳相传、即兴说唱的方式一代代流传下来。',
-      category: '民间文学',
-      imageUrl: '/heritage/格萨尔史诗.jpg',
-      videoUrl: '',
-      originStory: '',
-      significance: '记录了藏族社会的历史记忆、英雄理想与价值观，是中华民族口头传统中的璀璨明珠。',
-      baikeUrl: 'https://baike.baidu.com/item/%E6%A0%BC%E8%90%A8%E5%B0%94%E7%8E%8B%E4%BC%A0'
-    },
-    {
-      id: 10003,
-      name: '藏戏',
-      description: '被誉为”藏文化的活化石”，集歌舞、说唱、表演于一体，常在寺院法会和民间节日中演出。',
-      category: '传统戏剧',
-      imageUrl: '/heritage/藏戏.jpg',
-      videoUrl: '',
-      originStory: '',
-      significance: '藏戏综合了宗教仪式、历史故事与民间传说，是研究藏族社会生活与信仰体系的重要窗口。',
-      baikeUrl: 'https://baike.baidu.com/item/%E8%97%8F%E6%88%8F'
-    },
-    {
-      id: 10004,
-      name: '藏族唐卡',
-      description: '以矿物颜料在布、纸或丝绸上绘制的宗教卷轴画，色彩瑰丽、构图严谨，多悬挂于寺院与居室。',
-      category: '传统技艺',
-      imageUrl: '/heritage/唐卡.jpg',
-      videoUrl: '',
-      originStory: '',
-      significance: '唐卡承载着藏传佛教教义、历史人物与宇宙观，被视为”可以卷起来带走的宫殿壁画”，是西藏艺术的代表符号之一。',
-      baikeUrl: 'https://baike.baidu.com/item/%E5%94%90%E5%8D%A1'
-    }
-  ]
-  const extraBo: HeritageItem[] = [
-    {
-      id: 10001,
-      name: 'བོད་སྨན།',
-      description: 'གངས་ལྗོངས་ས་མཐོ་ནས་བྱུང་བའི་སྲོལ་རྒྱུན་སྨན་རིག་མ་ལག བོད་མིའི་ཉམས་མྱོང་དང་རྒྱ་གར། རྒྱ་ནག་སྨན་རིག་གི་སྙིང་པོ་བསྡུས་ཡོད།',
-      category: t('heritage.category.traditionalMedicine'),
-      imageUrl: '/heritage/藏药.jpg',
-      videoUrl: '',
-      originStory: '',
-      significance: 'བོད་མིས་ས་མཐོའི་རང་བྱུང་ཁོར་ཡུག་དང་མཉམ་འཚོའི་ནང་གྲུབ་པའི་བདེ་ཐང་ཤེས་རབ་མཚོན།',
-      baikeUrl: 'https://baike.baidu.com/item/%E8%97%8F%E5%8C%BB%E8%8D%AF%E6%B5%B4%E6%B3%95'
-    },
-    {
-      id: 10002,
-      name: 'གེ་སར་སྒྲུང་།',
-      description: '“འཛམ་གླིང་གི་སྒྲུང་རིང་ཤོས” ཞེས་གྲགས། སྒྲུང་མཁན་གྱི་ཁ་བརྒྱུད་དང་རང་བྱུང་གླུ་སྒྲུང་གིས་མི་རབས་ནས་མི་རབས་སུ་བརྒྱུད།',
-      category: t('heritage.category.folkLiterature'),
-      imageUrl: '/heritage/格萨尔史诗.jpg',
-      videoUrl: '',
-      originStory: '',
-      significance: 'བོད་མིའི་ལོ་རྒྱུས་དྲན་ཤེས། དཔའ་བོའི་ཕུགས་བསམ། རིན་ཐང་ལྟ་ཚུལ་བཅས་ཟིན་ཐོར་བཀོད་ཡོད།',
-      baikeUrl: 'https://baike.baidu.com/item/%E6%A0%BC%E8%90%A8%E5%B0%94%E7%8E%8B%E4%BC%A0'
-    },
-    {
-      id: 10003,
-      name: 'བོད་ཟློས་གར།',
-      description: '“བོད་རིག་གནས་ཀྱི་གསོན་པོའི་དངོས་རྫས” ཞེས་གྲགས། གླུ་གར། གཏམ་བཤད། འཁྲབ་སྟོན་བཅས་ཟུང་འབྲེལ་གྱི་སྲོལ་རྒྱུན་ཟློས་གར།',
-      category: t('heritage.category.traditionalDrama'),
-      imageUrl: '/heritage/藏戏.jpg',
-      videoUrl: '',
-      originStory: '',
-      significance: 'ཆོས་ལུགས་ཆོ་ག ལོ་རྒྱུས་སྒྲུང་། མི་དམངས་གཏམ་རྒྱུད་བཅས་མཉམ་སྡེབ་བྱས་པའི་རིག་གནས་སྒེའུ་ཁུང་།',
-      baikeUrl: 'https://baike.baidu.com/item/%E8%97%8F%E6%88%8F'
-    },
-    {
-      id: 10004,
-      name: 'བོད་རིགས་ཐང་ཀ',
-      description: 'རྡོ་སྨན་ཚོན་རྫས་ཀྱིས་རས། ཤོག་བུའམ་དར་རས་ཐོག་ཏུ་འབྲི་བའི་ཆོས་ལུགས་རི་མོ། ཚོན་མདོག་བཀྲ་ཤིས་ཤིང་གྲུབ་ཚུལ་ནན་ཏན་ཡིན།',
-      category: t('heritage.category.traditionalCraft'),
-      imageUrl: '/heritage/唐卡.jpg',
-      videoUrl: '',
-      originStory: '',
-      significance: 'ཐང་ཀས་བོད་བརྒྱུད་ནང་བསྟན་གྱི་ཆོས་དོན། ལོ་རྒྱུས་མི་སྣ། འཇིག་རྟེན་ལྟ་ཚུལ་བཅས་འཁུར་ཡོད།',
-      baikeUrl: 'https://baike.baidu.com/item/%E5%94%90%E5%8D%A1'
-    }
-  ]
-
-  const extra = locale.value === 'bo' ? extraBo : extraZh
-
-  // 为了避免和后台数据重复，先把与手动固定项目同名的条目从后台列表中排除
-  const extraNames = new Set(extra.map(item => item.name))
-
-  const base = heritageItems.value
-    .map(item => ({
-      ...item,
-      imageUrl: resolveHeritageImage(item)
-    }))
-    .filter(item => {
-      // 1. 排除与固定项目同名的条目
-      if (extraNames.has(item.name)) return false
-      // 2. 特殊处理：后台里叫“唐卡”，前端固定用“藏族唐卡”，这里直接去掉后台的“唐卡”
-      if (item.name === '唐卡' && extraNames.has('藏族唐卡')) return false
-      // 3. 代表卡片只收录能映射到明确本地图片的条目，避免泛图或断链图混入
-      if (!item.imageUrl) return false
-      return true
-    })
-    .slice(0, 4)
-
-  return [...base, ...extra]
-})
-
-// ---- 国家级非物质文化遗产（静态文本解析） ----
+const experienceSpots = computed<ExperienceSpot[]>(
+  () => heritageContent.value?.experienceSpots ?? []
+)
 
 interface NationalHeritageItem {
   id: number
@@ -1585,264 +1421,62 @@ interface NationalHeritageItem {
   description: string
 }
 
-// 结合本模块已收录内容与国家级非遗类别，保留明确属于非遗的项目。
-const nationalHeritageRaw = `西藏国家级非物质文化遗产项目导览
-西藏自治区拥有丰富的国家级非物质文化遗产代表性项目，其中格萨尔、藏戏、藏医药浴法等项目还被列入联合国教科文组织人类非物质文化遗产代表作名录。以下围绕本模块已收录内容与常见国家级项目，按八类整理，避免把普通景点或泛文化内容混入非遗名录：
-一、民间文学类 (1 项)
-格萨尔（第一批，2006 年）：世界最长的史诗，被誉为 "活形态史诗"，由艺人口头传唱，2009 年入选联合国教科文组织人类非遗代表作名录
-二、传统音乐类 (5 项)
-那曲山歌（第一批，2006 年）：西藏高原地区传统民歌形式
-门巴族萨玛民歌（第五批，2021 年）：西藏门巴族传统音乐形式，流行于错那市勒布区
-古尔鲁（第五批，2021 年）：民间文学与宗教音乐的结合，源于吐蕃时期的口头诗歌，属曲艺类
-工布扎念博咚（第五批，2021 年）：工布地区传统弹拨乐器音乐
-拉萨囊玛：西藏古典音乐，融合了藏族传统音乐与内地音乐元素
-三、传统舞蹈类 (20 项)
-热巴舞 (丁青热巴)（第二批，2008 年）：昌都丁青县传统舞蹈，历史可追溯至公元 11 世纪，融合歌舞、杂技的综合性表演
-芒康弦子（弦子舞）（第二批，2008 年）：以弦乐伴奏的集体舞，流行于西藏芒康地区
-锅庄舞（第一批，2006 年）：包括昌都锅庄舞、那曲锅庄等多个地区流派，藏族传统集体舞
-日喀则甲谐（第一批，2006 年）：大型传统歌舞，具有浓郁的西藏地方特色
-日喀则斯马卓（第一批，2006 年）：民间鼓舞，又称 "后藏鼓舞"
-山南久河卓舞（第四批，2014 年）：传统腰鼓舞，流行于山南市琼结县
-古格宣舞（阿里宣舞）（第二批，2008 年）：阿里地区传统宫廷舞蹈，融合藏戏、舞蹈、说唱等传统民间艺术
-拉萨囊玛（部分归类为传统舞蹈）：兼具音乐与舞蹈特点的艺术形式
-协荣仲孜：大型表演性舞蹈，流行于拉萨市堆龙德庆区
-阿古顿巴卓舞：流行于西藏部分地区的传统舞蹈
-热振曲卓（第五批，2021 年）：热振地区传统舞蹈形式
-堆谐 (拉孜堆谐)："藏式踢踏舞"，流行于日喀则拉孜县
-谐钦（多个地区变体）：
-南木林土布加谐钦
-拉萨纳如谐钦
-尼玛乡谐钦
-阿谐（达布阿谐）：传统劳动歌舞，流行于西藏部分地区
-芒康三弦舞：以三弦琴伴奏的传统舞蹈，流行于西藏芒康地区
-米纳羌姆（第四批，2014 年）：传统宗教舞蹈，流行于西藏部分地区
-果尔孜舞（第三批，2011 年）：有 1300 多年历史的传统舞蹈，传承沿袭传统的口口相传
-陈塘夏尔巴歌舞（第三批，2011 年）：定结县陈塘地区夏尔巴人传统歌舞
-嘉黎 "阿古顿巴" 卓舞：那曲市嘉黎县传统舞蹈
-普兰 "宣" 服饰舞蹈：阿里地区普兰县传统舞蹈，融合了独特的服饰文化
-四、传统戏剧类 (3 项)
-藏戏（第一批，2006 年）：包括多个流派，2009 年入选联合国教科文组织人类非遗代表作名录
-拉萨觉木隆
-日喀则迥巴
-日喀则南木林湘巴
-日喀则仁布江嘎尔
-山南雅隆扎西雪巴（第一批，2006 年）
-山南琼结卡卓扎西宾顿（第二批，2008 年）
-山南门巴戏（第一批，2006 年）：山南地区错那县勒布区门巴族传统戏剧，2007 年重组戏班后形成 9 人演出团体
-巴贡（霞尔巴贡）（第五批，2021 年）：传统戏剧形式，流行于西藏部分地区
-五、传统体育・游艺与杂技类 (1 项)
-藏族传统马术（第三批，2011 年）：西藏传统体育竞技项目，展示藏族精湛的骑马技艺
-六、传统技艺类 (16 项)
-藏族唐卡（第一批，2006 年）：包括多个画派，西藏传统绘画艺术
-勉唐画派：形成于 15 世纪，由勉拉・顿珠嘉措创立，以线条工整、色彩明快著称
-钦泽画派
-噶玛嘎孜画派
-齐吾岗派（第五批，2021 年）
-拉萨堆绣唐卡（第五批，2021 年）
-康勉萨唐卡（第五批，2021 年）
-藏族金属锻造技艺（第二批，2008 年）：包括多个流派和工艺
-藏族锻铜技艺（南木林县）
-藏刀锻制技艺（拉孜县）
-孜东铜器锻制技艺
-扎西吉彩金银锻铜技艺（第三批扩展，2011 年）
-擦擦制作技艺（拉萨擦擦制作技艺）（第五批，2021 年）：传统佛教艺术品制作技艺
-传统帐篷编制技艺（巴青牛毛帐篷编制技艺）（第五批，2021 年）：那曲市巴青县传统帐篷制作技艺
-藏族邦典、卡垫织造技艺（第一批，2006 年）：西藏传统纺织工艺，生产邦典（围裙）和卡垫（地毯）
-拉萨甲米水磨坊（第一批，2006 年）：传统水利磨面技术，展示了藏族人民的智慧和创造力
-藏族雕版印刷技艺（纳唐寺雕版印刷技艺）（第二批，2008 年）：传统印刷工艺，保存了大量藏文典籍
-藏刀锻制技艺（谢通门藏刀锻制技艺）：日喀则市谢通门县传统刀具制作技艺
-藏族造纸技艺（热如藏纸制作技艺）：传统手工造纸技术，使用当地特有的植物原料
-藏族传统泥塑技艺：西藏传统雕塑工艺，用于制作佛像和工艺品
-藏香制作技艺（敏珠林寺藏香制作技艺）（第五批，2021 年）：传统香料制作技艺，具有独特的配方和工艺
-泽帖尔编制技艺（第五批，2021 年）：山南市乃东区传统毛纺织技艺，被誉为 "西藏氆氇中的佳品"
-藏族扎囊木雕（第五批，2021 年）：扎囊县传统木雕工艺，用于制作佛像和家具
-晒盐技艺（井盐晒制技艺）（第二批，2008 年）：芒康县传统制盐工艺，展示了藏族人民与自然和谐共处的智慧
-墨脱石锅制作技艺（第四批，2014 年）：林芝市墨脱县传统厨具制作技艺，2015 年成为国家批准保护的地理标志产品
-藏族传统榨油技艺（江孜传统榨油技艺）：日喀则市江孜县传统榨油工艺，使用传统的木制榨油设备
-七、传统医药类 (1 项)
-藏医药浴法（藏医药浴疗法）：以藏医学理论为基础，结合雪域高原药材、温泉资源和浴疗经验形成的外治疗法，2018 年入选联合国教科文组织人类非遗代表作名录
-八、民俗类 (2 项)
-雪顿节（第一批，2006 年）：以展佛、藏戏汇演、民俗游艺等活动为核心的藏族重要节庆
-望果节（第四批，2014 年）：西藏农区秋收前后举行的农耕民俗节日，以绕田巡游、祈愿丰收、歌舞竞技等活动传承乡土共同体记忆`
+const representativeItems = computed<HeritageItem[]>(() => {
+  const content = heritageContent.value
+  const extra = Object.values(content?.representative ?? {}).map(item => ({
+    id: item.id,
+    name: item.name,
+    description: item.description,
+    category: t(`heritage.category.${item.categoryKey}`),
+    imageUrl: item.imageUrl,
+    videoUrl: '',
+    originStory: '',
+    significance: item.significance,
+    baikeUrl: item.baikeUrl
+  }))
 
-const getTibetanNationalHeritageItems = (): NationalHeritageItem[] => [
-  {
-    id: 1,
-    category: t('heritage.category.folkLiterature'),
-    name: 'གེ་སར།',
-    description: 'འཛམ་གླིང་གི་སྒྲུང་རིང་ཤོས་སུ་གྲགས་པའི་བོད་ཀྱི་དཔའ་བོའི་སྒྲུང་། སྒྲུང་མཁན་གྱི་ཁ་བརྒྱུད་ཀྱིས་ད་བར་བརྒྱུད་ཡོད།'
-  },
-  {
-    id: 2,
-    category: t('heritage.category.traditionalMusic'),
-    name: 'ནག་ཆུའི་རི་གླུ།',
-    description: 'བྱང་ཐང་ས་མཐོའི་རྩྭ་ཐང་འཚོ་བ་ལས་བྱུང་བའི་སྲོལ་རྒྱུན་དམངས་གླུ།'
-  },
-  {
-    id: 3,
-    category: t('heritage.category.traditionalMusic'),
-    name: 'ལྷ་སའི་ནང་མ།',
-    description: 'བོད་ཀྱི་གསོལ་སྟོན་དང་གླུ་གར་སྲོལ་རྒྱུན་ནང་གི་གླུ་རོལ་རྣམ་པ་གཙོ་བོ།'
-  },
-  {
-    id: 4,
-    category: t('heritage.category.traditionalDance'),
-    name: 'རེ་པ་གར།',
-    description: 'གླུ་དང་གར། རྩལ་འཁྲབ་བཅས་མཉམ་སྡེབ་ཀྱི་བོད་ཀྱི་སྲོལ་རྒྱུན་འཁྲབ་རྩལ།'
-  },
-  {
-    id: 5,
-    category: t('heritage.category.traditionalDance'),
-    name: 'མང་ཁང་གི་ཞན་ཙི།',
-    description: 'སྒྲ་སྙན་གྱི་རོལ་མོ་དང་མཉམ་དུ་འཁྲབ་པའི་མང་ཁང་ས་ཁུལ་གྱི་མཉམ་གར།'
-  },
-  {
-    id: 6,
-    category: t('heritage.category.traditionalDance'),
-    name: 'སྐོར་གར།',
-    description: 'བོད་མིའི་རྩྭ་ཐང་དང་གྲོང་སྡེའི་འཚོ་བའི་ནང་ཁྱབ་པའི་སྡེ་ཚན་མཉམ་གར།'
-  },
-  {
-    id: 7,
-    category: t('heritage.category.traditionalDrama'),
-    name: 'བོད་ཟློས་གར།',
-    description: 'ཆོས་ལུགས་ཆོ་ག་དང་ལོ་རྒྱུས་སྒྲུང་མཉམ་འདྲེས་ཀྱི་སྲོལ་རྒྱུན་ཟློས་གར།'
-  },
-  {
-    id: 8,
-    category: t('heritage.category.traditionalDrama'),
-    name: 'ལྷ་ས་ཇོ་མོ་ལུང་།',
-    description: 'བོད་ཟློས་གར་གྱི་གྲགས་ཆེ་བའི་རྒྱུན་ལུགས་གཅིག'
-  },
-  {
-    id: 9,
-    category: t('heritage.category.traditionalSports'),
-    name: 'བོད་རིགས་ཀྱི་རྟ་རྩལ།',
-    description: 'བོད་ཀྱི་རྟ་ཞོན་རྩལ་དང་རྩྭ་ཐང་འཚོ་བ་མཚོན་པའི་སྲོལ་རྒྱུན་ལུས་རྩལ།'
-  },
-  {
-    id: 10,
-    category: t('heritage.category.traditionalCraft'),
-    name: 'བོད་རིགས་ཐང་ཀ',
-    description: 'ཆོས་ལུགས་རི་མོ་དང་རྡོ་སྨན་ཚོན་རྫས་ལག་རྩལ་ཟུང་འབྲེལ་གྱི་བོད་ཀྱི་རི་མོའི་མཚོན་རྟགས།'
-  },
-  {
-    id: 11,
-    category: t('heritage.category.traditionalCraft'),
-    name: 'བོད་རིགས་ལྕགས་རིགས་བཟོ་རྩལ།',
-    description: 'བོད་ཀྱི་གྲི། ཟངས་ཆས། གསེར་དངུལ་རྒྱན་ཆ་སོགས་བཟོ་བའི་ལག་ཤེས།'
-  },
-  {
-    id: 12,
-    category: t('heritage.category.traditionalCraft'),
-    name: 'བོད་སྤོས་བཟོ་རྩལ།',
-    description: 'མིན་གྲོལ་གླིང་སོགས་སྲོལ་རྒྱུན་ནས་བྱུང་བའི་སྤོས་རྫས་དང་བཟོ་རྩལ།'
-  },
-  {
-    id: 13,
-    category: t('heritage.category.traditionalMedicine'),
-    name: 'བོད་སྨན་ཁྲུས་ཐབས།',
-    description: 'བོད་སྨན་རིག་པའི་གཞི་རྩ་དང་ས་མཐོའི་སྨན་རྩྭ། ཆུ་ཚན་སོགས་ཟུང་འབྲེལ་གྱི་ཕྱི་བཅོས་ཐབས་ལམ།'
-  },
-  {
-    id: 14,
-    category: t('heritage.category.folkCustom'),
-    name: 'ཞོ་སྟོན།',
-    description: 'འགྲེམས་སྟོན་ཆོ་ག བོད་ཟློས་གར་འཁྲབ་སྟོན། དམངས་ཁྲོད་རྩེད་མོ་བཅས་མཉམ་སྡེབ་ཀྱི་བོད་ཀྱི་དུས་ཆེན་གལ་ཆེན།'
-  },
-  {
-    id: 15,
-    category: t('heritage.category.folkCustom'),
-    name: 'འོང་སྐོར།',
-    description: 'ཞིང་ལས་ཐོན་སྐྱེད་དང་ལོ་ལེགས་སྨོན་འདུན་ལ་འབྲེལ་བའི་བོད་ཀྱི་ཞིང་གྲོང་དམངས་སྲོལ།'
-  }
-]
+  const extraNames = new Set(extra.map(item => item.name))
+  const thangkaBackendName = content?.aliases?.thangkaBackendName ?? ''
+  const thangkaDisplayName = content?.aliases?.thangkaDisplayName ?? ''
 
-// 简单归一化分类名称，便于和上方大类卡片对应
-const normalizeCategoryName = (name: string) => {
-  return name
-    .replace(/类$/, '')
-    .replace(/国家级/g, '')
-    .replace(/\s+/g, '')
-    .replace(/・/g, '·')
-}
-
-const nationalHeritageItems = computed<NationalHeritageItem[]>(() => {
-  if (locale.value === 'bo') {
-    return getTibetanNationalHeritageItems()
-  }
-
-  const lines = nationalHeritageRaw.split('\n').map(l => l.trim()).filter(Boolean)
-  const items: NationalHeritageItem[] = []
-  let currentCategory = ''
-  let id = 1
-
-  const categoryPrefixes = ['一、', '二、', '三、', '四、', '五、', '六、', '七、', '八、']
-
-  for (const line of lines) {
-    // 分类标题行
-    if (categoryPrefixes.some(prefix => line.startsWith(prefix))) {
-      const parts = line.split('、')
-      const rest = parts.slice(1).join('、')
-      currentCategory = rest.replace(/\(.*?\)/g, '').trim()
-      continue
-    }
-
-    // 忽略总说明
-    if (!currentCategory || line.startsWith('西藏自治区共有')) continue
-
-    // 尽量用全角冒号或半角冒号拆分为“名称 + 描述”
-    const sepIndex = line.indexOf('：')
-    let name = line
-    let description = ''
-
-    if (sepIndex !== -1) {
-      name = line.slice(0, sepIndex).trim()
-      description = line.slice(sepIndex + 1).trim()
-    }
-
-    // 去掉项目批次等括号信息中的数字，只保留主体名称
-    const firstParenIdx = name.indexOf('（')
-    if (firstParenIdx !== -1) {
-      name = name.slice(0, firstParenIdx).trim()
-    }
-
-    items.push({
-      id: id++,
-      category: currentCategory,
-      name,
-      description: description || '（暂无补充说明，后续可在后台完善这一条目的详细介绍。）'
+  const base = heritageItems.value
+    .map(item => ({
+      ...item,
+      imageUrl: resolveHeritageImage(item)
+    }))
+    .filter(item => {
+      if (extraNames.has(item.name)) return false
+      if (item.name === thangkaBackendName && extraNames.has(thangkaDisplayName)) return false
+      if (!item.imageUrl) return false
+      return true
     })
-  }
+    .slice(0, 4)
 
-  return items
+  return [...base, ...extra]
 })
 
-// 根据归一化后的分类名称分组，方便点击大类卡片时展示
-const nationalHeritageByCategory = computed<Record<string, NationalHeritageItem[]>>(() => {
-  const map: Record<string, NationalHeritageItem[]> = {}
-  for (const item of nationalHeritageItems.value) {
-    const key = normalizeCategoryName(item.category)
-    if (!map[key]) map[key] = []
-    map[key].push(item)
-  }
-  return map
-})
+const activeCategory = ref<HeritageCategoryKey | null>(null)
 
-const activeCategory = ref<string | null>(null)
+const getItemsByCategory = (categoryKey: HeritageCategoryKey): NationalHeritageItem[] => {
+  const items = heritageContent.value?.national?.categories?.[categoryKey]?.items ?? []
+  const noDescription = heritageContent.value?.national?.noDescription ?? ''
+  const categoryLabel = t(`heritage.category.${categoryKey}`)
 
-const getItemsByCategory = (categoryName: string): NationalHeritageItem[] => {
-  const key = normalizeCategoryName(categoryName)
-  return nationalHeritageByCategory.value[key] || []
+  return items.map(item => ({
+    id: item.id,
+    category: categoryLabel,
+    name: item.name,
+    description: item.description || noDescription
+  }))
 }
 
 const sortOptions = computed<Array<{ value: HeritageSortMode; label: string }>>(() => [
-  { value: 'hot', label: '综合热度' },
-  { value: 'views', label: '浏览最多' },
-  { value: 'likes', label: '点赞最多' },
-  { value: 'comments', label: '评论最多' },
-  { value: 'latest', label: '最新收录' },
-  { value: 'name', label: '名称排序' }
+  { value: 'hot', label: t('heritage.sort.hot') },
+  { value: 'views', label: t('heritage.sort.views') },
+  { value: 'likes', label: t('heritage.sort.likes') },
+  { value: 'comments', label: t('heritage.sort.comments') },
+  { value: 'latest', label: t('heritage.sort.latest') },
+  { value: 'name', label: t('heritage.sort.name') }
 ])
 
 const categoryOptions = computed(() => {
@@ -1923,7 +1557,7 @@ const formatEventMonth = (dateStr?: string) => {
   if (!dateStr) return '--'
   const date = new Date(dateStr)
   if (Number.isNaN(date.getTime())) return '--'
-  return `${date.getMonth() + 1}月`
+  return `${date.getMonth() + 1}${heritageContent.value?.eventMonthSuffix ?? ""}`
 }
 
 const formatEventDay = (dateStr?: string) => {
@@ -2053,18 +1687,23 @@ const refreshHeritageModule = async () => {
 const loadDetailData = async (item: HeritageItem) => {
   if (!item.id || item.id >= 10000) return
 
+  const requestId = ++detailRequestId
+  commentsPageRequestId += 1
+  const itemId = item.id
   commentsLoading.value = true
   commentsLoadingMore.value = false
   detailAuthRequired.value = false
   try {
-    const detailRes = await api.get(endpoints.heritage.detail(item.id), detailRequestConfig)
+    const detailRes = await api.get(endpoints.heritage.detail(itemId), detailRequestConfig)
       .catch(error => {
         if (isUnauthorizedError(error)) {
+          if (!isCurrentDetailRequest(requestId, itemId)) return null
           detailAuthRequired.value = true
           return null
         }
         throw error
       })
+    if (!isCurrentDetailRequest(requestId, itemId)) return
 
     if (detailAuthRequired.value) {
       itemComments.value = []
@@ -2074,46 +1713,55 @@ const loadDetailData = async (item: HeritageItem) => {
     }
 
     const [commentsRes, inheritorsRes, eventsRes] = await Promise.all([
-      api.get(endpoints.heritage.comments(item.id), {
+      api.get(endpoints.heritage.comments(itemId), {
         ...detailRequestConfig,
         params: { page: 0, size: heritageCommentsPageSize }
       }).catch(error => {
         if (isUnauthorizedError(error)) return null
         throw error
       }),
-      api.get(endpoints.heritage.inheritors(item.id), detailRequestConfig).catch(error => {
+      api.get(endpoints.heritage.inheritors(itemId), detailRequestConfig).catch(error => {
         if (isUnauthorizedError(error)) return null
         throw error
       }),
-      api.get(endpoints.heritage.events(item.id), detailRequestConfig).catch(error => {
+      api.get(endpoints.heritage.events(itemId), detailRequestConfig).catch(error => {
         if (isUnauthorizedError(error)) return null
         throw error
       })
     ])
+    if (!isCurrentDetailRequest(requestId, itemId)) return
     const detailItem = detailRes?.data as HeritageItem | undefined
     if (detailItem?.id) {
       selectedItem.value = { ...item, ...detailItem }
-      updateHeritageItem(item.id, detailItem)
+      updateHeritageItem(itemId, detailItem)
     }
     applyItemCommentsPage(commentsRes)
     itemInheritors.value = responseContent<HeritageInheritorItem>(inheritorsRes?.data)
     itemEvents.value = responseContent<HeritageEventItem>(eventsRes?.data)
     mergeFeaturedInheritors(itemInheritors.value)
   } catch (e) {
+    if (!isCurrentDetailRequest(requestId, itemId)) return
     console.error('Failed to load detail data:', summarizeClientError(e))
   } finally {
-    commentsLoading.value = false
+    if (isCurrentDetailRequest(requestId, itemId)) {
+      commentsLoading.value = false
+    }
   }
 
-  if (authStore.isLoggedIn && !detailAuthRequired.value) {
+  if (authStore.isLoggedIn && !detailAuthRequired.value && isCurrentDetailRequest(requestId, itemId)) {
     try {
-      const res = await api.get(endpoints.heritage.likeStatus(item.id), detailRequestConfig)
+      const res = await api.get(endpoints.heritage.likeStatus(itemId), detailRequestConfig)
+      if (!isCurrentDetailRequest(requestId, itemId)) return
       liked.value = res.data?.liked || false
-    } catch { liked.value = false }
+    } catch {
+      if (isCurrentDetailRequest(requestId, itemId)) {
+        liked.value = false
+      }
+    }
   }
 }
 
-const applyItemCommentsPage = (response: any, append = false) => {
+const applyItemCommentsPage = (response: PaginatedHttpResponse | null | undefined, append = false) => {
   const page = readPaginatedResponse<HeritageCommentItem>(response ?? { data: [] }, {
     page: append ? itemCommentsPageInfo.value.page + 1 : 0,
     size: heritageCommentsPageSize
@@ -2130,45 +1778,63 @@ const applyItemCommentsPage = (response: any, append = false) => {
 
 const loadNextItemCommentsPage = async () => {
   if (!selectedItem.value || commentsLoadingMore.value || !hasMoreItemComments.value) return
+  const itemId = selectedItem.value.id
+  const requestId = ++commentsPageRequestId
   commentsLoadingMore.value = true
   try {
-    const response = await api.get(endpoints.heritage.comments(selectedItem.value.id), {
+    const response = await api.get(endpoints.heritage.comments(itemId), {
       ...detailRequestConfig,
       params: { page: itemCommentsPageInfo.value.page + 1, size: heritageCommentsPageSize }
     })
+    if (!isCurrentCommentsPageRequest(requestId, itemId)) return
     applyItemCommentsPage(response, true)
   } catch (error) {
+    if (!isCurrentCommentsPageRequest(requestId, itemId)) return
     console.error('Failed to load more heritage comments:', summarizeClientError(error))
     showToast(t('toast.pageLoadFailed'), 'error')
   } finally {
-    commentsLoadingMore.value = false
+    if (isCurrentCommentsPageRequest(requestId, itemId)) {
+      commentsLoadingMore.value = false
+    }
   }
 }
 
 const toggleLike = async () => {
   if (!selectedItem.value || !authStore.isLoggedIn) return
+  const itemId = selectedItem.value.id
+  const requestId = ++likeMutationRequestId
+  const previousLiked = liked.value
+  const previousLikeCount = selectedItem.value.likeCount || 0
   try {
-    const res = await api.post(endpoints.heritage.like(selectedItem.value.id))
+    const res = await api.post(endpoints.heritage.like(itemId))
+    if (requestId !== likeMutationRequestId || !isSelectedHeritageItem(itemId)) return
+
     const nextLiked = res.data?.liked ?? !liked.value
     const nextLikeCount = typeof res.data?.likeCount === 'number'
       ? res.data.likeCount
-      : Math.max(0, (selectedItem.value.likeCount || 0) + (nextLiked ? 1 : -1))
+      : Math.max(0, previousLikeCount + (nextLiked === previousLiked ? 0 : nextLiked ? 1 : -1))
     liked.value = nextLiked
     selectedItem.value = { ...selectedItem.value, likeCount: nextLikeCount }
-    updateHeritageItem(selectedItem.value.id, { likeCount: nextLikeCount })
+    updateHeritageItem(itemId, { likeCount: nextLikeCount })
   } catch (e) {
     console.error('Failed to toggle like:', summarizeClientError(e))
   }
 }
 
 const submitComment = async () => {
-  if (!selectedItem.value || !authStore.isLoggedIn || !newCommentContent.value.trim()) return
+  if (!selectedItem.value || !authStore.isLoggedIn || !newCommentContent.value.trim() || submittingComment.value) return
+  const itemId = selectedItem.value.id
+  const content = newCommentContent.value.trim()
+  const rating = newCommentRating.value
+  const previousCommentCount = selectedItem.value.commentCount || 0
   submittingComment.value = true
   try {
-    const res = await api.post(endpoints.heritage.comments(selectedItem.value.id), {
-      content: newCommentContent.value.trim(),
-      rating: newCommentRating.value
+    const res = await api.post(endpoints.heritage.comments(itemId), {
+      content,
+      rating
     })
+    if (!isSelectedHeritageItem(itemId)) return
+
     if (res.data) {
       itemComments.value = [res.data, ...itemComments.value]
       const nextTotalElements = itemCommentsPageInfo.value.totalElements + 1
@@ -2181,9 +1847,9 @@ const submitComment = async () => {
         )
       }
       if (selectedItem.value) {
-        const nextCommentCount = (selectedItem.value.commentCount || 0) + 1
+        const nextCommentCount = previousCommentCount + 1
         selectedItem.value = { ...selectedItem.value, commentCount: nextCommentCount }
-        updateHeritageItem(selectedItem.value.id, { commentCount: nextCommentCount })
+        updateHeritageItem(itemId, { commentCount: nextCommentCount })
       }
     }
     newCommentContent.value = ''
@@ -2196,9 +1862,14 @@ const submitComment = async () => {
 }
 
 const deleteComment = async (commentId: number) => {
-  if (!selectedItem.value) return
+  if (!selectedItem.value || isDeletingComment(commentId)) return
+  const itemId = selectedItem.value.id
+  const previousCommentCount = selectedItem.value.commentCount || 0
+  setDeletingComment(commentId, true)
   try {
-    await api.delete(endpoints.heritage.deleteComment(selectedItem.value.id, commentId))
+    await api.delete(endpoints.heritage.deleteComment(itemId, commentId))
+    if (!isSelectedHeritageItem(itemId)) return
+
     itemComments.value = itemComments.value.filter(c => c.id !== commentId)
     const nextTotalElements = Math.max(0, itemCommentsPageInfo.value.totalElements - 1)
     itemCommentsPageInfo.value = {
@@ -2207,12 +1878,14 @@ const deleteComment = async (commentId: number) => {
       totalPages: Math.ceil(nextTotalElements / heritageCommentsPageSize)
     }
     if (selectedItem.value) {
-      const nextCommentCount = Math.max(0, (selectedItem.value.commentCount || 1) - 1)
+      const nextCommentCount = Math.max(0, previousCommentCount - 1)
       selectedItem.value = { ...selectedItem.value, commentCount: nextCommentCount }
-      updateHeritageItem(selectedItem.value.id, { commentCount: nextCommentCount })
+      updateHeritageItem(itemId, { commentCount: nextCommentCount })
     }
   } catch (e) {
     console.error('Failed to delete comment:', summarizeClientError(e))
+  } finally {
+    setDeletingComment(commentId, false)
   }
 }
 
@@ -2246,11 +1919,14 @@ watch(() => authStore.isLoggedIn, (isLoggedIn) => {
   }
 })
 
-const toggleCategory = (categoryName: string) => {
-  activeCategory.value = activeCategory.value === categoryName ? null : categoryName
+const toggleCategory = (categoryKey: HeritageCategoryKey) => {
+  activeCategory.value = activeCategory.value === categoryKey ? null : categoryKey
 }
 
 const openDetail = (item: HeritageItem) => {
+  detailRequestId += 1
+  commentsPageRequestId += 1
+  likeMutationRequestId += 1
   selectedItem.value = item
   itemComments.value = []
   resetItemCommentsPageInfo()

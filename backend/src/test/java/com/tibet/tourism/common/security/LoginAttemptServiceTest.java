@@ -1,15 +1,19 @@
 package com.tibet.tourism.common.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.test.util.ReflectionTestUtils;
 
 class LoginAttemptServiceTest {
@@ -237,6 +241,8 @@ class LoginAttemptServiceTest {
         StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
         ValueOperations<String, String> operations = mock(ValueOperations.class);
         when(redisTemplate.opsForValue()).thenReturn(operations);
+        when(redisTemplate.execute(any(RedisScript.class), anyList(), any(), any()))
+                .thenAnswer(invocation -> "1:" + System.currentTimeMillis());
         when(operations.get(argThat((String key) -> key != null
                 && key.startsWith("brute-force:acct:")
                 && !key.contains("redisdown"))))
@@ -252,17 +258,18 @@ class LoginAttemptServiceTest {
     @SuppressWarnings("unchecked")
     void redisKeysDoNotContainRawUsernameOrEmail() {
         StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
-        ValueOperations<String, String> operations = mock(ValueOperations.class);
-        when(redisTemplate.opsForValue()).thenReturn(operations);
+        when(redisTemplate.execute(any(RedisScript.class), anyList(), any(), any()))
+                .thenAnswer(invocation -> "1:" + System.currentTimeMillis());
 
         service = serviceWithRedis(redisTemplate);
 
         service.recordFailure("Traveler.Email@example.com", "203.0.113.91");
 
-        org.mockito.ArgumentCaptor<String> keyCaptor = org.mockito.ArgumentCaptor.forClass(String.class);
-        org.mockito.Mockito.verify(operations, org.mockito.Mockito.atLeastOnce())
-                .set(keyCaptor.capture(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.any());
+        org.mockito.ArgumentCaptor<List<String>> keyCaptor = org.mockito.ArgumentCaptor.forClass(List.class);
+        org.mockito.Mockito.verify(redisTemplate, org.mockito.Mockito.atLeastOnce())
+                .execute(any(RedisScript.class), keyCaptor.capture(), any(), any());
         assertThat(keyCaptor.getAllValues())
+                .flatExtracting(keys -> keys)
                 .allSatisfy(key -> assertThat(key)
                         .startsWith("brute-force:")
                         .doesNotContain("Traveler", "traveler", "Email", "email", "example.com", "@"));
@@ -325,15 +332,8 @@ class LoginAttemptServiceTest {
     @SuppressWarnings("unchecked")
     void redisWriteFailureFailsClosedWhenStrict() {
         StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
-        ValueOperations<String, String> operations = mock(ValueOperations.class);
-        when(redisTemplate.opsForValue()).thenReturn(operations);
-        org.mockito.Mockito.doThrow(new RuntimeException("redis down"))
-                .when(operations)
-                .set(
-                        org.mockito.ArgumentMatchers.anyString(),
-                        org.mockito.ArgumentMatchers.anyString(),
-                        org.mockito.ArgumentMatchers.anyLong(),
-                        org.mockito.ArgumentMatchers.any());
+        when(redisTemplate.execute(any(RedisScript.class), anyList(), any(), any()))
+                .thenThrow(new RuntimeException("redis down"));
 
         service = serviceWithRedis(redisTemplate);
         ReflectionTestUtils.setField(service, "redisFailClosed", true);
@@ -344,5 +344,28 @@ class LoginAttemptServiceTest {
         assertThat(decision.allowed()).isFalse();
         assertThat(decision.reason()).isEqualTo("backend");
         assertThat(decision.retryAfterSeconds()).isEqualTo(60);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void redisIncrementScriptReturnsMonotonicFailureCounts() {
+        StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
+        java.util.concurrent.ConcurrentHashMap<String, java.util.concurrent.atomic.AtomicInteger> failuresByKey =
+                new java.util.concurrent.ConcurrentHashMap<>();
+        when(redisTemplate.execute(any(RedisScript.class), anyList(), any(), any()))
+                .thenAnswer(invocation -> {
+                    String key = ((List<String>) invocation.getArgument(1)).get(0);
+                    int next = failuresByKey
+                            .computeIfAbsent(key, ignored -> new java.util.concurrent.atomic.AtomicInteger())
+                            .incrementAndGet();
+                    return next + ":" + System.currentTimeMillis();
+                });
+
+        service = serviceWithRedis(redisTemplate);
+
+        service.recordFailure("atomic-user", "203.0.113.10");
+        service.recordFailure("atomic-user", "203.0.113.11");
+
+        assertThat(service.failureCount("atomic-user")).isEqualTo(2);
     }
 }

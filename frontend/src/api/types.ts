@@ -36,6 +36,26 @@ export interface PublicUserResponse {
   owner: boolean
 }
 
+export interface LoginRequest {
+  username: string
+  password: string
+  secondaryPassword?: string
+}
+
+export type LoginResponse = Record<string, unknown> & {
+  nickname?: string
+  avatar?: string
+  avatarUrl?: string
+  role?: string
+  mustChangePassword?: boolean
+}
+
+export interface RegisterRequest {
+  username: string
+  nickname: string
+  password: string
+}
+
 export type SharedRouteSourceType = 'USER' | 'OFFICIAL'
 
 export interface SharedRouteResponse {
@@ -75,6 +95,37 @@ export interface RouteLikeStatusResponse {
 }
 
 export interface RouteLikeMutationResponse {
+  liked?: boolean
+  likeCount?: number | string | null
+}
+
+export interface QuestionResponse {
+  id: number
+  author?: PublicUserResponse | null
+  title: string
+  content: string
+  tags?: string | null
+  isResolved: boolean
+  viewCount: number
+  likeCount: number
+  answerCount?: number | null
+  createdAt: string
+}
+
+export interface QuestionAnswerResponse {
+  id: number
+  user?: PublicUserResponse | null
+  content: string
+  isAccepted: boolean
+  likeCount: number
+  createdAt: string
+}
+
+export interface QuestionLikeStatusResponse {
+  liked?: boolean
+}
+
+export interface QuestionLikeMutationResponse {
   liked?: boolean
   likeCount?: number | string | null
 }

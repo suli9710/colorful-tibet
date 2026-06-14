@@ -118,7 +118,15 @@ jobs:
         run: |
           set -euo pipefail
           docker compose --env-file .env.example -f docker-compose.yml config --quiet
-          docker compose --env-file .env.example -f docker-compose.prod.yml config --quiet
+          tmp_env="$(mktemp)"
+          cp .env.example "$tmp_env"
+          {
+            echo "NGINX_SERVER_NAME=colorfultibet.test www.colorfultibet.test"
+            echo "NGINX_REDIRECT_HOST=colorfultibet.test"
+            echo "NGINX_CERT_DOMAIN=colorfultibet.test"
+            echo "ALERTMANAGER_WEBHOOK_URL=https://alerts.colorfultibet.test/webhook"
+          } >> "$tmp_env"
+          docker compose --env-file "$tmp_env" -f docker-compose.prod.yml config --quiet
 
       - name: Validate Prometheus configuration
         run: |

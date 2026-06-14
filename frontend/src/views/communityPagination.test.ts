@@ -131,6 +131,9 @@ vi.mock('../stores/auth', () => ({
     hasValidSession: testState.hasValidSession,
     refreshSession: testState.refreshSession,
     updateUser: testState.updateUser,
+    get isLoggedIn() {
+      return Boolean(testState.authUser)
+    },
     get user() {
       return testState.authUser
     }
@@ -143,6 +146,9 @@ vi.mock('@/stores/auth', () => ({
     hasValidSession: testState.hasValidSession,
     refreshSession: testState.refreshSession,
     updateUser: testState.updateUser,
+    get isLoggedIn() {
+      return Boolean(testState.authUser)
+    },
     get user() {
       return testState.authUser
     }
@@ -1274,6 +1280,262 @@ describe('community detail pagination', () => {
     expect(root.textContent).toContain('Second heritage comment')
   })
 
+  it('ignores stale heritage like completions after switching selected items', async () => {
+    const staleLike = createDeferred<{ data: { liked: boolean; likeCount: number } }>()
+    testState.apiGet.mockImplementation((url: string, config?: any) => {
+      if (url === '/heritage') {
+        return Promise.resolve({
+          data: {
+            content: [
+              { id: 1, name: 'Slow heritage', category: '传统技艺', description: 'First detail', commentCount: 0, likeCount: 4, viewCount: 1 },
+              { id: 2, name: 'Current heritage', category: '传统技艺', description: 'Second detail', commentCount: 0, likeCount: 7, viewCount: 1 }
+            ],
+            page: 0,
+            size: 100,
+            totalElements: 2,
+            totalPages: 1
+          }
+        })
+      }
+      if (url === '/heritage/events/upcoming') {
+        return Promise.resolve({ data: { content: [] } })
+      }
+      if (url === '/heritage/1') {
+        return Promise.resolve({ data: { id: 1, name: 'Slow heritage', category: '传统技艺', description: 'First detail', commentCount: 0, likeCount: 4 } })
+      }
+      if (url === '/heritage/2') {
+        return Promise.resolve({ data: { id: 2, name: 'Current heritage', category: '传统技艺', description: 'Second detail', commentCount: 0, likeCount: 7 } })
+      }
+      if (url === '/heritage/1/comments' || url === '/heritage/2/comments') {
+        return Promise.resolve(paginatedArray([], Number(config?.params?.page ?? 0), 20, 0, 0))
+      }
+      if (url === '/heritage/1/inheritors' || url === '/heritage/1/events' || url === '/heritage/2/inheritors' || url === '/heritage/2/events') {
+        return Promise.resolve({ data: { content: [] } })
+      }
+      if (url === '/heritage/1/like-status' || url === '/heritage/2/like-status') {
+        return Promise.resolve({ data: { liked: false } })
+      }
+
+      return Promise.reject(new Error(`Unexpected GET ${url}`))
+    })
+    testState.apiPost.mockImplementation((url: string) => {
+      if (url === '/heritage/1/like') return staleLike.promise
+
+      return Promise.reject(new Error(`Unexpected POST ${url}`))
+    })
+
+    const root = await mountView(Heritage)
+    clickByText(root, 'Slow heritage')
+    await settleVue()
+
+    clickByText(root, '点赞')
+    await settleVue(2)
+    clickByText(root, 'Current heritage')
+    await settleVue()
+
+    expect(root.textContent).toContain('Current heritage')
+    expect(root.textContent).toContain('7')
+
+    staleLike.resolve({ data: { liked: true, likeCount: 99 } })
+    await settleVue()
+
+    expect(testState.apiPost).toHaveBeenCalledWith('/heritage/1/like')
+    expect(root.textContent).toContain('Current heritage')
+    expect(root.textContent).toContain('7')
+    expect(root.textContent).not.toContain('99')
+  })
+
+  it('ignores older same-item heritage like completions after a newer toggle finishes', async () => {
+    const firstLike = createDeferred<{ data: { liked: boolean; likeCount: number } }>()
+    const secondLike = createDeferred<{ data: { liked: boolean; likeCount: number } }>()
+    testState.apiGet.mockImplementation((url: string, config?: any) => {
+      if (url === '/heritage') {
+        return Promise.resolve({
+          data: {
+            content: [
+              { id: 1, name: 'Thangka craft', category: '传统技艺', description: 'Painted heritage', commentCount: 0, likeCount: 4, viewCount: 1 }
+            ],
+            page: 0,
+            size: 100,
+            totalElements: 1,
+            totalPages: 1
+          }
+        })
+      }
+      if (url === '/heritage/events/upcoming') {
+        return Promise.resolve({ data: { content: [] } })
+      }
+      if (url === '/heritage/1') {
+        return Promise.resolve({ data: { id: 1, name: 'Thangka craft', category: '传统技艺', description: 'Painted heritage', commentCount: 0, likeCount: 4 } })
+      }
+      if (url === '/heritage/1/comments') {
+        return Promise.resolve(paginatedArray([], Number(config?.params?.page ?? 0), 20, 0, 0))
+      }
+      if (url === '/heritage/1/inheritors' || url === '/heritage/1/events') {
+        return Promise.resolve({ data: { content: [] } })
+      }
+      if (url === '/heritage/1/like-status') {
+        return Promise.resolve({ data: { liked: false } })
+      }
+
+      return Promise.reject(new Error(`Unexpected GET ${url}`))
+    })
+    testState.apiPost
+      .mockReturnValueOnce(firstLike.promise)
+      .mockReturnValueOnce(secondLike.promise)
+
+    const root = await mountView(Heritage)
+    clickByText(root, 'Thangka craft')
+    await settleVue()
+
+    clickByText(root, '点赞')
+    await settleVue(2)
+    clickByText(root, '点赞')
+    await settleVue(2)
+
+    secondLike.resolve({ data: { liked: false, likeCount: 4 } })
+    await settleVue()
+    firstLike.resolve({ data: { liked: true, likeCount: 5 } })
+    await settleVue()
+
+    expect(testState.apiPost).toHaveBeenCalledTimes(2)
+    expect(root.textContent).toContain('点赞')
+    expect(root.textContent).not.toContain('已点赞')
+  })
+
+  it('prevents duplicate heritage comment submissions while one is in flight', async () => {
+    const pendingComment = createDeferred<{ data: { id: number; content: string; createdAt: string; nickname: string; rating: number } }>()
+    testState.apiGet.mockImplementation((url: string, config?: any) => {
+      if (url === '/heritage') {
+        return Promise.resolve({
+          data: {
+            content: [
+              { id: 1, name: 'Commentable heritage', category: '传统技艺', description: 'Detail', commentCount: 0, likeCount: 0, viewCount: 1 }
+            ],
+            page: 0,
+            size: 100,
+            totalElements: 1,
+            totalPages: 1
+          }
+        })
+      }
+      if (url === '/heritage/events/upcoming') {
+        return Promise.resolve({ data: { content: [] } })
+      }
+      if (url === '/heritage/1') {
+        return Promise.resolve({ data: { id: 1, name: 'Commentable heritage', category: '传统技艺', description: 'Detail', commentCount: 0 } })
+      }
+      if (url === '/heritage/1/comments') {
+        return Promise.resolve(paginatedArray([], Number(config?.params?.page ?? 0), 20, 0, 0))
+      }
+      if (url === '/heritage/1/inheritors' || url === '/heritage/1/events') {
+        return Promise.resolve({ data: { content: [] } })
+      }
+      if (url === '/heritage/1/like-status') {
+        return Promise.resolve({ data: { liked: false } })
+      }
+
+      return Promise.reject(new Error(`Unexpected GET ${url}`))
+    })
+    testState.apiPost.mockImplementation((url: string) => {
+      if (url === '/heritage/1/comments') return pendingComment.promise
+
+      return Promise.reject(new Error(`Unexpected POST ${url}`))
+    })
+
+    const root = await mountView(Heritage)
+    clickByText(root, 'Commentable heritage')
+    await settleVue()
+    await setInputValue(root, 'input[maxlength="1000"]', 'A careful comment')
+
+    const submitButton = Array.from(root.querySelectorAll('button')).find(button =>
+      button.textContent?.includes('发表')
+    )
+    expect(submitButton).toBeTruthy()
+    submitButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    submitButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await settleVue(2)
+
+    expect(testState.apiPost).toHaveBeenCalledTimes(1)
+    expect(testState.apiPost).toHaveBeenCalledWith('/heritage/1/comments', {
+      content: 'A careful comment',
+      rating: 5
+    })
+
+    pendingComment.resolve({
+      data: {
+        id: 201,
+        content: 'A careful comment',
+        createdAt: '2026-06-08T00:02:00Z',
+        nickname: 'Traveler',
+        rating: 5
+      }
+    })
+    await settleVue()
+
+    expect(root.textContent).toContain('A careful comment')
+  })
+
+  it('prevents duplicate heritage comment deletes while one is in flight', async () => {
+    const pendingDelete = createDeferred()
+    testState.apiGet.mockImplementation((url: string, config?: any) => {
+      if (url === '/heritage') {
+        return Promise.resolve({
+          data: {
+            content: [
+              { id: 1, name: 'Owned-comment heritage', category: '传统技艺', description: 'Detail', commentCount: 1, likeCount: 0, viewCount: 1 }
+            ],
+            page: 0,
+            size: 100,
+            totalElements: 1,
+            totalPages: 1
+          }
+        })
+      }
+      if (url === '/heritage/events/upcoming') {
+        return Promise.resolve({ data: { content: [] } })
+      }
+      if (url === '/heritage/1') {
+        return Promise.resolve({ data: { id: 1, name: 'Owned-comment heritage', category: '传统技艺', description: 'Detail', commentCount: 1 } })
+      }
+      if (url === '/heritage/1/comments') {
+        return Promise.resolve(paginatedArray([
+          { id: 301, content: 'Owned heritage comment', createdAt: '2026-06-08T00:00:00Z', nickname: 'Traveler', owner: true, rating: 5 }
+        ], Number(config?.params?.page ?? 0), 20, 1, 1))
+      }
+      if (url === '/heritage/1/inheritors' || url === '/heritage/1/events') {
+        return Promise.resolve({ data: { content: [] } })
+      }
+      if (url === '/heritage/1/like-status') {
+        return Promise.resolve({ data: { liked: false } })
+      }
+
+      return Promise.reject(new Error(`Unexpected GET ${url}`))
+    })
+    testState.apiDelete.mockImplementation((url: string) => {
+      if (url === '/heritage/1/comments/301') return pendingDelete.promise
+
+      return Promise.reject(new Error(`Unexpected DELETE ${url}`))
+    })
+
+    const root = await mountView(Heritage)
+    clickByText(root, 'Owned-comment heritage')
+    await settleVue()
+
+    expect(root.textContent).toContain('Owned heritage comment')
+    clickByText(root, '删除')
+    clickByText(root, '删除')
+    await settleVue(2)
+
+    expect(testState.apiDelete).toHaveBeenCalledTimes(1)
+    expect(testState.apiDelete).toHaveBeenCalledWith('/heritage/1/comments/301')
+
+    pendingDelete.resolve({})
+    await settleVue()
+
+    expect(root.textContent).not.toContain('Owned heritage comment')
+  })
+
   it('loads the next shared route comment page instead of hiding later comments', async () => {
     testState.routeParams.id = '42'
     testState.apiGet.mockImplementation((url: string, config?: any) => {
@@ -1618,6 +1880,56 @@ describe('community detail pagination', () => {
     expect(pageParamCalls('/community/questions/99/answers')).toContainEqual({ page: 1, size: 20 })
     expect(root.textContent).toContain('First answer')
     expect(root.textContent).toContain('Second answer')
+  })
+
+  it('ignores stale question like completions after the route question id changes', async () => {
+    const staleLike = createDeferred<{ data: { liked: boolean; likeCount: number } }>()
+    testState.routeParams.id = '99'
+    testState.apiGet.mockImplementation((url: string, config?: any) => {
+      if (url === '/community/questions/99') {
+        return Promise.resolve({
+          data: {
+            answerCount: 0,
+            author: { nickname: 'Questioner', owner: false },
+            content: 'Where should I go?',
+            createdAt: '2026-06-08T00:00:00Z',
+            id: 99,
+            isResolved: false,
+            likeCount: 0,
+            tags: '',
+            title: 'Travel question',
+            viewCount: 8
+          }
+        })
+      }
+      if (url === '/community/questions/99/answers') {
+        return Promise.resolve(paginatedArray([], Number(config?.params?.page ?? 0), 20, 0, 0))
+      }
+      if (url === '/community/questions/99/like-status') {
+        return Promise.resolve({ data: { liked: false } })
+      }
+
+      return Promise.reject(new Error(`Unexpected GET ${url}`))
+    })
+    testState.apiPost.mockImplementation((url: string) => {
+      if (url === '/community/questions/99/like') return staleLike.promise
+
+      return Promise.reject(new Error(`Unexpected POST ${url}`))
+    })
+
+    const root = await mountView(QuestionDetail)
+    const likeButton = root.querySelector<HTMLButtonElement>('button[aria-pressed="false"]')
+    expect(likeButton).toBeTruthy()
+
+    likeButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await settleVue(2)
+    testState.routeParams.id = '100'
+    staleLike.resolve({ data: { liked: true, likeCount: 99 } })
+    await settleVue()
+
+    expect(testState.apiPost).toHaveBeenCalledWith('/community/questions/99/like')
+    expect(root.textContent).toContain('Travel question')
+    expect(root.textContent).not.toContain('99')
   })
 
   it('loads the next my-routes page on the profile routes tab', async () => {

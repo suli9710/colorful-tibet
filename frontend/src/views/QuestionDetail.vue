@@ -190,6 +190,7 @@
         aria-live="assertive"
         aria-atomic="true"
       >
+        <h1 class="mb-2 text-xl font-bold">{{ t('common.error') }}</h1>
         <p class="mb-4 font-medium">{{ questionLoadError }}</p>
         <button
           type="button"
@@ -200,7 +201,9 @@
         </button>
       </div>
 
-      <div v-else-if="questionNotFound" class="text-center py-12 text-gray-500">{{ t('questionDetail.questionNotFound') }}</div>
+      <div v-else-if="questionNotFound" class="text-center py-12 text-gray-500">
+        <h1 class="text-xl font-bold">{{ t('questionDetail.questionNotFound') }}</h1>
+      </div>
     </div>
   </div>
 </template>
@@ -211,8 +214,21 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { motion } from 'motion-v'
 import { revealInitial, revealInView, revealTransition } from '../motion/presets'
-import api, { endpoints } from '../api'
-import { hasNextPage, mergeUniqueById, readPaginatedResponse, type PageMetadata } from '../api/endpoints'
+import api, {
+  endpoints,
+  type PublicUserResponse,
+  type QuestionAnswerResponse,
+  type QuestionLikeMutationResponse,
+  type QuestionLikeStatusResponse,
+  type QuestionResponse
+} from '../api'
+import {
+  hasNextPage,
+  mergeUniqueById,
+  readPaginatedResponse,
+  type PageMetadata,
+  type PaginatedHttpResponse
+} from '../api/endpoints'
 import { useAuthStore } from '../stores/auth'
 import { useAuthGuard } from '../composables/useAuthGuard'
 import { showConfirm } from '../composables/useConfirm'
@@ -227,8 +243,8 @@ const router = useRouter()
 const auth = useAuthStore()
 const { requireAuth } = useAuthGuard()
 
-const question = ref<any>(null)
-const answers = ref<any[]>([])
+const question = ref<QuestionResponse | null>(null)
+const answers = ref<QuestionAnswerResponse[]>([])
 const answersPageSize = 20
 const answersPageInfo = ref<PageMetadata>({
   page: 0,
@@ -251,6 +267,7 @@ const deletingQuestion = ref(false)
 let questionRequestId = 0
 let answersRequestId = 0
 let likeStatusRequestId = 0
+let questionLikeMutationId = 0
 
 const isAuthor = computed(() => Boolean(question.value?.author?.owner))
 const isQuestionAuthor = isAuthor
@@ -270,7 +287,7 @@ const questionLikeAccessibleName = computed(() => {
 })
 
 const normalizePublicUserName = (value: unknown) => typeof value === 'string' ? value.trim() : ''
-const publicUserName = (user: any) =>
+const publicUserName = (user?: PublicUserResponse | null) =>
   normalizePublicUserName(user?.nickname) || t('questionDetail.anonymousUser')
 
 interface TagOption { value: string; color: string }
@@ -284,10 +301,8 @@ const getTagColor = (tagValue: string): string => {
   return '#6b7280'
 }
 
-const getTagLabel = (tagValue: string) => tagValue
-
-const parseTags = (tagsStr: string): string[] => {
-  if (!tagsStr) return []
+const parseTags = (tagsStr: unknown): string[] => {
+  if (typeof tagsStr !== 'string' || !tagsStr) return []
   return tagsStr.split(',').map(s => s.trim()).filter(Boolean)
 }
 
@@ -305,8 +320,8 @@ const resetAnswers = () => {
   resetAnswersPageInfo()
 }
 
-const applyAnswersPage = (response: any, append = false) => {
-  const page = readPaginatedResponse<any>(response, {
+const applyAnswersPage = (response: PaginatedHttpResponse, append = false) => {
+  const page = readPaginatedResponse<QuestionAnswerResponse>(response, {
     page: append ? answersPageInfo.value.page + 1 : 0,
     size: answersPageSize
   })
@@ -329,7 +344,7 @@ const fetchAnswersPage = async (
   requestId = answersRequestId
 ) => {
   if (!questionId) return
-  const response = await api.get(endpoints.community.questionAnswers(questionId), {
+  const response = await api.get<unknown>(endpoints.community.questionAnswers(questionId), {
     params: { page, size: answersPageSize }
   })
   if (requestId !== answersRequestId || String(question.value?.id ?? '') !== String(questionId)) return
@@ -351,6 +366,32 @@ const responseStatus = (error: unknown) => {
 }
 
 const isNotFoundError = (error: unknown) => responseStatus(error) === 404
+const isUnauthorizedError = (error: unknown) => responseStatus(error) === 401
+
+const finiteNumber = (value: unknown) => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : undefined
+  }
+  return undefined
+}
+
+const applyQuestionLikeResult = (
+  responseData: QuestionLikeMutationResponse | undefined,
+  fallbackLiked: boolean,
+  fallbackLikeCount: number,
+  questionId: number | string
+) => {
+  if (!question.value || String(question.value.id) !== String(questionId)) return
+  isLiked.value = typeof responseData?.liked === 'boolean' ? responseData.liked : fallbackLiked
+  question.value.likeCount = Math.max(0, finiteNumber(responseData?.likeCount) ?? fallbackLikeCount)
+}
+
+const isCurrentQuestionLikeMutation = (mutationId: number, questionId: number | string) =>
+  mutationId === questionLikeMutationId &&
+  currentRouteQuestionId() === String(questionId) &&
+  String(question.value?.id ?? '') === String(questionId)
 
 const loadLikeStatus = async (id: number | string) => {
   const requestId = ++likeStatusRequestId
@@ -360,7 +401,9 @@ const loadLikeStatus = async (id: number | string) => {
   }
 
   try {
-    const likeRes = await api.get(endpoints.community.questionLikeStatus(String(id)))
+    const likeRes = await api.get<QuestionLikeStatusResponse>(endpoints.community.questionLikeStatus(String(id)), {
+      skipAuthRedirect: true
+    })
     if (requestId !== likeStatusRequestId || currentRouteQuestionId() !== String(id)) return
     isLiked.value = Boolean(likeRes.data.liked)
   } catch {
@@ -399,14 +442,16 @@ const loadQuestion = async () => {
   const id = currentRouteQuestionId()
   answersRequestId += 1
   likeStatusRequestId += 1
+  questionLikeMutationId += 1
   loading.value = true
+  liking.value = false
   questionLoadError.value = ''
   questionNotFound.value = false
   answersLoadError.value = ''
   answersLoading.value = false
   isLiked.value = false
   try {
-    const qRes = await api.get(endpoints.community.questionDetail(String(id)))
+    const qRes = await api.get<QuestionResponse | null>(endpoints.community.questionDetail(String(id)))
     if (requestId !== questionRequestId || currentRouteQuestionId() !== String(id)) return
     if (!qRes.data) {
       question.value = null
@@ -459,14 +504,14 @@ const submitAnswer = async () => {
   try {
     if (!(await requireAuth())) return
 
-    await api.post(endpoints.community.createQuestionAnswer(question.value.id), { content })
+    await api.post<QuestionAnswerResponse>(endpoints.community.createQuestionAnswer(question.value.id), { content })
     newAnswer.value = ''
     await fetchAnswersPage(0, false, question.value.id, ++answersRequestId)
     if (question.value) {
       question.value.answerCount = answersPageInfo.value.totalElements
     }
-  } catch (error: any) {
-    if (error.response?.status === 401) {
+  } catch (error: unknown) {
+    if (isUnauthorizedError(error)) {
       if (!(await requireAuth())) return
     } else {
       showToast(t('questionDetail.answerFailed'), 'error')
@@ -478,25 +523,32 @@ const submitAnswer = async () => {
 
 const toggleLike = async () => {
   if (liking.value || !question.value) return
+  const questionId = question.value.id
+  const mutationId = ++questionLikeMutationId
+  const previousLiked = isLiked.value
+  const previousLikeCount = question.value.likeCount
   liking.value = true
   try {
     if (!(await requireAuth())) return
+    if (!isCurrentQuestionLikeMutation(mutationId, questionId)) return
 
-    if (isLiked.value) {
-      await api.delete(endpoints.community.questionLike(question.value.id))
-      isLiked.value = false
-      question.value.likeCount = Math.max(0, (question.value.likeCount || 1) - 1)
+    if (previousLiked) {
+      const res = await api.delete<QuestionLikeMutationResponse>(endpoints.community.questionLike(questionId))
+      if (!isCurrentQuestionLikeMutation(mutationId, questionId)) return
+      applyQuestionLikeResult(res.data, false, previousLikeCount - 1, questionId)
     } else {
-      const res = await api.post(endpoints.community.questionLike(question.value.id))
-      isLiked.value = true
-      question.value.likeCount = res.data.likeCount
+      const res = await api.post<QuestionLikeMutationResponse>(endpoints.community.questionLike(questionId))
+      if (!isCurrentQuestionLikeMutation(mutationId, questionId)) return
+      applyQuestionLikeResult(res.data, true, previousLikeCount + 1, questionId)
     }
-  } catch (error: any) {
-    if (error.response?.status === 401) {
+  } catch (error: unknown) {
+    if (isUnauthorizedError(error)) {
       if (!(await requireAuth())) return
     }
   } finally {
-    liking.value = false
+    if (mutationId === questionLikeMutationId) {
+      liking.value = false
+    }
   }
 }
 
@@ -506,10 +558,11 @@ const acceptAnswer = async (answerId: number) => {
   try {
     if (!(await requireAuth())) return
 
-    await api.post(endpoints.community.acceptQuestionAnswer(question.value.id, answerId))
+    await api.post<void>(endpoints.community.acceptQuestionAnswer(question.value.id, answerId))
     question.value.isResolved = true
     await loadQuestion()
-  } catch (error: any) {
+  } catch (error: unknown) {
+    console.error('Failed to accept answer:', summarizeClientError(error))
     showToast(t('questionDetail.acceptFailed'), 'error')
   } finally {
     acceptingAnswerId.value = null
@@ -530,9 +583,10 @@ const deleteQuestion = async () => {
     })
     if (!confirmed) return
 
-    await api.delete(endpoints.community.deleteQuestion(question.value.id))
+    await api.delete<void>(endpoints.community.deleteQuestion(question.value.id))
     router.push('/community')
-  } catch (error: any) {
+  } catch (error: unknown) {
+    console.error('Failed to delete question:', summarizeClientError(error))
     showToast(t('questionDetail.deleteFailed'), 'error')
   } finally {
     deletingQuestion.value = false

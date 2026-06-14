@@ -1,0 +1,158 @@
+[
+  {
+    "id": 36,
+    "categoryKey": "traditionalDrama",
+    "name": "山南琼结卡卓扎西宾顿",
+    "description": ""
+  },
+  {
+    "id": 37,
+    "categoryKey": "traditionalDrama",
+    "name": "山南门巴戏",
+    "description": "山南地区错那县勒布区门巴族传统戏剧，2007 年重组戏班后形成 9 人演出团体"
+  },
+  {
+    "id": 38,
+    "categoryKey": "traditionalDrama",
+    "name": "巴贡",
+    "description": "传统戏剧形式，流行于西藏部分地区"
+  },
+  {
+    "id": 41,
+    "categoryKey": "traditionalCraft",
+    "name": "勉唐画派",
+    "description": "形成于 15 世纪，由勉拉・顿珠嘉措创立，以线条工整、色彩明快著称"
+  },
+  {
+    "id": 42,
+    "categoryKey": "traditionalCraft",
+    "name": "钦泽画派",
+    "description": ""
+  },
+  {
+    "id": 43,
+    "categoryKey": "traditionalCraft",
+    "name": "噶玛嘎孜画派",
+    "description": ""
+  },
+  {
+    "id": 44,
+    "categoryKey": "traditionalCraft",
+    "name": "齐吾岗派",
+    "description": ""
+  },
+  {
+    "id": 45,
+    "categoryKey": "traditionalCraft",
+    "name": "拉萨堆绣唐卡",
+    "description": ""
+  },
+  {
+    "id": 46,
+    "categoryKey": "traditionalCraft",
+    "name": "康勉萨唐卡",
+    "description": ""
+  },
+  {
+    "id": 48,
+    "categoryKey": "traditionalCraft",
+    "name": "藏族锻铜技艺",
+    "description": ""
+  },
+  {
+    "id": 49,
+    "categoryKey": "traditionalCraft",
+    "name": "藏刀锻制技艺",
+    "description": ""
+  },
+  {
+    "id": 50,
+    "categoryKey": "traditionalCraft",
+    "name": "孜东铜器锻制技艺",
+    "description": ""
+  },
+  {
+    "id": 51,
+    "categoryKey": "traditionalCraft",
+    "name": "扎西吉彩金银锻铜技艺",
+    "description": ""
+  },
+  {
+    "id": 52,
+    "categoryKey": "traditionalCraft",
+    "name": "擦擦制作技艺",
+    "description": "传统佛教艺术品制作技艺"
+  },
+  {
+    "id": 53,
+    "categoryKey": "traditionalCraft",
+    "name": "传统帐篷编制技艺",
+    "description": "那曲市巴青县传统帐篷制作技艺"
+  },
+  {
+    "id": 54,
+    "categoryKey": "traditionalCraft",
+    "name": "藏族邦典、卡垫织造技艺",
+    "description": "西藏传统纺织工艺，生产邦典（围裙）和卡垫（地毯）"
+  },
+  {
+    "id": 55,
+    "categoryKey": "traditionalCraft",
+    "name": "拉萨甲米水磨坊",
+    "description": "传统水利磨面技术，展示了藏族人民的智慧和创造力"
+  },
+  {
+    "id": 56,
+    "categoryKey": "traditionalCraft",
+    "name": "藏族雕版印刷技艺",
+    "description": "传统印刷工艺，保存了大量藏文典籍"
+  },
+  {
+    "id": 57,
+    "categoryKey": "traditionalCraft",
+    "name": "藏刀锻制技艺",
+    "description": "日喀则市谢通门县传统刀具制作技艺"
+  },
+  {
+    "id": 58,
+    "categoryKey": "traditionalCraft",
+    "name": "藏族造纸技艺",
+    "description": "传统手工造纸技术，使用当地特有的植物原料"
+  },
+  {
+    "id": 59,
+    "categoryKey": "traditionalCraft",
+    "name": "藏族传统泥塑技艺",
+    "description": "西藏传统雕塑工艺，用于制作佛像和工艺品"
+  },
+  {
+    "id": 61,
+    "categoryKey": "traditionalCraft",
+    "name": "泽帖尔编制技艺",
+    "description": "山南市乃东区传统毛纺织技艺，被誉为 \"西藏氆氇中的佳品\""
+  },
+  {
+    "id": 62,
+    "categoryKey": "traditionalCraft",
+    "name": "藏族扎囊木雕",
+    "description": "扎囊县传统木雕工艺，用于制作佛像和家具"
+  },
+  {
+    "id": 63,
+    "categoryKey": "traditionalCraft",
+    "name": "晒盐技艺",
+    "description": "芒康县传统制盐工艺，展示了藏族人民与自然和谐共处的智慧"
+  },
+  {
+    "id": 64,
+    "categoryKey": "traditionalCraft",
+    "name": "墨脱石锅制作技艺",
+    "description": "林芝市墨脱县传统厨具制作技艺，2015 年成为国家批准保护的地理标志产品"
+  },
+  {
+    "id": 65,
+    "categoryKey": "traditionalCraft",
+    "name": "藏族传统榨油技艺",
+    "description": "日喀则市江孜县传统榨油工艺，使用传统的木制榨油设备"
+  }
+]

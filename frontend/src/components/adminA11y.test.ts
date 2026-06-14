@@ -34,6 +34,53 @@ describe('admin component accessibility safeguards', () => {
     expect(adminHeritagePanelSource).not.toContain('const toList = (value: any)')
   })
 
+  it('keeps admin community partial load failures visible per tab', () => {
+    expect(adminCommunityPanelSource).toContain('const emptyCommunityTabErrors = (): Record<CommunityTab, string> =>')
+    expect(adminCommunityPanelSource).toContain('const communityTabErrors = ref<Record<CommunityTab, string>>')
+    expect(adminCommunityPanelSource).toContain('const activeCommunityTabError = computed')
+    expect(adminCommunityPanelSource).toContain('v-if="activeCommunityTabError"')
+    expect(adminCommunityPanelSource).toContain('role="alert"')
+    expect(adminCommunityPanelSource).toContain('aria-live="assertive"')
+    expect(adminCommunityPanelSource).toContain('communityTabErrors.value = failed.reduce<Record<CommunityTab, string>>')
+    expect(adminCommunityPanelSource).toContain("errors[request.key] = safeClientErrorMessage(error, t('admin.loadCommunityFailed'))")
+  })
+
+  it('keeps admin community refreshes scoped to the newest request', () => {
+    expect(adminCommunityPanelSource).toContain('let communityRequestId = 0')
+    expect(adminCommunityPanelSource).toContain('const isCurrentCommunityRequest = (requestId: number) => requestId === communityRequestId')
+    expect(adminCommunityPanelSource).toContain('const requestId = ++communityRequestId')
+    expect(adminCommunityPanelSource).toContain('if (!isCurrentCommunityRequest(requestId)) return')
+    expect(adminCommunityPanelSource).toContain('if (isCurrentCommunityRequest(requestId))')
+    expect(adminCommunityPanelSource).toContain('loadingCommunity.value = false')
+  })
+
+  it('keeps admin community edits and deletes guarded against duplicate or stale actions', () => {
+    expect(adminCommunityPanelSource).toContain('const deletingCommunityKeys = ref<ReadonlySet<string>>(new Set())')
+    expect(adminCommunityPanelSource).toContain('const isEditingCommunityItem = (type: CommunityType, id: number) =>')
+    expect(adminCommunityPanelSource).toContain('const isDeletingCommunityItem = (type: CommunityType, id: number) =>')
+    expect(adminCommunityPanelSource).toContain('const setCommunityItemDeleting = (type: CommunityType, id: number, deleting: boolean) =>')
+    expect(adminCommunityPanelSource).toContain('if (!editingItem.value || savingCommunity.value) return')
+    expect(adminCommunityPanelSource).toContain('const type = editingType.value')
+    expect(adminCommunityPanelSource).toContain('const itemId = editingItem.value.id')
+    expect(adminCommunityPanelSource).toContain('const form = { ...communityForm.value }')
+    expect(adminCommunityPanelSource).toContain('if (isEditingCommunityItem(type, itemId))')
+    expect(adminCommunityPanelSource).toContain('const forceCloseCommunityModal = () =>')
+    expect(adminCommunityPanelSource).toContain('forceCloseCommunityModal()')
+    expect(adminCommunityPanelSource).toContain('if (savingCommunity.value || isDeletingCommunityItem(type, id)) return')
+    expect(adminCommunityPanelSource).toContain('setCommunityItemDeleting(type, id, true)')
+    expect(adminCommunityPanelSource).toContain('setCommunityItemDeleting(type, id, false)')
+  })
+
+  it('keeps admin community icon-only row actions named and stateful', () => {
+    expect(adminCommunityPanelSource).toContain(':aria-label="`${t(\'common.edit\')} ${route.title || route.id}`.trim()"')
+    expect(adminCommunityPanelSource).toContain(':aria-label="`${t(\'common.delete\')} ${route.title || route.id}`.trim()"')
+    expect(adminCommunityPanelSource).toContain(':disabled="savingCommunity || isDeletingCommunityItem(\'route\', route.id)"')
+    expect(adminCommunityPanelSource).toContain(':aria-busy="isDeletingCommunityItem(\'route\', route.id)"')
+    expect(adminCommunityPanelSource).toContain(':aria-label="`${t(\'common.edit\')} ${question.title || question.id}`.trim()"')
+    expect(adminCommunityPanelSource).toContain(':aria-label="`${t(\'common.delete\')} ${answer.questionTitle || answer.id}`.trim()"')
+    expect(adminCommunityPanelSource).toContain('<form @submit.prevent="saveCommunityItem" class="space-y-5" :aria-busy="savingCommunity">')
+  })
+
   it('keeps AdminDashboard collapsible and clickable cards keyboard-operable', () => {
     for (const id of [
       'admin-hotel-orders-content',

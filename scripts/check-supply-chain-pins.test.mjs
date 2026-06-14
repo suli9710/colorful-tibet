@@ -1,11 +1,11 @@
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { spawnSync } from 'node:child_process'
 import { afterEach, describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   collectSupplyChainPinFindings,
+  runSupplyChainPinGate,
   validateDockerDigestEvidence
 } from './check-supply-chain-pins.mjs'
 import { REQUIRED_IMAGE_REFS } from './resolve-docker-image-digests.mjs'
@@ -44,10 +44,12 @@ const completeEvidenceRecords = () => {
 const completeEvidence = () => ({
   schemaVersion: 1,
   generatedAt: '2026-06-09T00:00:00.000Z',
+  resolver: 'scripts/resolve-docker-image-digests.mjs',
   verifier: 'release-operator@example.test',
   targetPlatforms: ['multi-platform-index'],
   lookupSource: 'Docker Registry HTTP API v2 via registry-1.docker.io',
   registry: 'registry-1.docker.io',
+  digestAlgorithm: 'sha256',
   records: completeEvidenceRecords()
 })
 
@@ -143,26 +145,28 @@ describe('supply-chain pin gate', () => {
       'docker-digest-evidence.json': JSON.stringify(completeEvidence())
     })
 
-    const result = spawnSync(process.execPath, [
-      path.join(process.cwd(), 'scripts/check-supply-chain-pins.mjs'),
+    const result = runSupplyChainPinGate([
       '--evidence-only',
       '--evidence',
       'docker-digest-evidence.json',
       root
-    ], { encoding: 'utf8' })
+    ])
 
-    assert.equal(result.status, 0, result.stderr)
-    assert.match(result.stdout, /Supply-chain release pins are complete/)
+    assert.equal(result.exitCode, 0, result.output)
+    assert.equal(result.findings.length, 0)
+    assert.match(result.output, /Supply-chain release pins are complete/)
   })
 
   it('rejects incomplete or tampered Docker digest evidence without registry access', () => {
     const findings = validateDockerDigestEvidence({
       schemaVersion: 1,
       generatedAt: 'not-a-date',
+      resolver: '',
       verifier: '',
       targetPlatforms: [],
       lookupSource: '',
       registry: 'registry.example.invalid',
+      digestAlgorithm: 'md5',
       records: [
         {
           source: REQUIRED_IMAGE_REFS[0].source,
@@ -182,7 +186,9 @@ describe('supply-chain pin gate', () => {
     const messages = findings.map((finding) => finding.content)
 
     assert.ok(messages.some((message) => message.includes('generatedAt')))
+    assert.ok(messages.some((message) => message.includes('resolver')))
     assert.ok(messages.some((message) => message.includes('verifier')))
+    assert.ok(messages.some((message) => message.includes('digestAlgorithm')))
     assert.ok(messages.some((message) => message.includes('lookupSource')))
     assert.ok(messages.some((message) => message.includes('targetPlatforms')))
     assert.ok(messages.some((message) => message.includes('registry-1.docker.io')))
