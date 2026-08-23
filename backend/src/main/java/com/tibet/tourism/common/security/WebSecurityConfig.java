@@ -1,8 +1,10 @@
 package com.tibet.tourism.common.security;
 
+import com.tibet.tourism.modules.auth.application.AdminMfaPolicy;
 import com.tibet.tourism.modules.user.infra.UserRepository;
 import jakarta.servlet.DispatcherType;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -52,17 +54,23 @@ public class WebSecurityConfig {
     @Autowired
     private UserSessionVersionService userSessionVersionService;
 
+    @Autowired
+    private AdminMfaPolicy adminMfaPolicy;
+
     @Value("${app.security.public-docs-enabled:false}")
     private boolean publicDocsEnabled;
 
     @Value("${app.security.public-metrics-enabled:false}")
     private boolean publicMetricsEnabled;
 
-    private final SecurityAccessDeniedHandler accessDeniedHandler = new SecurityAccessDeniedHandler();
-
     @Bean
     public AuthTokenFilter authenticationJwtTokenFilter() {
-        return new AuthTokenFilter(jwtUtils, userDetailsService, tokenRevocationService, userSessionVersionService);
+        return new AuthTokenFilter(
+                jwtUtils,
+                userDetailsService,
+                tokenRevocationService,
+                userSessionVersionService,
+                adminMfaPolicy);
     }
 
     @Bean
@@ -91,7 +99,11 @@ public class WebSecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(
             HttpSecurity http,
-            MustChangePasswordFilter mustChangePasswordFilter) throws Exception {
+            MustChangePasswordFilter mustChangePasswordFilter,
+            MetricsScrapeTokenFilter metricsScrapeTokenFilter,
+            ObjectProvider<AdminAccessDeniedAuditPublisher> auditPublisherProvider) throws Exception {
+        SecurityAccessDeniedHandler accessDeniedHandler = new SecurityAccessDeniedHandler(
+                auditPublisherProvider.getIfAvailable());
         http.cors(Customizer.withDefaults())
             .csrf(csrf -> csrf.disable())
             .exceptionHandling(exception -> exception
@@ -145,6 +157,7 @@ public class WebSecurityConfig {
 
         http.addFilterBefore(csrfCookieFilter, UsernamePasswordAuthenticationFilter.class);
         http.addFilterBefore(authenticationJwtTokenFilter(), UsernamePasswordAuthenticationFilter.class);
+        http.addFilterBefore(metricsScrapeTokenFilter, AuthTokenFilter.class);
         http.addFilterAfter(mustChangePasswordFilter, AuthTokenFilter.class);
 
         return http.build();

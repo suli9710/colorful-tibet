@@ -368,11 +368,28 @@ const { showConfirm } = useConfirm()
 const { showToast } = useToast()
 
 const text = (key: string, fallback: string) => te(key) ? t(key) : fallback
-const adminPageParams = { page: 0, size: 100 }
+const adminPageSize = 100
+const maxAdminListPages = 1000
 const toList = <T>(value: AdminListResponse<T>): T[] => {
   if (Array.isArray(value)) return value
   if (Array.isArray(value?.content)) return value.content
   return []
+}
+
+const fetchAllAdminPages = async <T>(url: string): Promise<T[]> => {
+  const collected: T[] = []
+  for (let page = 0; page < maxAdminListPages; page += 1) {
+    const response = await api.get<AdminListResponse<T> & { totalPages?: number; last?: boolean }>(url, {
+      params: { page, size: adminPageSize }
+    })
+    if (Array.isArray(response.data)) return response.data
+    const pageItems = toList<T>(response.data)
+    collected.push(...pageItems)
+    const totalPages = Number(response.data?.totalPages)
+    if (response.data?.last === true || pageItems.length < adminPageSize
+      || (Number.isFinite(totalPages) && page + 1 >= totalPages)) return collected
+  }
+  throw new Error('Heritage admin list exceeded the maximum supported page count')
 }
 
 const emptyItemForm = (): HeritageItemForm => ({
@@ -473,9 +490,9 @@ const fetchItems = async () => {
   loading.value = true
   itemError.value = ''
   try {
-    const response = await api.get<AdminListResponse<HeritageItem>>(endpoints.adminHeritage.list, { params: adminPageParams })
+    const nextItems = await fetchAllAdminPages<HeritageItem>(endpoints.adminHeritage.list)
     if (requestId !== itemsRequestId.value) return
-    items.value = toList<HeritageItem>(response.data)
+    items.value = nextItems
   } catch (error) {
     if (requestId !== itemsRequestId.value) return
     console.error('Failed to fetch heritage items:', summarizeClientError(error))

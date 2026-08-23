@@ -22,6 +22,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -57,6 +58,25 @@ class ApiExceptionHandlerTest {
         logger.detachAppender(appender);
         logger.setAdditive(originalAdditive);
         appender.stop();
+    }
+
+    @Test
+    void reportsDataIntegrityViolationAsRetryableConflictWithoutLeakingDetail() {
+        // This handler is what turns a concurrent duplicate submit into a retryable client error:
+        // OrderCenterService can no longer recover in-place, because the constraint violation marks
+        // the transaction rollback-only. Reported as 500 it looked like a server fault and the client
+        // had no reason to retry.
+        DataIntegrityViolationException exception = new DataIntegrityViolationException(
+                "Duplicate entry 'idem-key-1' for key 'orders.uk_orders_user_idempotency'");
+
+        ResponseEntity<Map<String, String>> response = handler.handleDataIntegrityViolation(exception);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().get("error"))
+                .doesNotContain("idem-key-1")
+                .doesNotContain("uk_orders_user_idempotency");
+        assertThat(appender.list).noneMatch(this::isErrorOrHigher);
     }
 
     @Test

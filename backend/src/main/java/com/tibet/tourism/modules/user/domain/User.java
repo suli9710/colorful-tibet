@@ -11,6 +11,11 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Version
+    @Column(nullable = false)
+    @JsonIgnore
+    private Long version = 0L;
+
     @Column(unique = true, nullable = false)
     private String username;
 
@@ -58,6 +63,15 @@ public class User {
 
     public void setId(Long id) {
         this.id = id;
+    }
+
+    @JsonIgnore
+    public Long getVersion() {
+        return version == null ? 0L : version;
+    }
+
+    public void setVersion(Long version) {
+        this.version = version == null ? 0L : version;
     }
 
     public String getUsername() {

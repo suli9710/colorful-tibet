@@ -1,6 +1,7 @@
 package com.tibet.tourism.modules.admin.web;
 import com.tibet.tourism.common.api.PageResponse;
 import com.tibet.tourism.common.validation.InputSanitizer;
+import com.tibet.tourism.modules.admin.application.AdminAuditLogService;
 import com.tibet.tourism.modules.admin.web.dto.CommunityAnswerUpdateRequest;
 import com.tibet.tourism.modules.admin.web.dto.CommunityContentUpdateRequest;
 import com.tibet.tourism.modules.admin.web.dto.CommunityQuestionUpdateRequest;
@@ -24,6 +25,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -37,6 +39,11 @@ import static com.tibet.tourism.modules.admin.web.mapper.AdminDtoMapper.*;
 @PreAuthorize("hasRole('ADMIN')")
 public class AdminCommunityController {
 
+    // The Pageable Sort is appended to the method-name ordering, so ?sort= can still name any
+    // entity property - including nested paths such as author.password. Restrict it here.
+    private static final Set<String> ADMIN_LIST_SORT_FIELDS = Set.of("id", "createdAt");
+    private static final Sort ADMIN_LIST_DEFAULT_SORT = Sort.by(Sort.Direction.DESC, "createdAt");
+
     private static final Set<String> ALLOWED_ROUTE_BUDGETS = Set.of("经济型", "舒适型", "豪华型");
     private static final Set<String> ALLOWED_ROUTE_PREFERENCES = Set.of("自然风光", "人文历史", "深度摄影", "休闲度假");
 
@@ -48,6 +55,7 @@ public class AdminCommunityController {
     private final TravelQuestionRepository travelQuestionRepository;
     private final TravelAnswerRepository travelAnswerRepository;
     private final QuestionLikeRepository questionLikeRepository;
+    private final AdminAuditLogService auditLogService;
 
     public AdminCommunityController(SharedRouteRepository sharedRouteRepository,
                                     RouteLikeRepository routeLikeRepository,
@@ -56,7 +64,8 @@ public class AdminCommunityController {
                                     CommentLikeRepository commentLikeRepository,
                                     TravelQuestionRepository travelQuestionRepository,
                                     TravelAnswerRepository travelAnswerRepository,
-                                    QuestionLikeRepository questionLikeRepository) {
+                                    QuestionLikeRepository questionLikeRepository,
+                                    AdminAuditLogService auditLogService) {
         this.sharedRouteRepository = sharedRouteRepository;
         this.routeLikeRepository = routeLikeRepository;
         this.routeCommentRepository = routeCommentRepository;
@@ -65,18 +74,24 @@ public class AdminCommunityController {
         this.travelQuestionRepository = travelQuestionRepository;
         this.travelAnswerRepository = travelAnswerRepository;
         this.questionLikeRepository = questionLikeRepository;
+        this.auditLogService = auditLogService;
     }
 
     @GetMapping("/community/routes")
     public ResponseEntity<PageResponse<Map<String, Object>>> getCommunityRoutes(
             @PageableDefault(size = 50) Pageable pageable) {
-        return ResponseEntity.ok(PageResponse.from(sharedRouteRepository.findAllByOrderByCreatedAtDesc(pageable)
+        return ResponseEntity.ok(PageResponse.from(sharedRouteRepository.findAllByOrderByCreatedAtDesc(InputSanitizer.sanitizePageable(pageable, ADMIN_LIST_SORT_FIELDS, ADMIN_LIST_DEFAULT_SORT, 50, 200))
                 .map(route -> toAdminSharedRoute(route))));
     }
 
     @PutMapping("/community/routes/{id}")
     @Transactional
     public ResponseEntity<?> updateCommunityRoute(@PathVariable Long id, @Valid @RequestBody CommunityRouteUpdateRequest request) {
+        return auditLogService.capture("community_route", id, "community_route_update",
+                () -> updateCommunityRouteInternal(id, request));
+    }
+
+    private ResponseEntity<?> updateCommunityRouteInternal(Long id, CommunityRouteUpdateRequest request) {
         Optional<SharedRoute> routeOpt = sharedRouteRepository.findById(id);
         if (routeOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
@@ -117,6 +132,11 @@ public class AdminCommunityController {
     @DeleteMapping("/community/routes/{id}")
     @Transactional
     public ResponseEntity<?> deleteCommunityRoute(@PathVariable Long id) {
+        return auditLogService.capture("community_route", id, "community_route_delete",
+                () -> deleteCommunityRouteInternal(id));
+    }
+
+    private ResponseEntity<?> deleteCommunityRouteInternal(Long id) {
         Optional<SharedRoute> routeOpt = sharedRouteRepository.findById(id);
         if (routeOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
@@ -128,13 +148,18 @@ public class AdminCommunityController {
     @GetMapping("/community/comments")
     public ResponseEntity<PageResponse<Map<String, Object>>> getCommunityComments(
             @PageableDefault(size = 50) Pageable pageable) {
-        return ResponseEntity.ok(PageResponse.from(routeCommentRepository.findAllByOrderByCreatedAtDesc(pageable)
+        return ResponseEntity.ok(PageResponse.from(routeCommentRepository.findAllByOrderByCreatedAtDesc(InputSanitizer.sanitizePageable(pageable, ADMIN_LIST_SORT_FIELDS, ADMIN_LIST_DEFAULT_SORT, 50, 200))
                 .map(comment -> toAdminRouteComment(comment))));
     }
 
     @PutMapping("/community/comments/{id}")
     @Transactional
     public ResponseEntity<?> updateCommunityComment(@PathVariable Long id, @Valid @RequestBody CommunityContentUpdateRequest request) {
+        return auditLogService.capture("route_comment", id, "route_comment_update",
+                () -> updateCommunityCommentInternal(id, request));
+    }
+
+    private ResponseEntity<?> updateCommunityCommentInternal(Long id, CommunityContentUpdateRequest request) {
         Optional<RouteComment> commentOpt = routeCommentRepository.findById(id);
         if (commentOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
@@ -154,6 +179,11 @@ public class AdminCommunityController {
     @DeleteMapping("/community/comments/{id}")
     @Transactional
     public ResponseEntity<?> deleteCommunityComment(@PathVariable Long id) {
+        return auditLogService.capture("route_comment", id, "route_comment_delete",
+                () -> deleteCommunityCommentInternal(id));
+    }
+
+    private ResponseEntity<?> deleteCommunityCommentInternal(Long id) {
         Optional<RouteComment> commentOpt = routeCommentRepository.findById(id);
         if (commentOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
@@ -172,13 +202,18 @@ public class AdminCommunityController {
     @GetMapping("/community/spot-comments")
     public ResponseEntity<PageResponse<Map<String, Object>>> getCommunitySpotComments(
             @PageableDefault(size = 50) Pageable pageable) {
-        return ResponseEntity.ok(PageResponse.from(commentRepository.findAllByOrderByCreatedAtDesc(pageable)
+        return ResponseEntity.ok(PageResponse.from(commentRepository.findAllByOrderByCreatedAtDesc(InputSanitizer.sanitizePageable(pageable, ADMIN_LIST_SORT_FIELDS, ADMIN_LIST_DEFAULT_SORT, 50, 200))
                 .map(comment -> toAdminSpotComment(comment))));
     }
 
     @PutMapping("/community/spot-comments/{id}")
     @Transactional
     public ResponseEntity<?> updateCommunitySpotComment(@PathVariable Long id, @Valid @RequestBody CommunitySpotCommentUpdateRequest request) {
+        return auditLogService.capture("spot_comment", id, "spot_comment_update",
+                () -> updateCommunitySpotCommentInternal(id, request));
+    }
+
+    private ResponseEntity<?> updateCommunitySpotCommentInternal(Long id, CommunitySpotCommentUpdateRequest request) {
         Optional<Comment> commentOpt = commentRepository.findById(id);
         if (commentOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
@@ -205,6 +240,11 @@ public class AdminCommunityController {
     @DeleteMapping("/community/spot-comments/{id}")
     @Transactional
     public ResponseEntity<?> deleteCommunitySpotComment(@PathVariable Long id) {
+        return auditLogService.capture("spot_comment", id, "spot_comment_delete",
+                () -> deleteCommunitySpotCommentInternal(id));
+    }
+
+    private ResponseEntity<?> deleteCommunitySpotCommentInternal(Long id) {
         Optional<Comment> commentOpt = commentRepository.findById(id);
         if (commentOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
@@ -218,13 +258,18 @@ public class AdminCommunityController {
     @GetMapping("/community/questions")
     public ResponseEntity<PageResponse<Map<String, Object>>> getCommunityQuestions(
             @PageableDefault(size = 50) Pageable pageable) {
-        return ResponseEntity.ok(PageResponse.from(travelQuestionRepository.findAllByOrderByCreatedAtDesc(pageable)
+        return ResponseEntity.ok(PageResponse.from(travelQuestionRepository.findAllByOrderByCreatedAtDesc(InputSanitizer.sanitizePageable(pageable, ADMIN_LIST_SORT_FIELDS, ADMIN_LIST_DEFAULT_SORT, 50, 200))
                 .map(question -> toAdminQuestion(question))));
     }
 
     @PutMapping("/community/questions/{id}")
     @Transactional
     public ResponseEntity<?> updateCommunityQuestion(@PathVariable Long id, @Valid @RequestBody CommunityQuestionUpdateRequest request) {
+        return auditLogService.capture("travel_question", id, "travel_question_update",
+                () -> updateCommunityQuestionInternal(id, request));
+    }
+
+    private ResponseEntity<?> updateCommunityQuestionInternal(Long id, CommunityQuestionUpdateRequest request) {
         Optional<TravelQuestion> questionOpt = travelQuestionRepository.findById(id);
         if (questionOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
@@ -256,6 +301,11 @@ public class AdminCommunityController {
     @DeleteMapping("/community/questions/{id}")
     @Transactional
     public ResponseEntity<?> deleteCommunityQuestion(@PathVariable Long id) {
+        return auditLogService.capture("travel_question", id, "travel_question_delete",
+                () -> deleteCommunityQuestionInternal(id));
+    }
+
+    private ResponseEntity<?> deleteCommunityQuestionInternal(Long id) {
         Optional<TravelQuestion> questionOpt = travelQuestionRepository.findById(id);
         if (questionOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
@@ -271,13 +321,18 @@ public class AdminCommunityController {
     @GetMapping("/community/answers")
     public ResponseEntity<PageResponse<Map<String, Object>>> getCommunityAnswers(
             @PageableDefault(size = 50) Pageable pageable) {
-        return ResponseEntity.ok(PageResponse.from(travelAnswerRepository.findAllByOrderByCreatedAtDesc(pageable)
+        return ResponseEntity.ok(PageResponse.from(travelAnswerRepository.findAllByOrderByCreatedAtDesc(InputSanitizer.sanitizePageable(pageable, ADMIN_LIST_SORT_FIELDS, ADMIN_LIST_DEFAULT_SORT, 50, 200))
                 .map(answer -> toAdminAnswer(answer))));
     }
 
     @PutMapping("/community/answers/{id}")
     @Transactional
     public ResponseEntity<?> updateCommunityAnswer(@PathVariable Long id, @Valid @RequestBody CommunityAnswerUpdateRequest request) {
+        return auditLogService.capture("travel_answer", id, "travel_answer_update",
+                () -> updateCommunityAnswerInternal(id, request));
+    }
+
+    private ResponseEntity<?> updateCommunityAnswerInternal(Long id, CommunityAnswerUpdateRequest request) {
         Optional<TravelAnswer> answerOpt = travelAnswerRepository.findById(id);
         if (answerOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
@@ -311,6 +366,11 @@ public class AdminCommunityController {
     @DeleteMapping("/community/answers/{id}")
     @Transactional
     public ResponseEntity<?> deleteCommunityAnswer(@PathVariable Long id) {
+        return auditLogService.capture("travel_answer", id, "travel_answer_delete",
+                () -> deleteCommunityAnswerInternal(id));
+    }
+
+    private ResponseEntity<?> deleteCommunityAnswerInternal(Long id) {
         Optional<TravelAnswer> answerOpt = travelAnswerRepository.findById(id);
         if (answerOpt.isEmpty()) {
             return ResponseEntity.notFound().build();

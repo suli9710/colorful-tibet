@@ -1,6 +1,7 @@
 package com.tibet.tourism.modules.admin.web;
 import com.tibet.tourism.common.api.PageResponse;
 import com.tibet.tourism.common.validation.InputSanitizer;
+import com.tibet.tourism.modules.admin.application.AdminAuditLogService;
 import com.tibet.tourism.modules.admin.web.dto.HeritageEventRequest;
 import com.tibet.tourism.modules.admin.web.dto.HeritageInheritorRequest;
 import com.tibet.tourism.modules.admin.web.dto.HeritageItemRequest;
@@ -16,6 +17,7 @@ import jakarta.validation.Valid;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 import java.util.Map;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -35,28 +37,41 @@ public class AdminHeritageController {
     private final HeritageEventRepository eventRepository;
     private final HeritageLikeRepository likeRepository;
     private final HeritageCommentRepository commentRepository;
+    private final AdminAuditLogService auditLogService;
 
     public AdminHeritageController(HeritageItemRepository itemRepository,
                                    HeritageInheritorRepository inheritorRepository,
                                    HeritageEventRepository eventRepository,
                                    HeritageLikeRepository likeRepository,
-                                   HeritageCommentRepository commentRepository) {
+                                   HeritageCommentRepository commentRepository,
+                                   AdminAuditLogService auditLogService) {
         this.itemRepository = itemRepository;
         this.inheritorRepository = inheritorRepository;
         this.eventRepository = eventRepository;
         this.likeRepository = likeRepository;
         this.commentRepository = commentRepository;
+        this.auditLogService = auditLogService;
     }
 
     // ---- Heritage Items CRUD ----
+    // ?sort= binds straight into the repository here, so restrict it to columns that are safe to expose.
+    private static final Set<String> HERITAGE_SORT_FIELDS = Set.of("id", "name", "category", "createdAt");
+    private static final Sort HERITAGE_DEFAULT_SORT = Sort.by(Sort.Direction.ASC, "id");
+
     @GetMapping
     public ResponseEntity<PageResponse<HeritageItemResponse>> getAllItems(
             @PageableDefault(size = 50, sort = "id", direction = Sort.Direction.ASC) Pageable pageable) {
-        return ResponseEntity.ok(PageResponse.from(itemRepository.findAll(pageable).map(HeritageItemResponse::from)));
+        return ResponseEntity.ok(PageResponse.from(itemRepository.findAll(InputSanitizer.sanitizePageable(pageable, HERITAGE_SORT_FIELDS, HERITAGE_DEFAULT_SORT, 50, 200)).map(HeritageItemResponse::from)));
     }
 
     @PostMapping
     public ResponseEntity<?> createItem(@RequestBody @Valid HeritageItemRequest request) {
+        return auditLogService.captureCreated("heritage_item", "heritage_item_create",
+                () -> createItemInternal(request),
+                body -> ((HeritageItemResponse) body).id());
+    }
+
+    private ResponseEntity<?> createItemInternal(HeritageItemRequest request) {
         HeritageItem item = new HeritageItem();
         applyItemFields(item, request);
         itemRepository.save(item);
@@ -65,6 +80,11 @@ public class AdminHeritageController {
 
     @PutMapping("/{id}")
     public ResponseEntity<?> updateItem(@PathVariable Long id, @RequestBody @Valid HeritageItemRequest request) {
+        return auditLogService.capture("heritage_item", id, "heritage_item_update",
+                () -> updateItemInternal(id, request));
+    }
+
+    private ResponseEntity<?> updateItemInternal(Long id, HeritageItemRequest request) {
         HeritageItem item = itemRepository.findById(id).orElse(null);
         if (item == null) return ResponseEntity.notFound().build();
         applyItemFields(item, request);
@@ -75,6 +95,11 @@ public class AdminHeritageController {
     @DeleteMapping("/{id}")
     @Transactional
     public ResponseEntity<?> deleteItem(@PathVariable Long id) {
+        return auditLogService.capture("heritage_item", id, "heritage_item_delete",
+                () -> deleteItemInternal(id));
+    }
+
+    private ResponseEntity<?> deleteItemInternal(Long id) {
         if (!itemRepository.existsById(id)) return ResponseEntity.notFound().build();
         likeRepository.deleteByHeritageItemId(id);
         commentRepository.deleteByHeritageItemId(id);
@@ -95,6 +120,12 @@ public class AdminHeritageController {
 
     @PostMapping("/{itemId}/inheritors")
     public ResponseEntity<?> createInheritor(@PathVariable Long itemId, @RequestBody @Valid HeritageInheritorRequest request) {
+        return auditLogService.captureCreated("heritage_inheritor", "heritage_inheritor_create",
+                () -> createInheritorInternal(itemId, request),
+                body -> ((HeritageInheritorResponse) body).id());
+    }
+
+    private ResponseEntity<?> createInheritorInternal(Long itemId, HeritageInheritorRequest request) {
         HeritageItem item = itemRepository.findById(itemId).orElse(null);
         if (item == null) return ResponseEntity.notFound().build();
 
@@ -107,6 +138,11 @@ public class AdminHeritageController {
 
     @PutMapping("/inheritors/{id}")
     public ResponseEntity<?> updateInheritor(@PathVariable Long id, @RequestBody @Valid HeritageInheritorRequest request) {
+        return auditLogService.capture("heritage_inheritor", id, "heritage_inheritor_update",
+                () -> updateInheritorInternal(id, request));
+    }
+
+    private ResponseEntity<?> updateInheritorInternal(Long id, HeritageInheritorRequest request) {
         HeritageInheritor inheritor = inheritorRepository.findById(id).orElse(null);
         if (inheritor == null) return ResponseEntity.notFound().build();
         applyInheritorFields(inheritor, request);
@@ -116,6 +152,11 @@ public class AdminHeritageController {
 
     @DeleteMapping("/inheritors/{id}")
     public ResponseEntity<?> deleteInheritor(@PathVariable Long id) {
+        return auditLogService.capture("heritage_inheritor", id, "heritage_inheritor_delete",
+                () -> deleteInheritorInternal(id));
+    }
+
+    private ResponseEntity<?> deleteInheritorInternal(Long id) {
         if (!inheritorRepository.existsById(id)) return ResponseEntity.notFound().build();
         inheritorRepository.deleteById(id);
         return ResponseEntity.ok(Map.of("message", "删除成功"));
@@ -132,6 +173,12 @@ public class AdminHeritageController {
 
     @PostMapping("/{itemId}/events")
     public ResponseEntity<?> createEvent(@PathVariable Long itemId, @RequestBody @Valid HeritageEventRequest request) {
+        return auditLogService.captureCreated("heritage_event", "heritage_event_create",
+                () -> createEventInternal(itemId, request),
+                body -> ((HeritageEventResponse) body).id());
+    }
+
+    private ResponseEntity<?> createEventInternal(Long itemId, HeritageEventRequest request) {
         HeritageItem item = itemRepository.findById(itemId).orElse(null);
         if (item == null) return ResponseEntity.notFound().build();
 
@@ -144,6 +191,11 @@ public class AdminHeritageController {
 
     @PutMapping("/events/{id}")
     public ResponseEntity<?> updateEvent(@PathVariable Long id, @RequestBody @Valid HeritageEventRequest request) {
+        return auditLogService.capture("heritage_event", id, "heritage_event_update",
+                () -> updateEventInternal(id, request));
+    }
+
+    private ResponseEntity<?> updateEventInternal(Long id, HeritageEventRequest request) {
         HeritageEvent event = eventRepository.findById(id).orElse(null);
         if (event == null) return ResponseEntity.notFound().build();
         applyEventFields(event, request);
@@ -153,6 +205,11 @@ public class AdminHeritageController {
 
     @DeleteMapping("/events/{id}")
     public ResponseEntity<?> deleteEvent(@PathVariable Long id) {
+        return auditLogService.capture("heritage_event", id, "heritage_event_delete",
+                () -> deleteEventInternal(id));
+    }
+
+    private ResponseEntity<?> deleteEventInternal(Long id) {
         if (!eventRepository.existsById(id)) return ResponseEntity.notFound().build();
         eventRepository.deleteById(id);
         return ResponseEntity.ok(Map.of("message", "删除成功"));

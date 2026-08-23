@@ -11,7 +11,7 @@ Run these checks from the repository root before a production release:
 
 ```powershell
 npm run test:ops
-node scripts/resolve-docker-image-digests.mjs --evidence --verifier=<name-or-email> --target-platform=multi-platform-index > docker-digest-evidence.json
+node scripts/resolve-docker-image-digests.mjs --evidence --verifier=<name-or-email> --target-platform=multi-platform-index --output=docker-digest-evidence.json
 node scripts/check-supply-chain-pins.mjs --evidence-only --evidence docker-digest-evidence.json
 node scripts/resolve-docker-image-digests.mjs --markdown
 npm run check:supply-chain-pins
@@ -46,9 +46,10 @@ resolves the former `pytest>=8.3,<9.0` range to `pytest==8.4.2`.
 
 Docker image references in Dockerfiles, Compose files, and workflow `docker run`
 commands were replaced with `name:tag@sha256:<digest>` pins verified through the
-official Docker Registry HTTP API v2 on 2026-06-09 +08:00. The source-matched
-evidence is checked in as `docker-digest-evidence.json` and validated by
-`scripts/check-supply-chain-pins.mjs`.
+official Docker Registry HTTP API v2. The evidence and moving image tags were
+refreshed on 2026-07-28 +08:00, including the workflow MySQL service image. The
+source-matched evidence is checked in as `docker-digest-evidence.json` and
+validated by `scripts/check-supply-chain-pins.mjs`.
 
 ## Pin Rotation
 
@@ -56,8 +57,12 @@ evidence is checked in as `docker-digest-evidence.json` and validated by
   networked release workstation that can reach `auth.docker.io` and
   `registry-1.docker.io`.
 - Also run `node scripts/resolve-docker-image-digests.mjs --evidence
-  --verifier=<name-or-email> --target-platform=multi-platform-index >
-  docker-digest-evidence.json` and attach that JSON file to the release record.
+  --verifier=<name-or-email> --target-platform=multi-platform-index
+  --output=docker-digest-evidence.json` and attach that JSON file to the release
+  record. `--output` writes a synced temporary file and atomically replaces the
+  prior evidence only after every required registry lookup succeeds. Do not use
+  shell redirection for this file, because the shell truncates the destination
+  before the resolver can fail closed.
 - On the release workstation, or later in an offline review environment, run
   `node scripts/check-supply-chain-pins.mjs --evidence-only --evidence docker-digest-evidence.json`.
   This does not contact Docker Hub; it verifies that the evidence has a valid
@@ -67,7 +72,8 @@ evidence is checked in as `docker-digest-evidence.json` and validated by
   same image tag.
 - Replace every Dockerfile `FROM` image with `name:tag@sha256:<digest>`.
 - Replace every Compose `image:` tag with `name:tag@sha256:<digest>`.
-- Replace workflow `docker run` image tags with `name:tag@sha256:<digest>`.
+- Replace workflow `docker run` and service image tags with
+  `name:tag@sha256:<digest>`.
 - Rerun `npm run check:supply-chain-pins`, `npm run test:ops`, and both Compose
   config checks after changing any pin.
 

@@ -33,13 +33,15 @@ class ItineraryControllerPaginationTest {
     private JwtAuthSupport jwtAuthSupport;
     @Mock
     private HttpServletRequest request;
+    @Mock
+    private com.tibet.tourism.common.security.antibot.RiskAssessmentService riskAssessmentService;
 
     private ItineraryController controller;
     private User user;
 
     @BeforeEach
     void setUp() {
-        controller = new ItineraryController(itineraryService, jwtAuthSupport);
+        controller = new ItineraryController(itineraryService, jwtAuthSupport, riskAssessmentService);
         user = new User();
         user.setId(7L);
         user.setUsername("traveler");

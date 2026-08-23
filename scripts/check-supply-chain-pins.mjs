@@ -385,7 +385,31 @@ export const collectSupplyChainPinFindings = (repoRoot, paths = DEFAULT_PATHS) =
   return findings
 }
 
-export const validateDockerDigestEvidence = (evidence) => {
+/**
+ * Reads the file and line a record claims to attest and returns the digest actually pinned there,
+ * or null when the line cannot be read. Without this the evidence file only had to be well-shaped,
+ * so it could drift from the Dockerfiles and compose files it claims to describe.
+ */
+const pinnedDigestAtSource = (repoRoot, source, image) => {
+  const separator = source.lastIndexOf(':')
+  if (separator < 0) return null
+  const filePath = source.slice(0, separator)
+  const lineNumber = Number(source.slice(separator + 1))
+  if (!Number.isInteger(lineNumber) || lineNumber < 1) return null
+
+  let line
+  try {
+    line = readFileSync(path.resolve(repoRoot, filePath), 'utf8').split(/\r?\n/)[lineNumber - 1]
+  } catch {
+    return null
+  }
+  if (typeof line !== 'string' || !line.includes(image)) return null
+
+  const match = line.slice(line.indexOf(image) + image.length).match(/^@(sha256:[0-9a-f]{64})/i)
+  return match ? match[1].toLowerCase() : null
+}
+
+export const validateDockerDigestEvidence = (evidence, repoRoot = null) => {
   const findings = []
   const records = evidence?.records
 
@@ -458,6 +482,21 @@ export const validateDockerDigestEvidence = (evidence) => {
       addEvidenceFinding(findings, `${record.image} has conflicting digests in evidence.`)
     }
     digestByImage.set(record.image, lowerDigest)
+
+    if (repoRoot) {
+      const actualDigest = pinnedDigestAtSource(repoRoot, record.source, record.image)
+      if (actualDigest === null) {
+        addEvidenceFinding(
+          findings,
+          `${label} does not resolve to a digest-pinned ${record.image} reference at that file and line.`
+        )
+      } else if (actualDigest !== lowerDigest) {
+        addEvidenceFinding(
+          findings,
+          `${label} records ${lowerDigest} but the source pins ${actualDigest}.`
+        )
+      }
+    }
   }
 
   for (const item of REQUIRED_IMAGE_REFS) {
@@ -470,10 +509,10 @@ export const validateDockerDigestEvidence = (evidence) => {
   return findings
 }
 
-export const loadDockerDigestEvidenceFindings = (evidencePath) => {
+export const loadDockerDigestEvidenceFindings = (evidencePath, repoRoot = null) => {
   try {
     const source = readFileSync(evidencePath, 'utf8')
-    return validateDockerDigestEvidence(JSON.parse(source))
+    return validateDockerDigestEvidence(JSON.parse(source), repoRoot)
   } catch (error) {
     const findings = []
     addEvidenceFinding(findings, `Unable to read or parse evidence file ${evidencePath}: ${error.message}`)
@@ -515,9 +554,16 @@ export const formatSupplyChainPinFindings = (findings) => {
 export const runSupplyChainPinGate = (args = process.argv.slice(2)) => {
   const evidenceOnly = args.includes('--evidence-only')
   const evidenceIndex = args.findIndex((arg) => arg === '--evidence' || arg.startsWith('--evidence='))
-  const evidencePath =
+  const explicitEvidencePath =
     evidenceIndex >= 0
       ? (args[evidenceIndex].includes('=') ? args[evidenceIndex].split('=')[1] : args[evidenceIndex + 1])
+      : null
+  // `--evidence` without a following path used to leave evidencePath undefined, which silently
+  // skipped the digest evidence validation that otherwise runs by default and still exited 0.
+  const evidenceFlagIsMalformed = evidenceIndex >= 0 && !explicitEvidencePath
+  const evidencePath =
+    evidenceIndex >= 0
+      ? explicitEvidencePath
       : evidenceOnly ? null : DEFAULT_DOCKER_DIGEST_EVIDENCE_PATH
   const repoArg = args.find((arg, index) =>
     !arg.startsWith('--') &&
@@ -525,11 +571,19 @@ export const runSupplyChainPinGate = (args = process.argv.slice(2)) => {
   )
   const repoRoot = repoArg ? path.resolve(repoArg) : path.resolve(path.dirname(scriptPath), '..')
   const findings = evidenceOnly ? [] : collectSupplyChainPinFindings(repoRoot)
-  if (evidenceOnly && !evidencePath) {
+  if (evidenceFlagIsMalformed) {
+    addEvidenceFinding(findings, '--evidence requires a path, e.g. --evidence=docker-digest-evidence.json.')
+  }
+  if (evidenceOnly && !evidencePath && !evidenceFlagIsMalformed) {
     findings.push(...validateDockerDigestEvidence(null))
   }
   if (evidencePath) {
-    findings.push(...loadDockerDigestEvidenceFindings(path.resolve(repoRoot, evidencePath)))
+    // --evidence-only audits the document in isolation and deliberately does not require the pinned
+    // repo files to exist yet, so the source cross-check only applies to the full gate CI runs.
+    findings.push(...loadDockerDigestEvidenceFindings(
+      path.resolve(repoRoot, evidencePath),
+      evidenceOnly ? null : repoRoot
+    ))
   }
   const output = formatSupplyChainPinFindings(findings)
   return {

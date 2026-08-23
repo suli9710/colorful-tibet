@@ -4,6 +4,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.tibet.tourism.modules.auth.application.AdminMfaPolicy;
 import com.tibet.tourism.modules.user.infra.UserRepository;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -30,6 +31,9 @@ class UploadResourceSecurityHeadersTest {
 
     @MockBean
     private JwtUtils jwtUtils;
+
+    @MockBean
+    private AdminMfaPolicy adminMfaPolicy;
 
     @MockBean
     private UserDetailsServiceImpl userDetailsService;

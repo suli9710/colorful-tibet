@@ -465,6 +465,15 @@ const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 const spot = ref<any>(null)
+let detailRequestId = 0
+
+// Number('abc') is NaN and NaN never equals itself, so comparing raw Number(route.params.id) values
+// would make every stale-request guard below fail open and strand the loading flags forever.
+const routeSpotId = (): number | null => {
+  const parsed = Number(route.params.id)
+  return Number.isFinite(parsed) ? parsed : null
+}
+const isCurrentSpot = (id: number | null): boolean => id !== null && id === routeSpotId()
 const loading = ref(true)
 const detailError = ref('')
 const submitting = ref(false)
@@ -616,22 +625,37 @@ const hasValidLocation = computed(() => {
 })
 
 const fetchSpotDetail = async () => {
+  const requestId = ++detailRequestId
+  const requestedSpotId = routeSpotId()
   loading.value = true
   detailError.value = ''
+  if (requestedSpotId === null) {
+    spot.value = null
+    mapReady.value = false
+    mapLoading.value = false
+    detailError.value = t('spotDetail.detailErrorMessage')
+    loading.value = false
+    return
+  }
   try {
-    const response = await api.get(endpoints.spots.detail(Number(route.params.id)))
+    const response = await api.get(endpoints.spots.detail(requestedSpotId))
+    if (requestId !== detailRequestId || !isCurrentSpot(requestedSpotId)) return
     spotImageFailed.value = false
     spot.value = response.data
     await nextTick()
+    if (requestId !== detailRequestId || !isCurrentSpot(requestedSpotId)) return
     initOrUpdateMap()
   } catch (error) {
+    if (requestId !== detailRequestId || !isCurrentSpot(requestedSpotId)) return
     console.error('Failed to fetch spot detail:', summarizeClientError(error))
     spot.value = null
     mapReady.value = false
     mapLoading.value = false
     detailError.value = t('spotDetail.detailErrorMessage')
   } finally {
-    loading.value = false
+    if (requestId === detailRequestId) {
+      loading.value = false
+    }
   }
 }
 
@@ -805,6 +829,9 @@ const commentsPageInfo = ref<PageMetadata>({
 })
 const commentsLoadingMore = ref(false)
 const submittingComment = ref(false)
+let commentsRequestId = 0
+let commentsPageRequestId = 0
+const likingCommentIds = new Set<number>()
 const commentForm = ref({
   content: '',
   rating: 5
@@ -841,36 +868,65 @@ const applyCommentsPage = (response: { data?: unknown; headers?: unknown }, appe
   }
 }
 
-const fetchCommentsPage = async (page = 0, append = false) => {
-  const response = await api.get(endpoints.comments.list(Number(route.params.id)), {
+const fetchCommentsPage = async (
+  page = 0,
+  append = false,
+  requestedSpotId: number | null = routeSpotId(),
+  isStale: () => boolean = () => false
+) => {
+  if (requestedSpotId === null) return
+  const response = await api.get(endpoints.comments.list(requestedSpotId), {
     params: { page, size: scenicSpotCommentsPageSize }
   })
+  if (isStale() || !isCurrentSpot(requestedSpotId)) return
   applyCommentsPage(response, append)
 }
 
 const fetchComments = async () => {
+  const requestId = ++commentsRequestId
+  const requestedSpotId = routeSpotId()
+  const isStale = () => requestId !== commentsRequestId
   commentsLoading.value = true
   commentsError.value = ''
+  if (requestedSpotId === null) {
+    commentsError.value = t('spotDetail.commentsLoadFailed')
+    commentsLoading.value = false
+    return
+  }
   try {
-    await fetchCommentsPage(0)
+    await fetchCommentsPage(0, false, requestedSpotId, isStale)
   } catch (error) {
+    if (isStale() || !isCurrentSpot(requestedSpotId)) return
     console.error('Failed to fetch comments:', summarizeClientError(error))
     commentsError.value = t('spotDetail.commentsLoadFailed')
   } finally {
-    commentsLoading.value = false
+    // commentsRequestId is only bumped here, so whoever superseded us owns the flag and will clear it.
+    if (!isStale()) {
+      commentsLoading.value = false
+    }
   }
 }
 
 const loadNextCommentsPage = async () => {
   if (commentsLoadingMore.value || !hasMoreComments.value) return
+  // Pagination keeps its own counter: sharing commentsRequestId with fetchComments meant a refresh
+  // invalidated the in-flight page and left commentsLoadingMore stuck true, disabling the button.
+  const pageRequestId = ++commentsPageRequestId
+  const refreshIdAtStart = commentsRequestId
+  const requestedSpotId = routeSpotId()
+  const isStale = () => pageRequestId !== commentsPageRequestId || refreshIdAtStart !== commentsRequestId
+  if (requestedSpotId === null) return
   commentsLoadingMore.value = true
   try {
-    await fetchCommentsPage(commentsPageInfo.value.page + 1, true)
+    await fetchCommentsPage(commentsPageInfo.value.page + 1, true, requestedSpotId, isStale)
   } catch (error) {
+    if (isStale() || !isCurrentSpot(requestedSpotId)) return
     console.error('Failed to load more scenic spot comments:', summarizeClientError(error))
     showToast(t('spotDetail.commentsLoadFailed'), 'error')
   } finally {
-    commentsLoadingMore.value = false
+    if (pageRequestId === commentsPageRequestId) {
+      commentsLoadingMore.value = false
+    }
   }
 }
 
@@ -939,7 +995,10 @@ async function handleCommentImageChange(event: Event) {
 }
 
 const submitComment = async () => {
-  if (!commentForm.value.content.trim()) return
+  if (submittingComment.value || !spot.value || !commentForm.value.content.trim()) return
+
+  const requestedSpotId = routeSpotId()
+  if (requestedSpotId === null) return
 
   if (!(await auth.ensureSession())) {
     router.push('/login')
@@ -949,13 +1008,14 @@ const submitComment = async () => {
   submittingComment.value = true
   try {
     await api.post(endpoints.comments.create, {
-      spotId: spot.value.id,
+      spotId: requestedSpotId,
       content: commentForm.value.content,
       rating: commentForm.value.rating,
       imageUrl: uploadedCommentImageUrl.value
     })
     
     // Reset form and refresh list
+    if (!isCurrentSpot(requestedSpotId)) return
     commentForm.value.content = ''
     commentForm.value.rating = 5
     removeSelectedCommentImage()
@@ -1007,19 +1067,27 @@ const deleteComment = async (comment: ScenicSpotCommentItem) => {
 }
 
 const toggleLike = async (comment: ScenicSpotCommentItem) => {
+  if (likingCommentIds.has(comment.id)) return
+  likingCommentIds.add(comment.id)
+  const requestedSpotId = routeSpotId()
   if (!(await auth.ensureSession())) {
     router.push('/login')
+    likingCommentIds.delete(comment.id)
     return
   }
   
   try {
     const response = await api.post(endpoints.comments.like(comment.id))
-    
-    comment.liked = response.data.liked
-    comment.likeCount = response.data.likeCount
+    const currentComment = comments.value.find(item => item.id === comment.id)
+    if (isCurrentSpot(requestedSpotId) && currentComment) {
+      currentComment.liked = response.data.liked
+      currentComment.likeCount = response.data.likeCount
+    }
   } catch (error) {
     console.error('Failed to toggle like:', summarizeClientError(error))
     showToast(t('spotDetail.operationFailed'), 'error')
+  } finally {
+    likingCommentIds.delete(comment.id)
   }
 }
 
@@ -1064,12 +1132,27 @@ const formatDate = (dateStr: string) => {
 
 // 监听语言变化，重新获取数据
 watch(locale, () => {
-  fetchSpotDetail()
+  void fetchSpotDetail()
+})
+
+watch(() => route.params.id, () => {
+  comments.value = []
+  commentsPageInfo.value = {
+    page: 0,
+    size: scenicSpotCommentsPageSize,
+    totalElements: 0,
+    totalPages: 0
+  }
+  commentsLoadingMore.value = false
+  commentsError.value = ''
+  removeSelectedCommentImage()
+  void fetchSpotDetail()
+  void fetchComments()
 })
 
 onMounted(async () => {
-  fetchSpotDetail()
+  void fetchSpotDetail()
   await auth.refreshSession()
-  fetchComments()
+  void fetchComments()
 })
 </script>

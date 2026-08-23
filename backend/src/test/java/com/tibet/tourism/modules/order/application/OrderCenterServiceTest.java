@@ -151,7 +151,7 @@ class OrderCenterServiceTest {
     }
 
     @Test
-    void idempotencyRaceReturnsExistingOrderAfterUniqueConstraintFailure() {
+    void idempotencyRaceFailsAsAConflictAndTheRetryReturnsTheWinningOrder() {
         PlatformOrder existing = new PlatformOrder();
         existing.setUser(user);
         existing.setOrderNo("ORD-RACE");
@@ -163,10 +163,17 @@ class OrderCenterServiceTest {
         when(orderRepository.save(any(PlatformOrder.class)))
                 .thenThrow(new DataIntegrityViolationException("duplicate idempotency key"));
 
-        var response = orderCenterService.createOrder(user, scenicOrderRequest(), "idem-1");
-
-        assertEquals("ORD-RACE", response.orderNo());
+        // Recovering inside the losing transaction cannot work: the flush that raised the violation has
+        // already marked the persistence context rollback-only, so anything built afterwards is
+        // discarded and the commit fails regardless. The request must surface as a retryable conflict.
+        assertThrows(
+                DataIntegrityViolationException.class,
+                () -> orderCenterService.createOrder(user, scenicOrderRequest(), "idem-1"));
         verify(inventoryLockRepository, never()).saveAndFlush(any());
+
+        // The client's retry runs in a fresh transaction and gets the order the winning request created.
+        var retry = orderCenterService.createOrder(user, scenicOrderRequest(), "idem-1");
+        assertEquals("ORD-RACE", retry.orderNo());
     }
 
     @Test
@@ -678,6 +685,28 @@ class OrderCenterServiceTest {
     }
 
     @Test
+    void hotelRoomOrderRejectsMultipleRoomsItCannotReserve() {
+        Hotel hotel = hotel();
+        com.tibet.tourism.modules.hotel.domain.RoomType roomType = roomType(hotel);
+        when(orderRepository.findByUserIdAndIdempotencyKey(1L, "hotel-1")).thenReturn(Optional.empty());
+        when(hotelRepository.findById(20L)).thenReturn(Optional.of(hotel));
+        when(roomTypeRepository.findByIdForUpdate(30L)).thenReturn(Optional.of(roomType));
+
+        CreateOrderRequest request = hotelOrderRequest();
+        request.getItems().get(0).setQuantity(5);
+
+        // activeLockKey is HOTEL_ROOM:hotel:roomType:date under a unique index, with no room-count
+        // dimension, so the platform can only ever hold one room-night. Billing quantity x nights
+        // would take money for rooms it never reserved.
+        IllegalArgumentException error = assertThrows(
+                IllegalArgumentException.class,
+                () -> orderCenterService.createOrder(user, request, "hotel-1"));
+
+        assertTrue(error.getMessage().contains("仅支持预订一间"));
+        verify(inventoryLockRepository, never()).saveAndFlush(any(InventoryLock.class));
+    }
+
+    @Test
     void hotelRoomOrderRejectsExistingActiveLock() {
         Hotel hotel = hotel();
         com.tibet.tourism.modules.hotel.domain.RoomType roomType = roomType(hotel);
@@ -1054,6 +1083,103 @@ class OrderCenterServiceTest {
 
         assertEquals("Refund amount exceeds paid amount", error.getMessage());
         assertEquals(1, order.getRefunds().size());
+    }
+
+    @Test
+    void refundRequestRejectsSecondRefundForAnAlreadyRefundedItem() {
+        PlatformOrder order = partiallyRefundedTwoItemOrder();
+        OrderItem alreadyRefunded = order.getItems().get(0);
+        Voucher survivingVoucher = issuedVoucher(order, order.getItems().get(1));
+        when(orderRepository.findVisibleByIdAndUserIdForUpdate(99L, 1L)).thenReturn(Optional.of(order));
+
+        var request = new com.tibet.tourism.modules.order.web.dto.RefundRequest();
+        request.setOrderItemId(alreadyRefunded.getId());
+
+        IllegalStateException error = assertThrows(
+                IllegalStateException.class,
+                () -> orderCenterService.requestRefund(user, 99L, request));
+
+        assertEquals("Order item has already been refunded", error.getMessage());
+        // Refunding the same item twice would have paid out the whole order total while the second item
+        // kept a redeemable voucher.
+        assertEquals(1, order.getRefunds().size());
+        assertEquals(Voucher.Status.ISSUED, survivingVoucher.getStatus());
+    }
+
+    @Test
+    void refundRequestForRemainingItemIsCappedAtThatItemsOwnShare() {
+        PlatformOrder order = partiallyRefundedTwoItemOrder();
+        OrderItem remaining = order.getItems().get(1);
+        when(orderRepository.findVisibleByIdAndUserIdForUpdate(99L, 1L)).thenReturn(Optional.of(order));
+        when(cancellationPolicyRepository.findFirstByProductTypeAndActiveTrueOrderByPriorityDesc(
+                OrderItem.ProductType.SCENIC_SPOT)).thenReturn(Optional.empty());
+
+        var request = new com.tibet.tourism.modules.order.web.dto.RefundRequest();
+        request.setOrderItemId(remaining.getId());
+
+        var response = orderCenterService.requestRefund(user, 99L, request);
+
+        assertEquals(0, new BigDecimal("100").compareTo(response.amount()));
+        assertEquals(2, order.getRefunds().size());
+    }
+
+    @Test
+    void cancelPartiallyRefundedOrderRefundsOnlyTheRemainingBalance() {
+        PlatformOrder order = partiallyRefundedTwoItemOrder();
+        when(orderRepository.findVisibleByIdAndUserIdForUpdate(99L, 1L)).thenReturn(Optional.of(order));
+        when(cancellationPolicyRepository.findFirstByProductTypeAndActiveTrueOrderByPriorityDesc(
+                OrderItem.ProductType.SCENIC_SPOT)).thenReturn(Optional.empty());
+
+        var response = orderCenterService.cancelOrder(user, 99L, new CancelOrderRequest());
+
+        // Summing every item - including the one already refunded - would ask for 200 against a 100
+        // remaining balance and fail with "Refund amount exceeds paid amount" forever.
+        assertEquals("REFUND_PENDING", response.status());
+        RefundOrder requested = order.getRefunds().stream()
+                .filter(refund -> refund.getStatus() == RefundOrder.Status.REQUESTED)
+                .findFirst()
+                .orElseThrow();
+        assertEquals(0, new BigDecimal("100").compareTo(requested.getAmount()));
+    }
+
+    private PlatformOrder partiallyRefundedTwoItemOrder() {
+        PlatformOrder order = new PlatformOrder();
+        order.setId(99L);
+        order.setUser(user);
+        order.setOrderNo("ORD-PARTIAL-REFUND");
+        order.setStatus(PlatformOrder.Status.CONFIRMED);
+        order.setPaymentStatus(PlatformOrder.PaymentStatus.PARTIALLY_REFUNDED);
+        order.setProductSummary("Two item order");
+        order.setTotalAmount(new BigDecimal("200"));
+        order.setPayableAmount(new BigDecimal("200"));
+        order.setPaidAt(java.time.LocalDateTime.now());
+
+        order.addItem(twoItemOrderLine(77L, 10L, OrderItem.Status.REFUNDED));
+        order.addItem(twoItemOrderLine(78L, 11L, OrderItem.Status.CONFIRMED));
+        successfulTransaction(order, "PAY-PARTIAL", new BigDecimal("200"));
+
+        RefundOrder completed = new RefundOrder();
+        completed.setId(500L);
+        completed.setRefundNo("RFD-500");
+        completed.setOrderItem(order.getItems().get(0));
+        completed.setAmount(new BigDecimal("100"));
+        completed.setStatus(RefundOrder.Status.COMPLETED);
+        order.addRefund(completed);
+        return order;
+    }
+
+    private OrderItem twoItemOrderLine(Long id, Long productId, OrderItem.Status status) {
+        OrderItem item = new OrderItem();
+        item.setId(id);
+        item.setProductType(OrderItem.ProductType.SCENIC_SPOT);
+        item.setProductId(productId);
+        item.setProductName("Spot " + productId);
+        item.setServiceStartDate(LocalDate.of(2026, 6, 1));
+        item.setQuantity(1);
+        item.setUnitPrice(new BigDecimal("100"));
+        item.setSubtotal(new BigDecimal("100"));
+        item.setStatus(status);
+        return item;
     }
 
     @Test

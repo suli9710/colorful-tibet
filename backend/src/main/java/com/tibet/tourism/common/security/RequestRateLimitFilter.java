@@ -1,4 +1,6 @@
 package com.tibet.tourism.common.security;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -8,11 +10,9 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.HexFormat;
 import java.util.List;
-import java.util.Map;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -34,7 +34,6 @@ public class RequestRateLimitFilter extends OncePerRequestFilter {
 
     private static final Logger logger = LoggerFactory.getLogger(RequestRateLimitFilter.class);
     private static final int MAX_TRACKED_WINDOWS = 20_000;
-    private static final long CLEANUP_INTERVAL_MILLIS = Duration.ofMinutes(1).toMillis();
     private static final long MIN_RATE_LIMIT_WINDOW_MILLIS = 1_000L;
     private static final long MAX_RATE_LIMIT_WINDOW_MILLIS = Duration.ofDays(1).toMillis();
     static final String INCREMENT_WITH_EXPIRE_LUA =
@@ -49,10 +48,12 @@ public class RequestRateLimitFilter extends OncePerRequestFilter {
             INCREMENT_WITH_EXPIRE_LUA,
             Long.class);
 
-    private final Map<String, RateWindow> windows = new ConcurrentHashMap<>();
+    private final Cache<String, RateWindow> windows = Caffeine.newBuilder()
+            .maximumSize(MAX_TRACKED_WINDOWS)
+            .expireAfterAccess(Duration.ofMinutes(30))
+            .build();
     private final StringRedisTemplate redisTemplate;
     private final TrustedProxyIpResolver trustedProxyIpResolver;
-    private final AtomicLong lastCleanupAt = new AtomicLong(0);
     private final AtomicLong redisFallbackActive = new AtomicLong(0);
     private final AtomicLong redisFallbackEvents = new AtomicLong(0);
     private final Counter redisFallbackCounter;
@@ -119,6 +120,12 @@ public class RequestRateLimitFilter extends OncePerRequestFilter {
 
     @Value("${app.security.rate-limit.upload.window-seconds:60}")
     private long uploadWindowSeconds;
+
+    @Value("${app.security.rate-limit.client-error.requests:30}")
+    private int clientErrorRequests;
+
+    @Value("${app.security.rate-limit.client-error.window-seconds:60}")
+    private long clientErrorWindowSeconds;
 
     @Value("${app.security.rate-limit.admin.requests:120}")
     private int adminRequests;
@@ -255,21 +262,13 @@ public class RequestRateLimitFilter extends OncePerRequestFilter {
     }
 
     private RateDecision tryAcquireInMemory(HttpServletRequest request, LimitRule rule, long now) {
-        cleanupIfNeeded(now);
         String key = rule.name() + ":" + clientIdentity(request);
-        RateWindow window = windows.computeIfAbsent(key, ignored -> new RateWindow(now));
+        RateWindow window = windows.get(key, ignored -> new RateWindow(now));
         return window.tryAcquire(rule, now);
     }
 
-    private void cleanupIfNeeded(long now) {
-        if (windows.size() < MAX_TRACKED_WINDOWS) {
-            return;
-        }
-        long lastCleanup = lastCleanupAt.get();
-        if (now - lastCleanup < CLEANUP_INTERVAL_MILLIS || !lastCleanupAt.compareAndSet(lastCleanup, now)) {
-            return;
-        }
-        windows.entrySet().removeIf(entry -> now - entry.getValue().lastSeenAt() > Duration.ofMinutes(30).toMillis());
+    long inMemoryMaximumSize() {
+        return windows.policy().eviction().orElseThrow().getMaximum();
     }
 
     private LimitRule resolveRule(String path, String method) {
@@ -291,6 +290,13 @@ public class RequestRateLimitFilter extends OncePerRequestFilter {
         }
         if (normalized.contains("/upload-image") || normalized.endsWith("/upload-avatar")) {
             return new LimitRule("upload", uploadRequests, configuredWindowMillis(uploadWindowSeconds), true);
+        }
+        if (normalized.equals("/api/client-errors")) {
+            return new LimitRule(
+                    "client-error",
+                    clientErrorRequests,
+                    configuredWindowMillis(clientErrorWindowSeconds),
+                    true);
         }
         if (normalized.startsWith("/api/admin/")) {
             return new LimitRule("admin", adminRequests, configuredWindowMillis(adminWindowSeconds), true);
@@ -339,10 +345,12 @@ public class RequestRateLimitFilter extends OncePerRequestFilter {
         }
     }
 
-    private record LimitRule(String name, int maxRequests, long windowMillis, boolean sensitive) {
+    // Package-private so RequestRateLimitFilterTest can drive the sliding-window algorithm with
+    // explicit timestamps instead of sleeping through real windows.
+    record LimitRule(String name, int maxRequests, long windowMillis, boolean sensitive) {
         private static final int MIN_REQUESTS = 1;
 
-        private LimitRule {
+        LimitRule {
             maxRequests = Math.max(MIN_REQUESTS, maxRequests);
             windowMillis = Math.min(
                     MAX_RATE_LIMIT_WINDOW_MILLIS,
@@ -350,7 +358,7 @@ public class RequestRateLimitFilter extends OncePerRequestFilter {
         }
     }
 
-    private record RateDecision(
+    record RateDecision(
             boolean allowed,
             int remaining,
             long retryAfterSeconds,
@@ -370,7 +378,7 @@ public class RequestRateLimitFilter extends OncePerRequestFilter {
         }
     }
 
-    private static class RateWindow {
+    static class RateWindow {
         private long windowStartedAt;
         private long lastSeenAt;
         private int currentCount;
@@ -386,12 +394,12 @@ public class RequestRateLimitFilter extends OncePerRequestFilter {
             long windowMs = rule.windowMillis();
 
             if (now - windowStartedAt >= windowMs) {
-                if (now - windowStartedAt >= windowMs * 2) {
-                    prevCount = 0;
-                } else {
-                    prevCount = currentCount;
-                }
-                windowStartedAt += windowMs;
+                // Snap past every elapsed window at once. Advancing by a single window left
+                // now - windowStartedAt >= windowMs, so after an idle gap of N windows the next N
+                // requests each re-entered this branch, reset the counter, and were admitted.
+                long elapsedWindows = (now - windowStartedAt) / Math.max(1L, windowMs);
+                prevCount = elapsedWindows >= 2 ? 0 : currentCount;
+                windowStartedAt += elapsedWindows * windowMs;
                 currentCount = 0;
             }
 

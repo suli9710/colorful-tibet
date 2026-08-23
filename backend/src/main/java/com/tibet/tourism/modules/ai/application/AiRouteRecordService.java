@@ -88,6 +88,37 @@ public class AiRouteRecordService {
         return routeRecordRepository.save(record);
     }
 
+    /**
+     * Persists a route that was served straight from the cache. Reuses the user's existing record for
+     * the same parameters instead of inserting another full-content row on every cache hit.
+     */
+    @Transactional
+    public AiRouteRecord recordCachedRoute(User user, int days, String budget, String preference,
+                                           String locale, String content) {
+        String normalizedBudget = normalizeKey(budget);
+        String normalizedPreference = normalizeKey(preference);
+        String normalizedLocale = normalizeLocale(locale);
+
+        AiRouteRecord record = routeRecordRepository.findReusableCachedRecords(
+                        user.getId(), days, normalizedBudget, normalizedPreference, normalizedLocale,
+                        PageRequest.of(0, 1))
+                .stream()
+                .findFirst()
+                .orElseGet(AiRouteRecord::new);
+
+        record.setUser(userRepository.getReferenceById(user.getId()));
+        record.setJobId(null);
+        record.setTitle(extractTitle(content, days));
+        record.setContent(content == null ? "" : content.trim());
+        record.setDays(days);
+        record.setBudget(normalizedBudget);
+        record.setPreference(normalizedPreference);
+        record.setLocale(normalizedLocale);
+        record.setStatus(AiRouteRecord.Status.COMPLETED);
+        record.setErrorMessage(null);
+        return routeRecordRepository.save(record);
+    }
+
     @Transactional
     public void updateRunningContent(Long userId, String jobId, String content) {
         if (userId == null || !StringUtils.hasText(jobId) || content == null || content.isBlank()) {

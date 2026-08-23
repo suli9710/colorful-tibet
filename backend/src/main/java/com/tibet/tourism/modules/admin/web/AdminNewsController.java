@@ -1,6 +1,7 @@
 package com.tibet.tourism.modules.admin.web;
 import com.tibet.tourism.common.api.PageResponse;
 import com.tibet.tourism.common.validation.InputSanitizer;
+import com.tibet.tourism.modules.admin.application.AdminAuditLogService;
 import com.tibet.tourism.modules.admin.web.dto.NewsRequest;
 import com.tibet.tourism.modules.content.application.TibetanTranslationService;
 import com.tibet.tourism.modules.content.domain.News;
@@ -9,6 +10,7 @@ import com.tibet.tourism.modules.content.infra.NewsRepository;
 import jakarta.validation.Valid;
 import java.time.LocalDateTime;
 import java.util.Map;
+import java.util.Set;
 import java.util.Optional;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Pageable;
@@ -26,22 +28,35 @@ public class AdminNewsController {
 
     private final NewsRepository newsRepository;
     private final TibetanTranslationService translationService;
+    private final AdminAuditLogService auditLogService;
 
     public AdminNewsController(NewsRepository newsRepository,
-                               TibetanTranslationService translationService) {
+                               TibetanTranslationService translationService,
+                               AdminAuditLogService auditLogService) {
         this.newsRepository = newsRepository;
         this.translationService = translationService;
+        this.auditLogService = auditLogService;
     }
+
+    // ?sort= binds straight into the repository here, so restrict it to columns that are safe to expose.
+    private static final Set<String> NEWS_SORT_FIELDS = Set.of("id", "title", "createdAt");
+    private static final Sort NEWS_DEFAULT_SORT = Sort.by(Sort.Direction.DESC, "createdAt");
 
     @GetMapping("/news")
     public ResponseEntity<PageResponse<NewsResponse>> getAllNews(
             @PageableDefault(size = 50, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
-        return ResponseEntity.ok(PageResponse.from(newsRepository.findAll(pageable).map(NewsResponse::from)));
+        return ResponseEntity.ok(PageResponse.from(newsRepository.findAll(InputSanitizer.sanitizePageable(pageable, NEWS_SORT_FIELDS, NEWS_DEFAULT_SORT, 50, 200)).map(NewsResponse::from)));
     }
 
     @PostMapping("/news")
     @CacheEvict(value = "newsCache", allEntries = true)
     public ResponseEntity<?> createNews(@Valid @RequestBody NewsRequest request) {
+        return auditLogService.captureCreated("news", "news_create",
+                () -> createNewsInternal(request),
+                body -> ((NewsResponse) body).id());
+    }
+
+    private ResponseEntity<?> createNewsInternal(NewsRequest request) {
         News news = new News();
         boolean autoTranslate = request.getAutoTranslate() == null || request.getAutoTranslate();
 
@@ -90,6 +105,10 @@ public class AdminNewsController {
     @PutMapping("/news/{id}")
     @CacheEvict(value = "newsCache", allEntries = true)
     public ResponseEntity<?> updateNews(@PathVariable Long id, @Valid @RequestBody NewsRequest request) {
+        return auditLogService.capture("news", id, "news_update", () -> updateNewsInternal(id, request));
+    }
+
+    private ResponseEntity<?> updateNewsInternal(Long id, NewsRequest request) {
         Optional<News> newsOpt = newsRepository.findById(id);
         if (newsOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
@@ -147,6 +166,10 @@ public class AdminNewsController {
     @DeleteMapping("/news/{id}")
     @CacheEvict(value = "newsCache", allEntries = true)
     public ResponseEntity<?> deleteNews(@PathVariable Long id) {
+        return auditLogService.capture("news", id, "news_delete", () -> deleteNewsInternal(id));
+    }
+
+    private ResponseEntity<?> deleteNewsInternal(Long id) {
         if (!newsRepository.existsById(id)) {
             return ResponseEntity.notFound().build();
         }

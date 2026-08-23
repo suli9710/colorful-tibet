@@ -45,10 +45,15 @@ public final class ApiSecurityPaths {
     private static final Set<String> PUBLIC_POST_PATHS = Set.of(
             "/api/auth/login",
             "/api/auth/register",
+            "/api/client-errors",
             "/api/guide/chat");
 
     private static final Set<String> OPTIONAL_AUTH_PUBLIC_POST_PATHS = Set.of(
             "/api/guide/chat");
+
+    private static final String[] OPTIONAL_AUTH_PUBLIC_READ_PATHS = {
+            "/api/spots/{id:\\d+}"
+    };
 
     private static final String[] ADMIN_API_PATHS = {
             "/api/admin/**",
@@ -88,6 +93,10 @@ public final class ApiSecurityPaths {
 
     public static boolean requiresCsrfWhenAuthenticatedPublicPost(String method, String path) {
         return "POST".equals(method) && OPTIONAL_AUTH_PUBLIC_POST_PATHS.contains(path);
+    }
+
+    public static boolean supportsOptionalAuthentication(String method, String path) {
+        return READ_METHODS.contains(method) && matchesAny(path, OPTIONAL_AUTH_PUBLIC_READ_PATHS);
     }
 
     private static boolean isPrivateUploadPath(String path) {

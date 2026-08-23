@@ -1,10 +1,17 @@
 # 生产环境 Docker Compose 配置
 # 使用方法: docker-compose -f docker-compose.prod.yml up -d
 
+x-default-logging: &default-logging
+  driver: local
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 services:
   production-preflight:
     image: alpine:3.21@sha256:48b0309ca019d89d40f670aa1bc06e426dc0931948452e8491e3d65087abc07d
     container_name: colorful-tibet-production-preflight
+    logging: *default-logging
     network_mode: none
     environment:
       - DB_PASSWORD=${DB_PASSWORD:?DB_PASSWORD is required in production}
@@ -21,12 +28,23 @@ services:
       - PAYMENT_CALLBACK_SECRET=${PAYMENT_CALLBACK_SECRET:?PAYMENT_CALLBACK_SECRET is required in production}
       - MYSQL_PASSWORD=${MYSQL_PASSWORD:-}
       - ALERTMANAGER_WEBHOOK_URL=${ALERTMANAGER_WEBHOOK_URL:?ALERTMANAGER_WEBHOOK_URL is required in production}
-      - TRUST_PROXY_HEADERS=${TRUST_PROXY_HEADERS:-false}
-      - TRUSTED_PROXY_CIDRS=${TRUSTED_PROXY_CIDRS:-}
+      - ALERT_LOG_TOKEN=${ALERT_LOG_TOKEN:?ALERT_LOG_TOKEN is required in production}
+      - APP_VERSION=${APP_VERSION:?APP_VERSION is required in production}
+      # Must mirror the backend service's defaults, or the preflight validates a configuration the
+      # backend never runs with.
+      - SERVER_FORWARD_HEADERS_STRATEGY=${SERVER_FORWARD_HEADERS_STRATEGY:-none}
+      - TRUST_PROXY_HEADERS=${TRUST_PROXY_HEADERS:-true}
+      - TRUSTED_PROXY_CIDRS=${TRUSTED_PROXY_CIDRS:-172.28.0.10/32}
+      - FRONTEND_CONTAINER_IP=${FRONTEND_CONTAINER_IP:-172.28.0.10}
       - NGINX_SERVER_NAME=${NGINX_SERVER_NAME:?NGINX_SERVER_NAME is required in production}
       - NGINX_REDIRECT_HOST=${NGINX_REDIRECT_HOST:?NGINX_REDIRECT_HOST is required in production}
       - NGINX_CERT_DOMAIN=${NGINX_CERT_DOMAIN:?NGINX_CERT_DOMAIN is required in production}
+      - SUPER_ADMIN_USERNAME=${SUPER_ADMIN_USERNAME:-lzh}
       - SUPER_ADMIN_TOTP_SECRET=${SUPER_ADMIN_TOTP_SECRET:?SUPER_ADMIN_TOTP_SECRET is required in production}
+      # Optional for a super-admin-only installation; when present every entry is validated and
+      # must be an independent username=Base32Secret pair.
+      - ADMIN_TOTP_SECRETS=${ADMIN_TOTP_SECRETS:-}
+      - TOTP_REPLAY_FAIL_CLOSED=${TOTP_REPLAY_FAIL_CLOSED:-true}
       - SCRAPLING_API_KEY=${SCRAPLING_API_KEY:?SCRAPLING_API_KEY is required in production}
       - RECAPTCHA_SITE_KEY=${RECAPTCHA_SITE_KEY:?RECAPTCHA_SITE_KEY is required in production}
       - RECAPTCHA_SECRET_KEY=${RECAPTCHA_SECRET_KEY:?RECAPTCHA_SECRET_KEY is required in production}
@@ -40,11 +58,14 @@ services:
       - SEED_DEMO_USERS=${SEED_DEMO_USERS:-false}
       - SEED_CONTENT_ENABLED=${SEED_CONTENT_ENABLED:-false}
       - PUBLIC_METRICS_ENABLED=${PUBLIC_METRICS_ENABLED:-false}
+      - METRICS_SCRAPE_TOKEN=${METRICS_SCRAPE_TOKEN:?METRICS_SCRAPE_TOKEN is required in production}
       - RATE_LIMIT_REDIS_ENABLED=${RATE_LIMIT_REDIS_ENABLED:-true}
       - RATE_LIMIT_REDIS_FAIL_CLOSED=${RATE_LIMIT_REDIS_FAIL_CLOSED:-true}
       - BRUTE_FORCE_REDIS_ENABLED=${BRUTE_FORCE_REDIS_ENABLED:-true}
       - BRUTE_FORCE_REDIS_FAIL_CLOSED=${BRUTE_FORCE_REDIS_FAIL_CLOSED:-true}
       - ANTIBOT_ENABLED=${ANTIBOT_ENABLED:-true}
+      - ANTIBOT_LOG_RETENTION_ENABLED=${ANTIBOT_LOG_RETENTION_ENABLED:-true}
+      - ANTIBOT_LOG_RETENTION_DAYS=${ANTIBOT_LOG_RETENTION_DAYS:-90}
       - RECAPTCHA_ENABLED=${RECAPTCHA_ENABLED:-true}
       - REGISTRATION_RECAPTCHA_REQUIRED=${REGISTRATION_RECAPTCHA_REQUIRED:-true}
       - DB_SSL_MODE=${DB_SSL_MODE:-REQUIRED}
@@ -134,6 +155,83 @@ services:
           fi
         }
 
+        require_int_range() {
+          name="$$1"
+          value="$$2"
+          minimum="$$3"
+          maximum="$$4"
+          case "$$value" in
+            ''|*[!0-9]*)
+              echo "Refusing production compose: $$name must be an integer between $$minimum and $$maximum, got '$$value'." >&2
+              exit 1
+              ;;
+          esac
+          if [ "$$value" -lt "$$minimum" ] || [ "$$value" -gt "$$maximum" ]; then
+            echo "Refusing production compose: $$name must be an integer between $$minimum and $$maximum, got '$$value'." >&2
+            exit 1
+          fi
+        }
+
+        is_sequential_base32_pattern() {
+          printf '%s\n' "$$1" | awk '
+            BEGIN { alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567" }
+            {
+              ascending = 1
+              descending = 1
+              for (i = 2; i <= length($$0) && (ascending || descending); i++) {
+                previous = index(alphabet, substr($$0, i - 1, 1)) - 1
+                current = index(alphabet, substr($$0, i, 1)) - 1
+                if (current != (previous + 1) % 32) ascending = 0
+                if (current != (previous + 31) % 32) descending = 0
+              }
+              exit (ascending || descending) ? 0 : 1
+            }
+          '
+        }
+
+        is_periodic_totp_pattern() {
+          printf '%s\n' "$$1" | awk '
+            {
+              size = length($$0)
+              for (period = 1; period <= int(size / 2); period++) {
+                if (size % period != 0) continue
+                repeated = 1
+                for (i = period + 1; i <= size; i++) {
+                  if (substr($$0, i, 1) != substr($$0, ((i - 1) % period) + 1, 1)) {
+                    repeated = 0
+                    break
+                  }
+                }
+                if (repeated) exit 0
+              }
+              exit 1
+            }
+          '
+        }
+
+        is_strong_totp_secret() {
+          secret="$$1"
+          if ! printf '%s' "$$secret" | grep -Eq '^[A-Z2-7]{32,}$$'; then
+            return 1
+          fi
+          if [ $$(( $${#secret} % 8 )) -ne 0 ]; then
+            return 1
+          fi
+          case "$$secret" in
+            GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ|JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP|MZXW6YTBOJQXGZJAMZXXE3DEMF2GK3LQ|NBSWY3DPEB3W64TMMQXG6ZRAMZXXE3DE|MFRGGZDFMZTWQ2LKMFRGGZDFMZTWQ2LK)
+              return 1
+              ;;
+          esac
+          distinct_count=$$(printf '%s' "$$secret" | fold -w 1 | sort -u | wc -l | tr -d '[:space:]')
+          if [ "$$distinct_count" -lt 8 ]; then
+            return 1
+          fi
+          if is_sequential_base32_pattern "$$secret" || is_periodic_totp_pattern "$$secret"; then
+            return 1
+          fi
+          return 0
+        }
+
         require_real_secret DB_PASSWORD "$$DB_PASSWORD"
         require_real_secret MYSQL_ROOT_PASSWORD "$$MYSQL_ROOT_PASSWORD"
         require_real_secret REDIS_PASSWORD "$$REDIS_PASSWORD"
@@ -142,6 +240,7 @@ services:
         require_real_secret ADMIN_ENCRYPTION_KEY "$$ADMIN_ENCRYPTION_KEY"
         require_real_secret CSRF_SIGNING_SECRET "$$CSRF_SIGNING_SECRET"
         require_real_secret CACHE_KEY_HMAC_SECRET "$$CACHE_KEY_HMAC_SECRET"
+        require_real_secret METRICS_SCRAPE_TOKEN "$$METRICS_SCRAPE_TOKEN"
         require_real_secret PAYMENT_CALLBACK_SECRET "$$PAYMENT_CALLBACK_SECRET"
         require_real_secret PII_KEYS "$$PII_KEYS"
         require_real_secret PII_ACTIVE_KID "$$PII_ACTIVE_KID"
@@ -155,15 +254,78 @@ services:
         require_real_secret VITE_AMAP_KEY "$$VITE_AMAP_KEY"
         require_real_secret VITE_AMAP_SECURITY_CODE "$$VITE_AMAP_SECURITY_CODE"
         require_real_secret ALERTMANAGER_WEBHOOK_URL "$$ALERTMANAGER_WEBHOOK_URL"
+        require_real_secret ALERT_LOG_TOKEN "$$ALERT_LOG_TOKEN"
+        require_real_secret APP_VERSION "$$APP_VERSION"
         reject_placeholder_if_set MYSQL_PASSWORD "$$MYSQL_PASSWORD"
         reject_placeholder_if_set PII_ENCRYPTION_KEY "$$PII_ENCRYPTION_KEY"
         reject_placeholder_if_set PAYMENT_CALLBACK_SECRET "$$PAYMENT_CALLBACK_SECRET"
-        if ! printf '%s' "$$SUPER_ADMIN_TOTP_SECRET" | grep -Eq '^[A-Z2-7]{32,}$$'; then
-          echo "Refusing production compose: SUPER_ADMIN_TOTP_SECRET must be a Base32 secret with at least 32 characters." >&2
+        if ! is_strong_totp_secret "$$SUPER_ADMIN_TOTP_SECRET"; then
+          echo "Refusing production compose: SUPER_ADMIN_TOTP_SECRET must be a high-entropy Base32 secret in complete 8-character blocks with at least 32 characters." >&2
           exit 1
         fi
+
+        validate_admin_totp_secrets() {
+          value="$$1"
+          super_username="$$2"
+          super_secret="$$3"
+          [ -z "$$value" ] && return 0
+          case "$$value" in
+            *[[:cntrl:]]*|';'*|*';'|*';;'*)
+              echo "Refusing production compose: ADMIN_TOTP_SECRETS must use semicolon-separated username=Base32Secret entries without empty or control-character entries." >&2
+              exit 1
+              ;;
+          esac
+
+          super_username=$(printf '%s' "$$super_username" | sed 's/^[[:space:]]*//; s/[[:space:]]*$$//' | tr '[:upper:]' '[:lower:]')
+          seen_users="|$$super_username|"
+          seen_secrets="|$$super_secret|"
+          old_ifs="$$IFS"
+          IFS=';'
+          for entry in $$value; do
+            IFS="$$old_ifs"
+            username=$${entry%%=*}
+            secret=$${entry#*=}
+            username=$(printf '%s' "$$username" | sed 's/^[[:space:]]*//; s/[[:space:]]*$$//')
+            secret=$(printf '%s' "$$secret" | sed 's/^[[:space:]]*//; s/[[:space:]]*$$//')
+            if ! printf '%s' "$$entry" | grep -q '=' || ! printf '%s' "$$username" | grep -Eq '^[A-Za-z0-9_-]{3,64}$$'; then
+              echo "Refusing production compose: ADMIN_TOTP_SECRETS contains an invalid username=Base32Secret entry." >&2
+              exit 1
+            fi
+            username_key=$(printf '%s' "$$username" | tr '[:upper:]' '[:lower:]')
+            case "$$seen_users" in
+              *"|$$username_key|"*)
+                echo "Refusing production compose: ADMIN_TOTP_SECRETS contains a duplicate or super-admin username." >&2
+                exit 1
+                ;;
+            esac
+            if [ -z "$$secret" ] || is_placeholder "$$secret"; then
+              echo "Refusing production compose: ADMIN_TOTP_SECRETS contains an empty or placeholder secret." >&2
+              exit 1
+            fi
+            if ! is_strong_totp_secret "$$secret"; then
+              echo "Refusing production compose: each ADMIN_TOTP_SECRETS secret must be a high-entropy Base32 secret in complete 8-character blocks with at least 32 characters." >&2
+              exit 1
+            fi
+            case "$$seen_secrets" in
+              *"|$$secret|"*)
+                echo "Refusing production compose: ADMIN_TOTP_SECRETS secrets must be independent." >&2
+                exit 1
+                ;;
+            esac
+            seen_users="$$seen_users$$username_key|"
+            seen_secrets="$$seen_secrets$$secret|"
+            IFS="$$old_ifs"
+          done
+          IFS="$$old_ifs"
+        }
+
+        validate_admin_totp_secrets "$$ADMIN_TOTP_SECRETS" "$$SUPER_ADMIN_USERNAME" "$$SUPER_ADMIN_TOTP_SECRET"
         if [ "$${#CACHE_KEY_HMAC_SECRET}" -lt 64 ]; then
           echo "Refusing production compose: CACHE_KEY_HMAC_SECRET must be at least 64 characters." >&2
+          exit 1
+        fi
+        if [ "$${#METRICS_SCRAPE_TOKEN}" -lt 64 ]; then
+          echo "Refusing production compose: METRICS_SCRAPE_TOKEN must be at least 64 characters." >&2
           exit 1
         fi
 
@@ -179,11 +341,17 @@ services:
         require_exact RATE_LIMIT_REDIS_FAIL_CLOSED "$$RATE_LIMIT_REDIS_FAIL_CLOSED" true
         require_exact BRUTE_FORCE_REDIS_ENABLED "$$BRUTE_FORCE_REDIS_ENABLED" true
         require_exact BRUTE_FORCE_REDIS_FAIL_CLOSED "$$BRUTE_FORCE_REDIS_FAIL_CLOSED" true
+        require_exact TOTP_REPLAY_FAIL_CLOSED "$$TOTP_REPLAY_FAIL_CLOSED" true
         require_exact ANTIBOT_ENABLED "$$ANTIBOT_ENABLED" true
+        require_exact ANTIBOT_LOG_RETENTION_ENABLED "$$ANTIBOT_LOG_RETENTION_ENABLED" true
+        require_int_range ANTIBOT_LOG_RETENTION_DAYS "$$ANTIBOT_LOG_RETENTION_DAYS" 1 365
         require_exact RECAPTCHA_ENABLED "$$RECAPTCHA_ENABLED" true
         require_exact REGISTRATION_RECAPTCHA_REQUIRED "$$REGISTRATION_RECAPTCHA_REQUIRED" true
         require_exact DB_ALLOW_PUBLIC_KEY_RETRIEVAL "$$DB_ALLOW_PUBLIC_KEY_RETRIEVAL" false
         require_exact SCRAPLING_ALLOW_UNAUTHENTICATED "$$SCRAPLING_ALLOW_UNAUTHENTICATED" false
+        require_exact SERVER_FORWARD_HEADERS_STRATEGY "$$SERVER_FORWARD_HEADERS_STRATEGY" none
+        require_exact TRUST_PROXY_HEADERS "$$TRUST_PROXY_HEADERS" true
+        require_exact TRUSTED_PROXY_CIDRS "$$TRUSTED_PROXY_CIDRS" "$$FRONTEND_CONTAINER_IP/32"
         if [ "$$DB_SSL_MODE" != "REQUIRED" ] && [ "$$DB_SSL_MODE" != "VERIFY_IDENTITY" ]; then
           echo "Refusing production compose: DB_SSL_MODE must be REQUIRED or VERIFY_IDENTITY, got '$$DB_SSL_MODE'." >&2
           exit 1
@@ -220,8 +388,9 @@ services:
         - APP_UID=${BACKEND_APP_UID:-10001}
         - APP_GID=${BACKEND_APP_GID:-10001}
     container_name: colorful-tibet-backend
+    logging: *default-logging
     ports:
-      - "127.0.0.1:8080:8080"
+      - "${BACKEND_HOST_BIND:-127.0.0.1}:${BACKEND_HOST_PORT:-8080}:8080"
     environment:
       - SPRING_PROFILES_ACTIVE=prod  # 使用生产环境配置
       - SPRING_FLYWAY_ENABLED=${SPRING_FLYWAY_ENABLED:-true}
@@ -252,11 +421,22 @@ services:
       # Default to closed; opt in only when the scrape path is protected (mTLS,
       # auth proxy, or a strictly trusted/isolated monitoring network).
       - PUBLIC_METRICS_ENABLED=${PUBLIC_METRICS_ENABLED:-false}
+      - METRICS_SCRAPE_TOKEN=${METRICS_SCRAPE_TOKEN:?METRICS_SCRAPE_TOKEN is required in production}
       - SEED_CONTENT_ENABLED=${SEED_CONTENT_ENABLED:-false}
       - COOKIE_SECURE=${COOKIE_SECURE:-true}
-      - SERVER_FORWARD_HEADERS_STRATEGY=${SERVER_FORWARD_HEADERS_STRATEGY:-framework}
-      - TRUST_PROXY_HEADERS=${TRUST_PROXY_HEADERS:-false}
-      - TRUSTED_PROXY_CIDRS=${TRUSTED_PROXY_CIDRS:-}
+      # Must stay "none". With "framework" Spring's ForwardedHeaderFilter rewrites
+      # request.getRemoteAddr() from the leftmost X-Forwarded-For entry and strips the
+      # X-Forwarded-* headers before TrustedProxyIpResolver runs, so every IP-keyed rate
+      # limit and brute-force counter would key off a client-supplied value.
+      - SERVER_FORWARD_HEADERS_STRATEGY=${SERVER_FORWARD_HEADERS_STRATEGY:-none}
+      # The backend's TCP peer is always the nginx container, so without trusting its forwarded
+      # header every caller resolves to one address and all IP-keyed rate limits, brute-force
+      # counters and anonymous quotas collapse into a single global bucket. That is safe to trust
+      # here precisely because nginx OVERWRITES X-Forwarded-For with $$remote_addr and blanks
+      # Forwarded/X-Forwarded-Host, and because the CIDR below names only that container.
+      - TRUST_PROXY_HEADERS=${TRUST_PROXY_HEADERS:-true}
+      # Keep in sync with the frontend service's pinned ipv4_address below.
+      - TRUSTED_PROXY_CIDRS=${TRUSTED_PROXY_CIDRS:-172.28.0.10/32}
       - RATE_LIMIT_REDIS_ENABLED=${RATE_LIMIT_REDIS_ENABLED:-true}
       - RATE_LIMIT_REDIS_FAIL_CLOSED=${RATE_LIMIT_REDIS_FAIL_CLOSED:-true}
       - BRUTE_FORCE_REDIS_ENABLED=${BRUTE_FORCE_REDIS_ENABLED:-true}
@@ -264,6 +444,8 @@ services:
       - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS}
       - SUPER_ADMIN_USERNAME=${SUPER_ADMIN_USERNAME:?SUPER_ADMIN_USERNAME is required in production}
       - SUPER_ADMIN_TOTP_SECRET=${SUPER_ADMIN_TOTP_SECRET:?SUPER_ADMIN_TOTP_SECRET is required in production}
+      - ADMIN_TOTP_SECRETS=${ADMIN_TOTP_SECRETS:-}
+      - TOTP_REPLAY_FAIL_CLOSED=${TOTP_REPLAY_FAIL_CLOSED:-true}
       # MySQL 数据库配置（如果使用 MySQL）
       - DB_USERNAME=${DB_USERNAME:-tibet_user}
       - DB_PASSWORD=${DB_PASSWORD:?DB_PASSWORD is required in production}
@@ -297,6 +479,10 @@ services:
       - HOTEL_BOOKING_PII_READ_USERNAMES=${HOTEL_BOOKING_PII_READ_USERNAMES:-${SUPER_ADMIN_USERNAME}}
       - FINGERPRINT_ENABLED=${FINGERPRINT_ENABLED:-true}
       - BEHAVIOR_ENABLED=${BEHAVIOR_ENABLED:-true}
+      - ANTIBOT_LOG_RETENTION_ENABLED=${ANTIBOT_LOG_RETENTION_ENABLED:-true}
+      - ANTIBOT_LOG_RETENTION_DAYS=${ANTIBOT_LOG_RETENTION_DAYS:-90}
+      - ANTIBOT_LOG_CLEANUP_CRON=${ANTIBOT_LOG_CLEANUP_CRON:-0 15 4 * * *}
+      - ANTIBOT_LOG_CLEANUP_ZONE=${ANTIBOT_LOG_CLEANUP_ZONE:-UTC}
       - RATE_LIMIT_AI_REQUESTS=${RATE_LIMIT_AI_REQUESTS:-6}
       - RATE_LIMIT_AI_WINDOW_SECONDS=${RATE_LIMIT_AI_WINDOW_SECONDS:-600}
       - AI_DAILY_QUOTA_PER_USER=${AI_DAILY_QUOTA_PER_USER:-20}
@@ -343,8 +529,10 @@ services:
       - tibet-network
 
   redis:
-    image: redis:7-alpine@sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99
+    image: redis:7-alpine@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2
     container_name: colorful-tibet-redis
+    user: redis
+    logging: *default-logging
     entrypoint:
       - /bin/sh
       - -ec
@@ -359,6 +547,13 @@ services:
         exec redis-server /tmp/redis.conf
     environment:
       - REDIS_PASSWORD=${REDIS_PASSWORD:?REDIS_PASSWORD is required in production}
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=16m,mode=1777
     volumes:
       - redis_data:/data
     depends_on:
@@ -379,8 +574,9 @@ services:
           memory: 512M
 
   mysql:
-    image: mysql:8.4@sha256:c36050afdca850f23cef85703f84c7531a5ae155a11b5ee1c60acb09937c4084
+    image: mysql:8.4@sha256:8dbcf531a03aade657e181b9cf2f1d1803ce621a1d55610cb44cb531ab7d7db6
     container_name: colorful-tibet-mysql
+    logging: *default-logging
     environment:
       - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required in production}
       - MYSQL_DATABASE=${DB_NAME:-tibet_tourism}
@@ -417,6 +613,7 @@ services:
       context: ./scrapler
       dockerfile: Dockerfile
     container_name: colorful-tibet-scrapling
+    logging: *default-logging
     environment:
       - SCRAPLING_MODE=${SCRAPLING_MODE:-stealth}
       - SCRAPLING_TIMEOUT_SECONDS=${SCRAPLING_TIMEOUT_SECONDS:-30}
@@ -430,6 +627,7 @@ services:
       - SCRAPLING_ALLOW_UNAUTHENTICATED=${SCRAPLING_ALLOW_UNAUTHENTICATED:-false}
       - SCRAPLING_MAX_CONCURRENCY=${SCRAPLING_MAX_CONCURRENCY:-2}
       - SCRAPLING_ALLOW_REQUEST_MODE_OVERRIDE=${SCRAPLING_ALLOW_REQUEST_MODE_OVERRIDE:-false}
+      - ALERT_LOG_TOKEN=${ALERT_LOG_TOKEN:?ALERT_LOG_TOKEN is required in production}
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -466,16 +664,21 @@ services:
         - VITE_RECAPTCHA_SITE_KEY=${VITE_RECAPTCHA_SITE_KEY:-${RECAPTCHA_SITE_KEY:?RECAPTCHA_SITE_KEY is required in production}}
         - VITE_AMAP_KEY=${VITE_AMAP_KEY:?VITE_AMAP_KEY is required for production map features}
         - VITE_AMAP_SECURITY_CODE=${VITE_AMAP_SECURITY_CODE:?VITE_AMAP_SECURITY_CODE is required for production map features}
+        - VITE_FRONTEND_ERROR_REPORT_URL=${VITE_FRONTEND_ERROR_REPORT_URL:-/api/client-errors}
+        - VITE_APP_VERSION=${APP_VERSION:?APP_VERSION is required in production}
     environment:
       - NGINX_SERVER_NAME=${NGINX_SERVER_NAME:?NGINX_SERVER_NAME is required in production}
       - NGINX_REDIRECT_HOST=${NGINX_REDIRECT_HOST:?NGINX_REDIRECT_HOST is required in production}
       - NGINX_CERT_DOMAIN=${NGINX_CERT_DOMAIN:?NGINX_CERT_DOMAIN is required in production}
+      # Set to true when a trusted host-level reverse proxy terminates TLS.
+      - NGINX_HTTP_ONLY=${NGINX_HTTP_ONLY:-false}
       - NGINX_REAL_IP_FROM=${NGINX_REAL_IP_FROM:-}
       - NGINX_REAL_IP_HEADER=${NGINX_REAL_IP_HEADER:-X-Forwarded-For}
     container_name: colorful-tibet-frontend
+    logging: *default-logging
     ports:
-      - "80:8080"
-      - "443:8443"
+      - "${FRONTEND_HOST_BIND:-0.0.0.0}:${FRONTEND_HOST_PORT:-80}:8080"
+      - "${FRONTEND_HTTPS_HOST_BIND:-0.0.0.0}:${FRONTEND_HTTPS_HOST_PORT:-443}:8443"
     volumes:
       - ./certs:/etc/nginx/certs:ro
       - /var/www/certbot:/var/www/certbot:ro
@@ -506,14 +709,26 @@ services:
           cpus: "0.5"
           memory: 256M
     networks:
-      - tibet-network
+      tibet-network:
+        # Pinned so TRUSTED_PROXY_CIDRS can name this proxy exactly.
+        ipv4_address: ${FRONTEND_CONTAINER_IP:-172.28.0.10}
 
   prometheus:
     image: prom/prometheus:v2.55.1@sha256:2659f4c2ebb718e7695cb9b25ffa7d6be64db013daba13e05c875451cf51b0d3
     container_name: colorful-tibet-prometheus
+    logging: *default-logging
+    entrypoint:
+      - /bin/sh
+      - -ec
     command:
-      - --config.file=/etc/prometheus/prometheus.yml
-      - --storage.tsdb.path=/prometheus
+      - |
+        umask 077
+        printf '%s' "$${METRICS_SCRAPE_TOKEN}" > /tmp/metrics-scrape-token
+        exec /bin/prometheus \
+          --config.file=/etc/prometheus/prometheus.yml \
+          --storage.tsdb.path=/prometheus
+    environment:
+      - METRICS_SCRAPE_TOKEN=${METRICS_SCRAPE_TOKEN:?METRICS_SCRAPE_TOKEN is required in production}
     ports:
       - "127.0.0.1:9090:9090"
     volumes:
@@ -542,6 +757,7 @@ services:
   alertmanager:
     image: prom/alertmanager:v0.27.0@sha256:e13b6ed5cb929eeaee733479dce55e10eb3bc2e9c4586c705a4e8da41e5eacf5
     container_name: colorful-tibet-alertmanager
+    logging: *default-logging
     entrypoint:
       - /bin/sh
       - -ec
@@ -563,7 +779,7 @@ services:
               - url: "$${ALERTMANAGER_WEBHOOK_URL}"
                 send_resolved: true
         EOF
-        /bin/alertmanager --config.file=/tmp/alertmanager.yml
+        /bin/alertmanager --config.file=/tmp/alertmanager.yml --storage.path=/alertmanager
     environment:
       - ALERTMANAGER_WEBHOOK_URL=${ALERTMANAGER_WEBHOOK_URL:?ALERTMANAGER_WEBHOOK_URL is required in production}
     security_opt:
@@ -588,6 +804,7 @@ services:
   grafana:
     image: grafana/grafana:11.4.0@sha256:d8ea37798ccc41061a62ab080f2676dda6bf7815558499f901bdb0f533a456fb
     container_name: colorful-tibet-grafana
+    logging: *default-logging
     environment:
       - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD is required in production}
@@ -622,6 +839,7 @@ services:
   zipkin:
     image: openzipkin/zipkin:3.4@sha256:c2830e93d95de43f0d10e00a3784a9ee101cdf4909370196c8802514fd7f1954
     container_name: colorful-tibet-zipkin
+    logging: *default-logging
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -643,6 +861,11 @@ services:
 networks:
   tibet-network:
     driver: bridge
+    # Fixed subnet so TRUSTED_PROXY_CIDRS can name the nginx container exactly instead of trusting a
+    # broad private range. Only the frontend container proxies to the backend.
+    ipam:
+      config:
+        - subnet: ${COMPOSE_NETWORK_SUBNET:-172.28.0.0/24}
 
 volumes:
   redis_data:

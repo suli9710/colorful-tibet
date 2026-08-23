@@ -22,7 +22,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.Locale;
 import java.util.Map;
 import java.util.OptionalDouble;
 import java.util.regex.Pattern;
@@ -60,11 +59,9 @@ public class AuthApplicationService {
     private final PasswordEncoder passwordEncoder;
     private final IpLocationService ipLocationService;
     private final LoginAttemptService loginAttemptService;
-    private final TotpService totpService;
+    private final AdminMfaPolicy adminMfaPolicy;
     private final RecaptchaService recaptchaService;
     private final AntibotProperties antibotProperties;
-    private final String superAdminUsername;
-    private final String superAdminTotpSecret;
     private final boolean requireStrongSecrets;
     private final boolean registrationRecaptchaRequired;
     private final Environment environment;
@@ -77,11 +74,9 @@ public class AuthApplicationService {
             PasswordEncoder passwordEncoder,
             IpLocationService ipLocationService,
             LoginAttemptService loginAttemptService,
-            TotpService totpService,
+            AdminMfaPolicy adminMfaPolicy,
             RecaptchaService recaptchaService,
             AntibotProperties antibotProperties,
-            @Value("${app.super-admin-username:}") String superAdminUsername,
-            @Value("${app.security.super-admin-totp-secret:}") String superAdminTotpSecret,
             @Value("${app.security.require-strong-secrets:false}") boolean requireStrongSecrets,
             @Value("${app.security.registration-recaptcha-required:false}") boolean registrationRecaptchaRequired,
             Environment environment) {
@@ -92,11 +87,9 @@ public class AuthApplicationService {
         this.passwordEncoder = passwordEncoder;
         this.ipLocationService = ipLocationService;
         this.loginAttemptService = loginAttemptService;
-        this.totpService = totpService;
+        this.adminMfaPolicy = adminMfaPolicy;
         this.recaptchaService = recaptchaService;
         this.antibotProperties = antibotProperties;
-        this.superAdminUsername = superAdminUsername;
-        this.superAdminTotpSecret = superAdminTotpSecret;
         this.requireStrongSecrets = requireStrongSecrets;
         this.registrationRecaptchaRequired = registrationRecaptchaRequired;
         this.environment = environment;
@@ -104,25 +97,8 @@ public class AuthApplicationService {
 
     @PostConstruct
     void validateSuperAdminConfiguration() {
+        adminMfaPolicy.validateStartup();
         boolean strictMode = requireStrongSecrets || isProdProfileActive();
-        if (!StringUtils.hasText(superAdminUsername)) {
-            if (strictMode) {
-                throw new IllegalStateException("Super-admin username must be configured");
-            }
-            logger.warn("Super-admin username is not configured; TOTP enforcement is disabled");
-            return;
-        }
-
-        if (!StringUtils.hasText(superAdminTotpSecret)) {
-            if (strictMode) {
-                throw new IllegalStateException("Super-admin TOTP secret must be configured");
-            }
-            logger.warn("Super-admin TOTP secret is not configured; super-admin login will be blocked");
-            return;
-        }
-
-        totpService.validateSecret(superAdminTotpSecret);
-
         if (strictMode && registrationRecaptchaRequired && !isRecaptchaConfigured()) {
             throw new IllegalStateException("Registration reCAPTCHA is required but not configured");
         }
@@ -171,13 +147,17 @@ public class AuthApplicationService {
                     return new AuthFailureException(GENERIC_LOGIN_ERROR);
                 });
 
-        enforceSuperAdminControls(user, loginRequest, clientIp);
+        boolean adminMfaVerified = enforceAdminControls(user, loginRequest, clientIp);
         enforceAccountStepUpIfNeeded(user, throttle, request, clientIp);
 
         loginAttemptService.reset(username, clientIp);
         SecurityContextHolder.getContext().setAuthentication(authentication);
 
-        String jwt = jwtUtils.generateJwtToken(authentication, user.getSessionVersion());
+        String mfaBinding = adminMfaVerified
+                ? adminMfaPolicy.currentBinding(user.getUsername())
+                : "";
+        String jwt = jwtUtils.generateJwtToken(
+                authentication, user.getSessionVersion(), adminMfaVerified, mfaBinding);
         updateLoginLocation(user, request);
         String csrfToken = csrfTokenService.generateToken(jwt);
 
@@ -262,13 +242,13 @@ public class AuthApplicationService {
                                               LoginAttemptService.LoginAttemptDecision throttle,
                                               HttpServletRequest request,
                                               String clientIp) {
-        if (!throttle.stepUpRequired() || superAdminUsername.equalsIgnoreCase(user.getUsername())) {
+        if (!throttle.stepUpRequired() || adminMfaPolicy.isSuperAdmin(user)) {
             return;
         }
         if (!isRecaptchaConfigured()) {
-            logger.warn("Login account step-up skipped because reCAPTCHA is not configured: user={}, failures={}",
+            logger.error("Login account step-up rejected because reCAPTCHA is not configured: user={}, failures={}",
                     userLogLabel(user.getUsername()), throttle.accountFailures());
-            return;
+            throw new AuthForbiddenException(STEP_UP_ERROR);
         }
 
         String token = request.getHeader(RECAPTCHA_HEADER);
@@ -309,36 +289,35 @@ public class AuthApplicationService {
         }
     }
 
-    private void enforceSuperAdminControls(User user, LoginRequest loginRequest, String clientIp) {
-        if (!superAdminUsername.equalsIgnoreCase(user.getUsername())) {
-            return;
+    private boolean enforceAdminControls(User user, LoginRequest loginRequest, String clientIp) {
+        AdminMfaPolicy.Verification verification =
+                adminMfaPolicy.verify(user, loginRequest.getSecondaryPassword());
+        if (verification == AdminMfaPolicy.Verification.NOT_REQUIRED) {
+            return false;
         }
-
-        enforceSuperAdminTotp(user, loginRequest, clientIp);
-        enforceSuperAdminRolePresent(user);
-    }
-
-    private void enforceSuperAdminTotp(User user, LoginRequest loginRequest, String clientIp) {
-        if (!StringUtils.hasText(superAdminTotpSecret)) {
-            logger.error("Super-admin TOTP secret is not configured: user={}",
+        if (verification == AdminMfaPolicy.Verification.UNCONFIGURED) {
+            logger.error("Administrator TOTP secret is not configured; refusing login: user={}",
                     userLogLabel(user.getUsername()));
             throw new AuthForbiddenException(GENERIC_LOGIN_ERROR);
         }
-
-        String provided = loginRequest.getSecondaryPassword();
-        if (!StringUtils.hasText(provided)) {
+        if (verification == AdminMfaPolicy.Verification.REQUIRED) {
             throw new SecondaryAuthRequiredException("Secondary authentication required");
         }
-        String totpAccountKey = user.getUsername().toLowerCase(Locale.ROOT);
-        if (!totpService.consumeCode(totpAccountKey, superAdminTotpSecret, provided.trim())) {
-            logger.warn("Rejected super-admin login with invalid or replayed TOTP code: user={}",
+        if (verification == AdminMfaPolicy.Verification.INVALID) {
+            logger.warn("Rejected administrator login with invalid or replayed TOTP code: user={}",
                     userLogLabel(user.getUsername()));
-            LoginAttemptService.LoginAttemptDecision failure = loginAttemptService.recordFailure(user.getUsername(), clientIp);
+            LoginAttemptService.LoginAttemptDecision failure =
+                    loginAttemptService.recordFailure(user.getUsername(), clientIp);
             if (!failure.allowed()) {
                 throw new AuthRateLimitException(RATE_LIMIT_ERROR, failure.retryAfterSeconds());
             }
             throw new AuthFailureException(GENERIC_LOGIN_ERROR);
         }
+
+        if (adminMfaPolicy.isSuperAdmin(user)) {
+            enforceSuperAdminRolePresent(user);
+        }
+        return true;
     }
 
     private void enforceSuperAdminRolePresent(User user) {

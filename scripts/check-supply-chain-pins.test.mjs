@@ -5,6 +5,7 @@ import { afterEach, describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   collectSupplyChainPinFindings,
+  loadDockerDigestEvidenceFindings,
   runSupplyChainPinGate,
   validateDockerDigestEvidence
 } from './check-supply-chain-pins.mjs'
@@ -155,6 +156,40 @@ describe('supply-chain pin gate', () => {
     assert.equal(result.exitCode, 0, result.output)
     assert.equal(result.findings.length, 0)
     assert.match(result.output, /Supply-chain release pins are complete/)
+  })
+
+  it('fails when --evidence is given without a path instead of silently skipping validation', () => {
+    const root = createFixture({
+      'docker-digest-evidence.json': JSON.stringify(completeEvidence())
+    })
+
+    // args[evidenceIndex + 1] used to be undefined here, which left evidencePath undefined, skipped
+    // the digest evidence validation that otherwise runs by default, and still reported success.
+    const result = runSupplyChainPinGate(['--evidence-only', '--evidence'])
+
+    assert.equal(result.exitCode, 1, result.output)
+    assert.match(result.output, /--evidence requires a path/)
+    assert.ok(root)
+  })
+
+  it('catches evidence that disagrees with the digest actually pinned in the repo', () => {
+    const evidence = completeEvidence()
+    const record = evidence.records.find((entry) => entry.source.startsWith('frontend/Dockerfile'))
+    const root = createFixture({
+      'docker-digest-evidence.json': JSON.stringify(evidence),
+      // Same image at the recorded line, but pinned to a different digest than the evidence claims.
+      'frontend/Dockerfile': `# line 1\nFROM ${record.image}@sha256:${'b'.repeat(64)} AS builder\n`
+    })
+
+    const findings = loadDockerDigestEvidenceFindings(
+      path.join(root, 'docker-digest-evidence.json'),
+      root
+    )
+
+    assert.ok(
+      findings.some((finding) => finding.content.includes(`but the source pins sha256:${'b'.repeat(64)}`)),
+      `expected a digest drift finding, got: ${JSON.stringify(findings)}`
+    )
   })
 
   it('rejects incomplete or tampered Docker digest evidence without registry access', () => {

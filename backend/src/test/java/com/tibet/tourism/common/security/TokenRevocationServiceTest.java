@@ -47,6 +47,13 @@ class TokenRevocationServiceTest {
     }
 
     @Test
+    void localRevocationMirrorHasHardMaximumSize() {
+        TokenRevocationService service = new TokenRevocationService(provider(null), jwtUtils);
+
+        assertThat(service.inMemoryMaximumSize()).isEqualTo(20_000);
+    }
+
+    @Test
     @SuppressWarnings("unchecked")
     void redisFailureFallsBackToLocalRevocationState() {
         StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);

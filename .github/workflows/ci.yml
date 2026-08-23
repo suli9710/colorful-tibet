@@ -1,6 +1,7 @@
 name: CI
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
@@ -179,14 +180,75 @@ jobs:
       - name: Test backend
         run: mvn -q test
 
+      - name: Dependency vulnerability scan
+        id: backend_dependency_check
+        continue-on-error: true
+        timeout-minutes: 20
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: >
+          mvn --batch-mode org.owasp:dependency-check-maven:12.2.2:check
+          -DfailBuildOnCVSS=7
+          -DnvdApiKeyEnvironmentVariable=NVD_API_KEY
+          -Dformat=ALL
+          -Dodc.outputDirectory="$GITHUB_WORKSPACE/backend/target/dependency-check-report"
+
+      - name: Upload backend dependency report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: backend-dependency-check-report
+          path: backend/target/dependency-check-report
+          if-no-files-found: ignore
+          retention-days: 14
+
       - name: Trivy filesystem scan
+        id: backend_trivy_fs
+        continue-on-error: true
         uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8
         with:
           scan-type: fs
-          scan-ref: .
+          scan-ref: backend
+          format: sarif
+          output: backend-trivy-fs.sarif
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           exit-code: '1'
+
+      - name: Upload backend Trivy report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: backend-trivy-fs-report
+          path: backend-trivy-fs.sarif
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Fail backend security scans
+        if: steps.backend_dependency_check.outcome == 'failure' || steps.backend_trivy_fs.outcome == 'failure'
+        run: |
+          # `continue-on-error` makes a timeout, an NVD outage, or a missing NVD_API_KEY (fork PRs)
+          # land here with outcome=failure too. Only a scan that actually produced a report can be
+          # reporting vulnerabilities; anything else is scan infrastructure and must not be dressed up
+          # as a security finding - but it must not pass silently either.
+          dependency_check_failed=0
+          if [ "${{ steps.backend_dependency_check.outcome }}" = "failure" ]; then
+            if [ -d backend/target/dependency-check-report ] \
+              && [ -n "$(ls -A backend/target/dependency-check-report 2>/dev/null)" ]; then
+              echo "::error::dependency-check reported findings at or above CVSS 7. Review the uploaded report."
+              dependency_check_failed=1
+            else
+              echo "::warning::dependency-check did not complete (timeout, NVD outage, or missing NVD_API_KEY);\
+           no report was produced, so no vulnerability conclusion can be drawn."
+            fi
+          fi
+
+          if [ "${{ steps.backend_trivy_fs.outcome }}" = "failure" ]; then
+            echo "::error::Trivy reported HIGH/CRITICAL findings. Review the uploaded SARIF report."
+            exit 1
+          fi
+
+          exit "$dependency_check_failed"
 
   backend-context:
     name: Backend context boot
@@ -196,7 +258,7 @@ jobs:
         working-directory: backend
     services:
       mysql:
-        image: mysql:8.4@sha256:c36050afdca850f23cef85703f84c7531a5ae155a11b5ee1c60acb09937c4084
+        image: mysql:8.4@sha256:8dbcf531a03aade657e181b9cf2f1d1803ce621a1d55610cb44cb531ab7d7db6
         env:
           MYSQL_ROOT_PASSWORD: ci-root-password
           MYSQL_DATABASE: colorful_tibet_test
@@ -220,7 +282,7 @@ jobs:
           java-version: '17'
           cache: maven
 
-      - name: Boot Spring context against MySQL (Flyway + wiring + startup validators)
+      - name: Verify Spring context, Flyway, and payment reservation locking against MySQL
         env:
           RUN_CONTEXT_TESTS: 'true'
           MYSQL_TEST_HOST: 127.0.0.1
@@ -230,6 +292,39 @@ jobs:
           MYSQL_TEST_PASSWORD: ci-app-password
           MYSQL_TEST_ALLOW_PUBLIC_KEY_RETRIEVAL: 'true'
         run: mvn -q test -Dtest=ApplicationContextSmokeTest
+
+  api-contract:
+    name: OpenAPI contract drift
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Set up Java
+        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Generate backend OpenAPI document
+        run: mvn -q -f backend/pom.xml -Dtest=OpenApiContractGenerationTest test
+
+      - name: Install frontend dependencies
+        run: npm --prefix frontend ci
+
+      - name: Regenerate frontend API types
+        run: npm --prefix frontend run generate:api-types
+
+      - name: Reject stale generated API types
+        run: git diff --exit-code -- frontend/src/api/generated/schema.d.ts
 
   scrapler:
     name: Scrapler tests
@@ -284,8 +379,10 @@ jobs:
       - name: Test frontend
         run: npm run test -- --run
 
-      - name: Audit dependencies
-        run: npm audit --audit-level=moderate
+      - name: Audit production dependencies
+        # Browser/build tooling is not shipped in the nginx image; Trivy still scans the full
+        # lockfile and applies the narrow, expiring exception in .trivyignore.yaml.
+        run: npm audit --omit=dev --audit-level=moderate
 
       - name: Build
         run: npm run build
@@ -295,9 +392,46 @@ jobs:
         with:
           scan-type: fs
           scan-ref: frontend
+          trivyignores: .trivyignore.yaml
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           exit-code: '1'
+
+  browser-smoke:
+    name: Browser smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npm exec -- playwright install --with-deps chromium
+
+      - name: Test browser smoke
+        run: npm run test:e2e
+
+      - name: Upload browser smoke report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: playwright-report
+          path: frontend/playwright-report
+          if-no-files-found: ignore
+          retention-days: 14
 
   docker-images:
     name: Docker image build and scan

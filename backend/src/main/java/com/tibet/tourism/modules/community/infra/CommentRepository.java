@@ -40,4 +40,14 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
     @Modifying
     @Query("UPDATE Comment c SET c.likeCount = CASE WHEN COALESCE(c.likeCount, 0) > 0 THEN c.likeCount - 1 ELSE 0 END, c.version = COALESCE(c.version, 0) + 1 WHERE c.id = :id")
     int decrementLikeCount(@Param("id") Long id);
+
+    /**
+     * Recomputes like_count from the surviving rows. Bulk-deleting a user's likes leaves the
+     * denormalised counters on other users' comments permanently inflated; recounting also repairs
+     * any drift that already accumulated.
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE Comment c SET c.likeCount = (SELECT COUNT(cl) FROM CommentLike cl WHERE cl.comment.id = c.id), "
+            + "c.version = COALESCE(c.version, 0) + 1 WHERE c.id IN :ids")
+    void recountLikes(@Param("ids") java.util.Collection<Long> ids);
 }

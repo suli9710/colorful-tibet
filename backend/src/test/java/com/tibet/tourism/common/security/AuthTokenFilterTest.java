@@ -11,6 +11,7 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import com.tibet.tourism.modules.auth.application.AdminMfaPolicy;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -36,11 +37,13 @@ class AuthTokenFilterTest {
         UserDetailsService userDetailsService = mock(UserDetailsService.class);
         TokenRevocationService tokenRevocationService = mock(TokenRevocationService.class);
         UserSessionVersionService userSessionVersionService = mock(UserSessionVersionService.class);
+        AdminMfaPolicy adminMfaPolicy = mock(AdminMfaPolicy.class);
         AuthTokenFilter filter = new AuthTokenFilter(
                 jwtUtils,
                 userDetailsService,
                 tokenRevocationService,
-                userSessionVersionService);
+                userSessionVersionService,
+                adminMfaPolicy);
 
         when(tokenRevocationService.isRevoked("bearer-token")).thenReturn(false);
         when(jwtUtils.validateJwtToken("bearer-token")).thenReturn(true);
@@ -62,6 +65,40 @@ class AuthTokenFilterTest {
                 .isEqualTo("bearer-user");
         verify(jwtUtils).validateJwtToken("bearer-token");
         verify(jwtUtils, never()).validateJwtToken("cookie-token");
+    }
+
+    @Test
+    void validCookieAuthenticatesOptionalPublicSpotDetail() throws Exception {
+        JwtUtils jwtUtils = mock(JwtUtils.class);
+        UserDetailsService userDetailsService = mock(UserDetailsService.class);
+        TokenRevocationService tokenRevocationService = mock(TokenRevocationService.class);
+        UserSessionVersionService userSessionVersionService = mock(UserSessionVersionService.class);
+        AuthTokenFilter filter = new AuthTokenFilter(
+                jwtUtils,
+                userDetailsService,
+                tokenRevocationService,
+                userSessionVersionService);
+
+        when(tokenRevocationService.isRevoked("public-session-token")).thenReturn(false);
+        when(jwtUtils.validateJwtToken("public-session-token")).thenReturn(true);
+        when(userSessionVersionService.tokenMatchesCurrentSession("public-session-token")).thenReturn(true);
+        when(jwtUtils.getUserNameFromJwtToken("public-session-token")).thenReturn("traveler");
+        when(userDetailsService.loadUserByUsername("traveler")).thenReturn(User
+                .withUsername("traveler")
+                .password("unused")
+                .roles("USER")
+                .build());
+
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/spots/42");
+        request.setServletPath("/api/spots/42");
+        request.setCookies(new Cookie(CookieAuthConstants.AUTH_COOKIE_NAME, "public-session-token"));
+
+        filter.doFilter(request, new MockHttpServletResponse(), new MockFilterChain());
+
+        assertThat(SecurityContextHolder.getContext().getAuthentication())
+                .isNotNull()
+                .extracting(authentication -> authentication.getName())
+                .isEqualTo("traveler");
     }
 
     @Test
@@ -192,11 +229,13 @@ class AuthTokenFilterTest {
         UserDetailsService userDetailsService = mock(UserDetailsService.class);
         TokenRevocationService tokenRevocationService = mock(TokenRevocationService.class);
         UserSessionVersionService userSessionVersionService = mock(UserSessionVersionService.class);
+        AdminMfaPolicy adminMfaPolicy = mock(AdminMfaPolicy.class);
         AuthTokenFilter filter = new AuthTokenFilter(
                 jwtUtils,
                 userDetailsService,
                 tokenRevocationService,
-                userSessionVersionService);
+                userSessionVersionService,
+                adminMfaPolicy);
         ListAppender<ILoggingEvent> appender = attachDebugAppender();
         String rawUsername = "admin.secret@example.com";
 
@@ -204,6 +243,12 @@ class AuthTokenFilterTest {
         when(jwtUtils.validateJwtToken("admin-token")).thenReturn(true);
         when(userSessionVersionService.tokenMatchesCurrentSession("admin-token")).thenReturn(true);
         when(jwtUtils.getUserNameFromJwtToken("admin-token")).thenReturn(rawUsername);
+        when(jwtUtils.isMfaVerified("admin-token")).thenReturn(true);
+        when(jwtUtils.getMfaBindingFromJwtToken("admin-token"))
+                .thenReturn("0123456789abcdef0123456789abcdef");
+        when(adminMfaPolicy.matchesCurrentBinding(
+                rawUsername, "0123456789abcdef0123456789abcdef"))
+                .thenReturn(true);
         when(userDetailsService.loadUserByUsername(rawUsername)).thenReturn(User
                 .withUsername(rawUsername)
                 .password("unused")
@@ -225,6 +270,141 @@ class AuthTokenFilterTest {
         assertThat(appender.list)
                 .extracting(ILoggingEvent::getFormattedMessage)
                 .noneMatch(message -> message.contains(rawUsername));
+    }
+
+    @Test
+    void administratorRequiresSignedMethodsAndCurrentMfaCredentialBinding() throws Exception {
+        JwtUtils jwtUtils = mock(JwtUtils.class);
+        UserDetailsService userDetailsService = mock(UserDetailsService.class);
+        TokenRevocationService tokenRevocationService = mock(TokenRevocationService.class);
+        UserSessionVersionService userSessionVersionService = mock(UserSessionVersionService.class);
+        AdminMfaPolicy adminMfaPolicy = mock(AdminMfaPolicy.class);
+        AuthTokenFilter filter = new AuthTokenFilter(
+                jwtUtils,
+                userDetailsService,
+                tokenRevocationService,
+                userSessionVersionService,
+                adminMfaPolicy);
+
+        when(tokenRevocationService.isRevoked(anyString())).thenReturn(false);
+        when(jwtUtils.validateJwtToken(anyString())).thenReturn(true);
+        when(userSessionVersionService.tokenMatchesCurrentSession(anyString())).thenReturn(true);
+        when(jwtUtils.getUserNameFromJwtToken("admin-no-amr")).thenReturn("admin");
+        when(jwtUtils.getUserNameFromJwtToken("admin-pwd-only")).thenReturn("admin");
+        when(jwtUtils.getUserNameFromJwtToken("admin-pwd-otp-no-binding")).thenReturn("admin");
+        when(jwtUtils.getUserNameFromJwtToken("admin-stale-binding")).thenReturn("admin");
+        when(jwtUtils.getUserNameFromJwtToken("admin-current-binding")).thenReturn("admin");
+        when(jwtUtils.isMfaVerified("admin-pwd-otp-no-binding")).thenReturn(true);
+        when(jwtUtils.isMfaVerified("admin-stale-binding")).thenReturn(true);
+        when(jwtUtils.isMfaVerified("admin-current-binding")).thenReturn(true);
+        when(jwtUtils.getMfaBindingFromJwtToken("admin-stale-binding"))
+                .thenReturn("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+        when(jwtUtils.getMfaBindingFromJwtToken("admin-current-binding"))
+                .thenReturn("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+        when(adminMfaPolicy.matchesCurrentBinding(
+                "admin", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"))
+                .thenReturn(true);
+        when(userDetailsService.loadUserByUsername("admin")).thenReturn(User
+                .withUsername("admin")
+                .password("unused")
+                .roles("ADMIN")
+                .build());
+
+        assertAdminTokenRejected(filter, "admin-no-amr");
+        assertAdminTokenRejected(filter, "admin-pwd-only");
+        assertAdminTokenRejected(filter, "admin-pwd-otp-no-binding");
+        assertAdminTokenRejected(filter, "admin-stale-binding");
+
+        MockHttpServletRequest accepted = authenticatedApiRequest();
+        accepted.addHeader("Authorization", "Bearer admin-current-binding");
+        filter.doFilter(accepted, new MockHttpServletResponse(), new MockFilterChain());
+        assertThat(SecurityContextHolder.getContext().getAuthentication())
+                .isNotNull()
+                .extracting(authentication -> authentication.getName())
+                .isEqualTo("admin");
+    }
+
+    @Test
+    void ordinaryUserTokenRemainsCompatibleWithoutMfaClaim() throws Exception {
+        JwtUtils jwtUtils = mock(JwtUtils.class);
+        UserDetailsService userDetailsService = mock(UserDetailsService.class);
+        TokenRevocationService tokenRevocationService = mock(TokenRevocationService.class);
+        UserSessionVersionService userSessionVersionService = mock(UserSessionVersionService.class);
+        AuthTokenFilter filter = new AuthTokenFilter(
+                jwtUtils, userDetailsService, tokenRevocationService, userSessionVersionService);
+
+        when(tokenRevocationService.isRevoked("user-old-token")).thenReturn(false);
+        when(jwtUtils.validateJwtToken("user-old-token")).thenReturn(true);
+        when(userSessionVersionService.tokenMatchesCurrentSession("user-old-token")).thenReturn(true);
+        when(jwtUtils.getUserNameFromJwtToken("user-old-token")).thenReturn("traveler");
+        when(userDetailsService.loadUserByUsername("traveler")).thenReturn(User
+                .withUsername("traveler")
+                .password("unused")
+                .roles("USER")
+                .build());
+
+        MockHttpServletRequest request = authenticatedApiRequest();
+        request.addHeader("Authorization", "Bearer user-old-token");
+        filter.doFilter(request, new MockHttpServletResponse(), new MockFilterChain());
+
+        assertThat(SecurityContextHolder.getContext().getAuthentication())
+                .isNotNull()
+                .extracting(authentication -> authentication.getName())
+                .isEqualTo("traveler");
+    }
+
+    private void assertAdminTokenRejected(AuthTokenFilter filter, String token) throws Exception {
+        SecurityContextHolder.clearContext();
+        MockHttpServletRequest request = authenticatedApiRequest();
+        request.addHeader("Authorization", "Bearer " + token);
+        filter.doFilter(request, new MockHttpServletResponse(), new MockFilterChain());
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+    }
+
+    @Test
+    void revokedTokenDoesNotAuthenticateEvenThoughItStillValidates() throws Exception {
+        // Every other test in this file stubs isRevoked -> false, so revocation was never actually
+        // exercised: a broken TokenRevocationService wiring would have passed the whole suite.
+        JwtUtils jwtUtils = mock(JwtUtils.class);
+        UserDetailsService userDetailsService = mock(UserDetailsService.class);
+        TokenRevocationService tokenRevocationService = mock(TokenRevocationService.class);
+        UserSessionVersionService userSessionVersionService = mock(UserSessionVersionService.class);
+        AuthTokenFilter filter = new AuthTokenFilter(
+                jwtUtils, userDetailsService, tokenRevocationService, userSessionVersionService);
+
+        when(tokenRevocationService.isRevoked("revoked-token")).thenReturn(true);
+
+        MockHttpServletRequest request = authenticatedApiRequest();
+        request.addHeader("Authorization", "Bearer revoked-token");
+
+        filter.doFilter(request, new MockHttpServletResponse(), new MockFilterChain());
+
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+        verify(userDetailsService, never()).loadUserByUsername(anyString());
+    }
+
+    @Test
+    void tokenFromASupersededSessionDoesNotAuthenticate() throws Exception {
+        // Same gap for the session-version check: it is what makes "log out everywhere" and forced
+        // password changes actually invalidate tokens that are otherwise still signed and unexpired.
+        JwtUtils jwtUtils = mock(JwtUtils.class);
+        UserDetailsService userDetailsService = mock(UserDetailsService.class);
+        TokenRevocationService tokenRevocationService = mock(TokenRevocationService.class);
+        UserSessionVersionService userSessionVersionService = mock(UserSessionVersionService.class);
+        AuthTokenFilter filter = new AuthTokenFilter(
+                jwtUtils, userDetailsService, tokenRevocationService, userSessionVersionService);
+
+        when(tokenRevocationService.isRevoked("stale-session-token")).thenReturn(false);
+        when(jwtUtils.validateJwtToken("stale-session-token")).thenReturn(true);
+        when(userSessionVersionService.tokenMatchesCurrentSession("stale-session-token")).thenReturn(false);
+
+        MockHttpServletRequest request = authenticatedApiRequest();
+        request.addHeader("Authorization", "Bearer stale-session-token");
+
+        filter.doFilter(request, new MockHttpServletResponse(), new MockFilterChain());
+
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+        verify(userDetailsService, never()).loadUserByUsername(anyString());
     }
 
     private MockHttpServletRequest authenticatedApiRequest() {

@@ -1,6 +1,7 @@
 package com.tibet.tourism.modules.spot.web;
 import com.tibet.tourism.common.error.ResourceNotFoundException;
 import com.tibet.tourism.common.security.SensitiveLogSanitizer;
+import com.tibet.tourism.modules.admin.application.AdminAuditLogService;
 import com.tibet.tourism.modules.spot.application.PriceFetchService;
 import com.tibet.tourism.modules.spot.application.PriceBatchUpdateJobService;
 import com.tibet.tourism.modules.spot.application.PriceUpdateService;
@@ -10,7 +11,6 @@ import com.tibet.tourism.modules.spot.web.dto.PriceInfo;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -26,17 +26,23 @@ public class PriceController {
     private static final String PRICE_NOT_FOUND_ERROR = "Price resource not found";
     private static final String PRICE_OPERATION_ERROR = "Price operation could not be processed";
 
-    @Autowired
-    private PriceFetchService priceFetchService;
+    private final PriceFetchService priceFetchService;
+    private final PriceUpdateService priceUpdateService;
+    private final PriceBatchUpdateJobService priceBatchUpdateJobService;
+    private final ScenicSpotRepository scenicSpotRepository;
+    private final AdminAuditLogService auditLogService;
 
-    @Autowired
-    private PriceUpdateService priceUpdateService;
-
-    @Autowired
-    private PriceBatchUpdateJobService priceBatchUpdateJobService;
-
-    @Autowired
-    private ScenicSpotRepository scenicSpotRepository;
+    public PriceController(PriceFetchService priceFetchService,
+                           PriceUpdateService priceUpdateService,
+                           PriceBatchUpdateJobService priceBatchUpdateJobService,
+                           ScenicSpotRepository scenicSpotRepository,
+                           AdminAuditLogService auditLogService) {
+        this.priceFetchService = priceFetchService;
+        this.priceUpdateService = priceUpdateService;
+        this.priceBatchUpdateJobService = priceBatchUpdateJobService;
+        this.scenicSpotRepository = scenicSpotRepository;
+        this.auditLogService = auditLogService;
+    }
 
     /**
      * 获取景点价格信息（不更新数据库，仅查询）
@@ -81,6 +87,11 @@ public class PriceController {
     public ResponseEntity<?> updatePrice(
             @PathVariable Long spotId,
             @RequestParam(required = false, defaultValue = "false") boolean force) {
+        return auditLogService.capture("scenic_spot_price", spotId, "scenic_spot_price_update",
+                () -> updatePriceInternal(spotId, force));
+    }
+
+    private ResponseEntity<?> updatePriceInternal(Long spotId, boolean force) {
         try {
             PriceUpdateService.PriceUpdateResult result = priceUpdateService.updateSpotPrice(spotId, force);
             return ResponseEntity.ok(result);
@@ -102,6 +113,11 @@ public class PriceController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> batchUpdatePrices(
             @RequestParam(required = false, defaultValue = "false") boolean force) {
+        return auditLogService.capture("scenic_spot_price", null, "scenic_spot_price_batch_update",
+                () -> batchUpdatePricesInternal(force));
+    }
+
+    private ResponseEntity<?> batchUpdatePricesInternal(boolean force) {
         try {
             PriceUpdateService.BatchUpdateResult result = priceUpdateService.batchUpdatePrices(force);
             return ResponseEntity.ok(result);
@@ -116,6 +132,11 @@ public class PriceController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> startBatchUpdateJob(
             @RequestParam(required = false, defaultValue = "false") boolean force) {
+        return auditLogService.capture("scenic_spot_price", null, "scenic_spot_price_job_start",
+                () -> startBatchUpdateJobInternal(force));
+    }
+
+    private ResponseEntity<?> startBatchUpdateJobInternal(boolean force) {
         try {
             return ResponseEntity.ok(priceBatchUpdateJobService.startJob(force));
         } catch (Exception e) {

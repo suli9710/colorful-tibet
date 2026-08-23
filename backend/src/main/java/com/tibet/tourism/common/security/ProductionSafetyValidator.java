@@ -4,6 +4,7 @@ import jakarta.annotation.PostConstruct;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
@@ -41,7 +42,9 @@ public class ProductionSafetyValidator {
     private final boolean bruteForceEnabled;
     private final boolean bruteForceRedisEnabled;
     private final boolean bruteForceRedisFailClosed;
+    private final boolean totpReplayFailClosed;
 
+    @Autowired
     public ProductionSafetyValidator(
             Environment environment,
             @Value("${app.security.cookie-secure:true}") boolean cookieSecure,
@@ -61,7 +64,8 @@ public class ProductionSafetyValidator {
             @Value("${app.security.rate-limit.redis-fail-closed:false}") boolean rateLimitRedisFailClosed,
             @Value("${app.security.brute-force.enabled:true}") boolean bruteForceEnabled,
             @Value("${app.security.brute-force.redis-enabled:true}") boolean bruteForceRedisEnabled,
-            @Value("${app.security.brute-force.redis-fail-closed:false}") boolean bruteForceRedisFailClosed) {
+            @Value("${app.security.brute-force.redis-fail-closed:false}") boolean bruteForceRedisFailClosed,
+            @Value("${app.security.totp-replay-fail-closed:false}") boolean totpReplayFailClosed) {
         this.environment = environment;
         this.cookieSecure = cookieSecure;
         this.requireStrongSecrets = requireStrongSecrets;
@@ -81,6 +85,51 @@ public class ProductionSafetyValidator {
         this.bruteForceEnabled = bruteForceEnabled;
         this.bruteForceRedisEnabled = bruteForceRedisEnabled;
         this.bruteForceRedisFailClosed = bruteForceRedisFailClosed;
+        this.totpReplayFailClosed = totpReplayFailClosed;
+    }
+
+    /** Retains source compatibility for existing direct unit-test construction. */
+    ProductionSafetyValidator(
+            Environment environment,
+            boolean cookieSecure,
+            boolean requireStrongSecrets,
+            boolean mockCallbackEnabled,
+            String scraplingApiKey,
+            boolean recaptchaEnabled,
+            boolean registrationRecaptchaRequired,
+            String recaptchaSiteKey,
+            String recaptchaSecretKey,
+            String piiKeys,
+            String piiActiveKid,
+            String superAdminTotpSecret,
+            String cacheKeyHmacSecret,
+            boolean rateLimitEnabled,
+            boolean rateLimitRedisEnabled,
+            boolean rateLimitRedisFailClosed,
+            boolean bruteForceEnabled,
+            boolean bruteForceRedisEnabled,
+            boolean bruteForceRedisFailClosed) {
+        this(
+                environment,
+                cookieSecure,
+                requireStrongSecrets,
+                mockCallbackEnabled,
+                scraplingApiKey,
+                recaptchaEnabled,
+                registrationRecaptchaRequired,
+                recaptchaSiteKey,
+                recaptchaSecretKey,
+                piiKeys,
+                piiActiveKid,
+                superAdminTotpSecret,
+                cacheKeyHmacSecret,
+                rateLimitEnabled,
+                rateLimitRedisEnabled,
+                rateLimitRedisFailClosed,
+                bruteForceEnabled,
+                bruteForceRedisEnabled,
+                bruteForceRedisFailClosed,
+                true);
     }
 
     @PostConstruct
@@ -104,7 +153,8 @@ public class ProductionSafetyValidator {
                 rateLimitRedisFailClosed,
                 bruteForceEnabled,
                 bruteForceRedisEnabled,
-                bruteForceRedisFailClosed);
+                bruteForceRedisFailClosed,
+                totpReplayFailClosed);
     }
 
     static void validate(
@@ -126,7 +176,8 @@ public class ProductionSafetyValidator {
             boolean rateLimitRedisFailClosed,
             boolean bruteForceEnabled,
             boolean bruteForceRedisEnabled,
-            boolean bruteForceRedisFailClosed) {
+            boolean bruteForceRedisFailClosed,
+            boolean totpReplayFailClosed) {
         if (productionSafetyRequired) {
             if (!cookieSecure) {
                 throw new IllegalStateException("Production deployment requires app.security.cookie-secure=true");
@@ -198,6 +249,10 @@ public class ProductionSafetyValidator {
             if (!bruteForceRedisFailClosed) {
                 throw new IllegalStateException(
                         "Production deployment requires app.security.brute-force.redis-fail-closed=true");
+            }
+            if (!totpReplayFailClosed) {
+                throw new IllegalStateException(
+                        "Production deployment requires app.security.totp-replay-fail-closed=true");
             }
         }
     }

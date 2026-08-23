@@ -2,6 +2,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { setAppLocale } from '../i18n'
 import { Menu, X, LogOut } from 'lucide-vue-next'
 import api, { updateMemoizedLocale, clearTokenCache, endpoints } from '../api/index'
 import { useAuthStore } from '../stores/auth'
@@ -148,10 +149,9 @@ const isPathActive = (paths: string[]) => paths.some(path => (
 const isNavItemActive = (item: NavItem) => isPathActive(item.matchPaths ?? [item.path])
 const isAdminActive = computed(() => isPathActive(['/admin']))
 
-const switchLanguage = (lang: string) => {
-  locale.value = lang
-  updateMemoizedLocale(lang)
-  document.documentElement.lang = lang
+const switchLanguage = async (lang: string) => {
+  const activeLocale = await setAppLocale(lang)
+  updateMemoizedLocale(activeLocale)
 }
 
 const logout = async () => {

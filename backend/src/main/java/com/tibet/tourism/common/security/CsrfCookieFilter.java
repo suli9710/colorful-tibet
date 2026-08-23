@@ -26,11 +26,14 @@ public class CsrfCookieFilter extends OncePerRequestFilter {
 
     private final CsrfTokenService csrfTokenService;
     private final Set<String> allowedOrigins;
+    private final TrustedProxyIpResolver trustedProxyIpResolver;
 
     public CsrfCookieFilter(
             CsrfTokenService csrfTokenService,
+            TrustedProxyIpResolver trustedProxyIpResolver,
             @Value("${app.cors.allowed-origins:}") String allowedOrigins) {
         this.csrfTokenService = csrfTokenService;
+        this.trustedProxyIpResolver = trustedProxyIpResolver;
         this.allowedOrigins = Arrays.stream(allowedOrigins.split(","))
                 .map(String::trim)
                 .filter(StringUtils::hasText)
@@ -119,12 +122,32 @@ public class CsrfCookieFilter extends OncePerRequestFilter {
     }
 
     private String requestOrigin(HttpServletRequest request) {
-        String scheme = request.getScheme();
+        // Behind the TLS-terminating proxy the connector only ever sees plain HTTP on an internal
+        // port, so deriving the origin from it alone yields e.g. http://example.com:8080 and can
+        // never equal the browser's https://example.com. Use what the trusted proxy reports instead.
+        String scheme = forwardedScheme(request);
+        String hostHeader = request.getHeader("Host");
+        if (StringUtils.hasText(hostHeader)) {
+            // Host carries the externally visible authority, with a port only when the client used a
+            // non-default one; nginx forwards it verbatim via `proxy_set_header Host $host`.
+            return scheme + "://" + hostHeader.trim();
+        }
+
         String host = request.getServerName();
         int port = request.getServerPort();
         boolean defaultPort = ("http".equalsIgnoreCase(scheme) && port == 80)
                 || ("https".equalsIgnoreCase(scheme) && port == 443);
         return defaultPort ? scheme + "://" + host : scheme + "://" + host + ":" + port;
+    }
+
+    private String forwardedScheme(HttpServletRequest request) {
+        if (trustedProxyIpResolver != null && trustedProxyIpResolver.isTrustedProxyPeer(request)) {
+            String forwardedProto = request.getHeader("X-Forwarded-Proto");
+            if ("https".equalsIgnoreCase(forwardedProto) || "http".equalsIgnoreCase(forwardedProto)) {
+                return forwardedProto.toLowerCase(java.util.Locale.ROOT);
+            }
+        }
+        return request.getScheme();
     }
 
     private String requestPath(HttpServletRequest request) {

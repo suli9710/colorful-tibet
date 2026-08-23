@@ -15,6 +15,8 @@ import com.tibet.tourism.common.security.TrustedProxyIpResolver;
 import com.tibet.tourism.common.security.UserDetailsServiceImpl;
 import com.tibet.tourism.common.security.UserSessionVersionService;
 import com.tibet.tourism.common.security.WebSecurityConfig;
+import com.tibet.tourism.modules.auth.application.AdminMfaPolicy;
+import com.tibet.tourism.modules.admin.application.AdminAuditLogService;
 import com.tibet.tourism.modules.recommendation.application.ColdStartOptimizationService;
 import com.tibet.tourism.modules.recommendation.application.ItemBasedRecommendationService;
 import com.tibet.tourism.modules.recommendation.application.RecommendationService;
@@ -50,6 +52,12 @@ class ScenicSpotRecommendationDebugSecurityTest {
 
     @MockBean
     private JwtUtils jwtUtils;
+
+    @MockBean
+    private AdminMfaPolicy adminMfaPolicy;
+
+    @MockBean
+    private AdminAuditLogService adminAuditLogService;
 
     @MockBean
     private UserDetailsServiceImpl userDetailsService;

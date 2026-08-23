@@ -8,8 +8,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.hamcrest.Matchers.containsString;
 
+import com.tibet.tourism.modules.auth.application.AdminMfaPolicy;
 import com.tibet.tourism.modules.user.infra.UserRepository;
 import jakarta.servlet.http.Cookie;
 import java.util.Map;
@@ -24,8 +28,10 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.userdetails.User;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -35,11 +41,14 @@ import org.springframework.web.bind.annotation.RestController;
 @WebMvcTest(controllers = WebSecurityConfigPublicAccessTest.ProbeController.class)
 @Import({
         WebSecurityConfig.class,
+        MetricsScrapeTokenFilter.class,
         AuthEntryPointJwt.class,
         CsrfCookieFilter.class,
         TrustedProxyIpResolver.class,
         WebSecurityConfigPublicAccessTest.ProbeController.class
 })
+@TestPropertySource(properties =
+        "app.security.metrics-scrape-token=metrics-test-token-that-is-longer-than-thirty-two-characters")
 class WebSecurityConfigPublicAccessTest {
 
     @Autowired
@@ -47,6 +56,9 @@ class WebSecurityConfigPublicAccessTest {
 
     @MockBean
     private JwtUtils jwtUtils;
+
+    @MockBean
+    private AdminMfaPolicy adminMfaPolicy;
 
     @MockBean
     private UserDetailsServiceImpl userDetailsService;
@@ -62,6 +74,9 @@ class WebSecurityConfigPublicAccessTest {
 
     @MockBean
     private UserRepository userRepository;
+
+    @MockBean
+    private AdminAccessDeniedAuditPublisher accessDeniedAuditPublisher;
 
     @ParameterizedTest
     @MethodSource("publicReadRequests")
@@ -120,6 +135,43 @@ class WebSecurityConfigPublicAccessTest {
                 .andExpect(header().string("X-Content-Type-Options", "nosniff"))
                 .andExpect(jsonPath("$.error").value("Forbidden"))
                 .andExpect(jsonPath("$.message").value("Access denied"));
+
+        verify(accessDeniedAuditPublisher).publish(
+                any(), eq(AdminAccessDeniedAuditEvent.Source.SECURITY_FILTER));
+    }
+
+    @Test
+    void methodLevelAdminDenialPublishesAuditAndKeepsForbiddenResponse() throws Exception {
+        when(jwtUtils.validateJwtToken("valid-token")).thenReturn(true);
+        when(jwtUtils.getUserNameFromJwtToken("valid-token")).thenReturn("traveler");
+        when(userSessionVersionService.tokenMatchesCurrentSession("valid-token")).thenReturn(true);
+        when(userDetailsService.loadUserByUsername("traveler")).thenReturn(
+                User.withUsername("traveler").password("unused").roles("USER").build());
+
+        mockMvc.perform(put("/api/hotel-bookings/42/status")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer valid-token"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error").value("\u65e0\u6743\u8bbf\u95ee\u8be5\u8d44\u6e90"));
+
+        verify(accessDeniedAuditPublisher).publish(
+                any(), eq(AdminAccessDeniedAuditEvent.Source.METHOD_SECURITY));
+    }
+
+    @Test
+    void prometheusScrapeAcceptsDedicatedServiceToken() throws Exception {
+        mockMvc.perform(get("/actuator/prometheus")
+                        .header(HttpHeaders.AUTHORIZATION,
+                                "Bearer metrics-test-token-that-is-longer-than-thirty-two-characters"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void prometheusScrapeRejectsMissingOrIncorrectServiceToken() throws Exception {
+        mockMvc.perform(get("/actuator/prometheus"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/actuator/prometheus")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer wrong-token"))
+                .andExpect(status().isUnauthorized());
     }
 
     private static Stream<MockHttpServletRequestBuilder> publicReadRequests() {
@@ -159,6 +211,7 @@ class WebSecurityConfigPublicAccessTest {
         return Stream.of(
                 post("/api/auth/login"),
                 post("/api/auth/register"),
+                post("/api/client-errors"),
                 post("/api/guide/chat"));
     }
 
@@ -222,7 +275,8 @@ class WebSecurityConfigPublicAccessTest {
                 "/api/community/questions/1/answers",
                 "/api/community/questions/1/like-status",
                 "/images/public.jpg",
-                "/uploads/public.jpg"
+                "/uploads/public.jpg",
+                "/actuator/prometheus"
         })
         public Map<String, String> publicRead() {
             return Map.of("status", "ok");
@@ -232,6 +286,7 @@ class WebSecurityConfigPublicAccessTest {
                 "/api/auth/login",
                 "/api/auth/logout",
                 "/api/auth/register",
+                "/api/client-errors",
                 "/api/guide/chat",
                 "/api/payments/callbacks/mock",
                 "/api/news",
@@ -253,6 +308,12 @@ class WebSecurityConfigPublicAccessTest {
                 "/api/heritage/1"
         })
         public Map<String, String> putProbe() {
+            return Map.of("status", "ok");
+        }
+
+        @PutMapping("/api/hotel-bookings/{id}/status")
+        @PreAuthorize("hasRole('ADMIN')")
+        public Map<String, String> adminStatusProbe() {
             return Map.of("status", "ok");
         }
 

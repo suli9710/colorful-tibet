@@ -39,4 +39,8 @@ public interface TravelAnswerRepository extends JpaRepository<TravelAnswer, Long
     @Query("UPDATE TravelAnswer a SET a.isAccepted = false "
             + "WHERE a.question.id = :questionId AND a.id <> :answerId AND a.isAccepted = true")
     int clearAcceptedExcept(@Param("questionId") Long questionId, @Param("answerId") Long answerId);
+
+    /** Questions (owned by other users) whose answer_count must be recomputed after this user's answers are deleted. */
+    @Query("SELECT DISTINCT a.question.id FROM TravelAnswer a WHERE a.user.id = :userId")
+    List<Long> findAnsweredQuestionIdsByUserId(@Param("userId") Long userId);
 }

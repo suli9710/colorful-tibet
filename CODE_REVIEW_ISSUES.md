@@ -1,12 +1,14 @@
 # Code Review Issues
 
-Last updated: 2026-06-12
-Last reviewed: 2026-06-12 00:00:00 +08:00
+Last updated: 2026-08-23
+Last reviewed: 2026-08-23 +08:00
 
 This file tracks issues re-checked against the current worktree. Items marked fixed have code and tests in this worktree; residual items remain candidates for the next review cycle.
 
 ## Verification Snapshot
 
+- Best-practices repair gate on 2026-08-23 +08:00: administrator MFA now uses independent per-account TOTP credentials, signed `pwd`+`otp` AMR, an HMAC credential binding that invalidates JWTs on secret rotation/removal, strict production 160-bit/pattern-rejecting Base32 validation, and credential-scoped Redis replay claims that fail closed in production. Persistent HMAC-referenced administrator audit coverage reaches all 52 mutation endpoints in the review inventory; each allowed mutation requires a durable pre-operation attempt, authorization denials are classified at the filter/method-security boundary, and successful single-entity creates bind the audit row to the new entity id. Security posture evaluates actual database administrator coverage. Validation passed backend 1663 tests (0 failures/errors, 5 skipped), frontend typecheck plus 55 files / 376 tests and production build, Playwright smoke 1/1, Scrapler 23 tests, ops 64/64, supply-chain pins, deterministic OpenAPI type generation, and `git diff --check` (line-ending warnings only).
+- Supply-chain digest refresh on 2026-07-28 +08:00: all moving Docker Hub tags were resolved again through the official Registry HTTP API v2 and synchronized across Dockerfiles, Compose, `.github/workflows/ci.yml`, and `docker-digest-evidence.json`. The required-source inventory now reverse-checks every digest-pinned repository reference, including the CI MySQL service image, for 17 source records total. Evidence generation now rejects unknown, conflicting, duplicate, or incomplete CLI arguments; returns no partial result when any lookup fails; and uses `--output` to fsync a same-directory temporary file before atomically replacing prior evidence. Validation passed the live resolver comparison, offline evidence audit, supply-chain gate, both Compose config checks, and `npm run test:ops` (51/51).
 - 8-agent cross-review on 2026-06-12: eight readonly review agents completed a full-repository matrix pass with at least four agents per code segment (see `.cursor/review-matrix.json`). All eight agents reported **zero High-severity** findings; prior 2026-06-10 hardening (payment integrity, CSRF/PII, Redis fail-closed, stale-response guards, XSS, ops preflight) was independently confirmed. The cycle opened **26 Medium** residuals (CT-FE-067 through CT-FE-077, CT-BE-043 through CT-BE-050, CT-OPS-035 through CT-OPS-041) plus a consolidated Low/deferred list. Cross-agent consensus covered `ScenicSpotDetail` stale races, login step-up fail-open, `HotelBooking` submit scoping, admin list truncation/audit gaps, ops gate drift, pagination envelope inconsistency, and FE/BE product-integration contradictions (itinerary book, hotel inquiry, Scrapler publish, OrderCenter refund/invoice). No validation rerun was executed in this documentation-only cycle.
 - Product-hardening multi-agent cycle on 2026-06-10 01:10 +08:00: 4 development agents, 1 testing agent, and 1 review agent completed. Closed CT-FE-061 through CT-FE-066, CT-BE-042, CT-OPS-033, and CT-OPS-034 in the current worktree. The review agent found no High issues and three Medium findings; all three were fixed locally with regression tests: HeatMap fallback zoom can no longer reintroduce an invalid `geo` option, QuestionDetail like mutations cannot write into a different route question after navigation, and Heritage same-item like toggles ignore older out-of-order completions. This cycle also hardened AdminCommunityPanel stale refresh/save/delete paths, Heritage comment duplicate actions, hotel browsing and booking stale/fail-closed flows, login/register/Q&A DTO typing, backend mutation rate-limit fail-closed coverage, production host/TOTP/preflight checks, and Docker digest evidence validation. Validation passed focused frontend regression suites (6 files / 85 tests), `opsConfigGuardrails.test.ts` (9 tests), frontend typecheck, `npm run test:ops` (37 tests), `npm run check:supply-chain-pins`, full `npm run check` (backend compile/test, frontend typecheck plus 49 files / 329 tests plus production build, Scrapler 16 tests), and final diff hygiene checks with only LF-to-CRLF working-copy warnings.
 - Product-hardening multi-agent cycle on 2026-06-09 19:10 +08:00: 4 development agents, 1 testing agent, and 1 review agent completed. Closed CT-FE-058, CT-FE-059, CT-FE-060, and CT-OPS-032 in the current worktree. Admin community management now exposes per-tab partial load failures through accessible alerts instead of silently rendering empty or stale data; HotelBooking API hotel/room responses are scoped to the latest route hotel id so an older response cannot make users view one hotel while submitting another; Heritage detail, comment pagination, and like-status requests are scoped to the current selected item so older modal responses cannot overwrite the active item; and the supply-chain pin checker now uses a stable ESM direct-execution guard so evidence-only CLI tests cannot pass with empty output. The review agent found no High issues and its three Medium findings were addressed locally. Validation passed focused frontend guardrail suites for admin/community, route/hotel, and heritage i18n/stale safety (3 files / 22 tests), frontend typecheck, focused order/hotel/favorites/security suites from the development agents, focused backend guide-chat/security coverage, `npm run test:ops` (33 tests), `npm run check:supply-chain-pins`, full `npm run check` (backend compile/test, frontend typecheck plus 49 files / 312 tests plus production build, Scrapler 16 tests), and `git diff --check` with only LF-to-CRLF working-copy warnings.
@@ -56,6 +58,10 @@ This file tracks issues re-checked against the current worktree. Items marked fi
 
 ## Fixed This Cycle
 
+- CT-BE-046: Admin list endpoints now sanitize page size and allowlist sort fields before repository access, with controller contract coverage.
+- CT-BE-047: Persistent administrator auditing now covers all 52 write endpoints in the review inventory, requires a committed `attempt/started` row before an allowed mutation runs, records filter- and method-security denials, and binds successful single-entity creates to the actual new id. HMAC actor/target references and bounded outcomes avoid request bodies, query strings, raw paths, secrets, and exception messages; mixed user/admin endpoints audit only `ROLE_ADMIN` calls.
+- CT-OPS-035: The root `npm run check` now includes both the supply-chain pin gate and the complete ops test suite.
+- Administrator MFA: every current `ROLE_ADMIN` requires an independent configured TOTP secret; promotion fails closed without one, old/rotated credential JWTs are rejected through signed AMR plus HMAC binding, and production replay protection requires an authoritative Redis claim.
 - CT-FE-061: `HeatMap.vue` now normalizes runtime API/chart payloads, escapes tooltip HTML, rejects untrusted remote geo fallback URLs, labels the chart/zoom control for assistive tech, ignores stale chart reloads, and keeps fallback zoom from writing invalid `geo` options.
 - CT-FE-062: Hotel list/detail browsing now uses stronger typed API normalization, stale-response guards, retryable failure states, and safer user-facing fallbacks.
 - CT-FE-063: Login, Register, and QuestionDetail now use typed DTO/error handling instead of broad assumptions, and QuestionDetail like mutations are scoped to the initiating question id.
@@ -259,24 +265,6 @@ This file tracks issues re-checked against the current worktree. Items marked fi
 - Evidence: `CurrentUserApplicationService` pages spot and route comments with the same `Pageable`; `UserProfile.vue` merges with `Math.max`.
 - Fix direction: Separate `spotPage`/`routePage` params or return one merged sorted `PageResponse`.
 
-### CT-BE-046 - Open - Admin list endpoints use raw Pageable
-
-- Severity: Medium | Priority: P1 | Agents: 3, 5
-- Evidence: `AdminCommunityController`, `AdminUserController`, `AdminHeritageController` pass client `Pageable` without `InputSanitizer.sanitizePageable`.
-- Fix direction: Wrap with allowlisted sort fields and max size; extend `AdminPageResponseContractTest`.
-
-### CT-BE-047 - Open - Admin community/content mutations lack audit trail
-
-- Severity: Medium | Priority: P1 | Agents: 3, 6
-- Evidence: `AdminAuditLog` used only in `AdminUserService`; `AdminCommunityController` / `AdminHeritageController` mutate without persistent audit rows.
-- Fix direction: Persist audit entries for community/heritage/news/carousel admin mutations.
-
-### CT-OPS-035 - Open - Root npm run check omits ops/supply-chain gates
-
-- Severity: Medium | Priority: P1 | Agent: 4
-- Evidence: `package.json` `check` runs backend/frontend/scrapler only; CI runs `test:ops` and `check:supply-chain-pins` separately.
-- Fix direction: Include ops gates in `npm run check` or document/enforce `npm run check && npm run test:ops && npm run check:supply-chain-pins` as release gate.
-
 ### CT-OPS-036 - Open - CORS_ALLOWED_ORIGINS not fail-closed in production preflight
 
 - Severity: Medium | Priority: P1 | Agent: 4
@@ -374,7 +362,6 @@ This file tracks issues re-checked against the current worktree. Items marked fi
 - Login lockout copy hardcoded Chinese in `Login.vue` (Agents 1, 7); add i18n keys.
 - `allowed_login_fingerprint_hash` column exists without login enforcement (`V8`, `User.java`).
 - Heritage like toggle lacks UI in-flight lock; RouteCommunity/AdminHeritage save handlers rely on `:disabled` only.
-- TOTP codes reusable within acceptance window (~90s); optional replay cache.
 - `UserService` / `AdminStatsService` thin direct test coverage.
 - Frontend composables `useAuthGuard`, `routeGeneration` store, `useBehaviorTracker` lack dedicated tests.
 - Pagination envelope split on `/api/bookings/my`, `/api/itineraries/my` (Agents 5, 8).

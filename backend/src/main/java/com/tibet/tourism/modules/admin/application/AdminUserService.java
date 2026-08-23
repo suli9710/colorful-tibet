@@ -2,9 +2,8 @@ package com.tibet.tourism.modules.admin.application;
 
 import com.tibet.tourism.common.security.LoginAttemptService;
 import com.tibet.tourism.common.security.PiiCryptoConverter;
-import com.tibet.tourism.common.security.PiiMasker;
-import com.tibet.tourism.modules.admin.domain.AdminAuditLog;
-import com.tibet.tourism.modules.admin.infra.AdminAuditLogRepository;
+import com.tibet.tourism.modules.auth.application.AdminMfaPolicy;
+import com.tibet.tourism.common.security.antibot.infra.BehaviorLogRepository;
 import com.tibet.tourism.modules.ai.infra.AiRouteRecordRepository;
 import com.tibet.tourism.modules.community.infra.CommentLikeRepository;
 import com.tibet.tourism.modules.community.infra.CommentRepository;
@@ -27,8 +26,11 @@ import com.tibet.tourism.modules.user.infra.UserVisitHistoryRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.Query;
+import java.util.Collection;
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -45,9 +47,6 @@ public class AdminUserService {
     private static final String UNLOCK_LOGIN_ACTION = "admin_user_unlock_login";
     private static final String ROLE_UPDATE_ACTION = "admin_user_role_update";
     private static final String DELETE_USER_ACTION = "admin_user_delete";
-    private static final String RESULT_SUCCESS = "success";
-    private static final String RESULT_DENIED = "denied";
-    private static final String RESULT_FAILURE = "failure";
 
     private final UserRepository userRepository;
     private final LoginAttemptService loginAttemptService;
@@ -68,7 +67,9 @@ public class AdminUserService {
     private final TibetTravelKitRepository tibetTravelKitRepository;
     private final ItineraryRepository itineraryRepository;
     private final UserVisitHistoryRepository userVisitHistoryRepository;
-    private final AdminAuditLogRepository adminAuditLogRepository;
+    private final AdminAuditLogService adminAuditLogService;
+    private final BehaviorLogRepository behaviorLogRepository;
+    private final AdminMfaPolicy adminMfaPolicy;
     private final PiiCryptoConverter piiCryptoConverter = new PiiCryptoConverter();
 
     @PersistenceContext
@@ -94,9 +95,11 @@ public class AdminUserService {
                             HotelBookingRepository hotelBookingRepository,
                             AiRouteRecordRepository aiRouteRecordRepository,
                             TibetTravelKitRepository tibetTravelKitRepository,
-                            ItineraryRepository itineraryRepository,
-                            UserVisitHistoryRepository userVisitHistoryRepository,
-                            AdminAuditLogRepository adminAuditLogRepository) {
+                             ItineraryRepository itineraryRepository,
+                             UserVisitHistoryRepository userVisitHistoryRepository,
+                             AdminAuditLogService adminAuditLogService,
+                             BehaviorLogRepository behaviorLogRepository,
+                             AdminMfaPolicy adminMfaPolicy) {
         this.userRepository = userRepository;
         this.loginAttemptService = loginAttemptService;
         this.commentLikeRepository = commentLikeRepository;
@@ -116,7 +119,9 @@ public class AdminUserService {
         this.tibetTravelKitRepository = tibetTravelKitRepository;
         this.itineraryRepository = itineraryRepository;
         this.userVisitHistoryRepository = userVisitHistoryRepository;
-        this.adminAuditLogRepository = adminAuditLogRepository;
+        this.adminAuditLogService = adminAuditLogService;
+        this.behaviorLogRepository = behaviorLogRepository;
+        this.adminMfaPolicy = adminMfaPolicy;
     }
 
     public record RoleUpdateResult(boolean success, int status, String message) {}
@@ -146,140 +151,222 @@ public class AdminUserService {
     @Transactional
     public RoleUpdateResult updateRole(Long targetUserId, String role, Authentication authentication) {
         String operatorUsername = authenticatedUsername(authentication);
-        AuditActor actor = auditActor(operatorUsername);
-        Optional<User> userOpt = userRepository.findById(targetUserId);
-        if (userOpt.isEmpty()) {
-            auditRoleUpdate(actor, targetUserId, "user#missing", RESULT_FAILURE,
-                    "target_not_found", null, null);
-            return new RoleUpdateResult(false, 404, "用户不存在");
+        AdminAuditLogService.Attempt attempt = adminAuditLogService.beginForActor(
+                operatorUsername, "user", targetUserId, ROLE_UPDATE_ACTION);
+        try {
+            Optional<User> userOpt = userRepository.findById(targetUserId);
+            if (userOpt.isEmpty()) {
+                auditRoleUpdate(attempt, AdminAuditLogService.Result.FAILURE,
+                        "target_not_found", null, null);
+                return new RoleUpdateResult(false, 404, "用户不存在");
+            }
+            return updateRoleInternal(userOpt.get(), role, authentication, operatorUsername, attempt);
+        } catch (RuntimeException exception) {
+            auditUnexpectedFailure(attempt, exception, null, null);
+            throw exception;
         }
-        return updateRole(userOpt.get(), role, authentication);
     }
 
     @Transactional
     public RoleUpdateResult updateRole(User user, String role, Authentication authentication) {
         String operatorUsername = authenticatedUsername(authentication);
-        AuditActor actor = auditActor(operatorUsername);
         Long targetId = user == null ? null : user.getId();
-        String targetRef = auditRef(user);
+        AdminAuditLogService.Attempt attempt = adminAuditLogService.beginForActor(
+                operatorUsername, "user", targetId, ROLE_UPDATE_ACTION);
+        try {
+            return updateRoleInternal(user, role, authentication, operatorUsername, attempt);
+        } catch (RuntimeException exception) {
+            auditUnexpectedFailure(attempt, exception, roleName(user), roleName(user));
+            throw exception;
+        }
+    }
+
+    private RoleUpdateResult updateRoleInternal(User user,
+                                                String role,
+                                                Authentication authentication,
+                                                String operatorUsername,
+                                                AdminAuditLogService.Attempt attempt) {
         String beforeRole = roleName(user);
 
+        if (user == null) {
+            auditRoleUpdate(attempt, AdminAuditLogService.Result.FAILURE,
+                    "target_not_found", null, null);
+            return new RoleUpdateResult(false, 404, "用户不存在");
+        }
+
         if (authentication == null) {
-            auditRoleUpdate(actor, targetId, targetRef, RESULT_FAILURE, "unauthenticated", beforeRole, beforeRole);
+            auditRoleUpdate(attempt, AdminAuditLogService.Result.FAILURE,
+                    "unauthenticated", beforeRole, beforeRole);
             return new RoleUpdateResult(false, 401, "未登录，不能修改用户角色");
         }
         if (role == null) {
-            auditRoleUpdate(actor, targetId, targetRef, RESULT_FAILURE, "role_required", beforeRole, beforeRole);
+            auditRoleUpdate(attempt, AdminAuditLogService.Result.FAILURE,
+                    "role_required", beforeRole, beforeRole);
             return new RoleUpdateResult(false, 400, "角色不能为空");
         }
+
+        User.Role requestedRole;
         try {
-            User.Role requestedRole = User.Role.valueOf(role.trim().toUpperCase(Locale.ROOT));
-            boolean operatorIsSuperAdmin = isSuperAdminUsername(operatorUsername);
-            String afterRole = requestedRole.name();
-
-            if (isSuperAdminAccount(user)) {
-                auditRoleUpdate(actor, targetId, targetRef, RESULT_DENIED, "protected_account", beforeRole, afterRole);
-                return new RoleUpdateResult(false, 400, "不能修改超级管理员角色");
-            }
-            if (sameUsername(operatorUsername, user.getUsername()) && requestedRole != User.Role.ADMIN) {
-                auditRoleUpdate(actor, targetId, targetRef, RESULT_DENIED, "self_admin_demotion", beforeRole, afterRole);
-                return new RoleUpdateResult(false, 400, "不能取消自己的管理员权限");
-            }
-            if (!operatorIsSuperAdmin) {
-                auditRoleUpdate(actor, targetId, targetRef, RESULT_DENIED, "requires_super_admin", beforeRole, afterRole);
-                return new RoleUpdateResult(false, 403, "只有超级管理员可以调整管理员角色");
-            }
-
-            if (user.getRole() != requestedRole) {
-                user.setRole(requestedRole);
-                user.incrementSessionVersion();
-            }
-            userRepository.save(user);
-            auditRoleUpdate(actor, targetId, targetRef, RESULT_SUCCESS, "authorized", beforeRole, afterRole);
-            return new RoleUpdateResult(true, 200, "角色更新成功");
+            requestedRole = User.Role.valueOf(role.trim().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException e) {
-            auditRoleUpdate(actor, targetId, targetRef, RESULT_FAILURE, "invalid_role", beforeRole, beforeRole);
+            auditRoleUpdate(attempt, AdminAuditLogService.Result.FAILURE,
+                    "invalid_role", beforeRole, beforeRole);
             return new RoleUpdateResult(false, 400, "无效的角色");
         }
+
+        boolean operatorIsSuperAdmin = isSuperAdminUsername(operatorUsername);
+        String afterRole = requestedRole.name();
+
+        if (isSuperAdminAccount(user)) {
+            auditRoleUpdate(attempt, AdminAuditLogService.Result.DENIED,
+                    "protected_account", beforeRole, afterRole);
+            return new RoleUpdateResult(false, 400, "不能修改超级管理员角色");
+        }
+        if (sameUsername(operatorUsername, user.getUsername()) && requestedRole != User.Role.ADMIN) {
+            auditRoleUpdate(attempt, AdminAuditLogService.Result.DENIED,
+                    "self_admin_demotion", beforeRole, afterRole);
+            return new RoleUpdateResult(false, 400, "不能取消自己的管理员权限");
+        }
+        if (!operatorIsSuperAdmin) {
+            auditRoleUpdate(attempt, AdminAuditLogService.Result.DENIED,
+                    "requires_super_admin", beforeRole, afterRole);
+            return new RoleUpdateResult(false, 403, "只有超级管理员可以调整管理员角色");
+        }
+
+        if (requestedRole == User.Role.ADMIN
+                && !adminMfaPolicy.isSuperAdmin(user)
+                && !adminMfaPolicy.hasConfiguredSecret(user.getUsername())) {
+            auditRoleUpdate(attempt, AdminAuditLogService.Result.DENIED,
+                    "admin_mfa_not_configured", beforeRole, afterRole);
+            return new RoleUpdateResult(false, 409,
+                    "请先为该管理员配置独立的双因素认证密钥");
+        }
+
+        if (user.getRole() != requestedRole) {
+            user.setRole(requestedRole);
+            user.incrementSessionVersion();
+        }
+        userRepository.save(user);
+        auditRoleUpdate(attempt, AdminAuditLogService.Result.SUCCESS,
+                "authorized", beforeRole, afterRole);
+        return new RoleUpdateResult(true, 200, "角色更新成功");
     }
 
     @Transactional
     public UnlockUserResult unlockLogin(Long targetUserId, Authentication authentication) {
         String operatorUsername = authenticatedUsername(authentication);
-        AuditActor actor = auditActor(operatorUsername);
+        AdminAuditLogService.Attempt attempt = adminAuditLogService.beginForActor(
+                operatorUsername, "user", targetUserId, UNLOCK_LOGIN_ACTION);
+        try {
+            if (authentication == null) {
+                auditUnlock(attempt, AdminAuditLogService.Result.FAILURE, "unauthenticated");
+                return new UnlockUserResult(false, 401, "未登录，不能解除登录锁定");
+            }
 
-        if (authentication == null) {
-            auditUnlock(actor, targetUserId, "user#unknown", RESULT_FAILURE, "unauthenticated");
-            return new UnlockUserResult(false, 401, "未登录，不能解除登录锁定");
+            Optional<User> targetUserOpt = userRepository.findById(targetUserId);
+            if (targetUserOpt.isEmpty()) {
+                auditUnlock(attempt, AdminAuditLogService.Result.FAILURE, "target_not_found");
+                return new UnlockUserResult(false, 404, "用户不存在");
+            }
+
+            User targetUser = targetUserOpt.get();
+            boolean operatorIsSuperAdmin = isSuperAdminUsername(operatorUsername);
+            if (requiresSuperAdminToUnlock(targetUser) && !operatorIsSuperAdmin) {
+                auditUnlock(attempt, AdminAuditLogService.Result.DENIED, "requires_super_admin");
+                return new UnlockUserResult(false, 403, "只有超级管理员可以解除管理员账号锁定");
+            }
+
+            // This mutates Redis and the local fallback. The durable attempt above must therefore
+            // commit before reset is invoked; finalization may fail without erasing that evidence.
+            loginAttemptService.reset(targetUser.getUsername());
+            auditUnlock(attempt, AdminAuditLogService.Result.SUCCESS, "authorized");
+            return new UnlockUserResult(true, 200, "已解除登录锁定");
+        } catch (RuntimeException exception) {
+            auditUnexpectedFailure(attempt, exception, null, null);
+            throw exception;
         }
-
-        Optional<User> targetUserOpt = userRepository.findById(targetUserId);
-        if (targetUserOpt.isEmpty()) {
-            auditUnlock(actor, targetUserId, "user#missing", RESULT_FAILURE, "target_not_found");
-            return new UnlockUserResult(false, 404, "用户不存在");
-        }
-
-        User targetUser = targetUserOpt.get();
-        String targetRef = auditRef(targetUser);
-        boolean operatorIsSuperAdmin = isSuperAdminUsername(operatorUsername);
-        if (requiresSuperAdminToUnlock(targetUser) && !operatorIsSuperAdmin) {
-            auditUnlock(actor, targetUser.getId(), targetRef, RESULT_DENIED, "requires_super_admin");
-            return new UnlockUserResult(false, 403, "只有超级管理员可以解除管理员账号锁定");
-        }
-
-        loginAttemptService.reset(targetUser.getUsername());
-        auditUnlock(actor, targetUser.getId(), targetRef, RESULT_SUCCESS, "authorized");
-        return new UnlockUserResult(true, 200, "已解除登录锁定");
     }
 
     @Transactional
     public DeleteUserResult deleteUser(Long targetUserId, Authentication authentication) {
         String operatorUsername = authenticatedUsername(authentication);
-        AuditActor actor = auditActor(operatorUsername);
-        Optional<User> userOpt = userRepository.findById(targetUserId);
-        if (userOpt.isEmpty()) {
-            auditDelete(actor, targetUserId, "user#missing", RESULT_FAILURE,
-                    "target_not_found", null);
-            return new DeleteUserResult(false, 404, "用户不存在");
+        AdminAuditLogService.Attempt attempt = adminAuditLogService.beginForActor(
+                operatorUsername, "user", targetUserId, DELETE_USER_ACTION);
+        try {
+            Optional<User> userOpt = userRepository.findById(targetUserId);
+            if (userOpt.isEmpty()) {
+                auditDelete(attempt, AdminAuditLogService.Result.FAILURE, "target_not_found", null);
+                return new DeleteUserResult(false, 404, "用户不存在");
+            }
+            return deleteUserInternal(userOpt.get(), authentication, operatorUsername, attempt);
+        } catch (RuntimeException exception) {
+            auditUnexpectedFailure(attempt, exception, null, null);
+            throw exception;
         }
-        return deleteUser(userOpt.get(), authentication);
     }
 
     @Transactional
     public DeleteUserResult deleteUser(User targetUser, Authentication authentication) {
         String operatorUsername = authenticatedUsername(authentication);
-        AuditActor actor = auditActor(operatorUsername);
         Long targetId = targetUser == null ? null : targetUser.getId();
-        String targetRef = auditRef(targetUser);
+        AdminAuditLogService.Attempt attempt = adminAuditLogService.beginForActor(
+                operatorUsername, "user", targetId, DELETE_USER_ACTION);
+        try {
+            return deleteUserInternal(targetUser, authentication, operatorUsername, attempt);
+        } catch (RuntimeException exception) {
+            auditUnexpectedFailure(attempt, exception, roleName(targetUser), null);
+            throw exception;
+        }
+    }
+
+    private DeleteUserResult deleteUserInternal(User targetUser,
+                                                Authentication authentication,
+                                                String operatorUsername,
+                                                AdminAuditLogService.Attempt attempt) {
         String beforeRole = roleName(targetUser);
 
+        if (targetUser == null) {
+            auditDelete(attempt, AdminAuditLogService.Result.FAILURE, "target_not_found", null);
+            return new DeleteUserResult(false, 404, "用户不存在");
+        }
+
         if (authentication == null) {
-            auditDelete(actor, targetId, targetRef, RESULT_FAILURE, "unauthenticated", beforeRole);
+            auditDelete(attempt, AdminAuditLogService.Result.FAILURE, "unauthenticated", beforeRole);
             return new DeleteUserResult(false, 401, "未登录，不能删除用户");
         }
         if (!isSuperAdminUsername(operatorUsername)) {
-            auditDelete(actor, targetId, targetRef, RESULT_DENIED, "requires_super_admin", beforeRole);
+            auditDelete(attempt, AdminAuditLogService.Result.DENIED, "requires_super_admin", beforeRole);
             return new DeleteUserResult(false, 403, "只有超级管理员可以删除用户");
         }
         if (isSuperAdminAccount(targetUser)) {
-            auditDelete(actor, targetId, targetRef, RESULT_DENIED, "protected_account", beforeRole);
+            auditDelete(attempt, AdminAuditLogService.Result.DENIED, "protected_account", beforeRole);
             return new DeleteUserResult(false, 400, "不能删除超级管理员账号");
         }
         if (isReservedSystemAccount(targetUser)) {
             // "official" 是官方内容（OFFICIAL 共享路线等）的系统作者账号，删除会级联清除全部官方内容。
-            auditDelete(actor, targetId, targetRef, RESULT_DENIED, "protected_account", beforeRole);
+            auditDelete(attempt, AdminAuditLogService.Result.DENIED, "protected_account", beforeRole);
             return new DeleteUserResult(false, 400, "不能删除系统账号");
         }
         if (sameUsername(operatorUsername, targetUser.getUsername())) {
-            auditDelete(actor, targetId, targetRef, RESULT_DENIED, "self_delete", beforeRole);
+            auditDelete(attempt, AdminAuditLogService.Result.DENIED, "self_delete", beforeRole);
             return new DeleteUserResult(false, 400, "不能删除当前登录账号");
         }
         if (targetUser.getRole() != User.Role.USER) {
-            auditDelete(actor, targetId, targetRef, RESULT_DENIED, "target_not_user", beforeRole);
+            auditDelete(attempt, AdminAuditLogService.Result.DENIED, "target_not_user", beforeRole);
             return new DeleteUserResult(false, 403, "只能删除普通用户账号");
         }
 
         Long userId = targetUser.getId();
+
+        // Capture the content owned by OTHER users that this account engaged with. Deleting the rows
+        // below without recomputing their denormalised counters leaves those comments, routes and
+        // questions permanently reporting more likes/comments/answers than actually exist.
+        List<Long> likedCommentIds = commentLikeRepository.findLikedCommentIdsByUserId(userId);
+        List<Long> likedRouteIds = routeLikeRepository.findLikedRouteIdsByUserId(userId);
+        List<Long> commentedRouteIds = routeCommentRepository.findCommentedRouteIdsByUserId(userId);
+        List<Long> likedQuestionIds = questionLikeRepository.findLikedQuestionIdsByUserId(userId);
+        List<Long> answeredQuestionIds = travelAnswerRepository.findAnsweredQuestionIdsByUserId(userId);
+
         commentLikeRepository.deleteByCommentUserId(userId);
         commentLikeRepository.deleteByUserId(userId);
         routeLikeRepository.deleteByRouteAuthorId(userId);
@@ -302,9 +389,25 @@ public class AdminUserService {
         itineraryRepository.clearParentReferencesToUserItineraries(userId);
         itineraryRepository.deleteByUserId(userId);
         userVisitHistoryRepository.deleteByUserId(userId);
+        behaviorLogRepository.deleteByUserId(userId);
+
+        // Recount rather than decrement: recomputing from the surviving rows is idempotent and also
+        // repairs counters that drifted before this fix existed.
+        recountIfAny(likedCommentIds, commentRepository::recountLikes);
+        recountIfAny(likedRouteIds, sharedRouteRepository::recountLikes);
+        recountIfAny(commentedRouteIds, sharedRouteRepository::recountComments);
+        recountIfAny(likedQuestionIds, travelQuestionRepository::recountLikes);
+        recountIfAny(answeredQuestionIds, travelQuestionRepository::recountAnswers);
+
         userRepository.delete(targetUser);
-        auditDelete(actor, targetId, targetRef, RESULT_SUCCESS, "authorized", beforeRole);
+        auditDelete(attempt, AdminAuditLogService.Result.SUCCESS, "authorized", beforeRole);
         return new DeleteUserResult(true, 200, "用户删除成功");
+    }
+
+    private static void recountIfAny(List<Long> ids, Consumer<Collection<Long>> recount) {
+        if (ids != null && !ids.isEmpty()) {
+            recount.accept(ids);
+        }
     }
 
     private String authenticatedUsername(Authentication authentication) {
@@ -340,89 +443,52 @@ public class AdminUserService {
                 && first.trim().equalsIgnoreCase(second.trim());
     }
 
-    private AuditActor auditActor(String username) {
-        if (username == null || username.isBlank()) {
-            return new AuditActor(null, "user#anonymous");
-        }
-        Optional<User> actorUser = userRepository.findByUsername(username);
-        Long actorId = (actorUser == null ? Optional.<User>empty() : actorUser)
-                .map(User::getId)
-                .orElse(null);
-        return new AuditActor(actorId, auditRef(username));
-    }
-
-    private String auditRef(User user) {
-        if (user == null) {
-            return "user#unknown";
-        }
-        return auditRef(user.getUsername());
-    }
-
-    private String auditRef(String username) {
-        return "user#" + PiiMasker.shortHash(username);
-    }
-
     private String roleName(User user) {
         return user == null || user.getRole() == null ? null : user.getRole().name();
     }
 
-    private void auditUnlock(AuditActor actor,
-                             Long targetId,
-                             String targetRef,
-                             String result,
+    private void auditUnlock(AdminAuditLogService.Attempt attempt,
+                             AdminAuditLogService.Result result,
                              String reason) {
-        saveAudit(actor, targetId, targetRef, UNLOCK_LOGIN_ACTION, result, reason, null, null);
+        adminAuditLogService.complete(attempt, result, reason);
         securityAuditLogger.info(
                 "action={} result={} reason={} actorId={} actorRef={} targetId={} targetRef={}",
                 UNLOCK_LOGIN_ACTION,
-                result,
+                result.value(),
                 reason,
-                actor.id(),
-                actor.ref(),
-                targetId,
-                targetRef);
+                attempt.actorId(),
+                attempt.actorRef(),
+                attempt.targetId(),
+                attempt.targetRef());
     }
 
-    private void auditRoleUpdate(AuditActor actor,
-                                 Long targetId,
-                                 String targetRef,
-                                 String result,
+    private void auditRoleUpdate(AdminAuditLogService.Attempt attempt,
+                                 AdminAuditLogService.Result result,
                                  String reason,
                                  String beforeRole,
                                  String afterRole) {
-        saveAudit(actor, targetId, targetRef, ROLE_UPDATE_ACTION, result, reason, beforeRole, afterRole);
+        adminAuditLogService.complete(attempt, result, reason, beforeRole, afterRole);
     }
 
-    private void auditDelete(AuditActor actor,
-                             Long targetId,
-                             String targetRef,
-                             String result,
+    private void auditDelete(AdminAuditLogService.Attempt attempt,
+                             AdminAuditLogService.Result result,
                              String reason,
                              String beforeRole) {
-        saveAudit(actor, targetId, targetRef, DELETE_USER_ACTION, result, reason, beforeRole, null);
+        adminAuditLogService.complete(attempt, result, reason, beforeRole, null);
     }
 
-    private void saveAudit(AuditActor actor,
-                           Long targetId,
-                           String targetRef,
-                           String action,
-                           String result,
-                           String reason,
-                           String beforeRole,
-                           String afterRole) {
-        adminAuditLogRepository.save(AdminAuditLog.create(
-                actor.id(),
-                actor.ref(),
-                targetId,
-                targetRef,
-                action,
-                result,
-                reason,
+    private void auditUnexpectedFailure(AdminAuditLogService.Attempt attempt,
+                                        RuntimeException exception,
+                                        String beforeRole,
+                                        String afterRole) {
+        String type = exception == null ? "Exception" : exception.getClass().getSimpleName();
+        adminAuditLogService.complete(
+                attempt,
+                AdminAuditLogService.Result.FAILURE,
+                "exception_" + type,
                 beforeRole,
-                afterRole));
+                afterRole);
     }
-
-    private record AuditActor(Long id, String ref) {}
 
     private void anonymizeFinancialRecords(Long userId) {
         String encryptedAnonymousLabel = piiCryptoConverter.convertToDatabaseColumn(ANONYMIZED_LABEL);

@@ -13,6 +13,7 @@ import com.tibet.tourism.common.security.TrustedProxyIpResolver;
 import com.tibet.tourism.common.security.UserDetailsServiceImpl;
 import com.tibet.tourism.common.security.UserSessionVersionService;
 import com.tibet.tourism.common.security.WebSecurityConfig;
+import com.tibet.tourism.modules.auth.application.AdminMfaPolicy;
 import com.tibet.tourism.modules.admin.application.AdminSecurityPostureService;
 import com.tibet.tourism.modules.user.infra.UserRepository;
 import org.junit.jupiter.api.Test;
@@ -36,6 +37,9 @@ class AdminSecurityPostureControllerTest {
 
     @MockBean
     private JwtUtils jwtUtils;
+
+    @MockBean
+    private AdminMfaPolicy adminMfaPolicy;
 
     @MockBean
     private UserDetailsServiceImpl userDetailsService;

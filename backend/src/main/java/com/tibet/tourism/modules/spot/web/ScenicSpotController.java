@@ -2,6 +2,7 @@ package com.tibet.tourism.modules.spot.web;
 import com.tibet.tourism.common.api.PageResponse;
 import com.tibet.tourism.common.security.SensitiveLogSanitizer;
 import com.tibet.tourism.common.validation.InputSanitizer;
+import com.tibet.tourism.modules.admin.application.AdminAuditLogService;
 import com.tibet.tourism.modules.recommendation.application.ColdStartOptimizationService;
 import com.tibet.tourism.modules.recommendation.application.ItemBasedRecommendationService;
 import com.tibet.tourism.modules.recommendation.application.RecommendationContextBuilder;
@@ -61,6 +62,9 @@ public class ScenicSpotController {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private AdminAuditLogService auditLogService;
 
     @GetMapping
     public PageResponse<ScenicSpotResponse> getAllSpots(
@@ -258,9 +262,15 @@ public class ScenicSpotController {
     @PostMapping("/admin/precompute-similarity")
     @PreAuthorize("hasRole('ADMIN')")
     public Map<String, Object> precomputeItemSimilarity() {
+        AdminAuditLogService.Attempt auditAttempt = auditLogService.begin(
+                "item_similarity", null, "item_similarity_precompute");
         long startTime = System.currentTimeMillis();
         try {
-            itemBasedRecommendationService.precomputeItemSimilarityMatrix();
+            boolean completed = itemBasedRecommendationService.precomputeItemSimilarityMatrix();
+            auditLogService.complete(
+                    auditAttempt,
+                    completed ? AdminAuditLogService.Result.SUCCESS : AdminAuditLogService.Result.FAILURE,
+                    completed ? "completed" : "already_in_progress");
             long endTime = System.currentTimeMillis();
             return Map.of(
                 "success", true,
@@ -268,6 +278,10 @@ public class ScenicSpotController {
                 "duration", endTime - startTime
             );
         } catch (Exception e) {
+            auditLogService.complete(
+                    auditAttempt,
+                    AdminAuditLogService.Result.FAILURE,
+                    "exception_" + e.getClass().getSimpleName());
             logger.error("Failed to precompute scenic spot similarity matrix: {}", SensitiveLogSanitizer.exceptionSummary(e));
             return Map.of(
                 "success", false,

@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import questionDetailSource from './QuestionDetail.vue?raw'
-import rawExtraMessages from '../i18n/locales/extra.json'
+import extraZh from '../i18n/locales/extra.zh.json'
+import extraBo from '../i18n/locales/extra.bo.json'
 
-const extraMessages = rawExtraMessages as {
+const extraMessages = { zh: extraZh, bo: extraBo } as {
   zh: { questionDetail: Record<string, unknown> }
   bo: { questionDetail: Record<string, unknown> }
 }

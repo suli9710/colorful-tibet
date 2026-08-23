@@ -151,6 +151,7 @@ app:
   security:
     public-docs-enabled: ${PUBLIC_DOCS_ENABLED:false}
     public-metrics-enabled: ${PUBLIC_METRICS_ENABLED:false}
+    metrics-scrape-token: ${METRICS_SCRAPE_TOKEN:}
     require-strong-secrets: ${REQUIRE_STRONG_SECRETS:true}
     registration-recaptcha-required: ${REGISTRATION_RECAPTCHA_REQUIRED:true}
     hotel-booking-pii-read-usernames: ${HOTEL_BOOKING_PII_READ_USERNAMES:${SUPER_ADMIN_USERNAME:}}
@@ -163,6 +164,9 @@ app:
     trust-proxy-headers: ${TRUST_PROXY_HEADERS:false}
     trusted-proxy-cidrs: ${TRUSTED_PROXY_CIDRS:}
     super-admin-totp-secret: ${SUPER_ADMIN_TOTP_SECRET}
+    admin-totp-secrets: ${ADMIN_TOTP_SECRETS:}
+    # Never accept an administrator TOTP without a cluster-wide, atomic replay claim.
+    totp-replay-fail-closed: ${TOTP_REPLAY_FAIL_CLOSED:true}
     rate-limit:
       enabled: ${RATE_LIMIT_ENABLED:true}
       redis-enabled: ${RATE_LIMIT_REDIS_ENABLED:true}

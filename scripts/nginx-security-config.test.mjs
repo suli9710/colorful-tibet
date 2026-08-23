@@ -43,4 +43,37 @@ describe('nginx edge security config', () => {
     assert.ok(redirectCheck >= 0 && redirectCheck < tlsRender)
     assert.ok(certCheck >= 0 && certCheck < tlsRender)
   })
+
+  it('renders the real-ip config both templates promise', () => {
+    // Without this the documented NGINX_REAL_IP_FROM knob is silently inert and, behind a CDN,
+    // $binary_remote_addr stays the proxy address so every limit_req/limit_conn zone collapses
+    // into one bucket shared by the whole internet.
+    assert.match(frontendDockerfile, /render_real_ip\(\) \{/)
+    assert.match(frontendDockerfile, /set_real_ip_from \$trusted_cidr;/)
+    assert.match(frontendDockerfile, /real_ip_header \$real_ip_header_name;/)
+    assert.match(frontendDockerfile, /\/etc\/nginx\/conf\.d\/real-ip\.conf/)
+    assert.match(frontendDockerfile, /NGINX_REAL_IP_FROM entries must be IPv4\/IPv6 addresses or CIDRs/)
+
+    const call = frontendDockerfile.indexOf("'render_real_ip'")
+    const httpRender = frontendDockerfile.indexOf('/etc/nginx/http.conf.template', call)
+    assert.ok(call >= 0, 'render_real_ip is never invoked')
+    assert.ok(httpRender > call, 'real-ip.conf must be rendered before the server templates')
+  })
+
+  it('never lets a caller contribute to the forwarded client IP', () => {
+    for (const [name, conf] of [['nginx.conf', prodNginx], ['nginx.http.conf', httpNginx]]) {
+      assert.doesNotMatch(
+        conf,
+        /proxy_set_header\s+X-Forwarded-For\s+\$proxy_add_x_forwarded_for/,
+        `${name} must overwrite X-Forwarded-For, not append to the caller's value`
+      )
+      assert.match(conf, /proxy_set_header X-Forwarded-For \$remote_addr;/)
+      assert.match(conf, /proxy_set_header Forwarded "";/)
+      assert.match(conf, /proxy_set_header X-Forwarded-Host "";/)
+    }
+  })
+
+  it('keeps nginx as PID 1 so container stop shuts it down gracefully', () => {
+    assert.match(frontendDockerfile, /exec nginx -g/)
+  })
 })

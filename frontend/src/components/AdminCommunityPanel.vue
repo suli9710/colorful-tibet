@@ -619,11 +619,23 @@ const toArray = <T>(value: CommunityListResponse<T>): T[] => {
   return []
 }
 
-const pageParams = { page: 0, size: 100 }
+const adminPageSize = 100
+const maxAdminListPages = 1000
 
 const fetchCommunityList = async <T>(url: string) => {
-  const response = await api.get<CommunityListResponse<T>>(url, { params: pageParams })
-  return toArray<T>(response.data)
+  const collected: T[] = []
+  for (let page = 0; page < maxAdminListPages; page += 1) {
+    const response = await api.get<CommunityListResponse<T> & { totalPages?: number; last?: boolean }>(url, {
+      params: { page, size: adminPageSize }
+    })
+    if (Array.isArray(response.data)) return response.data
+    const pageItems = toArray<T>(response.data)
+    collected.push(...pageItems)
+    const totalPages = Number(response.data?.totalPages)
+    if (response.data?.last === true || pageItems.length < adminPageSize
+      || (Number.isFinite(totalPages) && page + 1 >= totalPages)) return collected
+  }
+  throw new Error('Community admin list exceeded the maximum supported page count')
 }
 
 const isCurrentCommunityRequest = (requestId: number) => requestId === communityRequestId

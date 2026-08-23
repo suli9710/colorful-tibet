@@ -28,6 +28,8 @@ DEFAULT_HEADERS = {
     "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
 }
 
+MAX_HTTP_REDIRECTS = 5
+
 SEARCH_PROVIDERS: dict[str, str] = {
     "baidu": "https://www.baidu.com/s?wd={query}",
     "bing": "https://www.bing.com/search?q={query}",
@@ -371,18 +373,7 @@ class ManagedFetcher:
         self.label = f"Scrapling ({config.mode})"
 
     def __enter__(self) -> "ManagedFetcher":
-        if self.config.mode == "httpx":
-            self.label = "httpx fallback"
-            return self
-
-        try:
-            self._manager = self._build_session()
-            self._session = self._manager.__enter__() if hasattr(self._manager, "__enter__") else self._manager
-        except Exception as exc:
-            logger.warning("Scrapling session unavailable, falling back to httpx: %s", exc)
-            self._manager = None
-            self._session = None
-            self.label = "httpx fallback"
+        self.label = "httpx (redirect-safe)"
         return self
 
     def __exit__(self, exc_type, exc, tb) -> None:
@@ -427,33 +418,36 @@ class ManagedFetcher:
         return FetcherSession(**kwargs)
 
     def fetch(self, url: str) -> Optional[str]:
-        if self._session is None:
-            return fetch_with_httpx(url, self.config)
-
-        try:
-            if hasattr(self._session, "get"):
-                response = self._session.get(url)
-            else:
-                response = self._session.fetch(url)
-            return response_to_text(response)
-        except Exception as exc:
-            logger.warning("Scrapling fetch failed for %s, trying httpx fallback: %s", url, exc)
-            return fetch_with_httpx(url, self.config)
+        # Keep the network boundary in httpx so every redirect target is validated
+        # before a connection is opened. Scrapling remains available for parsing.
+        return fetch_with_httpx(url, self.config)
 
 
 def fetch_with_httpx(url: str, config: ScraperConfig) -> Optional[str]:
     try:
         client_kwargs: dict[str, Any] = {
             "timeout": config.timeout,
-            "follow_redirects": True,
+            "follow_redirects": False,
             "headers": DEFAULT_HEADERS,
         }
         if config.proxy_url:
             client_kwargs["proxy"] = config.proxy_url
         with httpx.Client(**client_kwargs) as client:
-            response = client.get(url)
-            response.raise_for_status()
-            return response.text
+            current_url = url
+            for redirect_count in range(MAX_HTTP_REDIRECTS + 1):
+                validate_target_url(current_url, allowed_domains=config.allowed_domains)
+                response = client.get(current_url)
+                if response.is_redirect:
+                    location = response.headers.get("location")
+                    if not location:
+                        raise ValueError("Redirect response is missing a Location header")
+                    if redirect_count >= MAX_HTTP_REDIRECTS:
+                        raise ValueError("Too many HTTP redirects")
+                    current_url = urllib.parse.urljoin(current_url, location)
+                    continue
+                response.raise_for_status()
+                return response.text
+            raise ValueError("Too many HTTP redirects")
     except Exception as exc:
         logger.warning("httpx fetch failed for %s: %s", url, exc)
         return None

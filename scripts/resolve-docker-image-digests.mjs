@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto'
+import { open, rename, rm } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -15,19 +17,20 @@ export const REQUIRED_IMAGE_REFS = [
   { source: 'backend/Dockerfile:2', image: 'maven:3.9-eclipse-temurin-17' },
   { source: 'backend/Dockerfile:9', image: 'eclipse-temurin:17-jre-alpine' },
   { source: 'frontend/Dockerfile:2', image: 'node:22-alpine' },
-  { source: 'frontend/Dockerfile:24', image: 'nginx:alpine' },
+  { source: 'frontend/Dockerfile:28', image: 'nginx:alpine' },
   { source: 'scrapler/Dockerfile:1', image: 'python:3.11-slim' },
   { source: 'docker-compose.yml:3', image: 'mysql:8.4' },
-  { source: 'docker-compose.yml:118', image: 'redis:7-alpine' },
-  { source: 'docker-compose.prod.yml:6', image: 'alpine:3.21' },
-  { source: 'docker-compose.prod.yml:346', image: 'redis:7-alpine' },
-  { source: 'docker-compose.prod.yml:382', image: 'mysql:8.4' },
-  { source: 'docker-compose.prod.yml:512', image: 'prom/prometheus:v2.55.1' },
-  { source: 'docker-compose.prod.yml:543', image: 'prom/alertmanager:v0.27.0' },
-  { source: 'docker-compose.prod.yml:589', image: 'grafana/grafana:11.4.0' },
-  { source: 'docker-compose.prod.yml:623', image: 'openzipkin/zipkin:3.4' },
-  { source: '.github/workflows/ci.yml:137', image: 'prom/prometheus:v2.55.1' },
-  { source: '.github/workflows/ci.yml:142', image: 'prom/prometheus:v2.55.1' }
+  { source: 'docker-compose.yml:126', image: 'redis:7-alpine' },
+  { source: 'docker-compose.prod.yml:12', image: 'alpine:3.21' },
+  { source: 'docker-compose.prod.yml:532', image: 'redis:7-alpine' },
+  { source: 'docker-compose.prod.yml:577', image: 'mysql:8.4' },
+  { source: 'docker-compose.prod.yml:717', image: 'prom/prometheus:v2.55.1' },
+  { source: 'docker-compose.prod.yml:758', image: 'prom/alertmanager:v0.27.0' },
+  { source: 'docker-compose.prod.yml:805', image: 'grafana/grafana:11.4.0' },
+  { source: 'docker-compose.prod.yml:840', image: 'openzipkin/zipkin:3.4' },
+  { source: '.github/workflows/ci.yml:138', image: 'prom/prometheus:v2.55.1' },
+  { source: '.github/workflows/ci.yml:143', image: 'prom/prometheus:v2.55.1' },
+  { source: '.github/workflows/ci.yml:261', image: 'mysql:8.4' }
 ]
 
 export const splitDockerImageRef = (imageRef) => {
@@ -168,19 +171,151 @@ export const createDigestEvidence = (
   }))
 })
 
-const main = async () => {
-  const json = process.argv.includes('--json')
-  const evidence = process.argv.includes('--evidence')
-  const markdown = process.argv.includes('--markdown')
-  const timeoutArg = process.argv.find((arg) => arg.startsWith('--timeout-ms='))
-  const verifierArg = process.argv.find((arg) => arg.startsWith('--verifier='))
-  const platformArgs = process.argv
-    .filter((arg) => arg.startsWith('--target-platform='))
-    .map((arg) => arg.split('=')[1])
-  const timeoutMs = timeoutArg ? Number.parseInt(timeoutArg.split('=')[1], 10) : 10_000
-  const verifier = verifierArg ? verifierArg.split('=')[1] : ''
+export const resolveRequiredImageDigests = async (
+  requiredImageRefs = REQUIRED_IMAGE_REFS,
+  { resolveImpl = resolveDockerHubDigest, timeoutMs = 10_000 } = {}
+) => {
   const records = []
   const resolved = new Map()
+
+  for (const item of requiredImageRefs) {
+    try {
+      if (!resolved.has(item.image)) {
+        resolved.set(item.image, await resolveImpl(item.image, { timeoutMs }))
+      }
+      records.push({
+        source: item.source,
+        ...resolved.get(item.image)
+      })
+    } catch (error) {
+      throw new Error(`Failed to resolve ${item.image} (${item.source}): ${error.message}`, {
+        cause: error
+      })
+    }
+  }
+
+  return records
+}
+
+export const writeOutputAtomically = async (outputPath, content) => {
+  const targetPath = path.resolve(outputPath)
+  const temporaryPath = path.join(
+    path.dirname(targetPath),
+    `.${path.basename(targetPath)}.${process.pid}.${randomUUID()}.tmp`
+  )
+  let outputHandle
+
+  try {
+    outputHandle = await open(temporaryPath, 'wx', 0o644)
+    await outputHandle.writeFile(content, 'utf8')
+    await outputHandle.sync()
+    await outputHandle.close()
+    outputHandle = undefined
+    await rename(temporaryPath, targetPath)
+  } finally {
+    if (outputHandle) {
+      await outputHandle.close().catch(() => {})
+    }
+    await rm(temporaryPath, { force: true }).catch(() => {})
+  }
+}
+
+export const parseCliArgs = (args) => {
+  const options = {
+    json: false,
+    evidence: false,
+    markdown: false,
+    timeoutMs: 10_000,
+    verifier: '',
+    targetPlatforms: [],
+    outputPath: ''
+  }
+  const seen = new Set()
+  const markOnce = (name) => {
+    if (seen.has(name)) {
+      throw new Error(`Argument may be provided only once: ${name}`)
+    }
+    seen.add(name)
+  }
+
+  for (const arg of args) {
+    if (arg === '--json' || arg === '--evidence' || arg === '--markdown') {
+      markOnce(arg)
+      options[arg.slice(2)] = true
+      continue
+    }
+
+    if (arg.startsWith('--timeout-ms=')) {
+      markOnce('--timeout-ms')
+      const value = arg.slice('--timeout-ms='.length)
+      if (!/^[1-9][0-9]*$/.test(value)) {
+        throw new Error('--timeout-ms must be a positive integer.')
+      }
+      options.timeoutMs = Number.parseInt(value, 10)
+      continue
+    }
+
+    if (arg.startsWith('--verifier=')) {
+      markOnce('--verifier')
+      options.verifier = arg.slice('--verifier='.length)
+      continue
+    }
+
+    if (arg.startsWith('--target-platform=')) {
+      const value = arg.slice('--target-platform='.length).trim()
+      if (!value) {
+        throw new Error('--target-platform must not be empty.')
+      }
+      if (options.targetPlatforms.includes(value)) {
+        throw new Error(`Duplicate target platform: ${value}`)
+      }
+      options.targetPlatforms.push(value)
+      continue
+    }
+
+    if (arg.startsWith('--output=')) {
+      markOnce('--output')
+      options.outputPath = arg.slice('--output='.length)
+      if (!options.outputPath.trim()) {
+        throw new Error('Atomic output requires a non-empty --output=<path>.')
+      }
+      continue
+    }
+
+    throw new Error(`Unknown argument: ${arg}`)
+  }
+
+  const formats = [
+    options.json && '--json',
+    options.evidence && '--evidence',
+    options.markdown && '--markdown'
+  ].filter(Boolean)
+  if (formats.length > 1) {
+    throw new Error(`Output format arguments are mutually exclusive: ${formats.join(', ')}`)
+  }
+
+  return options
+}
+
+const main = async () => {
+  let options
+  try {
+    options = parseCliArgs(process.argv.slice(2))
+  } catch (error) {
+    console.error(error.message)
+    process.exitCode = 1
+    return
+  }
+
+  const {
+    json,
+    evidence,
+    markdown,
+    timeoutMs,
+    verifier,
+    targetPlatforms,
+    outputPath
+  } = options
 
   if (evidence && !verifier.trim()) {
     console.error('Evidence output requires --verifier=<release-operator> so the release record is accountable.')
@@ -188,34 +323,39 @@ const main = async () => {
     return
   }
 
-  for (const item of REQUIRED_IMAGE_REFS) {
-    try {
-      if (!resolved.has(item.image)) {
-        resolved.set(item.image, await resolveDockerHubDigest(item.image, { timeoutMs }))
-      }
-      records.push({
-        source: item.source,
-        ...resolved.get(item.image)
-      })
-    } catch (error) {
-      console.error(`Failed to resolve ${item.image} (${item.source}): ${error.message}`)
-      process.exitCode = 1
-    }
+  let records
+  try {
+    records = await resolveRequiredImageDigests(REQUIRED_IMAGE_REFS, { timeoutMs })
+  } catch (error) {
+    console.error(error.message)
+    process.exitCode = 1
+    return
   }
 
-  if (records.length > 0) {
-    if (evidence) {
-      console.log(JSON.stringify(createDigestEvidence(records, {
-        verifier,
-        targetPlatforms: platformArgs.length > 0 ? platformArgs : ['multi-platform-index']
-      }), null, 2))
-    } else if (json) {
-      console.log(JSON.stringify(records, null, 2))
-    } else if (markdown) {
-      console.log(formatMarkdown(records))
-    } else {
-      console.log(formatText(records))
+  let output
+  if (evidence) {
+    output = JSON.stringify(createDigestEvidence(records, {
+      verifier,
+      targetPlatforms: targetPlatforms.length > 0 ? targetPlatforms : ['multi-platform-index']
+    }), null, 2)
+  } else if (json) {
+    output = JSON.stringify(records, null, 2)
+  } else if (markdown) {
+    output = formatMarkdown(records)
+  } else {
+    output = formatText(records)
+  }
+
+  if (outputPath) {
+    try {
+      await writeOutputAtomically(outputPath, `${output}\n`)
+      console.error(`Wrote Docker digest output atomically to ${path.resolve(outputPath)}`)
+    } catch (error) {
+      console.error(`Failed to write Docker digest output to ${path.resolve(outputPath)}: ${error.message}`)
+      process.exitCode = 1
     }
+  } else {
+    console.log(output)
   }
 }
 

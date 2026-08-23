@@ -37,6 +37,10 @@ public interface CommentLikeRepository extends JpaRepository<CommentLike, Long> 
     @Modifying
     @Query("DELETE FROM CommentLike cl WHERE cl.comment.user.id = :userId")
     void deleteByCommentUserId(@Param("userId") Long userId);
+
+    /** Comments (owned by other users) whose like_count must be recomputed after this user's likes are deleted. */
+    @Query("SELECT DISTINCT cl.comment.id FROM CommentLike cl WHERE cl.user.id = :userId")
+    List<Long> findLikedCommentIdsByUserId(@Param("userId") Long userId);
 }
 
 

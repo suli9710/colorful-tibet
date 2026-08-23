@@ -1,0 +1,18 @@
+vulnerabilities:
+  - id: CVE-2026-14257
+    purls:
+      - pkg:npm/brace-expansion@2.1.4
+    expired_at: 2026-08-31
+    statement: >-
+      Temporary dev-only exception for openapi-typescript 7.13.0 via
+      @redocly/openapi-core/minimatch 5.1.9. The generator only consumes the
+      repository-generated backend/target/openapi/openapi.json and is absent
+      from the nginx runtime image. Remove this exception when upstream adopts
+      brace-expansion 5.0.8 or newer.
+  - id: GHSA-mh99-v99m-4gvg
+    purls:
+      - pkg:npm/brace-expansion@2.1.4
+    expired_at: 2026-08-31
+    statement: >-
+      Alias for CVE-2026-14257; kept because npm and Trivy may report different
+      advisory identifiers for the same transitive development-only package.

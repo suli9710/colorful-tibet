@@ -7,16 +7,36 @@
 
       <!-- Layer 1: Background image -->
       <AnimatePresence :initial="false">
-        <motion.img
+        <motion.div
           :key="heroSlides[currentSlide].image"
-          :src="heroSlides[currentSlide].image"
-          :alt="heroSlides[currentSlide].title"
           :initial="{ opacity: 0 }"
           :animate="{ opacity: 0.6 }"
           :exit="{ opacity: 0 }"
           :transition="{ duration: 1.05, ease: motionEase }"
           class="absolute inset-0 w-full h-full object-cover z-1 scale-[1.05]"
-        />
+        >
+          <picture class="block h-full w-full">
+            <source
+              v-if="resolveResponsiveImage(heroSlides[currentSlide].image)"
+              :srcset="resolveResponsiveImage(heroSlides[currentSlide].image)?.avif"
+              type="image/avif"
+              sizes="100vw"
+            >
+            <source
+              v-if="resolveResponsiveImage(heroSlides[currentSlide].image)"
+              :srcset="resolveResponsiveImage(heroSlides[currentSlide].image)?.webp"
+              type="image/webp"
+              sizes="100vw"
+            >
+            <img
+              :src="resolveResponsiveImage(heroSlides[currentSlide].image)?.fallback || heroSlides[currentSlide].image"
+              :alt="heroSlides[currentSlide].title"
+              class="h-full w-full object-cover"
+              decoding="async"
+              fetchpriority="high"
+            >
+          </picture>
+        </motion.div>
       </AnimatePresence>
 
       <!-- Layer 2: Distant mountains (slowest parallax) -->
@@ -204,12 +224,29 @@
                :whileHover="{ y: -4, scale: 1.01 }"
                :whilePress="{ scale: 0.998 }">
             <div class="relative h-56 overflow-hidden sm:h-72">
-              <motion.img :src="spot.imageUrl" :alt="spot.name"
-                   class="w-full h-full object-cover tibet-image-hover img-fade-in will-change-transform"
-                   loading="lazy"
-                   :whileHover="{ scale: 1.08 }"
-                   :transition="{ duration: 0.65, ease: [0.16, 1, 0.3, 1] }">
-              </motion.img>
+              <picture class="block h-full w-full">
+                <source
+                  v-if="resolveResponsiveImage(spot.imageUrl)"
+                  :srcset="resolveResponsiveImage(spot.imageUrl)?.avif"
+                  type="image/avif"
+                  sizes="(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw"
+                >
+                <source
+                  v-if="resolveResponsiveImage(spot.imageUrl)"
+                  :srcset="resolveResponsiveImage(spot.imageUrl)?.webp"
+                  type="image/webp"
+                  sizes="(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw"
+                >
+                <motion.img
+                  :src="resolveResponsiveImage(spot.imageUrl)?.fallback || spot.imageUrl"
+                  :alt="spot.name"
+                  class="w-full h-full object-cover tibet-image-hover img-fade-in will-change-transform"
+                  loading="lazy"
+                  decoding="async"
+                  :whileHover="{ scale: 1.08 }"
+                  :transition="{ duration: 0.65, ease: [0.16, 1, 0.3, 1] }"
+                />
+              </picture>
               <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/15 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 ease-out-expo"></div>
               <motion.div
                 class="absolute left-0 top-0 h-full w-1/2 bg-gradient-to-r from-transparent via-white/20 to-transparent opacity-0 mix-blend-screen group-hover:opacity-100"
@@ -271,6 +308,7 @@ import api, { endpoints } from '../api'
 import PrayerFlags from '../components/PrayerFlags.vue'
 import { useAuthStore } from '../stores/auth'
 import { summarizeClientError } from '../utils/errorMonitoring'
+import { resolveResponsiveImage } from '../utils/responsiveImages'
 import {
   cardExit,
   cardInitial,

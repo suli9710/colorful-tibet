@@ -3,10 +3,13 @@ package com.tibet.tourism.modules.admin.application;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
@@ -15,11 +18,14 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.tibet.tourism.common.security.CacheKeyHasher;
 import com.tibet.tourism.common.security.LoginAttemptService;
 import com.tibet.tourism.common.security.PiiCryptoConverter;
+import com.tibet.tourism.common.security.antibot.infra.BehaviorLogRepository;
 import com.tibet.tourism.modules.admin.domain.AdminAuditLog;
 import com.tibet.tourism.modules.admin.infra.AdminAuditLogRepository;
 import com.tibet.tourism.modules.ai.infra.AiRouteRecordRepository;
+import com.tibet.tourism.modules.auth.application.AdminMfaPolicy;
 import com.tibet.tourism.modules.community.infra.CommentLikeRepository;
 import com.tibet.tourism.modules.community.infra.CommentRepository;
 import com.tibet.tourism.modules.community.infra.FavoriteRepository;
@@ -43,19 +49,25 @@ import jakarta.persistence.Query;
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
-import org.mockito.ArgumentCaptor;
+import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
+import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.security.core.Authentication;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.TransactionStatus;
 
 @ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class AdminUserServiceTest {
@@ -104,14 +116,31 @@ class AdminUserServiceTest {
     @Mock
     private AdminAuditLogRepository adminAuditLogRepository;
     @Mock
+    private PlatformTransactionManager transactionManager;
+    @Mock
+    private TransactionStatus transactionStatus;
+    @Mock
+    private BehaviorLogRepository behaviorLogRepository;
+    @Mock
+    private AdminMfaPolicy adminMfaPolicy;
+    @Mock
     private EntityManager entityManager;
     @Mock
     private Query nativeQuery;
 
     private AdminUserService service;
+    private CacheKeyHasher cacheKeyHasher;
+    private final AtomicLong auditSequence = new AtomicLong();
+    private final Map<Long, AdminAuditLog> persistedAuditLogs = new HashMap<>();
 
     @BeforeEach
     void setUp() {
+        cacheKeyHasher = new CacheKeyHasher("admin-user-service-test-hmac-secret");
+        AdminAuditLogService adminAuditLogService = new AdminAuditLogService(
+                adminAuditLogRepository,
+                userRepository,
+                cacheKeyHasher,
+                transactionManager);
         service = new AdminUserService(
                 userRepository,
                 loginAttemptService,
@@ -132,11 +161,29 @@ class AdminUserServiceTest {
                 tibetTravelKitRepository,
                 itineraryRepository,
                 userVisitHistoryRepository,
-                adminAuditLogRepository);
+                adminAuditLogService,
+                behaviorLogRepository,
+                adminMfaPolicy);
         ReflectionTestUtils.setField(service, "superAdminUsername", "lzh");
         ReflectionTestUtils.setField(service, "entityManager", entityManager);
         lenient().when(entityManager.createNativeQuery(anyString())).thenReturn(nativeQuery);
         lenient().when(nativeQuery.setParameter(anyString(), any())).thenReturn(nativeQuery);
+        lenient().when(transactionManager.getTransaction(any(TransactionDefinition.class)))
+                .thenReturn(transactionStatus);
+        lenient().when(adminAuditLogRepository.saveAndFlush(any(AdminAuditLog.class)))
+                .thenAnswer(invocation -> {
+                    AdminAuditLog audit = invocation.getArgument(0);
+                    if (audit.getId() == null) {
+                        audit.setId(auditSequence.incrementAndGet());
+                    }
+                    persistedAuditLogs.put(audit.getId(), audit);
+                    return audit;
+                });
+        lenient().when(adminAuditLogRepository.findById(anyLong()))
+                .thenAnswer(invocation -> Optional.ofNullable(
+                        persistedAuditLogs.get(invocation.getArgument(0))));
+        lenient().when(adminMfaPolicy.hasConfiguredSecret(anyString())).thenReturn(true);
+        lenient().when(adminMfaPolicy.isSuperAdmin(any(User.class))).thenReturn(false);
     }
 
     @AfterEach
@@ -212,6 +259,7 @@ class AdminUserServiceTest {
                 tibetTravelKitRepository,
                 itineraryRepository,
                 userVisitHistoryRepository,
+                behaviorLogRepository,
                 userRepository);
         deletes.verify(commentLikeRepository).deleteByCommentUserId(10L);
         deletes.verify(commentLikeRepository).deleteByUserId(10L);
@@ -234,6 +282,7 @@ class AdminUserServiceTest {
         deletes.verify(itineraryRepository).clearParentReferencesToUserItineraries(10L);
         deletes.verify(itineraryRepository).deleteByUserId(10L);
         deletes.verify(userVisitHistoryRepository).deleteByUserId(10L);
+        deletes.verify(behaviorLogRepository).deleteByUserId(10L);
         deletes.verify(userRepository).delete(target);
 
         ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
@@ -379,6 +428,27 @@ class AdminUserServiceTest {
     }
 
     @Test
+    void rolePromotionIsRejectedUntilIndependentAdminMfaIsConfigured() {
+        User actor = user(1L, "lzh", User.Role.ADMIN);
+        User target = user(10L, "traveler", User.Role.USER);
+        when(userRepository.findByUsername("lzh")).thenReturn(Optional.of(actor));
+        when(adminMfaPolicy.hasConfiguredSecret("traveler")).thenReturn(false);
+
+        AdminUserService.RoleUpdateResult result = service.updateRole(target, "ADMIN", auth("lzh"));
+
+        assertFalse(result.success());
+        assertEquals(409, result.status());
+        assertEquals(User.Role.USER, target.getRole());
+        verify(userRepository, never()).save(target);
+        AdminAuditLog audit = captureOnlyAudit();
+        assertEquals("admin_user_role_update", audit.getAction());
+        assertEquals("denied", audit.getResult());
+        assertEquals("admin_mfa_not_configured", audit.getReason());
+        assertEquals("USER", audit.getBeforeRole());
+        assertEquals("ADMIN", audit.getAfterRole());
+    }
+
+    @Test
     void invalidRolePersistsFailureAuditWithoutRawUsernames() {
         User actor = user(1L, "lzh", User.Role.ADMIN);
         User target = user(10L, "traveler", User.Role.USER);
@@ -414,7 +484,7 @@ class AdminUserServiceTest {
         assertEquals("target_not_found", audit.getReason());
         assertEquals(1L, audit.getActorId());
         assertEquals(404L, audit.getTargetId());
-        assertEquals("user#missing", audit.getTargetRef());
+        assertEquals(auditTargetRef(404L), audit.getTargetRef());
         assertAuditDoesNotContain(audit, "lzh");
     }
 
@@ -434,7 +504,7 @@ class AdminUserServiceTest {
         assertEquals("target_not_found", audit.getReason());
         assertEquals(1L, audit.getActorId());
         assertEquals(404L, audit.getTargetId());
-        assertEquals("user#missing", audit.getTargetRef());
+        assertEquals(auditTargetRef(404L), audit.getTargetRef());
         assertAuditDoesNotContain(audit, "lzh");
     }
 
@@ -494,7 +564,9 @@ class AdminUserServiceTest {
         assertFalse(logs.contains("admin2"));
         assertFalse(logs.contains("lzh"));
         ArgumentCaptor<AdminAuditLog> auditCaptor = ArgumentCaptor.forClass(AdminAuditLog.class);
-        verify(adminAuditLogRepository, times(2)).save(auditCaptor.capture());
+        verify(adminAuditLogRepository, times(2)).saveAndFlush(auditCaptor.capture());
+        verify(adminAuditLogRepository, times(2)).findById(anyLong());
+        verify(adminAuditLogRepository, times(2)).flush();
         assertTrue(auditCaptor.getAllValues().stream()
                 .allMatch(audit -> "admin_user_unlock_login".equals(audit.getAction())
                         && "denied".equals(audit.getResult())
@@ -527,7 +599,9 @@ class AdminUserServiceTest {
         assertFalse(logs.contains("admin2"));
         assertFalse(logs.contains("lzh"));
         ArgumentCaptor<AdminAuditLog> auditCaptor = ArgumentCaptor.forClass(AdminAuditLog.class);
-        verify(adminAuditLogRepository, times(2)).save(auditCaptor.capture());
+        verify(adminAuditLogRepository, times(2)).saveAndFlush(auditCaptor.capture());
+        verify(adminAuditLogRepository, times(2)).findById(anyLong());
+        verify(adminAuditLogRepository, times(2)).flush();
         assertTrue(auditCaptor.getAllValues().stream()
                 .allMatch(audit -> "admin_user_unlock_login".equals(audit.getAction())
                         && "success".equals(audit.getResult())
@@ -550,7 +624,7 @@ class AdminUserServiceTest {
         assertTrue(logs.contains("result=failure"));
         assertTrue(logs.contains("reason=target_not_found"));
         assertTrue(logs.contains("targetId=404"));
-        assertTrue(logs.contains("targetRef=user#missing"));
+        assertTrue(logs.contains("targetRef=" + auditTargetRef(404L)));
         assertFalse(logs.contains("manager"));
         AdminAuditLog audit = captureOnlyAudit();
         assertEquals("admin_user_unlock_login", audit.getAction());
@@ -558,8 +632,53 @@ class AdminUserServiceTest {
         assertEquals("target_not_found", audit.getReason());
         assertEquals(1L, audit.getActorId());
         assertEquals(404L, audit.getTargetId());
-        assertEquals("user#missing", audit.getTargetRef());
+        assertEquals(auditTargetRef(404L), audit.getTargetRef());
         assertAuditDoesNotContain(audit, "manager");
+    }
+
+    @Test
+    void auditPreflightFailurePreventsUnlockReset() {
+        failAuditPreflight();
+
+        assertThrows(
+                AdminAuditLogService.AuditUnavailableException.class,
+                () -> service.unlockLogin(10L, auth("manager")));
+
+        verify(userRepository, never()).findById(10L);
+        verify(loginAttemptService, never()).reset(anyString());
+        assertAuditPreflightAbortedBeforeCompletion();
+    }
+
+    @Test
+    void auditPreflightFailurePreventsRoleMutation() {
+        User target = user(10L, "traveler", User.Role.USER);
+        failAuditPreflight();
+
+        assertThrows(
+                AdminAuditLogService.AuditUnavailableException.class,
+                () -> service.updateRole(target, "ADMIN", auth("lzh")));
+
+        assertEquals(User.Role.USER, target.getRole());
+        assertEquals(0L, target.getSessionVersion());
+        verify(userRepository, never()).save(target);
+        verify(adminMfaPolicy, never()).hasConfiguredSecret(anyString());
+        assertAuditPreflightAbortedBeforeCompletion();
+    }
+
+    @Test
+    void auditPreflightFailurePreventsUserDeletion() {
+        User target = user(10L, "traveler", User.Role.USER);
+        failAuditPreflight();
+
+        assertThrows(
+                AdminAuditLogService.AuditUnavailableException.class,
+                () -> service.deleteUser(target, auth("lzh")));
+
+        verify(userRepository, never()).delete(target);
+        verify(commentLikeRepository, never()).findLikedCommentIdsByUserId(10L);
+        verify(sharedRouteRepository, never()).deleteByAuthor(target);
+        verify(entityManager, never()).createNativeQuery(anyString());
+        assertAuditPreflightAbortedBeforeCompletion();
     }
 
     private void assertDeleteRejected(User target, Authentication auth, int status) {
@@ -572,8 +691,28 @@ class AdminUserServiceTest {
 
     private AdminAuditLog captureOnlyAudit() {
         ArgumentCaptor<AdminAuditLog> auditCaptor = ArgumentCaptor.forClass(AdminAuditLog.class);
-        verify(adminAuditLogRepository).save(auditCaptor.capture());
-        return auditCaptor.getValue();
+        verify(adminAuditLogRepository).saveAndFlush(auditCaptor.capture());
+        AdminAuditLog audit = auditCaptor.getValue();
+        verify(adminAuditLogRepository).findById(audit.getId());
+        verify(adminAuditLogRepository).flush();
+        return audit;
+    }
+
+    private String auditTargetRef(Long targetId) {
+        return cacheKeyHasher.cacheKey("admin-audit-target", "user:" + targetId);
+    }
+
+    private void failAuditPreflight() {
+        doThrow(new IllegalStateException("audit database unavailable"))
+                .when(adminAuditLogRepository)
+                .saveAndFlush(any(AdminAuditLog.class));
+    }
+
+    private void assertAuditPreflightAbortedBeforeCompletion() {
+        verify(adminAuditLogRepository, never()).findById(anyLong());
+        verify(adminAuditLogRepository, never()).flush();
+        verify(transactionManager).rollback(transactionStatus);
+        verify(transactionManager, never()).commit(transactionStatus);
     }
 
     private void assertAuditDoesNotContain(AdminAuditLog audit, String... forbiddenValues) {

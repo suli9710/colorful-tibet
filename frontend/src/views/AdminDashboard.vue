@@ -1802,13 +1802,36 @@ const priceBatchStatusText = computed(() => {
   return '正在准备爬虫任务...'
 })
 
-const adminPageParams = { page: 0, size: 100 }
+const adminPageSize = 100
+const maxAdminListPages = 1000
+// Hotel orders are refreshed every Nth 15s tick (i.e. once a minute) instead of on every tick.
+const hotelOrderRefreshEveryTicks = 4
 const toList = <T>(value: unknown): T[] => {
   if (Array.isArray(value)) return value as T[]
   if (value && typeof value === 'object' && Array.isArray((value as { content?: unknown }).content)) {
     return (value as { content: T[] }).content
   }
   return []
+}
+
+const fetchAllAdminPages = async <T>(url: string, isStale: () => boolean = () => false): Promise<T[]> => {
+  const collected: T[] = []
+  for (let page = 0; page < maxAdminListPages; page += 1) {
+    // Abort as soon as a newer fetch supersedes this one; otherwise overlapping refreshes each keep
+    // draining every remaining page even though their results will be discarded.
+    if (isStale()) return collected
+    const response = await api.get<unknown>(url, { params: { page, size: adminPageSize } })
+    if (Array.isArray(response.data)) return response.data as T[]
+    const pageItems = toList<T>(response.data)
+    collected.push(...pageItems)
+    const envelope = response.data && typeof response.data === 'object'
+      ? response.data as { totalPages?: unknown; last?: unknown }
+      : null
+    const totalPages = Number(envelope?.totalPages)
+    if (envelope?.last === true || pageItems.length < adminPageSize
+      || (Number.isFinite(totalPages) && page + 1 >= totalPages)) return collected
+  }
+  throw new Error('Admin list exceeded the maximum supported page count')
 }
 
 const adminListErrorMessage = (error: unknown, fallback: string) => {
@@ -1833,9 +1856,9 @@ const fetchUsers = async () => {
   loadingUsers.value = true
   usersError.value = ''
   try {
-    const response = await api.get<unknown>(endpoints.admin.users, { params: adminPageParams })
+    const nextItems = await fetchAllAdminPages<AdminUserSummary>(endpoints.admin.users)
     if (requestId !== usersRequestId) return
-    users.value = toList<AdminUserSummary>(response.data)
+    users.value = nextItems
   } catch (error: unknown) {
     if (requestId !== usersRequestId) return
     console.error('Failed to fetch users:', summarizeClientError(error))
@@ -1853,9 +1876,9 @@ const fetchSpots = async () => {
   loadingSpots.value = true
   spotsError.value = ''
   try {
-    const response = await api.get<unknown>(endpoints.admin.spots, { params: adminPageParams })
+    const nextItems = await fetchAllAdminPages<AdminSpot>(endpoints.admin.spots)
     if (requestId !== spotsRequestId) return
-    spots.value = toList<AdminSpot>(response.data)
+    spots.value = nextItems
   } catch (error: unknown) {
     if (requestId !== spotsRequestId) return
     spotsError.value = reportAdminListLoadFailure('admin spots', error, t('admin.spotsLoadFailed'))
@@ -2065,12 +2088,13 @@ const setHotelOrderStatusError = (orderId: number, message: string) => {
 const fetchHotelOrders = async () => {
   const requestId = hotelOrdersRequestId + 1
   hotelOrdersRequestId = requestId
+  const isStale = () => requestId !== hotelOrdersRequestId
   loadingHotelOrders.value = true
   hotelOrdersError.value = ''
   try {
-    const response = await api.get<unknown>(endpoints.hotelBookings.all, { params: adminPageParams })
-    if (requestId !== hotelOrdersRequestId) return
-    hotelOrders.value = toList<HotelOrder>(response.data)
+    const nextItems = await fetchAllAdminPages<HotelOrder>(endpoints.hotelBookings.all, isStale)
+    if (isStale()) return
+    hotelOrders.value = nextItems
     hotelOrderStatusErrors.value = {}
   } catch (error: unknown) {
     if (requestId !== hotelOrdersRequestId) return
@@ -2085,6 +2109,17 @@ const fetchHotelOrders = async () => {
 
 const refreshOperationalData = async () => {
   await Promise.all([fetchStats(), fetchHotelOrders()])
+}
+
+// fetchHotelOrders walks every page of the booking list, so polling it as often as the lightweight
+// stats call multiplied admin backend load by the number of pages. Stats stay on the fast cadence;
+// the order list refreshes more slowly and, additionally, immediately after any action that changes
+// it (status update, delete, or the explicit refresh button).
+const pollOperationalData = async (includeHotelOrders: boolean) => {
+  await Promise.all([
+    fetchStats(),
+    ...(includeHotelOrders && !loadingHotelOrders.value ? [fetchHotelOrders()] : [])
+  ])
 }
 
 const updateHotelOrderStatus = async (order: HotelOrder, event: Event) => {
@@ -2147,9 +2182,9 @@ const fetchNews = async () => {
       return
     }
     
-    const response = await api.get<unknown>(endpoints.admin.news, { params: adminPageParams })
+    const nextItems = await fetchAllAdminPages<AdminNewsItem>(endpoints.admin.news)
     if (requestId !== newsRequestId) return
-    newsList.value = toList<AdminNewsItem>(response.data)
+    newsList.value = nextItems
   } catch (error: unknown) {
     if (requestId !== newsRequestId) return
     newsError.value = reportAdminListLoadFailure('admin news', error, t('admin.newsLoadFailed'))
@@ -2393,9 +2428,9 @@ const fetchAdminRoutes = async () => {
   loadingAdminRoutes.value = true
   adminRoutesError.value = ''
   try {
-    const res = await api.get<unknown>(endpoints.adminRoutes.list, { params: adminPageParams })
+    const nextItems = await fetchAllAdminPages<AdminRouteItem>(endpoints.adminRoutes.list)
     if (requestId !== adminRoutesRequestId) return
-    adminRoutes.value = toList<AdminRouteItem>(res.data)
+    adminRoutes.value = nextItems
   } catch (e) {
     if (requestId !== adminRoutesRequestId) return
     adminRoutesError.value = reportAdminListLoadFailure('admin routes', e, t('admin.routesLoadFailed'))
@@ -2489,9 +2524,9 @@ const fetchAdminHotels = async () => {
   loadingAdminHotels.value = true
   adminHotelsError.value = ''
   try {
-    const res = await api.get<unknown>(endpoints.adminHotels.list, { params: adminPageParams })
+    const nextItems = await fetchAllAdminPages<AdminHotelItem>(endpoints.adminHotels.list)
     if (requestId !== adminHotelsRequestId) return
-    adminHotels.value = toList<AdminHotelItem>(res.data)
+    adminHotels.value = nextItems
     failedHotelImages.value = {}
   } catch (e) {
     if (requestId !== adminHotelsRequestId) return
@@ -2603,8 +2638,10 @@ onMounted(async () => {
   fetchAdminRoutes()
   fetchAdminHotels()
 
+  let operationalTicks = 0
   operationalRefreshTimer = window.setInterval(() => {
-    void refreshOperationalData()
+    operationalTicks += 1
+    void pollOperationalData(operationalTicks % hotelOrderRefreshEveryTicks === 0)
     void fetchSecurityPosture()
   }, 15000)
 })

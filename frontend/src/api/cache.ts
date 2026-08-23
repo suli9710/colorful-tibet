@@ -19,22 +19,21 @@ const HOTEL_ORDER_STORAGE_KEY_PREFIXES = [
   `${HOTEL_ORDER_STORAGE_KEY}:`,
   'colorful-tibet:hotel-orders'
 ]
-const PRIVATE_GET_EXACT_PATHS = [
-  '/bookings',
-  '/hotel-bookings',
-  '/orders'
-]
-const PRIVATE_GET_PATH_MARKERS = [
-  '/admin',
-  '/auth/me',
-  '/bookings/my',
-  '/favorites',
-  '/hotel-bookings/my',
-  '/itineraries/my',
-  '/orders/my',
-  '/routes/ai',
-  '/routes/my-routes',
-  '/spots/recommendations'
+const CACHEABLE_PUBLIC_GET_PATHS = [
+  /^\/spots$/,
+  /^\/spots\/(?:search|heatmap)$/,
+  /^\/spots\/\d+(?:\/similar)?$/,
+  /^\/news$/,
+  /^\/heritage$/,
+  /^\/heritage\/events\/upcoming$/,
+  /^\/heritage\/\d+(?:\/(?:comments|inheritors|events))?$/,
+  /^\/tibet-specialty\/(?:culture-tips|phrasebook|sustainable-options)$/,
+  /^\/routes\/shared(?:\/\d+(?:\/comments)?)?$/,
+  /^\/carousels$/,
+  /^\/hotel-bookings\/hotels(?:\/\d+)?$/,
+  /^\/hotel-bookings\/room-types\/\d+$/,
+  /^\/comments\/spot\/\d+$/,
+  /^\/community\/questions(?:\/\d+(?:\/answers)?)?$/
 ]
 
 const pendingGets = new Map<string, Promise<AxiosResponse>>()
@@ -173,15 +172,9 @@ function getRequestPath(url: string): string {
   }
 }
 
-function isPrivateGetUrl(url: string): boolean {
-  const requestUrl = String(url || '')
-  const requestPath = getRequestPath(requestUrl)
-  const isOrderDetailPath = /^\/(?:bookings|orders)\/[^/]+/.test(requestPath)
-  const isHotelOrderDetailPath = /^\/hotel-bookings\/(?!hotels(?:\/|$)|room-types(?:\/|$))[^/]+/.test(requestPath)
-  return PRIVATE_GET_EXACT_PATHS.includes(requestPath)
-    || isOrderDetailPath
-    || isHotelOrderDetailPath
-    || PRIVATE_GET_PATH_MARKERS.some(marker => requestUrl.includes(marker) || requestPath.includes(marker))
+function isExplicitlyCacheablePublicGet(url: string): boolean {
+  const requestPath = getRequestPath(url)
+  return CACHEABLE_PUBLIC_GET_PATHS.some(pattern => pattern.test(requestPath))
 }
 
 type CacheableGetConfig = AxiosRequestConfig & {
@@ -194,7 +187,8 @@ interface GetCacheClient {
 
 function shouldUseGetCache(url: string, config: CacheableGetConfig = {}) {
   if (config.skipGetCache) return false
-  return !isPrivateGetUrl(url)
+  if (hasStoredAuthenticatedSession()) return false
+  return isExplicitlyCacheablePublicGet(url)
 }
 
 function stableStringify(value: unknown): string {
@@ -216,7 +210,22 @@ function getRequestKey(url: string, config: CacheableGetConfig = {}) {
   })
 }
 
+function getResponseHeader(response: AxiosResponse, name: string): string {
+  const headers = response.headers as { get?: (header: string) => unknown; [key: string]: unknown } | undefined
+  const direct = headers?.get?.(name) ?? headers?.get?.(name.toLowerCase())
+  if (direct != null) return String(direct)
+  const key = headers ? Object.keys(headers).find(item => item.toLowerCase() === name.toLowerCase()) : undefined
+  return key ? String(headers?.[key] ?? '') : ''
+}
+
 function isCacheableGetResponse(response: AxiosResponse): boolean {
+  const cacheControl = getResponseHeader(response, 'Cache-Control')
+  const vary = getResponseHeader(response, 'Vary')
+  if (/\b(?:no-cache|no-store|private)\b/i.test(cacheControl)
+    || /(?:^|,)\s*max-age\s*=\s*0\b/i.test(cacheControl)
+    || vary.trim() === '*') {
+    return false
+  }
   try {
     return JSON.stringify(response.data).length <= GET_RESPONSE_CACHE_MAX_CHARS
   } catch {

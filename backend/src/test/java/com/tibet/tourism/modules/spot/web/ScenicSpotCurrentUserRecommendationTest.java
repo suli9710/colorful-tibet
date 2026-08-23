@@ -23,6 +23,8 @@ import com.tibet.tourism.common.security.TrustedProxyIpResolver;
 import com.tibet.tourism.common.security.UserDetailsServiceImpl;
 import com.tibet.tourism.common.security.UserSessionVersionService;
 import com.tibet.tourism.common.security.WebSecurityConfig;
+import com.tibet.tourism.modules.auth.application.AdminMfaPolicy;
+import com.tibet.tourism.modules.admin.application.AdminAuditLogService;
 import com.tibet.tourism.modules.recommendation.application.ColdStartOptimizationService;
 import com.tibet.tourism.modules.recommendation.application.ItemBasedRecommendationService;
 import com.tibet.tourism.modules.recommendation.application.RecommendationService;
@@ -61,6 +63,12 @@ class ScenicSpotCurrentUserRecommendationTest {
 
     @MockBean
     private JwtUtils jwtUtils;
+
+    @MockBean
+    private AdminMfaPolicy adminMfaPolicy;
+
+    @MockBean
+    private AdminAuditLogService adminAuditLogService;
 
     @MockBean
     private UserDetailsServiceImpl userDetailsService;
@@ -242,6 +250,12 @@ class ScenicSpotCurrentUserRecommendationTest {
         when(jwtUtils.validateJwtToken(USER_TOKEN)).thenReturn(true);
         when(userSessionVersionService.tokenMatchesCurrentSession(USER_TOKEN)).thenReturn(true);
         when(jwtUtils.getUserNameFromJwtToken(USER_TOKEN)).thenReturn(appUser.getUsername());
+        if (appUser.getRole() == User.Role.ADMIN) {
+            String binding = "0123456789abcdef0123456789abcdef";
+            when(jwtUtils.isMfaVerified(USER_TOKEN)).thenReturn(true);
+            when(jwtUtils.getMfaBindingFromJwtToken(USER_TOKEN)).thenReturn(binding);
+            when(adminMfaPolicy.matchesCurrentBinding(appUser.getUsername(), binding)).thenReturn(true);
+        }
         when(userDetailsService.loadUserByUsername(appUser.getUsername()))
                 .thenReturn(new org.springframework.security.core.userdetails.User(
                         appUser.getUsername(),

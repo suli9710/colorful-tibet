@@ -13,9 +13,10 @@ rule_files:
 
 scrape_configs:
   - job_name: colorful-tibet-backend
-    # Production compose keeps PUBLIC_METRICS_ENABLED=false by default.
-    # Configure an authenticated or allowlisted scrape path before relying on this job.
     metrics_path: /actuator/prometheus
+    authorization:
+      type: Bearer
+      credentials_file: /tmp/metrics-scrape-token
     static_configs:
       - targets:
           - backend:8080

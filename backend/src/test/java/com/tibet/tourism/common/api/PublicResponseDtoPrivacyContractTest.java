@@ -167,7 +167,7 @@ class PublicResponseDtoPrivacyContractTest {
                         .filter(path -> path.getFileName().toString().endsWith(".class"))
                         .map(path -> classNameFor(packageName, packageDirectory, path))
                         .filter(className -> !className.contains("$"))
-                        .map(PublicResponseDtoPrivacyContractTest::loadClass)
+                        .<Class<?>>map(PublicResponseDtoPrivacyContractTest::loadClass)
                         .toList();
             }
         } catch (IOException | URISyntaxException e) {

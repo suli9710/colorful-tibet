@@ -4,7 +4,10 @@ import com.tibet.tourism.common.security.CsrfTokenService;
 import com.tibet.tourism.common.security.JwtUtils;
 import com.tibet.tourism.common.security.TokenRevocationService;
 import com.tibet.tourism.common.security.antibot.AntibotProperties;
+import com.tibet.tourism.modules.auth.application.AdminMfaPolicy;
 import com.tibet.tourism.modules.admin.web.dto.SecurityPostureResponse;
+import com.tibet.tourism.modules.user.domain.User;
+import com.tibet.tourism.modules.user.infra.UserRepository;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -29,6 +32,8 @@ public class AdminSecurityPostureService {
     private final CsrfTokenService csrfTokenService;
     private final TokenRevocationService tokenRevocationService;
     private final AntibotProperties antibotProperties;
+    private final AdminMfaPolicy adminMfaPolicy;
+    private final UserRepository userRepository;
 
     @Value("${app.security.public-docs-enabled:false}")
     private boolean publicDocsEnabled;
@@ -110,13 +115,17 @@ public class AdminSecurityPostureService {
                                        JwtUtils jwtUtils,
                                        CsrfTokenService csrfTokenService,
                                        TokenRevocationService tokenRevocationService,
-                                       AntibotProperties antibotProperties) {
+                                       AntibotProperties antibotProperties,
+                                       AdminMfaPolicy adminMfaPolicy,
+                                       UserRepository userRepository) {
         this.environment = environment;
         this.healthEndpoint = healthEndpoint;
         this.jwtUtils = jwtUtils;
         this.csrfTokenService = csrfTokenService;
         this.tokenRevocationService = tokenRevocationService;
         this.antibotProperties = antibotProperties;
+        this.adminMfaPolicy = adminMfaPolicy;
+        this.userRepository = userRepository;
     }
 
     public SecurityPostureResponse getSecurityPosture() {
@@ -189,6 +198,8 @@ public class AdminSecurityPostureService {
                 hasText(jwtSecret) ? "JWT secret configured" : "JWT secret missing");
         addFinding(findings, "CSRF_CONFIGURED", isCsrfConfigured() ? "PASS" : "FAIL",
                 isCsrfConfigured() ? "CSRF signing configured" : "CSRF signing secret missing");
+        AdminMfaCoverage adminMfaCoverage = evaluateAdminMfaCoverage();
+        addAdminMfaFinding(findings, adminMfaCoverage);
         addFinding(findings, "RATE_LIMITING", rateLimitEnabled ? "PASS" : "WARN",
                 rateLimitEnabled ? "Rate limiting enabled" : "Rate limiting disabled");
         addFinding(findings, "RATE_LIMIT_REDIS_FAIL_CLOSED",
@@ -214,7 +225,7 @@ public class AdminSecurityPostureService {
                 hasText(scraplingServiceUrl) ? "Scrapling endpoint configured" : "Scrapling disabled");
         response.setFindings(findings);
 
-        response.setScore(score(response));
+        response.setScore(score(response, adminMfaCoverage));
         response.setStatus(resolveStatus(response.getScore()));
         return response;
     }
@@ -312,19 +323,21 @@ public class AdminSecurityPostureService {
                             String message) {
         SecurityPostureResponse.Finding finding = new SecurityPostureResponse.Finding();
         finding.setId(id);
-        finding.setSeverity("PASS".equals(status) ? "LOW" : "WARN".equals(status) ? "MEDIUM" : "HIGH");
+        finding.setSeverity("PASS".equals(status) || "INFO".equals(status) ? "LOW"
+                : "WARN".equals(status) ? "MEDIUM" : "HIGH");
         finding.setStatus(status);
         finding.setMessage(message);
         findings.add(finding);
     }
 
-    private int score(SecurityPostureResponse response) {
+    private int score(SecurityPostureResponse response, AdminMfaCoverage adminMfaCoverage) {
         int score = 100;
         score -= response.getExposure().isPublicDocsEnabled() ? 8 : 0;
         score -= response.getExposure().isPublicMetricsEnabled() ? 10 : 0;
         score -= penalty(response.getAuthentication().isJwtConfigured(), 25, 0);
         score -= penalty(response.getAuthentication().isCsrfConfigured(), 15, 0);
         score -= penalty(response.getAuthentication().isSuperAdminTotpConfigured(), 10, 0);
+        score -= adminMfaCoverage.scorePenalty();
         score -= penalty(response.getProtections().isRateLimitEnabled(), 12, 0);
         score -= penalty(response.getProtections().isBruteForceEnabled(), 10, 0);
         score -= penalty(response.getDataProtection().isPiiKeysConfigured(), 10, 0);
@@ -333,6 +346,64 @@ public class AdminSecurityPostureService {
         score -= dependencyPenalty(response.getDependencies().getRedis());
         score -= dependencyPenalty(response.getDependencies().getScrapling());
         return Math.max(0, score);
+    }
+
+    private AdminMfaCoverage evaluateAdminMfaCoverage() {
+        if (userRepository == null || adminMfaPolicy == null) {
+            return AdminMfaCoverage.unavailable();
+        }
+        try {
+            List<String> administratorUsernames = userRepository.findUsernamesByRole(User.Role.ADMIN);
+            if (administratorUsernames == null || administratorUsernames.isEmpty()) {
+                return AdminMfaCoverage.available(0, 0);
+            }
+            int missingCount = (int) administratorUsernames.stream()
+                    .filter(username -> !StringUtils.hasText(username)
+                            || !adminMfaPolicy.hasConfiguredSecret(username))
+                    .count();
+            return AdminMfaCoverage.available(administratorUsernames.size(), missingCount);
+        } catch (RuntimeException exception) {
+            return AdminMfaCoverage.unavailable();
+        }
+    }
+
+    private void addAdminMfaFinding(List<SecurityPostureResponse.Finding> findings,
+                                    AdminMfaCoverage coverage) {
+        if (!coverage.available()) {
+            addFinding(findings, "ADMIN_MFA_CONFIGURATION", "FAIL",
+                    "Administrator MFA coverage could not be verified");
+            return;
+        }
+        if (coverage.adminCount() == 0) {
+            addFinding(findings, "ADMIN_MFA_CONFIGURATION", "INFO",
+                    "No administrator accounts exist");
+            return;
+        }
+        if (coverage.missingCount() == 0) {
+            addFinding(findings, "ADMIN_MFA_CONFIGURATION", "PASS",
+                    "Every administrator account has an independent TOTP secret");
+            return;
+        }
+        addFinding(findings, "ADMIN_MFA_CONFIGURATION", "FAIL",
+                "Administrator MFA is missing for " + coverage.missingCount() + " account(s)");
+    }
+
+    private record AdminMfaCoverage(boolean available, int adminCount, int missingCount) {
+
+        private static AdminMfaCoverage available(int adminCount, int missingCount) {
+            return new AdminMfaCoverage(true, adminCount, missingCount);
+        }
+
+        private static AdminMfaCoverage unavailable() {
+            return new AdminMfaCoverage(false, 0, 0);
+        }
+
+        private int scorePenalty() {
+            if (!available) {
+                return 20;
+            }
+            return missingCount > 0 ? 20 : 0;
+        }
     }
 
     private int penalty(boolean pass, int failPenalty, int warningPenalty) {

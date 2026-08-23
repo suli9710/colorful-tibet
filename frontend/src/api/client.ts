@@ -11,6 +11,7 @@ import {
   installGetCache,
   withSpecialTimeout
 } from './cache'
+import { shouldAttachDeviceFingerprint } from './riskSignals'
 
 declare module 'axios' {
   export interface AxiosRequestConfig {
@@ -79,10 +80,12 @@ api.interceptors.request.use(async config => {
     delete config.headers['Content-Type']
   }
 
-  try {
-    const fp = await getDeviceFingerprint()
-    if (fp) config.headers['X-Device-Fingerprint'] = fp
-  } catch { /* ignore */ }
+  if (shouldAttachDeviceFingerprint(config)) {
+    try {
+      const fp = await getDeviceFingerprint()
+      if (fp) config.headers['X-Device-Fingerprint'] = fp
+    } catch { /* ignore */ }
+  }
 
   return config
 })

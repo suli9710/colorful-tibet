@@ -30,6 +30,11 @@ class LoginAttemptServiceTest {
     }
 
     @Test
+    void inMemoryFallbackHasHardMaximumSize() {
+        assertThat(service.inMemoryMaximumSize()).isEqualTo(10_000);
+    }
+
+    @Test
     void accountFailuresBelowThresholdDoNotHardLockUsername() {
         for (int i = 0; i < 2; i++) {
             LoginAttemptService.LoginAttemptDecision decision =

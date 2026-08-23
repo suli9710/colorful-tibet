@@ -255,12 +255,40 @@ describe('auth store sensitive storage handling', () => {
       headers: {
         Accept: 'application/json',
         'Accept-Language': 'bo'
-      }
+      },
+      signal: expect.any(Object)
     })
     expect(auth.user).toEqual({
       nickname: 'Fresh Traveler',
       role: 'USER'
     })
+  })
+
+  it('clears the local session only when the server explicitly returns 401', async () => {
+    const { localStorage } = installBrowserStorage()
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('', { status: 401 })))
+    const auth = useAuthStore()
+    auth.login({ nickname: 'Traveler', role: 'USER' })
+
+    await expect(auth.refreshSession()).resolves.toBe(false)
+
+    expect(auth.user).toBeNull()
+    expect(localStorage.getItem('user')).toBeNull()
+  })
+
+  it.each([
+    ['network failure', () => Promise.reject(new TypeError('offline'))],
+    ['server failure', () => Promise.resolve(new Response('', { status: 503 }))]
+  ])('preserves the current session on %s', async (_label, responseFactory) => {
+    const { localStorage } = installBrowserStorage()
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(responseFactory))
+    const auth = useAuthStore()
+    auth.login({ nickname: 'Traveler', role: 'USER' })
+
+    await expect(auth.refreshSession()).resolves.toBe(false)
+
+    expect(auth.user).toEqual({ nickname: 'Traveler', role: 'USER' })
+    expect(localStorage.getItem('user')).not.toBeNull()
   })
 
   it('sanitizes legacy stored user records when restoring from storage', () => {

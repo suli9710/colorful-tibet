@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 
 import com.tibet.tourism.common.security.LoginAttemptService;
 import com.tibet.tourism.modules.admin.application.AdminUserService;
+import com.tibet.tourism.modules.admin.application.AdminAuditLogService;
 import com.tibet.tourism.modules.upload.application.FileStorageService;
 import com.tibet.tourism.modules.user.domain.User;
 import com.tibet.tourism.modules.user.infra.UserRepository;
@@ -39,6 +40,9 @@ class AdminUserControllerPolicyTest {
     private AdminUserService adminUserService;
 
     @Mock
+    private AdminAuditLogService auditLogService;
+
+    @Mock
     private Authentication authentication;
 
     @Test
@@ -47,7 +51,7 @@ class AdminUserControllerPolicyTest {
         AdminUserService.UserActionPolicy actionPolicy =
                 new AdminUserService.UserActionPolicy(true, false, false);
         AdminUserController controller = new AdminUserController(
-                userRepository, loginAttemptService, fileStorageService, adminUserService);
+                userRepository, loginAttemptService, fileStorageService, adminUserService, auditLogService);
 
         when(userRepository.findAll(any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(user), PageRequest.of(0, 10), 1));

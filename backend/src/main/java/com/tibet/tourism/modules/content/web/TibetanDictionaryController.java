@@ -1,6 +1,7 @@
 package com.tibet.tourism.modules.content.web;
 
 import com.tibet.tourism.common.validation.InputSanitizer;
+import com.tibet.tourism.modules.admin.application.AdminAuditLogService;
 import com.tibet.tourism.modules.content.application.TibetanTranslationService;
 import com.tibet.tourism.modules.content.domain.TibetanDictionary;
 import com.tibet.tourism.modules.content.infra.TibetanDictionaryRepository;
@@ -50,11 +51,14 @@ public class TibetanDictionaryController {
 
     private final TibetanDictionaryRepository dictionaryRepository;
     private final TibetanTranslationService translationService;
+    private final AdminAuditLogService auditLogService;
 
     public TibetanDictionaryController(TibetanDictionaryRepository dictionaryRepository,
-                                       TibetanTranslationService translationService) {
+                                       TibetanTranslationService translationService,
+                                       AdminAuditLogService auditLogService) {
         this.dictionaryRepository = dictionaryRepository;
         this.translationService = translationService;
+        this.auditLogService = auditLogService;
     }
 
     @GetMapping
@@ -86,6 +90,12 @@ public class TibetanDictionaryController {
 
     @PostMapping
     public ResponseEntity<?> createEntry(@Valid @RequestBody TibetanDictionaryRequest request) {
+        return auditLogService.captureCreated("tibetan_dictionary", "tibetan_dictionary_create",
+                () -> createEntryInternal(request),
+                body -> ((TibetanDictionaryResponse) body).id());
+    }
+
+    private ResponseEntity<?> createEntryInternal(TibetanDictionaryRequest request) {
         String chineseText = InputSanitizer.requiredPlainText(
                 request.getChineseText(), CHINESE_TEXT_MAX_LENGTH, "chineseText");
         String tibetanText = InputSanitizer.requiredTextBlock(
@@ -112,6 +122,11 @@ public class TibetanDictionaryController {
     @PutMapping("/{id}")
     public ResponseEntity<?> updateEntry(@PathVariable @Positive Long id,
                                          @Valid @RequestBody TibetanDictionaryUpdateRequest request) {
+        return auditLogService.capture("tibetan_dictionary", id, "tibetan_dictionary_update",
+                () -> updateEntryInternal(id, request));
+    }
+
+    private ResponseEntity<?> updateEntryInternal(Long id, TibetanDictionaryUpdateRequest request) {
         Optional<TibetanDictionary> existing = dictionaryRepository.findById(id);
         if (existing.isEmpty()) {
             return ResponseEntity.notFound().build();
@@ -137,6 +152,11 @@ public class TibetanDictionaryController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<DictionaryMessageResponse> deleteEntry(@PathVariable @Positive Long id) {
+        return auditLogService.capture("tibetan_dictionary", id, "tibetan_dictionary_delete",
+                () -> deleteEntryInternal(id));
+    }
+
+    private ResponseEntity<DictionaryMessageResponse> deleteEntryInternal(Long id) {
         if (!dictionaryRepository.existsById(id)) {
             return ResponseEntity.notFound().build();
         }
@@ -162,6 +182,11 @@ public class TibetanDictionaryController {
     @PostMapping("/batch")
     public ResponseEntity<DictionaryBatchAddResponse> batchAdd(
             @Valid @RequestBody DictionaryBatchAddRequest request) {
+        return auditLogService.capture("tibetan_dictionary", null, "tibetan_dictionary_batch_add",
+                () -> batchAddInternal(request));
+    }
+
+    private ResponseEntity<DictionaryBatchAddResponse> batchAddInternal(DictionaryBatchAddRequest request) {
         TibetanDictionary.Type type = parseDictionaryType(request.getType())
                 .orElse(TibetanDictionary.Type.WORD);
         Map<String, String> translations = sanitizeTranslations(request.getTranslations());
@@ -175,6 +200,11 @@ public class TibetanDictionaryController {
 
     @PostMapping("/initialize")
     public ResponseEntity<DictionaryMessageResponse> initialize() {
+        return auditLogService.capture("tibetan_dictionary", null, "tibetan_dictionary_initialize",
+                this::initializeInternal);
+    }
+
+    private ResponseEntity<DictionaryMessageResponse> initializeInternal() {
         translationService.initializeDefaultDictionary();
         return ResponseEntity.ok(new DictionaryMessageResponse("Default dictionary initialized"));
     }

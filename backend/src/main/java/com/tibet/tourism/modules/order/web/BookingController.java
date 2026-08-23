@@ -22,6 +22,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -155,9 +156,14 @@ public class BookingController {
             return ResponseEntity.ok(Map.of("message", "Booking already cancelled"));
         }
 
+        // Cancel the mirror first. It refuses for an already-paid order, and cancelling the booking
+        // anyway would leave that order CONFIRMED/PAID with no refund record.
+        if (!orderCenterService.cancelLegacyMirror(user, "LEGACY_SPOT_BOOKING", booking.getId(), "旧景点预订取消")) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(Map.of("error", "该预订对应的订单已支付，请改用退款流程"));
+        }
         booking.setStatus(Booking.Status.CANCELLED);
         bookingRepository.save(booking);
-        orderCenterService.cancelLegacyMirror(user, "LEGACY_SPOT_BOOKING", booking.getId(), "旧景点预订取消");
 
         return ResponseEntity.ok(Map.of("message", "Booking cancelled successfully!"));
     }

@@ -1,6 +1,8 @@
 package com.tibet.tourism.modules.route.web;
 import com.tibet.tourism.common.security.JwtAuthSupport;
 import com.tibet.tourism.common.security.SensitiveLogSanitizer;
+import com.tibet.tourism.common.security.antibot.RiskAssessmentService;
+import com.tibet.tourism.common.security.antibot.RiskResult;
 import com.tibet.tourism.modules.route.application.ItineraryService;
 import com.tibet.tourism.modules.route.web.dto.itinerary.BookItineraryItemRequest;
 import com.tibet.tourism.modules.route.web.dto.itinerary.CreateItineraryVersionRequest;
@@ -34,13 +36,18 @@ public class ItineraryController {
     private static final String ITINERARY_ITEM_NOT_FOUND_ERROR = "Itinerary item not found";
     private static final String ITINERARY_FORBIDDEN_ERROR = "Itinerary action is not allowed";
     private static final String INVALID_BOOKING_REQUEST_ERROR = "Booking request could not be processed";
+    private static final String SECURITY_VALIDATION_FAILED_ERROR = "Security validation failed";
 
     private final ItineraryService itineraryService;
     private final JwtAuthSupport jwtAuthSupport;
+    private final RiskAssessmentService riskAssessmentService;
 
-    public ItineraryController(ItineraryService itineraryService, JwtAuthSupport jwtAuthSupport) {
+    public ItineraryController(ItineraryService itineraryService,
+                               JwtAuthSupport jwtAuthSupport,
+                               RiskAssessmentService riskAssessmentService) {
         this.itineraryService = itineraryService;
         this.jwtAuthSupport = jwtAuthSupport;
+        this.riskAssessmentService = riskAssessmentService;
     }
 
     @PostMapping("/generate")
@@ -102,9 +109,25 @@ public class ItineraryController {
     public ResponseEntity<?> bookItem(@PathVariable Long id,
                                       @PathVariable Long itemId,
                                       @Valid @RequestBody(required = false) BookItineraryItemRequest request,
+                                      @RequestHeader(value = "X-Recaptcha-Token", required = false) String recaptchaToken,
+                                      @RequestHeader(value = "X-Device-Fingerprint", required = false) String fingerprint,
+                                      @RequestHeader(value = "X-Behavior-Data", required = false) String behaviorData,
                                       HttpServletRequest httpRequest) {
         User user = jwtAuthSupport.resolveCurrentUser(httpRequest);
         BookItineraryItemRequest safeRequest = request == null ? new BookItineraryItemRequest() : request;
+
+        // This endpoint creates the same spot and hotel bookings as /api/bookings and
+        // /api/hotel-bookings, so it must pass the same anti-bot gate; otherwise it is simply the
+        // unguarded way in.
+        RiskResult risk = riskAssessmentService.assess(
+                recaptchaToken, fingerprint, user == null ? null : user.getId(), behaviorData,
+                httpRequest.getRemoteAddr(), "/api/itineraries/items/bookings");
+        if (risk.decision() != RiskResult.Decision.ALLOW) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
+                    "error", SECURITY_VALIDATION_FAILED_ERROR,
+                    "code", "ANTIBOT_" + risk.decision().name()));
+        }
+
         try {
             return ResponseEntity.status(HttpStatus.CREATED).body(itineraryService.bookItem(user, id, itemId, safeRequest));
         } catch (NoSuchElementException e) {

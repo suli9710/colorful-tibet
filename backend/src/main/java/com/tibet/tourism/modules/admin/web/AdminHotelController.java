@@ -1,6 +1,7 @@
 package com.tibet.tourism.modules.admin.web;
 import com.tibet.tourism.common.api.PageResponse;
 import com.tibet.tourism.common.validation.InputSanitizer;
+import com.tibet.tourism.modules.admin.application.AdminAuditLogService;
 import com.tibet.tourism.modules.admin.web.dto.HotelRequest;
 import com.tibet.tourism.modules.hotel.domain.Hotel;
 import com.tibet.tourism.modules.hotel.domain.RoomType;
@@ -16,6 +17,7 @@ import jakarta.validation.Valid;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Map;
+import java.util.Set;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
@@ -43,23 +45,36 @@ public class AdminHotelController {
     private final HotelRepository hotelRepository;
     private final RoomTypeRepository roomTypeRepository;
     private final HotelBookingRepository hotelBookingRepository;
+    private final AdminAuditLogService auditLogService;
 
     public AdminHotelController(HotelRepository hotelRepository,
                                RoomTypeRepository roomTypeRepository,
-                               HotelBookingRepository hotelBookingRepository) {
+                               HotelBookingRepository hotelBookingRepository,
+                               AdminAuditLogService auditLogService) {
         this.hotelRepository = hotelRepository;
         this.roomTypeRepository = roomTypeRepository;
         this.hotelBookingRepository = hotelBookingRepository;
+        this.auditLogService = auditLogService;
     }
+
+    // ?sort= binds straight into the repository here, so restrict it to columns that are safe to expose.
+    private static final Set<String> HOTEL_SORT_FIELDS = Set.of("id", "name", "rating", "createdAt");
+    private static final Sort HOTEL_DEFAULT_SORT = Sort.by(Sort.Direction.ASC, "id");
 
     @GetMapping("/hotels")
     public ResponseEntity<PageResponse<HotelResponse>> getAllHotels(
             @PageableDefault(size = 50, sort = "id", direction = Sort.Direction.ASC) Pageable pageable) {
-        return ResponseEntity.ok(PageResponse.from(hotelRepository.findAll(pageable).map(HotelResponse::from)));
+        return ResponseEntity.ok(PageResponse.from(hotelRepository.findAll(InputSanitizer.sanitizePageable(pageable, HOTEL_SORT_FIELDS, HOTEL_DEFAULT_SORT, 50, 200)).map(HotelResponse::from)));
     }
 
     @PostMapping("/hotels")
     public ResponseEntity<?> createHotel(@Valid @RequestBody HotelRequest request) {
+        return auditLogService.captureCreated("hotel", "hotel_create",
+                () -> createHotelInternal(request),
+                body -> ((HotelResponse) body).id());
+    }
+
+    private ResponseEntity<?> createHotelInternal(HotelRequest request) {
         Hotel hotel = new Hotel();
         String name = InputSanitizer.requiredPlainText(request.getName(), 200, "酒店名称");
         hotel.setName(name);
@@ -77,6 +92,10 @@ public class AdminHotelController {
 
     @PutMapping("/hotels/{id}")
     public ResponseEntity<?> updateHotel(@PathVariable Long id, @Valid @RequestBody HotelRequest request) {
+        return auditLogService.capture("hotel", id, "hotel_update", () -> updateHotelInternal(id, request));
+    }
+
+    private ResponseEntity<?> updateHotelInternal(Long id, HotelRequest request) {
         Hotel hotel = hotelRepository.findById(id).orElse(null);
         if (hotel == null) {
             return ResponseEntity.notFound().build();
@@ -97,6 +116,10 @@ public class AdminHotelController {
     @DeleteMapping("/hotels/{id}")
     @Transactional
     public ResponseEntity<?> deleteHotel(@PathVariable Long id) {
+        return auditLogService.capture("hotel", id, "hotel_delete", () -> deleteHotelInternal(id));
+    }
+
+    private ResponseEntity<?> deleteHotelInternal(Long id) {
         if (!hotelRepository.existsById(id)) {
             return ResponseEntity.notFound().build();
         }
@@ -122,6 +145,12 @@ public class AdminHotelController {
 
     @PostMapping("/hotels/{hotelId}/room-types")
     public ResponseEntity<?> createRoomType(@PathVariable Long hotelId, @Valid @RequestBody RoomTypeRequest request) {
+        return auditLogService.captureCreated("room_type", "room_type_create",
+                () -> createRoomTypeInternal(hotelId, request),
+                body -> ((RoomTypeResponse) body).id());
+    }
+
+    private ResponseEntity<?> createRoomTypeInternal(Long hotelId, RoomTypeRequest request) {
         Hotel hotel = hotelRepository.findById(hotelId).orElse(null);
         if (hotel == null) {
             return ResponseEntity.notFound().build();
@@ -134,6 +163,11 @@ public class AdminHotelController {
 
     @PutMapping("/room-types/{id}")
     public ResponseEntity<?> updateRoomType(@PathVariable Long id, @Valid @RequestBody RoomTypeRequest request) {
+        return auditLogService.capture("room_type", id, "room_type_update",
+                () -> updateRoomTypeInternal(id, request));
+    }
+
+    private ResponseEntity<?> updateRoomTypeInternal(Long id, RoomTypeRequest request) {
         RoomType existing = roomTypeRepository.findById(id).orElse(null);
         if (existing == null) return ResponseEntity.notFound().build();
         applyRoomTypeRequest(existing, request);
@@ -142,6 +176,11 @@ public class AdminHotelController {
 
     @DeleteMapping("/room-types/{id}")
     public ResponseEntity<?> deleteRoomType(@PathVariable Long id) {
+        return auditLogService.capture("room_type", id, "room_type_delete",
+                () -> deleteRoomTypeInternal(id));
+    }
+
+    private ResponseEntity<?> deleteRoomTypeInternal(Long id) {
         if (!roomTypeRepository.existsById(id)) return ResponseEntity.notFound().build();
         roomTypeRepository.deleteById(id);
         return ResponseEntity.ok(Map.of("message", "删除成功"));

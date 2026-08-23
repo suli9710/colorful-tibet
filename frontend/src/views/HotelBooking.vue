@@ -759,9 +759,12 @@ watch(
 
 const submitBooking = async () => {
   if (submitting.value) return
+  const requestedHotelId = hotelId.value
+  const requestedRoomId = roomId.value
+  const requestedRoom = selectedRoom.value
   submitAttempted.value = true
   submitError.value = ''
-  if (bookingUnavailable.value) {
+  if (bookingUnavailable.value || !requestedRoom || requestedRoom.id !== requestedRoomId) {
     submitError.value = bookingValidationMessages.value.roomUnavailable
     return
   }
@@ -798,10 +801,10 @@ const submitBooking = async () => {
   try {
     const behaviorData = encodeBehaviorData()
     await api.post(endpoints.hotelBookings.create, {
-      hotelId: hotelId.value,
-      roomId: roomId.value,
-      roomName: selectedRoom.value?.name || '',
-      roomPrice: selectedRoom.value?.price || 0,
+      hotelId: requestedHotelId,
+      roomId: requestedRoomId,
+      roomName: requestedRoom.name,
+      roomPrice: requestedRoom.price,
       nights: nights.value,
       checkInDate: form.value.checkInDate,
       checkOutDate: form.value.checkOutDate,
@@ -832,6 +835,7 @@ const submitBooking = async () => {
   submitAttempted.value = false
   window.dispatchEvent(new CustomEvent('hotel-orders-updated'))
   window.dispatchEvent(new CustomEvent('bookings-updated'))
+  if (requestedHotelId !== hotelId.value || requestedRoomId !== roomId.value) return
   router.push({ path: '/hotel-orders', query: { created: '1' } })
 }
 </script>

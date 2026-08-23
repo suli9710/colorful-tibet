@@ -1,5 +1,6 @@
 package com.tibet.tourism.modules.admin.web;
 import com.tibet.tourism.modules.admin.application.AdminStatsService;
+import com.tibet.tourism.modules.admin.application.AdminAuditLogService;
 import com.tibet.tourism.modules.recommendation.application.ItemBasedRecommendationService;
 import com.tibet.tourism.modules.recommendation.application.RecommendationEvaluationService;
 import com.tibet.tourism.modules.recommendation.web.dto.RecommendationEvaluationResponse;
@@ -17,13 +18,16 @@ public class AdminStatsController {
     private final AdminStatsService adminStatsService;
     private final ItemBasedRecommendationService itemBasedRecommendationService;
     private final RecommendationEvaluationService recommendationEvaluationService;
+    private final AdminAuditLogService auditLogService;
 
     public AdminStatsController(AdminStatsService adminStatsService,
                                 ItemBasedRecommendationService itemBasedRecommendationService,
-                                RecommendationEvaluationService recommendationEvaluationService) {
+                                RecommendationEvaluationService recommendationEvaluationService,
+                                AdminAuditLogService auditLogService) {
         this.adminStatsService = adminStatsService;
         this.itemBasedRecommendationService = itemBasedRecommendationService;
         this.recommendationEvaluationService = recommendationEvaluationService;
+        this.auditLogService = auditLogService;
     }
 
     @GetMapping("/stats")
@@ -38,8 +42,23 @@ public class AdminStatsController {
 
     @PostMapping("/recommendations/item-similarity/precompute")
     public ResponseEntity<Map<String, Object>> precomputeItemSimilarity() {
+        AdminAuditLogService.Attempt auditAttempt = auditLogService.begin(
+                "item_similarity", null, "item_similarity_precompute");
         long startTime = System.currentTimeMillis();
-        boolean started = itemBasedRecommendationService.precomputeItemSimilarityMatrix();
+        boolean started;
+        try {
+            started = itemBasedRecommendationService.precomputeItemSimilarityMatrix();
+            auditLogService.complete(
+                    auditAttempt,
+                    started ? AdminAuditLogService.Result.SUCCESS : AdminAuditLogService.Result.FAILURE,
+                    started ? "completed" : "already_in_progress");
+        } catch (RuntimeException exception) {
+            auditLogService.complete(
+                    auditAttempt,
+                    AdminAuditLogService.Result.FAILURE,
+                    "exception_" + exception.getClass().getSimpleName());
+            throw exception;
+        }
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("success", started);
         body.put("message", started ? "景点相似度矩阵计算完成" : "景点相似度矩阵正在计算中");

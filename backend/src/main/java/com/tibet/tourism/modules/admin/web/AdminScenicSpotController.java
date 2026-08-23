@@ -1,6 +1,7 @@
 package com.tibet.tourism.modules.admin.web;
 import com.tibet.tourism.common.api.PageResponse;
 import com.tibet.tourism.common.validation.InputSanitizer;
+import com.tibet.tourism.modules.admin.application.AdminAuditLogService;
 import com.tibet.tourism.modules.admin.web.dto.ScenicSpotRequest;
 import com.tibet.tourism.modules.community.domain.Comment;
 import com.tibet.tourism.modules.community.infra.CommentLikeRepository;
@@ -18,6 +19,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Map;
+import java.util.Set;
 import java.util.Optional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -40,6 +42,7 @@ public class AdminScenicSpotController {
     private final BookingRepository bookingRepository;
     private final UserVisitHistoryRepository userVisitHistoryRepository;
     private final TibetanTranslationService translationService;
+    private final AdminAuditLogService auditLogService;
 
     public AdminScenicSpotController(ScenicSpotRepository scenicSpotRepository,
                                      SpotTagRepository tagRepository,
@@ -47,7 +50,8 @@ public class AdminScenicSpotController {
                                      CommentLikeRepository commentLikeRepository,
                                      BookingRepository bookingRepository,
                                      UserVisitHistoryRepository userVisitHistoryRepository,
-                                     TibetanTranslationService translationService) {
+                                     TibetanTranslationService translationService,
+                                     AdminAuditLogService auditLogService) {
         this.scenicSpotRepository = scenicSpotRepository;
         this.tagRepository = tagRepository;
         this.commentRepository = commentRepository;
@@ -55,16 +59,26 @@ public class AdminScenicSpotController {
         this.bookingRepository = bookingRepository;
         this.userVisitHistoryRepository = userVisitHistoryRepository;
         this.translationService = translationService;
+        this.auditLogService = auditLogService;
     }
+
+    // ?sort= binds straight into the repository here, so restrict it to columns that are safe to expose.
+    private static final Set<String> SCENICSPOT_SORT_FIELDS = Set.of("id", "name", "category", "ticketPrice", "createdAt");
+    private static final Sort SCENICSPOT_DEFAULT_SORT = Sort.by(Sort.Direction.ASC, "id");
 
     @GetMapping("/spots")
     public ResponseEntity<PageResponse<ScenicSpotResponse>> getAllSpots(
             @PageableDefault(size = 50, sort = "id", direction = Sort.Direction.ASC) Pageable pageable) {
-        return ResponseEntity.ok(PageResponse.from(scenicSpotRepository.findAllWithoutTags(pageable).map(ScenicSpotResponse::from)));
+        return ResponseEntity.ok(PageResponse.from(scenicSpotRepository.findAllWithoutTags(InputSanitizer.sanitizePageable(pageable, SCENICSPOT_SORT_FIELDS, SCENICSPOT_DEFAULT_SORT, 50, 200)).map(ScenicSpotResponse::from)));
     }
 
     @PutMapping("/spots/{id}")
     public ResponseEntity<?> updateSpot(@PathVariable Long id, @Valid @RequestBody ScenicSpotRequest request) {
+        return auditLogService.capture("scenic_spot", id, "scenic_spot_update",
+                () -> updateSpotInternal(id, request));
+    }
+
+    private ResponseEntity<?> updateSpotInternal(Long id, ScenicSpotRequest request) {
         Optional<ScenicSpot> spotOpt = scenicSpotRepository.findById(id);
         if (spotOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
@@ -132,6 +146,12 @@ public class AdminScenicSpotController {
 
     @PostMapping("/spots")
     public ResponseEntity<?> createSpot(@Valid @RequestBody ScenicSpotRequest request) {
+        return auditLogService.captureCreated("scenic_spot", "scenic_spot_create",
+                () -> createSpotInternal(request),
+                body -> ((ScenicSpotResponse) body).id());
+    }
+
+    private ResponseEntity<?> createSpotInternal(ScenicSpotRequest request) {
         ScenicSpot spot = new ScenicSpot();
         boolean autoTranslate = request.getAutoTranslate() == null || request.getAutoTranslate();
 
@@ -187,6 +207,11 @@ public class AdminScenicSpotController {
     @DeleteMapping("/spots/{id}")
     @Transactional
     public ResponseEntity<?> deleteSpot(@PathVariable Long id) {
+        return auditLogService.capture("scenic_spot", id, "scenic_spot_delete",
+                () -> deleteSpotInternal(id));
+    }
+
+    private ResponseEntity<?> deleteSpotInternal(Long id) {
         if (!scenicSpotRepository.existsById(id)) {
             return ResponseEntity.notFound().build();
         }

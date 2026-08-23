@@ -206,6 +206,7 @@ docker compose down
 | `PII_KEYS` / `PII_ACTIVE_KID` | 敏感信息加密密钥集合与当前 key id |
 | `ADMIN_ENCRYPTION_KEY` | 管理端敏感配置加密密钥 |
 | `SUPER_ADMIN_USERNAME` / `SUPER_ADMIN_TOTP_SECRET` | 超级管理员账号与 TOTP 二次认证密钥 |
+| `ADMIN_TOTP_SECRETS` | 可选的其他管理员独立 TOTP 配置，格式为分号分隔的 `username=Base32Secret`；留空表示仅配置超级管理员。生产密钥必须由 CSPRNG 独立生成；preflight 只能校验 160-bit canonical Base32 形状并拒绝占位值、公开测试值、低多样性、格式错误或复用密钥，不能证明随机熵 |
 | `DOUBAO_API_KEY` / `ARK_API_KEY` | AI 路线生成所需模型 API Key |
 | `VITE_AMAP_KEY` / `VITE_AMAP_SECURITY_CODE` | 高德地图前端配置 |
 | `CORS_ALLOWED_ORIGINS` | 允许跨域来源，生产应设置为正式域名 |

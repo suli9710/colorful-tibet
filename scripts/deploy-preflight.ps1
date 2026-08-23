@@ -49,7 +49,7 @@ function Read-DotEnv {
         }
         $match = [regex]::Match($line, '^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$')
         if (-not $match.Success) {
-            Add-Issue "Cannot parse $PathValue line ${lineNumber}: $line"
+            Add-Issue "Cannot parse $PathValue line ${lineNumber}; line contents were suppressed."
             continue
         }
 
@@ -96,7 +96,22 @@ function Require-Exact {
 
     $actual = Get-EnvValue $EnvValues $Name
     if ($actual -ne $Expected) {
-        Add-Issue "$Name must be $Expected for $Stage, got '$actual'."
+        Add-Issue "$Name must be $Expected for $Stage."
+    }
+}
+
+function Require-IntRange {
+    param(
+        [hashtable] $EnvValues,
+        [string] $Name,
+        [int] $Minimum,
+        [int] $Maximum
+    )
+
+    $value = Get-EnvValue $EnvValues $Name
+    $parsed = 0
+    if (-not [int]::TryParse($value, [ref] $parsed) -or $parsed -lt $Minimum -or $parsed -gt $Maximum) {
+        Add-Issue "$Name must be an integer between $Minimum and $Maximum for $Stage."
     }
 }
 
@@ -112,7 +127,7 @@ function Require-RealValue {
         return
     }
     if (Test-Placeholder $value) {
-        Add-Issue "$Name still looks like a placeholder: '$value'."
+        Add-Issue "$Name still looks like a placeholder."
     }
 }
 
@@ -128,7 +143,7 @@ function Require-SingleHost {
         return
     }
     if (Test-Placeholder $value) {
-        Add-Issue "$Name still looks like a placeholder: '$value'."
+        Add-Issue "$Name still looks like a placeholder."
     }
     if ($value -match '\s' -or -not (Test-DnsHostName $value)) {
         Add-Issue "$Name must be a single DNS host without scheme, path, port, comma, whitespace, or control characters."
@@ -147,7 +162,7 @@ function Require-ServerNameList {
         return
     }
     if (Test-Placeholder $value) {
-        Add-Issue "$Name still looks like a placeholder: '$value'."
+        Add-Issue "$Name still looks like a placeholder."
     }
     if ($value -match '[\r\n\t]') {
         Add-Issue "$Name entries must be DNS hosts separated by single spaces only."
@@ -156,7 +171,7 @@ function Require-ServerNameList {
 
     foreach ($hostName in ($value.Trim() -split ' +')) {
         if (-not (Test-DnsHostName $hostName)) {
-            Add-Issue "$Name entry '$hostName' must be a DNS host without scheme, path, port, comma, wildcard, or control characters."
+            Add-Issue "$Name contains an entry that is not a DNS host without scheme, path, port, comma, wildcard, or control characters."
         }
     }
 }
@@ -180,17 +195,17 @@ function Require-Base64KeySet {
     foreach ($entry in $PiiKeys.Split(",")) {
         $parts = $entry.Split(":", 2)
         if ($parts.Count -ne 2 -or [string]::IsNullOrWhiteSpace($parts[0]) -or [string]::IsNullOrWhiteSpace($parts[1])) {
-            Add-Issue "PII_KEYS entry '$entry' must use kid:base64-32-byte-key format."
+            Add-Issue "PII_KEYS contains an entry that must use kid:base64-32-byte-key format; entry contents were suppressed."
             continue
         }
 
         try {
             $bytes = [Convert]::FromBase64String($parts[1])
             if ($bytes.Length -ne 32) {
-                Add-Issue "PII_KEYS entry '$($parts[0])' must decode to exactly 32 bytes."
+                Add-Issue "PII_KEYS contains a key that must decode to exactly 32 bytes; entry contents were suppressed."
             }
         } catch {
-            Add-Issue "PII_KEYS entry '$($parts[0])' is not valid Base64."
+            Add-Issue "PII_KEYS contains a key that is not valid Base64; entry contents were suppressed."
         }
 
         if ($parts[0] -eq $ActiveKid) {
@@ -215,11 +230,137 @@ function Require-Base32TotpSecret {
         return
     }
     if (Test-Placeholder $value) {
-        Add-Issue "$Name still looks like a placeholder: '$value'."
+        Add-Issue "$Name still looks like a placeholder."
         return
     }
-    if ($value -notmatch '^[A-Z2-7]{32,}$') {
-        Add-Issue "$Name must be a Base32 secret with at least 32 characters."
+    if (-not (Test-StrongTotpSecret $value)) {
+        Add-Issue "$Name must be a high-entropy Base32 secret in complete 8-character blocks with at least 32 characters."
+    }
+}
+
+function Test-StrongTotpSecret {
+    param([string] $Secret)
+
+    if ($Secret -cnotmatch '^[A-Z2-7]{32,}$' -or ($Secret.Length % 8) -ne 0) {
+        return $false
+    }
+    if (@($Secret.ToCharArray() | Sort-Object -Unique).Count -lt 8) {
+        return $false
+    }
+    if ($Secret -in @(
+        'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ',
+        'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP',
+        'MZXW6YTBOJQXGZJAMZXXE3DEMF2GK3LQ',
+        'NBSWY3DPEB3W64TMMQXG6ZRAMZXXE3DE',
+        'MFRGGZDFMZTWQ2LKMFRGGZDFMZTWQ2LK'
+    )) {
+        return $false
+    }
+    if ((Test-SequentialBase32Pattern $Secret) -or (Test-PeriodicTotpPattern $Secret)) {
+        return $false
+    }
+    return $true
+}
+
+function Test-SequentialBase32Pattern {
+    param([string] $CanonicalSecret)
+
+    $alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'
+    $ascending = $true
+    $descending = $true
+    for ($index = 1; $index -lt $CanonicalSecret.Length -and ($ascending -or $descending); $index++) {
+        $previous = $alphabet.IndexOf($CanonicalSecret[$index - 1])
+        $current = $alphabet.IndexOf($CanonicalSecret[$index])
+        if ($current -ne (($previous + 1) % $alphabet.Length)) {
+            $ascending = $false
+        }
+        if ($current -ne (($previous - 1 + $alphabet.Length) % $alphabet.Length)) {
+            $descending = $false
+        }
+    }
+    return $ascending -or $descending
+}
+
+function Test-PeriodicTotpPattern {
+    param([string] $CanonicalSecret)
+
+    for ($period = 1; $period -le [Math]::Floor($CanonicalSecret.Length / 2); $period++) {
+        if (($CanonicalSecret.Length % $period) -ne 0) {
+            continue
+        }
+        $repeated = $true
+        for ($index = $period; $index -lt $CanonicalSecret.Length; $index++) {
+            if ($CanonicalSecret[$index] -cne $CanonicalSecret[$index % $period]) {
+                $repeated = $false
+                break
+            }
+        }
+        if ($repeated) {
+            return $true
+        }
+    }
+    return $false
+}
+
+function Validate-AdminTotpSecrets {
+    param([hashtable] $EnvValues)
+
+    # A blank map is valid for a deliberate super-admin-only installation. If operators add
+    # entries, validate the complete map here so a typo cannot leave an administrator permanently
+    # unable to sign in after the deployment has already stopped traffic.
+    $raw = Get-EnvValue $EnvValues "ADMIN_TOTP_SECRETS"
+    if ([string]::IsNullOrWhiteSpace($raw)) {
+        return
+    }
+    if ($raw -match '[\r\n]' -or $raw.StartsWith(';') -or $raw.EndsWith(';') -or $raw.Contains(';;')) {
+        Add-Issue "ADMIN_TOTP_SECRETS must use semicolon-separated username=Base32Secret entries without empty or control-character entries."
+        return
+    }
+
+    $superUsername = (Get-EnvValue $EnvValues "SUPER_ADMIN_USERNAME" "lzh").Trim().ToLowerInvariant()
+    $superSecret = Get-EnvValue $EnvValues "SUPER_ADMIN_TOTP_SECRET"
+    $seenUsers = @{}
+    $seenSecrets = @{}
+    if ($superUsername.Length -gt 0) {
+        $seenUsers[$superUsername] = $true
+    }
+    if ($superSecret.Length -gt 0) {
+        $seenSecrets[$superSecret] = $true
+    }
+
+    foreach ($entry in $raw.Split(';')) {
+        $parts = $entry.Split("=", 2)
+        if ($parts.Count -ne 2) {
+            Add-Issue "ADMIN_TOTP_SECRETS contains an invalid username=Base32Secret entry."
+            continue
+        }
+
+        $username = $parts[0].Trim()
+        $secret = $parts[1].Trim()
+        if ($username -notmatch '^[A-Za-z0-9_-]{3,64}$') {
+            Add-Issue "ADMIN_TOTP_SECRETS contains an invalid administrator username."
+            continue
+        }
+        $usernameKey = $username.ToLowerInvariant()
+        if ($seenUsers.ContainsKey($usernameKey)) {
+            Add-Issue "ADMIN_TOTP_SECRETS contains a duplicate or super-admin username."
+        } else {
+            $seenUsers[$usernameKey] = $true
+        }
+
+        if ([string]::IsNullOrWhiteSpace($secret) -or (Test-Placeholder $secret)) {
+            Add-Issue "ADMIN_TOTP_SECRETS contains an empty or placeholder secret."
+            continue
+        }
+        if (-not (Test-StrongTotpSecret $secret)) {
+            Add-Issue "Each ADMIN_TOTP_SECRETS secret must be a high-entropy Base32 secret in complete 8-character blocks with at least 32 characters."
+            continue
+        }
+        if ($seenSecrets.ContainsKey($secret)) {
+            Add-Issue "ADMIN_TOTP_SECRETS secrets must be independent."
+        } else {
+            $seenSecrets[$secret] = $true
+        }
     }
 }
 
@@ -260,15 +401,29 @@ Require-Exact $EnvValues "RATE_LIMIT_REDIS_ENABLED" "true"
 Require-Exact $EnvValues "RATE_LIMIT_REDIS_FAIL_CLOSED" "true"
 Require-Exact $EnvValues "BRUTE_FORCE_REDIS_ENABLED" "true"
 Require-Exact $EnvValues "BRUTE_FORCE_REDIS_FAIL_CLOSED" "true"
+Require-Exact $EnvValues "TOTP_REPLAY_FAIL_CLOSED" "true"
 Require-Exact $EnvValues "ANTIBOT_ENABLED" "true"
+Require-Exact $EnvValues "ANTIBOT_LOG_RETENTION_ENABLED" "true"
+Require-IntRange $EnvValues "ANTIBOT_LOG_RETENTION_DAYS" 1 365
 Require-Exact $EnvValues "RECAPTCHA_ENABLED" "true"
 Require-Exact $EnvValues "REGISTRATION_RECAPTCHA_REQUIRED" "true"
 Require-Exact $EnvValues "SCRAPLING_ALLOW_UNAUTHENTICATED" "false"
+Require-Exact $EnvValues "SERVER_FORWARD_HEADERS_STRATEGY" "none"
+Require-Exact $EnvValues "TRUST_PROXY_HEADERS" "true"
+
+$frontendContainerIp = Get-EnvValue $EnvValues "FRONTEND_CONTAINER_IP"
+$trustedProxyCidrs = Get-EnvValue $EnvValues "TRUSTED_PROXY_CIDRS"
+if ([string]::IsNullOrWhiteSpace($frontendContainerIp)) {
+    Add-Issue "FRONTEND_CONTAINER_IP must be set for $Stage."
+} elseif ($trustedProxyCidrs -cne "$frontendContainerIp/32") {
+    Add-Issue "TRUSTED_PROXY_CIDRS must exactly match FRONTEND_CONTAINER_IP/32 for $Stage; expected '$frontendContainerIp/32', got '$trustedProxyCidrs'."
+}
 
 foreach ($name in @(
     "JWT_SECRET",
     "CSRF_SIGNING_SECRET",
     "CACHE_KEY_HMAC_SECRET",
+    "METRICS_SCRAPE_TOKEN",
     "ADMIN_ENCRYPTION_KEY",
     "PAYMENT_CALLBACK_SECRET",
     "DB_PASSWORD",
@@ -281,7 +436,8 @@ foreach ($name in @(
     "VITE_AMAP_KEY",
     "VITE_AMAP_SECURITY_CODE",
     "GRAFANA_ADMIN_PASSWORD",
-    "ALERTMANAGER_WEBHOOK_URL"
+    "ALERTMANAGER_WEBHOOK_URL",
+    "APP_VERSION"
 )) {
     Require-RealValue $EnvValues $name
 }
@@ -295,6 +451,11 @@ if ($cacheKeyHmacSecret.Length -lt 64) {
     Add-Issue "CACHE_KEY_HMAC_SECRET must be at least 64 characters for $Stage."
 }
 
+$metricsScrapeToken = Get-EnvValue $EnvValues "METRICS_SCRAPE_TOKEN"
+if ($metricsScrapeToken.Length -lt 64) {
+    Add-Issue "METRICS_SCRAPE_TOKEN must be at least 64 characters for $Stage."
+}
+
 $dbSslMode = Get-EnvValue $EnvValues "DB_SSL_MODE" "REQUIRED"
 if ($dbSslMode -notin @("REQUIRED", "VERIFY_IDENTITY")) {
     Add-Issue "DB_SSL_MODE must be REQUIRED or VERIFY_IDENTITY for $Stage, got '$dbSslMode'."
@@ -302,6 +463,7 @@ if ($dbSslMode -notin @("REQUIRED", "VERIFY_IDENTITY")) {
 
 Require-Base64KeySet (Get-EnvValue $EnvValues "PII_KEYS") (Get-EnvValue $EnvValues "PII_ACTIVE_KID")
 Require-Base32TotpSecret $EnvValues "SUPER_ADMIN_TOTP_SECRET"
+Validate-AdminTotpSecrets $EnvValues
 
 $piiMigration = (Get-EnvValue $EnvValues "PII_MIGRATION_ENABLED" "false").ToLowerInvariant()
 if ($piiMigration -eq "true") {

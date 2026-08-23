@@ -15,8 +15,10 @@ interface ErrorPayload {
   timestamp: string
 }
 
-const ERROR_REPORT_URL = import.meta.env.VITE_FRONTEND_ERROR_REPORT_URL as string | undefined
-const RELEASE = (import.meta.env.VITE_APP_VERSION as string | undefined) || 'development'
+const ERROR_REPORT_URL = (import.meta.env.VITE_FRONTEND_ERROR_REPORT_URL as string | undefined)
+  || (import.meta.env.PROD ? '/api/client-errors' : undefined)
+const RELEASE = (import.meta.env.VITE_APP_VERSION as string | undefined)
+  || (import.meta.env.DEV ? 'development' : 'unknown')
 const MAX_REPORTS_PER_MINUTE = 5
 const SENSITIVE_KEY_PATTERN = '(?:token|jwt|secret|password|authorization|code|key|api[_-]?key|access[_-]?token|refresh[_-]?token|auth[_-]?token|id[_-]?token|jwt[_-]?token|user[_-]?token|bearer[_-]?token|xsrf[_-]?token|csrf[_-]?token|x-xsrf-token|session|cookie)'
 const QUERY_REDACTION_PATTERN = new RegExp(`\\b(${SENSITIVE_KEY_PATTERN}=)[^&\\s]+`, 'gi')

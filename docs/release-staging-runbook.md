@@ -15,12 +15,14 @@ Prepare these files before running the preflight:
   with:
 
 ```powershell
-node scripts/resolve-docker-image-digests.mjs --evidence --verifier=<name-or-email> --target-platform=multi-platform-index > docker-digest-evidence.json
+node scripts/resolve-docker-image-digests.mjs --evidence --verifier=<name-or-email> --target-platform=multi-platform-index --output=docker-digest-evidence.json
 ```
 
 Do not hand-edit or invent `sha256:` values in an offline environment. If the
 evidence is missing, expired by policy, or owned by the wrong verifier, stop and
-regenerate it from the registry.
+regenerate it from the registry. Keep the `--output` form: it replaces the
+evidence atomically only after every required lookup succeeds; shell redirection
+can truncate the prior evidence before a failed lookup is reported.
 
 ## 2. Offline Preflight
 
@@ -109,8 +111,27 @@ Before promotion:
   file are available.
 - Confirm database backup/snapshot restore instructions have been rehearsed.
 - Confirm `PII_MIGRATION_ENABLED=false` is the rollback default.
-- Confirm admin access still requires TOTP and `SUPER_ADMIN_TOTP_SECRET` is not
-  a placeholder.
+- Confirm every administrator has an independent TOTP secret: keep the required
+  `SUPER_ADMIN_TOTP_SECRET` for the configured super-admin and, when ordinary
+  administrators exist, set `ADMIN_TOTP_SECRETS` to semicolon-separated
+  `username=Base32Secret` entries. The map may be empty for a deliberate
+  super-admin-only installation. Generate every production secret with a CSPRNG;
+  preflight requires at least 160 bits in complete Base32 blocks and rejects
+  placeholders, published test values, low-diversity material, obvious Base32
+  sequences, periodic repeated blocks, malformed entries, duplicate usernames,
+  and reused secrets without printing secret values.
+- When rotating or removing an administrator TOTP secret, stop or drain all
+  administrator authentication and API traffic first. Atomically update the
+  shared configuration, fully restart every instance, verify no old instance is
+  serving, then restore administrator traffic. Only one credential is active per
+  administrator; do not perform a rolling old/new-secret deployment. JWTs are
+  bound to the current credential, so the new configuration rejects tokens minted
+  for the superseded secret while an old instance could still accept or issue them.
+- Rotate `CACHE_KEY_HMAC_SECRET` with the same stop/drain boundary: it derives
+  both Redis TOTP replay-scope labels and administrator JWT `mfb` bindings.
+  Atomically update the shared secret, fully restart every instance, verify that
+  no old-key process remains, then restore administrator traffic and require
+  administrator reauthentication. Never use a rolling mixed-key deployment.
 - Confirm `PAYMENT_MOCK_CALLBACK_ENABLED=false`, `SEED_DEMO_USERS=false`, and
   `SEED_CONTENT_ENABLED=false`.
 

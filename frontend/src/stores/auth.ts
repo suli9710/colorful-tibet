@@ -282,21 +282,37 @@ export const clearStoredAuth = () => {
   bumpSessionVersion()
 }
 
+const SESSION_REFRESH_TIMEOUT_MS = 10_000
+
+class SessionRefreshHttpError extends Error {
+  constructor(readonly status: number) {
+    super(`Session refresh failed with status ${status}`)
+    this.name = 'SessionRefreshHttpError'
+  }
+}
+
 const fetchCurrentUser = async (): Promise<RawAuthUser> => {
   const locale = readStorage(getLocalStorage(), 'locale') || 'zh'
-  const response = await fetch(`${normalizedApiBaseURL()}${endpoints.auth.me}`, {
-    credentials: sameOriginApi ? 'include' : 'omit',
-    headers: {
-      Accept: 'application/json',
-      'Accept-Language': locale
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), SESSION_REFRESH_TIMEOUT_MS)
+  try {
+    const response = await fetch(`${normalizedApiBaseURL()}${endpoints.auth.me}`, {
+      credentials: sameOriginApi ? 'include' : 'omit',
+      headers: {
+        Accept: 'application/json',
+        'Accept-Language': locale
+      },
+      signal: controller.signal
+    })
+
+    if (!response.ok) {
+      throw new SessionRefreshHttpError(response.status)
     }
-  })
 
-  if (!response.ok) {
-    throw new Error(`Session refresh failed with status ${response.status}`)
+    return response.json()
+  } finally {
+    clearTimeout(timeout)
   }
-
-  return response.json()
 }
 
 export const useAuthStore = defineStore('auth', () => {
@@ -337,8 +353,12 @@ export const useAuthStore = defineStore('auth', () => {
       try {
         const currentUser = await fetchCurrentUser()
         return applySession(currentUser)
-      } catch {
-        logout()
+      } catch (error) {
+        // Only an explicit authentication rejection proves that the cookie-backed session is
+        // invalid. Transient network, timeout, and 5xx failures must not destroy local state.
+        if (error instanceof SessionRefreshHttpError && error.status === 401) {
+          logout()
+        }
         return false
       } finally {
         sessionChecked.value = true

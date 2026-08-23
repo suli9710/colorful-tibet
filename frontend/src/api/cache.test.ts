@@ -58,11 +58,11 @@ function createApi(rawGet: TestGet) {
   }
 }
 
-const response = (data: unknown): AxiosResponse => ({
+const response = (data: unknown, headers: Record<string, string> = {}): AxiosResponse => ({
   data,
   status: 200,
   statusText: 'OK',
-  headers: {},
+  headers,
   config: { headers: {} } as InternalAxiosRequestConfig
 })
 
@@ -82,14 +82,14 @@ describe('GET cache storage guardrails', () => {
 
     installGetCache(api)
 
-    await api.get('/scenic-spots')
-    await api.get('/scenic-spots')
+    await api.get('/spots')
+    await api.get('/spots')
 
     expect(localStorage.getItem('user')).toBeNull()
     expect(rawGet).toHaveBeenCalledTimes(1)
   })
 
-  it('scopes public GETs by session state and version without user id or username', async () => {
+  it('does not cache even public GETs while an authenticated session is present', async () => {
     const { localStorage } = installBrowserStorage()
     localStorage.setItem('auth-session-version', '5')
     const { installGetCache } = await import('./cache')
@@ -97,12 +97,10 @@ describe('GET cache storage guardrails', () => {
     rawGet
       .mockResolvedValueOnce(response({ seq: 1 }))
       .mockResolvedValueOnce(response({ seq: 2 }))
-      .mockResolvedValueOnce(response({ seq: 3 }))
     const api = createApi(rawGet)
 
     installGetCache(api)
 
-    await expect(api.get('/scenic-spots')).resolves.toMatchObject({ data: { seq: 1 } })
     localStorage.setItem('user', JSON.stringify({
       version: 2,
       storedAt: Date.now(),
@@ -111,20 +109,10 @@ describe('GET cache storage guardrails', () => {
         username: 'traveler'
       }
     }))
-    await expect(api.get('/scenic-spots')).resolves.toMatchObject({ data: { seq: 2 } })
-    localStorage.setItem('user', JSON.stringify({
-      version: 2,
-      storedAt: Date.now(),
-      user: {
-        id: 99,
-        username: 'another-traveler'
-      }
-    }))
-    await expect(api.get('/scenic-spots')).resolves.toMatchObject({ data: { seq: 2 } })
-    localStorage.setItem('auth-session-version', '6')
-    await expect(api.get('/scenic-spots')).resolves.toMatchObject({ data: { seq: 3 } })
+    await expect(api.get('/spots')).resolves.toMatchObject({ data: { seq: 1 } })
+    await expect(api.get('/spots')).resolves.toMatchObject({ data: { seq: 2 } })
 
-    expect(rawGet).toHaveBeenCalledTimes(3)
+    expect(rawGet).toHaveBeenCalledTimes(2)
   })
 
   it('does not keep oversized responses in the in-memory GET cache', async () => {
@@ -138,8 +126,8 @@ describe('GET cache storage guardrails', () => {
 
     installGetCache(api)
 
-    await api.get('/scenic-spots')
-    await expect(api.get('/scenic-spots')).resolves.toMatchObject({ data: { text: 'small' } })
+    await api.get('/spots')
+    await expect(api.get('/spots')).resolves.toMatchObject({ data: { text: 'small' } })
 
     expect(rawGet).toHaveBeenCalledTimes(2)
   })
@@ -231,5 +219,43 @@ describe('GET cache storage guardrails', () => {
     await expect(api.get('/spots/recommendations', { params: { userId: 42 } })).resolves.toMatchObject({ data: { seq: 4 } })
 
     expect(rawGet).toHaveBeenCalledTimes(4)
+  })
+
+  it('does not cache new GET endpoints unless they are explicitly allowlisted', async () => {
+    installBrowserStorage()
+    const { installGetCache } = await import('./cache')
+    const rawGet = createRawGet()
+    rawGet
+      .mockResolvedValueOnce(response({ seq: 1 }))
+      .mockResolvedValueOnce(response({ seq: 2 }))
+    const api = createApi(rawGet)
+
+    installGetCache(api)
+
+    await expect(api.get('/new-personalized-feed')).resolves.toMatchObject({ data: { seq: 1 } })
+    await expect(api.get('/new-personalized-feed')).resolves.toMatchObject({ data: { seq: 2 } })
+    expect(rawGet).toHaveBeenCalledTimes(2)
+  })
+
+  it.each([
+    ['Cache-Control private', { 'cache-control': 'private, max-age=60' }],
+    ['Cache-Control no-store', { 'Cache-Control': 'no-store' }],
+    ['Cache-Control no-cache', { 'Cache-Control': 'no-cache' }],
+    ['Cache-Control max-age zero', { 'Cache-Control': 'public, max-age=0' }],
+    ['Vary wildcard', { Vary: '*' }]
+  ])('honors %s response headers', async (_label, headers) => {
+    installBrowserStorage()
+    const { installGetCache } = await import('./cache')
+    const rawGet = createRawGet()
+    rawGet
+      .mockResolvedValueOnce(response({ seq: 1 }, headers))
+      .mockResolvedValueOnce(response({ seq: 2 }))
+    const api = createApi(rawGet)
+
+    installGetCache(api)
+
+    await api.get('/spots')
+    await expect(api.get('/spots')).resolves.toMatchObject({ data: { seq: 2 } })
+    expect(rawGet).toHaveBeenCalledTimes(2)
   })
 })

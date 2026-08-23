@@ -29,6 +29,30 @@ public interface AiRouteRecordRepository extends JpaRepository<AiRouteRecord, Lo
 
     Optional<AiRouteRecord> findFirstByUserIdAndJobIdOrderByUpdatedAtDesc(Long userId, String jobId);
 
+    /**
+     * The record a cache hit should refresh instead of inserting a new one. Serving a cached route
+     * used to persist a fresh full-content row on every request, so repeatedly asking for the same
+     * itinerary grew the table without bound. Manually saved records are excluded so a user's kept
+     * routes are never overwritten.
+     */
+    @Query("""
+            SELECT r FROM AiRouteRecord r
+            WHERE r.user.id = :userId
+              AND r.jobId IS NULL
+              AND r.days = :days
+              AND r.budget = :budget
+              AND r.preference = :preference
+              AND r.locale = :locale
+              AND (r.manuallySaved IS NULL OR r.manuallySaved = false)
+            ORDER BY r.updatedAt DESC
+            """)
+    List<AiRouteRecord> findReusableCachedRecords(@Param("userId") Long userId,
+                                                  @Param("days") Integer days,
+                                                  @Param("budget") String budget,
+                                                  @Param("preference") String preference,
+                                                  @Param("locale") String locale,
+                                                  Pageable pageable);
+
     @Query("""
             SELECT r FROM AiRouteRecord r
             WHERE r.status = :status

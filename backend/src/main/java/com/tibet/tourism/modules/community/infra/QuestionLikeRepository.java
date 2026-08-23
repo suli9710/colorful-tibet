@@ -1,4 +1,5 @@
 package com.tibet.tourism.modules.community.infra;
+import java.util.List;
 import com.tibet.tourism.modules.community.domain.QuestionLike;
 import com.tibet.tourism.modules.community.domain.TravelQuestion;
 import com.tibet.tourism.modules.user.domain.User;
@@ -30,4 +31,8 @@ public interface QuestionLikeRepository extends JpaRepository<QuestionLike, Long
             VALUES (:questionId, :userId, CURRENT_TIMESTAMP)
             """, nativeQuery = true)
     int insertIgnore(@Param("questionId") Long questionId, @Param("userId") Long userId);
+
+    /** Questions (owned by other users) whose like_count must be recomputed after this user's likes are deleted. */
+    @Query("SELECT DISTINCT ql.question.id FROM QuestionLike ql WHERE ql.user.id = :userId")
+    List<Long> findLikedQuestionIdsByUserId(@Param("userId") Long userId);
 }

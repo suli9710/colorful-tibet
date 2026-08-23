@@ -110,6 +110,16 @@
           {{ errorMessage }}<span v-if="lockCountdown > 0">（{{ lockCountdown }}秒后可重试）</span>
         </div>
 
+        <motion.div
+          v-if="isRecaptchaV2Enabled()"
+          :initial="authItemInitial"
+          :animate="authItemAnimate"
+          :transition="authItemTransition(0.4)"
+          class="min-h-[78px]"
+        >
+          <div ref="recaptchaContainer" class="flex justify-center"></div>
+        </motion.div>
+
         <motion.div :initial="authItemInitial" :animate="authItemAnimate" :transition="authItemTransition(0.44)">
           <motion.button type="submit" :disabled="isLoginSubmitDisabled"
                   :whileHover="isLoginSubmitDisabled ? {} : authSubmitHover"
@@ -144,14 +154,23 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { motion, useReducedMotion } from 'motion-v'
 import api, { clearTokenCache, endpoints, type LoginRequest, type LoginResponse } from '../api'
 import { useAuthStore } from '../stores/auth'
 import { safeClientErrorMessage, summarizeClientError } from '../utils/errorMonitoring'
-import { getRecaptchaToken, isRecaptchaError, isRecaptchaV3Enabled } from '../utils/recaptcha'
+import {
+  RecaptchaError,
+  getRecaptchaToken,
+  getRecaptchaWidgetResponse,
+  isRecaptchaError,
+  isRecaptchaV2Enabled,
+  isRecaptchaV3Enabled,
+  renderRecaptchaCheckbox,
+  resetRecaptchaWidget
+} from '../utils/recaptcha'
 import { resolvePostLoginRedirect } from '../router/authRedirect'
 import {
   authCardAnimate,
@@ -275,6 +294,30 @@ const requiresSecondaryAuth = (error: unknown) => {
     && data.requiresSecondaryAuth === true
 }
 
+const recaptchaContainer = ref<HTMLElement | null>(null)
+const recaptchaWidgetId = ref<number | null>(null)
+let loginUnmounted = false
+let recaptchaUnavailable = false
+
+const getOptionalLoginRecaptchaToken = async () => {
+  recaptchaUnavailable = false
+  if (isRecaptchaV2Enabled()) {
+    // The backend demands a token once login step-up kicks in, so a v2 deployment must send the
+    // checkbox response; degrading to no token would lock the account out permanently.
+    const widgetResponse = getRecaptchaWidgetResponse(recaptchaWidgetId.value)
+    if (!widgetResponse) throw new RecaptchaError()
+    return widgetResponse
+  }
+  if (!isRecaptchaV3Enabled()) return ''
+  try {
+    return await getRecaptchaToken('login')
+  } catch (error) {
+    recaptchaUnavailable = true
+    console.warn('Login reCAPTCHA unavailable; continuing with server-side risk controls:', summarizeClientError(error))
+    return ''
+  }
+}
+
 const handleLogin = async () => {
   if (isLoginSubmitDisabled.value) return
 
@@ -286,7 +329,7 @@ const handleLogin = async () => {
       password: form.value.password,
       ...(requiresSecondaryPassword.value ? { secondaryPassword: form.value.secondaryPassword } : {})
     }
-    const recaptchaToken = isRecaptchaV3Enabled() ? await getRecaptchaToken('login') : ''
+    const recaptchaToken = await getOptionalLoginRecaptchaToken()
     const { data: user } = await api.post<LoginResponse>(endpoints.auth.login, payload, {
       headers: recaptchaToken ? { 'X-Recaptcha-Token': recaptchaToken } : {}
     })
@@ -302,6 +345,12 @@ const handleLogin = async () => {
     router.push(resolvePostLoginRedirect(route.query.redirect, user.role))
   } catch (error: unknown) {
     if (isRecaptchaError(error)) {
+      errorMessage.value = t('security.recaptchaFailed')
+      resetRecaptchaWidget(recaptchaWidgetId.value)
+      return
+    }
+    if (recaptchaUnavailable && responseStatus(error) === 403) {
+      // The step-up check rejected us because the token we swallowed above never reached the server.
       errorMessage.value = t('security.recaptchaFailed')
       return
     }
@@ -319,8 +368,31 @@ const handleLogin = async () => {
     if (lockSeconds > 0) {
       startCountdown(lockSeconds)
     }
+    resetRecaptchaWidget(recaptchaWidgetId.value)
   } finally {
     loading.value = false
   }
 }
+
+onMounted(async () => {
+  if (!isRecaptchaV2Enabled()) return
+  await nextTick()
+  if (!recaptchaContainer.value) return
+  try {
+    const widgetId = await renderRecaptchaCheckbox(recaptchaContainer.value, {
+      onExpired: () => resetRecaptchaWidget(recaptchaWidgetId.value),
+      onError: () => resetRecaptchaWidget(recaptchaWidgetId.value)
+    })
+    if (loginUnmounted) return
+    recaptchaWidgetId.value = widgetId
+  } catch (error: unknown) {
+    if (loginUnmounted) return
+    console.error('Failed to render login reCAPTCHA:', summarizeClientError(error))
+    errorMessage.value = t('security.recaptchaFailed')
+  }
+})
+
+onUnmounted(() => {
+  loginUnmounted = true
+})
 </script>

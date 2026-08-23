@@ -15,7 +15,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import java.util.concurrent.Executor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -60,7 +62,32 @@ public class ItemBasedRecommendationService {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    @Qualifier("recommendationExecutor")
+    private Executor recommendationExecutor;
+
     private volatile boolean redisCacheWarningLogged = false;
+
+    /**
+     * Queues a matrix precompute on the recommendation pool. Safe to call from a request thread:
+     * {@code precomputeItemSimilarityMatrix} already refuses to run concurrently with itself.
+     */
+    private void schedulePrecompute() {
+        if (recommendationExecutor == null || precomputeInProgress.get()) {
+            return;
+        }
+        try {
+            recommendationExecutor.execute(() -> {
+                try {
+                    precomputeItemSimilarityMatrix();
+                } catch (RuntimeException e) {
+                    logger.warn("Background item similarity precompute failed: {}", e.getClass().getSimpleName());
+                }
+            });
+        } catch (RuntimeException e) {
+            logger.warn("Could not queue item similarity precompute: {}", e.getClass().getSimpleName());
+        }
+    }
 
     /**
      * 预计算景点相似度矩阵（离线计算）
@@ -282,9 +309,12 @@ public class ItemBasedRecommendationService {
             matrixSnapshot = itemSimilarityMatrix;
         }
         if (matrixSnapshot.isEmpty()) {
-            logger.warn("Item similarity matrix empty; starting precompute");
-            precomputeItemSimilarityMatrix();
-            matrixSnapshot = itemSimilarityMatrix;
+            // Precomputing here would run an O(users x items^2) sweep on the caller's HTTP thread.
+            // Hand it to the recommendation pool and let this request fall back to the other
+            // strategies; the matrix will be ready for subsequent requests.
+            logger.warn("Item similarity matrix empty; scheduling precompute off the request thread");
+            schedulePrecompute();
+            return Collections.emptyMap();
         }
 
         // 获取用户的历史访问记录（用于评分权重）

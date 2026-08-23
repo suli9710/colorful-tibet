@@ -1,10 +1,12 @@
 package com.tibet.tourism.common.security;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.HexFormat;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.Set;
 import org.slf4j.Logger;
@@ -48,7 +50,10 @@ public class LoginAttemptService {
             String.class);
 
     private final StringRedisTemplate redisTemplate;
-    private final ConcurrentHashMap<String, AttemptRecord> memory = new ConcurrentHashMap<>();
+    private final Cache<String, AttemptRecord> memory = Caffeine.newBuilder()
+            .maximumSize(MAX_INMEMORY_ENTRIES)
+            .expireAfterWrite(Duration.ofDays(7))
+            .build();
 
     @Value("${app.security.brute-force.enabled:true}")
     private boolean enabled;
@@ -190,8 +195,6 @@ public class LoginAttemptService {
             return backendUnavailableDecision();
         }
 
-        evictStaleInMemory(now);
-
         LoginAttemptDecision blocked = strongestBlockedDecision(
                 lockState("account", accountRecord, safeThreshold(maxAttempts)),
                 lockState("pair", pairRecord, safeThreshold(pairMaxAttempts)),
@@ -270,7 +273,7 @@ public class LoginAttemptService {
             return redisRecord;
         }
 
-        AttemptRecord newRecord = memory.compute(key, (k, existing) -> {
+        AttemptRecord newRecord = memory.asMap().compute(key, (k, existing) -> {
             int newFailures = (existing == null) ? 1 : existing.failures + 1;
             return new AttemptRecord(newFailures, now);
         });
@@ -307,18 +310,18 @@ public class LoginAttemptService {
         if (redisEnabled) {
             if (redisTemplate == null) {
                 failClosedIfRedisUnavailable(null);
-                return memory.get(key);
+                return memory.getIfPresent(key);
             }
             try {
                 String value = redisTemplate.opsForValue().get(REDIS_PREFIX + key);
                 if (value == null) {
-                    memory.remove(key);
+                    memory.invalidate(key);
                     return null;
                 }
 
                 AttemptRecord redisRecord = fromRedisValue(value);
                 if (redisRecord != null) {
-                    return mergeMaxFailures(redisRecord, memory.get(key));
+                    return mergeMaxFailures(redisRecord, memory.getIfPresent(key));
                 }
                 logger.debug("Ignoring unreadable brute-force Redis payload for keyHash={}", shortHash(key));
             } catch (Exception e) {
@@ -329,7 +332,7 @@ public class LoginAttemptService {
                 }
             }
         }
-        return memory.get(key);
+        return memory.getIfPresent(key);
     }
 
     private void syncToRedis(String key, AttemptRecord record) {
@@ -359,13 +362,6 @@ public class LoginAttemptService {
         return LoginAttemptDecision.blocked("backend", BACKEND_UNAVAILABLE_RETRY_SECONDS, 0, false);
     }
 
-    private void evictStaleInMemory(long now) {
-        if (memory.size() >= MAX_INMEMORY_ENTRIES) {
-            long cutoff = now - TimeUnit.HOURS.toMillis(1);
-            memory.entrySet().removeIf(entry -> entry.getValue().lastFailureAt < cutoff);
-        }
-    }
-
     private void deleteRecord(String key) {
         if (redisEnabled && redisTemplate != null) {
             try {
@@ -374,7 +370,11 @@ public class LoginAttemptService {
                 logger.debug("Redis unavailable for brute-force delete: {}", SensitiveLogSanitizer.exceptionSummary(e));
             }
         }
-        memory.remove(key);
+        memory.invalidate(key);
+    }
+
+    long inMemoryMaximumSize() {
+        return memory.policy().eviction().orElseThrow().getMaximum();
     }
 
     private AttemptRecord mergeMaxFailures(AttemptRecord a, AttemptRecord b) {
