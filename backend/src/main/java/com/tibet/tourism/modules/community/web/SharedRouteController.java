@@ -104,7 +104,9 @@ public class SharedRouteController {
                     dto.getContent(),
                     dto.getDays(),
                     dto.getBudget(),
-                    dto.getPreference()
+                    dto.getPreference(),
+                    dto.getTravelStatus(),
+                    dto.getTravelMonth()
             );
             return ResponseEntity.ok(SharedRouteResponse.fromEntity(route, userId));
         } catch (Exception e) {

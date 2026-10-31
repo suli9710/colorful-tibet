@@ -26,6 +26,7 @@ import com.tibet.tourism.modules.route.web.dto.itinerary.ItineraryQuoteItemRespo
 import com.tibet.tourism.modules.route.web.dto.itinerary.ItineraryQuoteResponse;
 import com.tibet.tourism.modules.route.web.dto.itinerary.ItineraryResponse;
 import com.tibet.tourism.modules.route.web.dto.itinerary.ItinerarySummaryResponse;
+import com.tibet.tourism.modules.route.web.dto.itinerary.UpdateItineraryItemRequest;
 import com.tibet.tourism.modules.spot.domain.ScenicSpot;
 import com.tibet.tourism.modules.spot.infra.ScenicSpotRepository;
 import com.tibet.tourism.modules.user.domain.User;
@@ -84,6 +85,8 @@ public class ItineraryService {
 
     @Transactional
     public ItineraryResponse generateItinerary(User user, GenerateItineraryRequest request) {
+        if (request.getTravelers() != null && (request.getTravelers() < 1 || request.getTravelers() > 20)) throw new IllegalArgumentException("出行人数必须为1至20人");
+        if (request.getStartDate() != null && request.getStartDate().isBefore(LocalDate.now())) throw new IllegalArgumentException("出发日期不能早于今天");
         String versionType = normalizeVersionType(request.getVersionType());
         Itinerary itinerary = buildItinerary(
                 user,
@@ -152,9 +155,9 @@ public class ItineraryService {
         if (!itinerary.getId().equals(itineraryId) || !itinerary.getUser().getId().equals(user.getId())) {
             throw new SecurityException("无权操作该行程节点");
         }
-        if (item.getBookingStatus() == ItineraryItem.BookingStatus.BOOKED && item.getBookingReferenceId() != null) {
+        if ((item.getBookingStatus() == ItineraryItem.BookingStatus.BOOKED || item.getBookingStatus() == ItineraryItem.BookingStatus.INQUIRY_SUBMITTED) && item.getBookingReferenceId() != null) {
             return new BookItineraryItemResponse(item.getId(), item.getBookingReferenceType(),
-                    item.getBookingReferenceId(), money(item.getEstimatedCost()), "该节点已预订");
+                    item.getBookingReferenceId(), money(item.getEstimatedCost()), "该节点已提交咨询，实际确认状态请查看订单");
         }
 
         int travelers = Math.max(1, request.getTravelers() == null ? 1 : request.getTravelers());
@@ -168,8 +171,32 @@ public class ItineraryService {
     }
 
     @Transactional
+    public ItineraryResponse updateItem(User user, Long itineraryId, Long itemId, UpdateItineraryItemRequest request) {
+        if (request == null || request.startTime() == null || !request.startTime().matches("^(?:[01][0-9]|2[0-3]):[0-5][0-9]$")
+                || request.durationMinutes() == null || request.durationMinutes() < 1 || request.durationMinutes() > 1440
+                || request.expectedVersion() == null || request.expectedVersion() < 0) {
+            throw new IllegalArgumentException("有效时间和时长不能为空");
+        }
+        ItineraryItem item = itineraryItemRepository.findByIdForUpdate(itemId)
+                .orElseThrow(() -> new NoSuchElementException("行程节点不存在"));
+        Itinerary itinerary = item.getDay().getItinerary();
+        if (!itinerary.getId().equals(itineraryId) || !itinerary.getUser().getId().equals(user.getId())) {
+            throw new SecurityException("无权调整该行程节点");
+        }
+        if (!Objects.equals(item.getVersion(), request.expectedVersion())) throw new org.springframework.dao.OptimisticLockingFailureException("行程项目已被更新");
+        if (item.getBookingReferenceId() != null) throw new IllegalArgumentException("已提交咨询的项目不能改变时间，请先处理对应订单");
+        item.setStartTime(request.startTime());
+        item.setDurationMinutes(request.durationMinutes());
+        itineraryItemRepository.saveAndFlush(item);
+        itinerary.setSourceContent(buildSourceContent(itinerary));
+        // Saving a conflicting draft is allowed; readiness must expose the conflict, never certify it.
+        return toResponse(itineraryRepository.save(itinerary));
+    }
+
+    @Transactional
     public ItineraryResponse createVersion(User user, Long itineraryId, CreateItineraryVersionRequest request) {
         Itinerary parent = loadItinerary(user, itineraryId);
+        if (parent.getTravelers() == null) throw new IllegalArgumentException("历史行程未记录人数，请按实际人数重新生成，不自动沿用默认人数");
         String versionType = normalizeVersionType(request.getVersionType());
         Itinerary version = buildItinerary(
                 user,
@@ -179,7 +206,7 @@ public class ItineraryService {
                 normalizeBudget(parent.getBudget(), versionType),
                 parent.getPreference(),
                 versionType,
-                2
+                parent.getTravelers() == null ? 1 : parent.getTravelers()
         );
         return toResponse(itineraryRepository.save(version));
     }
@@ -203,20 +230,23 @@ public class ItineraryService {
         itinerary.setUser(user);
         itinerary.setParentItinerary(parent);
         itinerary.setDays(days);
+        itinerary.setTravelers(travelers);
+        itinerary.setGenerationRuleVersion(ItineraryTrustPolicy.VERSION);
         itinerary.setStartDate(startDate);
         itinerary.setBudget(budget);
         itinerary.setPreference(preference);
         itinerary.setVersionType(versionType);
         itinerary.setVersionLabel(versionLabel(versionType));
-        itinerary.setTitle("西藏" + days + "天" + versionLabel(versionType) + "可预订行程");
+        itinerary.setTitle("西藏" + days + "天" + versionLabel(versionType) + "行程草案");
 
+        Map<Long, List<RoomType>> roomCache = new HashMap<>();
         for (int dayNumber = 1; dayNumber <= days; dayNumber++) {
             ScenicSpot spot = pickSpot(spots, dayNumber, versionType);
             ItineraryDay day = buildDay(dayNumber, startDate.plusDays(dayNumber - 1L), spot, budget, versionType);
             addTransportItem(day, dayNumber, budget, versionType);
             addSpotItem(day, spot, dayNumber, travelers, spots, versionType);
             addMealItem(day, travelers, budget);
-            addHotelItem(day, hotels, spot, travelers, dayNumber, budget, versionType);
+            addHotelItem(day, hotels, spot, travelers, dayNumber, budget, versionType, roomCache);
             day.setEstimatedCost(sumDay(day));
             itinerary.addDay(day);
         }
@@ -266,7 +296,7 @@ public class ItineraryService {
                              List<ScenicSpot> alternatives,
                              String versionType) {
         if (spot == null) {
-            ItineraryItem note = baseItem(ItineraryItem.ItemType.NOTE, "10:30", "高原适应与自由活动", 180, 2);
+            ItineraryItem note = baseItem(ItineraryItem.ItemType.NOTE, "11:00", "高原适应与自由活动", 180, 2);
             note.setDescription("当天以适应海拔和轻量城市漫步为主，不安排强制景点。");
             note.setEstimatedCost(ZERO);
             day.addItem(note);
@@ -275,7 +305,7 @@ public class ItineraryService {
 
         int altitude = parseAltitude(spot);
         BigDecimal price = estimateSpotPrice(spot, day.getTravelDate()).multiply(BigDecimal.valueOf(travelers));
-        ItineraryItem item = baseItem(ItineraryItem.ItemType.SCENIC_SPOT, "10:30", spot.getName(), 180, 2);
+        ItineraryItem item = baseItem(ItineraryItem.ItemType.SCENIC_SPOT, "11:00", spot.getName(), 180, 2);
         item.setDescription(buildSpotDescription(spot, versionType));
         item.setEstimatedCost(money(price));
         item.setAltitudeMeters(altitude == 0 ? null : altitude);
@@ -308,11 +338,11 @@ public class ItineraryService {
                               int travelers,
                               int dayNumber,
                               String budget,
-                              String versionType) {
+                              String versionType, Map<Long, List<RoomType>> roomCache) {
         Hotel hotel = pickHotel(hotels, spot, dayNumber);
-        RoomType roomType = pickRoomType(hotel, travelers, budget);
+        RoomType roomType = pickRoomType(hotel, travelers, budget, roomCache);
         ItineraryItem item = baseItem(ItineraryItem.ItemType.HOTEL, "20:30", hotel == null ? "住宿待确认" : hotel.getName(), 720, 4);
-        item.setDescription(hotel == null ? "暂未匹配到可订酒店，可先保存行程后人工补充。" : "建议入住 " + fallback(hotel.getLocation(), day.getRegion()) + "，优先选择含氧/供暖/可停车的房型。");
+        item.setDescription(hotel == null ? "未匹配到同地区住宿，需补充后核验，不自动替换为其他地区酒店。" : roomType == null ? "没有已知容量足够且有参考价格的房型，需联系供应商确认。" : "建议入住 " + fallback(hotel.getLocation(), day.getRegion()) + "，优先选择含氧/供暖/可停车的房型。");
         item.setEstimatedCost(money(roomType == null || roomType.getPrice() == null ? hotelFallbackPrice(budget) : roomType.getPrice()));
         item.setBookingAction(hotel == null || roomType == null ? ItineraryItem.BookingAction.ADD_TO_TRIP : ItineraryItem.BookingAction.BOOK_HOTEL);
         item.setBookingStatus(hotel == null || roomType == null ? ItineraryItem.BookingStatus.NOT_BOOKABLE : ItineraryItem.BookingStatus.BOOKABLE);
@@ -348,7 +378,7 @@ public class ItineraryService {
         bookingRepository.save(booking);
         orderCenterService.createFromLegacySpotBooking(booking);
 
-        item.setBookingStatus(ItineraryItem.BookingStatus.BOOKED);
+        item.setBookingStatus(ItineraryItem.BookingStatus.INQUIRY_SUBMITTED);
         item.setBookingReferenceType("SPOT_BOOKING");
         item.setBookingReferenceId(booking.getId());
         itineraryItemRepository.save(item);
@@ -362,6 +392,7 @@ public class ItineraryService {
             throw new IllegalArgumentException("该酒店节点缺少可预订房型");
         }
 
+        if (roomType.getCapacity() == null || roomType.getCapacity() < travelers) throw new IllegalArgumentException("当前房型不能确认容纳全部出行人，请更换房型");
         String guestName = StringUtils.hasText(request.getGuestName()) ? request.getGuestName() : fallback(user.getNickname(), user.getUsername());
         String phone = StringUtils.hasText(request.getPhone()) ? request.getPhone() : user.getPhone();
         if (!StringUtils.hasText(phone)) {
@@ -379,7 +410,7 @@ public class ItineraryService {
         bookingRequest.setCheckOutDate(item.getDay().getTravelDate().plusDays(1));
 
         HotelBooking saved = hotelBookingService.createBooking(user, bookingRequest);
-        item.setBookingStatus(ItineraryItem.BookingStatus.BOOKED);
+        item.setBookingStatus(ItineraryItem.BookingStatus.INQUIRY_SUBMITTED);
         item.setBookingReferenceType("HOTEL_BOOKING");
         item.setBookingReferenceId(saved.getId());
         itineraryItemRepository.save(item);
@@ -430,8 +461,9 @@ public class ItineraryService {
         if (dayNumber == 1) {
             return spots.stream()
                     .filter(spot -> containsAny(spot.getName(), "布达拉", "大昭寺", "八廓", "拉萨"))
+                    .filter(spot -> parseAltitude(spot) > 0 && parseAltitude(spot) < 3900)
                     .findFirst()
-                    .orElse(spots.get(0));
+                    .orElse(null);
         }
         int stride = "hidden".equals(versionType) ? 2 : 1;
         int index = Math.floorMod((dayNumber - 1) * stride, spots.size());
@@ -442,32 +474,39 @@ public class ItineraryService {
         if (hotels.isEmpty()) {
             return null;
         }
-        String location = spot == null ? "" : fallback(spot.getLocation(), spot.getName());
+        String location = spot == null ? "拉萨" : fallback(spot.getLocation(), "");
         return hotels.stream()
-                .filter(hotel -> StringUtils.hasText(hotel.getLocation()) && containsAny(location, hotel.getLocation()))
+                .filter(hotel -> StringUtils.hasText(hotel.getLocation())
+                        && !Set.of("西藏", "西藏自治区", "中国").contains(hotel.getLocation().trim())
+                        && containsAny(location, hotel.getLocation()))
                 .findFirst()
-                .orElse(hotels.get(Math.floorMod(dayNumber - 1, hotels.size())));
+                .orElse(null);
     }
 
-    private RoomType pickRoomType(Hotel hotel, int travelers, String budget) {
+    private RoomType pickRoomType(Hotel hotel, int travelers, String budget, Map<Long, List<RoomType>> roomCache) {
         if (hotel == null || hotel.getId() == null) {
             return null;
         }
-        List<RoomType> roomTypes = roomTypeRepository.findByHotelIdOrderBySortOrderAsc(hotel.getId());
+        List<RoomType> roomTypes = roomCache.computeIfAbsent(hotel.getId(), roomTypeRepository::findByHotelIdOrderBySortOrderAsc);
         Comparator<RoomType> priceOrder = Comparator.comparing(room -> room.getPrice() == null ? BigDecimal.ZERO : room.getPrice());
         if ("luxury".equals(budget)) {
             priceOrder = priceOrder.reversed();
         }
         return roomTypes.stream()
-                .filter(room -> room.getCapacity() == null || room.getCapacity() >= travelers)
+                .filter(room -> room.getCapacity() != null && room.getCapacity() >= travelers)
+                .filter(room -> room.getPrice() != null && room.getPrice().signum() >= 0)
+                .filter(room -> room.getInventoryUnits() != null && room.getInventoryUnits() > 0)
                 .sorted(priceOrder)
                 .findFirst()
-                .orElse(roomTypes.stream().sorted(priceOrder).findFirst().orElse(null));
+                .orElse(null);
     }
 
     private ItineraryQuoteItemResponse toQuoteItem(ItineraryDay day, ItineraryItem item) {
-        boolean bookable = item.getBookingAction() == ItineraryItem.BookingAction.BOOK_SPOT
-                || item.getBookingAction() == ItineraryItem.BookingAction.BOOK_HOTEL;
+        boolean bookable = item.getBookingAction() == ItineraryItem.BookingAction.BOOK_SPOT && item.getScenicSpot() != null
+                || item.getBookingAction() == ItineraryItem.BookingAction.BOOK_HOTEL
+                && item.getHotel() != null && item.getRoomType() != null
+                && item.getRoomType().getInventoryUnits() != null && item.getRoomType().getInventoryUnits() > 0
+                && item.getRoomType().getCapacity() != null && item.getRoomType().getCapacity() > 0;
         return new ItineraryQuoteItemResponse(
                 item.getId(),
                 day.getDayNumber(),
@@ -478,7 +517,7 @@ public class ItineraryService {
                 bookable,
                 item.getBookingAction() == null ? ItineraryItem.BookingAction.NONE.name() : item.getBookingAction().name(),
                 item.getBookingStatus() == null ? ItineraryItem.BookingStatus.NOT_BOOKABLE.name() : item.getBookingStatus().name(),
-                bookable ? "实时/缓存价" : "预估价"
+                "参考估价 · 未确认库存/履约"
         );
     }
 
@@ -498,7 +537,10 @@ public class ItineraryService {
                 itinerary.getStatus().name(),
                 itinerary.getSourceContent(),
                 itinerary.getCreatedAt(),
-                itinerary.getItineraryDays().stream().map(this::toDayResponse).toList()
+                itinerary.getItineraryDays().stream().map(this::toDayResponse).toList(),
+                ItineraryTrustPolicy.evaluate(itinerary),
+                itinerary.getTravelers(),
+                itinerary.getGenerationRuleVersion()
         );
     }
 
@@ -559,7 +601,8 @@ public class ItineraryService {
                 hotel == null ? null : hotel.getName(),
                 roomType == null ? null : roomType.getId(),
                 roomType == null ? null : roomType.getName(),
-                item.getSortOrder()
+                item.getSortOrder(),
+                item.getVersion()
         );
     }
 
@@ -569,9 +612,7 @@ public class ItineraryService {
         }
         BigDecimal unitPrice = spot.getTicketPrice() == null ? BigDecimal.ZERO : spot.getTicketPrice();
         int month = travelDate.getMonthValue();
-        if (month >= 1 && month <= 3) {
-            return ZERO;
-        }
+        // No blanket free-ticket assumption: use stored seasonal or base reference price.
 
         MonthDay travelMonthDay = MonthDay.from(travelDate);
         MonthDay may1 = MonthDay.of(5, 1);
@@ -595,6 +636,7 @@ public class ItineraryService {
     }
 
     private String altitudeRisk(int altitude) {
+        if (altitude <= 0) return "UNKNOWN";
         if (altitude >= 4700) return "HIGH";
         if (altitude >= 3900) return "MEDIUM";
         return "LOW";
@@ -623,6 +665,7 @@ public class ItineraryService {
     private String buildSourceContent(Itinerary itinerary) {
         StringBuilder builder = new StringBuilder();
         builder.append("# ").append(itinerary.getTitle()).append("\n\n");
+        builder.append("规则版本：").append(ItineraryTrustPolicy.VERSION).append("；费用均为估计，交通、预约、住宿与履约需确认。\n\n");
         builder.append("预算：").append(itinerary.getBudget()).append("；偏好：").append(itinerary.getPreference())
                 .append("；版本：").append(itinerary.getVersionLabel()).append("\n\n");
         for (ItineraryDay day : itinerary.getItineraryDays()) {

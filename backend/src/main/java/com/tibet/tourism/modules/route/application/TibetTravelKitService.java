@@ -556,13 +556,13 @@ public class TibetTravelKitService {
             ));
         }
 
-        Month month = LocalDate.now().getMonth();
+        Month month = (itinerary.getStartDate() == null ? LocalDate.now() : itinerary.getStartDate()).getMonth();
         if (month.getValue() >= Month.MAY.getValue() && month.getValue() <= Month.OCTOBER.getValue()) {
             alerts.add(new TravelAlertResponse(
                     "MEDIUM",
                     "CROWD",
                     "旺季景区客流提醒",
-                    "当前处于西藏旅游旺季，热门寺庙、湖泊和观景台更容易出现排队和停车压力。",
+                    "出行日期处于通常的旅游旺季（非实时客流），热门寺庙、湖泊和观景台更容易出现排队和停车压力。",
                     "把核心景点放在上午，备选点位放在下午。",
                     null,
                     expiresAt

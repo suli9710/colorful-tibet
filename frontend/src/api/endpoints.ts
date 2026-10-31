@@ -131,6 +131,7 @@ export const endpoints = {
     deleteQuestion: (id: number | string) => `/community/questions/${id}`
   },
   itineraries: {
+    updateItem: (itineraryId: number, itemId: number) => `/itineraries/${itineraryId}/items/${itemId}`,
     generate: '/itineraries/generate',
     my: '/itineraries/my',
     detail: (id: number) => `/itineraries/${id}`,

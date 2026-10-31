@@ -180,7 +180,10 @@
                 <div class="relative h-40 overflow-hidden rounded-xl bg-stone-100">
                   <img
                     v-if="resolveHeritageImage(item)"
-                    :src="resolveHeritageImage(item)"
+                    :src="responsiveImage(resolveHeritageImage(item))"
+                    :srcset="responsiveSrcset(resolveHeritageImage(item))"
+                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                    width="640" height="420" decoding="async"
                     :alt="item.name"
                     class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                     loading="lazy"
@@ -507,7 +510,10 @@
               <div class="h-36 -mx-4 -mt-4 mb-4 overflow-hidden rounded-t-2xl bg-stone-100 sm:-mx-5 sm:-mt-5">
                 <img
                   v-if="resolveHeritageImage(item)"
-                  :src="resolveHeritageImage(item)"
+                  :src="responsiveImage(resolveHeritageImage(item))"
+                    :srcset="responsiveSrcset(resolveHeritageImage(item))"
+                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                    width="640" height="420" decoding="async"
                   :alt="item.name"
                   class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                   loading="lazy"
@@ -1088,6 +1094,7 @@
 </template>
 
 <script setup lang="ts">
+import { responsiveImage, responsiveSrcset } from '../utils/responsiveImages'
 import { ref, onMounted, computed, watch, nextTick, onBeforeUnmount } from 'vue'
 import { AnimatePresence, motion } from 'motion-v'
 import { useI18n } from 'vue-i18n'

@@ -231,7 +231,8 @@ class AiRouteServiceTest {
         assertEquals(1, countOccurrences(normalized, "### 第1天："));
         assertEquals(1, countOccurrences(normalized, "### 第4天："));
         assertEquals(1, countOccurrences(normalized, "## 安全与执行校验"));
-        assertTrue(normalized.contains("每天为4-8条可执行安排"));
+        assertTrue(normalized.contains("每天建议为4-8条草案安排"));
+        assertFalse(normalized.contains("条可执行安排"));
     }
 
     @Test

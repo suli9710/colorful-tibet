@@ -49,7 +49,6 @@ import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.MonthDay;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.HexFormat;
@@ -743,18 +742,72 @@ public class OrderCenterService {
         });
     }
 
+    @Transactional
     public void ensureHotelRoomAvailable(Long hotelId, Long roomTypeId, LocalDate checkIn, LocalDate checkOut) {
+        ensureHotelRoomAvailable(hotelId, roomTypeId, checkIn, checkOut, null);
+    }
+
+    @Transactional
+    public void ensureHotelRoomAvailable(Long hotelId, Long roomTypeId, LocalDate checkIn, LocalDate checkOut,
+                                         Long excludedLegacyBookingId) {
         if (hotelId == null || roomTypeId == null || checkIn == null || checkOut == null) {
-            return;
+            throw new IllegalArgumentException("Hotel, room and dates are required");
+        }
+        RoomType room = roomTypeRepository.findByIdForUpdate(roomTypeId)
+                .orElseThrow(() -> new NoSuchElementException("Room type not found"));
+        if (room.getHotel() == null || !hotelId.equals(room.getHotel().getId())) {
+            throw new IllegalArgumentException("Room type does not belong to this hotel");
         }
         long nights = ChronoUnit.DAYS.between(checkIn, checkOut);
-        for (long i = 0; i < nights; i++) {
-            String activeLockKey = OrderItem.ProductType.HOTEL_ROOM + ":" + hotelId + ":" + roomTypeId + ":" + checkIn.plusDays(i);
-            releaseExpiredActiveLock(activeLockKey);
-            if (inventoryLockRepository.existsByActiveLockKey(activeLockKey)) {
-                throw new IllegalStateException("Room type is unavailable for the selected dates");
-            }
+        if (nights < 1 || nights > 30 || checkIn.isBefore(LocalDate.now())) {
+            throw new IllegalArgumentException("Invalid hotel stay dates");
         }
+        for (long i = 0; i < nights; i++) {
+            ensureHotelCapacity(room, checkIn.plusDays(i), 1, excludedLegacyBookingId);
+        }
+    }
+
+    /** Serialize all reservation channels on the room row. Count each legacy/mirrored stay once. */
+    private void ensureHotelCapacity(RoomType room, LocalDate date, int requested, Long excludedLegacyBookingId) {
+        Integer units = room.getInventoryUnits();
+        if (units == null) {
+            throw new IllegalStateException("Room inventory is unverified; supplier confirmation is required");
+        }
+        if (requested < 1 || units < requested) {
+            throw new IllegalStateException("Room type is unavailable for the selected dates");
+        }
+        Long hotelId = room.getHotel().getId();
+        inventoryLockRepository.findExpiredProductLocksForUpdate(OrderItem.ProductType.HOTEL_ROOM,
+                        hotelId, room.getId(), date, InventoryLock.Status.LOCKED, LocalDateTime.now())
+                .forEach(lock -> {
+                    lock.setStatus(InventoryLock.Status.EXPIRED);
+                    lock.setActiveLockKey(null);
+                    inventoryLockRepository.saveAndFlush(lock);
+                });
+        List<InventoryLock> locks = inventoryLockRepository.findActiveSkuDateLocksForUpdate(
+                OrderItem.ProductType.HOTEL_ROOM, hotelId, room.getId(), date, ACTIVE_INVENTORY_STATUSES).stream()
+                .filter(lock -> room.getId().equals(lock.getSkuId()))
+                .filter(lock -> !isLegacyLockFor(lock, excludedLegacyBookingId))
+                .toList();
+        long reserved = locks.stream().mapToLong(lock -> Math.max(1, defaultQuantity(lock.getQuantity()))).sum();
+        LocalDateTime cutoff = LocalDateTime.now().minusMinutes(LOCK_MINUTES);
+        List<HotelBooking> legacy = hotelBookingRepository.findOverlappingActiveBookingsForUpdate(
+                room.getId(), ACTIVE_HOTEL_BOOKING_STATUSES, date, date.plusDays(1));
+        reserved += legacy.stream()
+                .filter(booking -> excludedLegacyBookingId == null || !excludedLegacyBookingId.equals(booking.getId()))
+                .filter(booking -> booking.getStatus() != HotelBooking.Status.PENDING
+                        || booking.getCreatedAt() == null || !booking.getCreatedAt().isBefore(cutoff))
+                .filter(booking -> locks.stream().noneMatch(lock -> isLegacyLockFor(lock, booking.getId())))
+                .count();
+        if (reserved + requested > units) {
+            throw new IllegalStateException("Room type is unavailable for the selected dates");
+        }
+    }
+
+    private boolean isLegacyLockFor(InventoryLock lock, Long bookingId) {
+        return bookingId != null && lock.getOrder() != null
+                && "LEGACY_HOTEL_BOOKING".equals(lock.getOrder().getSourceType())
+                && bookingId.equals(lock.getOrder().getSourceReferenceId());
     }
 
     public boolean verifyCallbackSignature(PaymentCallbackRequest request) {
@@ -798,7 +851,7 @@ public class OrderCenterService {
         ScenicSpot spot = scenicSpotRepository.findByIdForUpdate(request.getProductId())
                 .orElseThrow(() -> new NoSuchElementException("Spot not found"));
         int quantity = defaultQuantity(request.getQuantity());
-        BigDecimal unitPrice = scenicSpotPrice(spot, request.getServiceStartDate());
+        BigDecimal unitPrice = ScenicReferencePrice.resolve(spot, request.getServiceStartDate());
         OrderItem item = new OrderItem();
         item.setProductType(OrderItem.ProductType.SCENIC_SPOT);
         item.setProductId(spot.getId());
@@ -828,8 +881,13 @@ public class OrderCenterService {
         if (nights < 1 || nights > 30) {
             throw new IllegalArgumentException("Invalid hotel stay dates");
         }
-        ensureNoLegacyHotelBookingOverlap(roomType, checkIn, checkOut);
-        BigDecimal roomPrice = defaultMoney(roomType.getPrice());
+        if (checkIn.isBefore(LocalDate.now())) {
+            throw new IllegalArgumentException("Invalid hotel stay dates");
+        }
+        if (roomType.getPrice() == null || roomType.getPrice().signum() <= 0) {
+            throw new IllegalStateException("Room price requires confirmation");
+        }
+        BigDecimal roomPrice = roomType.getPrice();
         int quantity = defaultQuantity(request.getQuantity());
         BigDecimal subtotal = roomPrice.multiply(BigDecimal.valueOf(nights)).multiply(BigDecimal.valueOf(quantity));
 
@@ -846,14 +904,6 @@ public class OrderCenterService {
         item.setSubtotal(subtotal);
         item.setSortOrder(sortOrder);
         return item;
-    }
-
-    private void ensureNoLegacyHotelBookingOverlap(RoomType roomType, LocalDate checkIn, LocalDate checkOut) {
-        List<HotelBooking> overlapping = hotelBookingRepository.findOverlappingActiveBookingsForUpdate(
-                roomType.getId(), ACTIVE_HOTEL_BOOKING_STATUSES, checkIn, checkOut);
-        if (!overlapping.isEmpty()) {
-            throw new IllegalStateException("Room type is unavailable for the selected dates");
-        }
     }
 
     private void attachCancellationPolicy(OrderItem item) {
@@ -882,11 +932,14 @@ public class OrderCenterService {
         lock.setExpiresAt(order.getExpiresAt());
         String activeLockKey = activeLockKey(item, serviceDate);
         lock.setActiveLockKey(activeLockKey);
-        if (StringUtils.hasText(activeLockKey)) {
-            releaseExpiredActiveLock(activeLockKey);
-            if (inventoryLockRepository.existsByActiveLockKey(activeLockKey)) {
-                throw new IllegalStateException("Room type is unavailable for the selected dates");
+        if (item.getProductType() == OrderItem.ProductType.HOTEL_ROOM) {
+            RoomType room = roomTypeRepository.findByIdForUpdate(item.getSkuId())
+                    .orElseThrow(() -> new NoSuchElementException("Room type not found"));
+            if (room.getHotel() == null || !item.getProductId().equals(room.getHotel().getId())) {
+                throw new IllegalArgumentException("Room type does not belong to this hotel");
             }
+            Long legacyId = "LEGACY_HOTEL_BOOKING".equals(order.getSourceType()) ? order.getSourceReferenceId() : null;
+            ensureHotelCapacity(room, serviceDate, defaultQuantity(item.getQuantity()), legacyId);
         } else if (item.getProductType() == OrderItem.ProductType.SCENIC_SPOT) {
             ensureScenicCapacityAvailable(item, serviceDate);
         }
@@ -914,19 +967,8 @@ public class OrderCenterService {
         if (item.getProductType() != OrderItem.ProductType.HOTEL_ROOM || serviceDate == null || item.getSkuId() == null) {
             return null;
         }
-        return item.getProductType() + ":" + item.getProductId() + ":" + item.getSkuId() + ":" + serviceDate;
-    }
-
-    private void releaseExpiredActiveLock(String activeLockKey) {
-        inventoryLockRepository.findByActiveLockKey(activeLockKey).ifPresent(existing -> {
-            if (existing.getStatus() == InventoryLock.Status.LOCKED
-                    && existing.getExpiresAt() != null
-                    && existing.getExpiresAt().isBefore(LocalDateTime.now())) {
-                existing.setStatus(InventoryLock.Status.EXPIRED);
-                existing.setActiveLockKey(null);
-                inventoryLockRepository.saveAndFlush(existing);
-            }
-        });
+        return item.getProductType() + ":" + item.getProductId() + ":" + item.getSkuId() + ":" + serviceDate
+                + ":" + item.getOrder().getOrderNo() + ":" + item.getSortOrder();
     }
 
     private void ensureScenicCapacityAvailable(OrderItem item, LocalDate serviceDate) {
@@ -1535,23 +1577,6 @@ public class OrderCenterService {
         auditLog.setToStatus(toStatus);
         auditLog.setNote(note);
         return auditLog;
-    }
-
-    private BigDecimal scenicSpotPrice(ScenicSpot spot, LocalDate visitDate) {
-        BigDecimal unitPrice = defaultMoney(spot.getTicketPrice());
-        int month = visitDate.getMonthValue();
-        if (month >= 1 && month <= 3) {
-            return BigDecimal.ZERO;
-        }
-        MonthDay md = MonthDay.from(visitDate);
-        boolean isPeakSeason = !md.isBefore(MonthDay.of(5, 1)) && !md.isAfter(MonthDay.of(10, 31));
-        if (isPeakSeason && spot.getPeakSeasonPrice() != null) {
-            return spot.getPeakSeasonPrice();
-        }
-        if (!isPeakSeason && spot.getOffSeasonPrice() != null) {
-            return spot.getOffSeasonPrice();
-        }
-        return unitPrice;
     }
 
     private String buildSummary(List<OrderItem> items) {

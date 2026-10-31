@@ -41,7 +41,7 @@
         :transition="{ duration: 0.5, ease: motionEase }"
       >
         <img v-if="hasSpotImage"
-             :src="spot.imageUrl"
+             :src="responsiveImage(spot.imageUrl || '')" :srcset="responsiveSrcset(spot.imageUrl || '')" sizes="(max-width: 640px) 100vw, 50vw" width="1280" height="850" decoding="async"
              :alt="spot.name"
              loading="eager"
              class="w-full h-full object-cover img-fade-in"
@@ -438,6 +438,7 @@
 </template>
 
 <script setup lang="ts">
+import { responsiveImage, responsiveSrcset } from '../utils/responsiveImages'
 import { ref, computed, onMounted, watch, nextTick, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'

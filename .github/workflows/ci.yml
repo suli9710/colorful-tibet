@@ -229,7 +229,7 @@ jobs:
           MYSQL_TEST_USERNAME: colorful_tibet_app
           MYSQL_TEST_PASSWORD: ci-app-password
           MYSQL_TEST_ALLOW_PUBLIC_KEY_RETRIEVAL: 'true'
-        run: mvn -q test -Dtest=ApplicationContextSmokeTest
+        run: mvn -q test -Dtest=ApplicationContextSmokeTest,HotelInventoryConcurrencyIntegrationTest
 
   scrapler:
     name: Scrapler tests

@@ -9,6 +9,7 @@
       >
         <h1 class="text-2xl font-bold text-gray-900 mb-3 sm:text-3xl sm:mb-4">{{ t('hotel.ordersTitle') }}</h1>
         <p class="text-gray-600">{{ t('hotel.ordersSubtitle') }}</p>
+        <p class="mt-3 text-sm leading-relaxed text-amber-800">这里是站内咨询与处理记录，不等于供应商确认单。实际库存、付款、退改和入住以真实服务方确认为准。</p>
       </motion.div>
 
       <motion.div

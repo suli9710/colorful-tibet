@@ -11,6 +11,11 @@
           :key="heroSlides[currentSlide].image"
           :src="heroSlides[currentSlide].image"
           :alt="heroSlides[currentSlide].title"
+          :srcset="heroSrcset(heroSlides[currentSlide].image)"
+          sizes="100vw"
+          width="1920" height="1280"
+          :fetchpriority="currentSlide === 0 ? 'high' : 'auto'"
+          decoding="async"
           :initial="{ opacity: 0 }"
           :animate="{ opacity: 0.6 }"
           :exit="{ opacity: 0 }"
@@ -67,17 +72,18 @@
             <div
               class="flex flex-col justify-center gap-3 sm:flex-row sm:gap-4"
             >
-              <router-link to="/spots" class="tibet-btn w-full px-6 py-3.5 text-base shadow-xl will-change-transform hover:-translate-y-1 hover:scale-[1.03] active:scale-95 sm:w-auto sm:px-8 sm:py-4 sm:text-lg">
-                {{ t('home.startExploring') }}
+              <router-link to="/route-planner" class="tibet-btn w-full px-6 py-3.5 text-base shadow-xl will-change-transform hover:-translate-y-1 hover:scale-[1.03] active:scale-95 sm:w-auto sm:px-8 sm:py-4 sm:text-lg">
+                规划我的西藏行程
               </router-link>
               <button
                       @click="scrollToHeatmap"
                       class="tibet-btn-ghost w-full border-white/30 px-6 py-3.5 text-base text-white will-change-transform hover:-translate-y-1 hover:scale-[1.03] hover:border-white/50 hover:bg-white/10 hover:text-white active:scale-95 sm:w-auto sm:px-8 sm:py-4 sm:text-lg">
-                {{ t('home.viewHeatmap') }}
+                先了解目的地
               </button>
             </div>
         </div>
 
+        <p class="mt-5 text-xs leading-relaxed text-white/85">逐日安排 · 待确认事项 · 参考预算 · 离线行前包</p>
         <!-- Bead-style carousel dots -->
         <div class="mt-8 flex items-center justify-center gap-2.5 sm:mt-10">
           <button v-for="(slide, index) in heroSlides" :key="`${slide.image}-${index}`" type="button" @click="goToSlide(index)"
@@ -204,7 +210,7 @@
                :whileHover="{ y: -4, scale: 1.01 }"
                :whilePress="{ scale: 0.998 }">
             <div class="relative h-56 overflow-hidden sm:h-72">
-              <motion.img :src="spot.imageUrl" :alt="spot.name"
+              <motion.img :src="responsiveImage(spot.imageUrl || '')" :srcset="responsiveSrcset(spot.imageUrl || '')" sizes="(max-width: 640px) 100vw, 50vw" width="1280" height="850" decoding="async" :alt="spot.name"
                    class="w-full h-full object-cover tibet-image-hover img-fade-in will-change-transform"
                    loading="lazy"
                    :whileHover="{ scale: 1.08 }"
@@ -263,6 +269,7 @@
 </template>
 
 <script setup lang="ts">
+import { responsiveImage, responsiveSrcset } from '../utils/responsiveImages'
 import { defineAsyncComponent, ref, onMounted, onUnmounted, watch } from 'vue'
 import { AnimatePresence, motion, useReducedMotion } from 'motion-v'
 import { useRouter } from 'vue-router'
@@ -331,23 +338,34 @@ const recommendationNotice = ref('')
 const loading = ref(true)
 const heatmapMounted = ref(false)
 const currentSlide = ref(0)
+const carouselPaused = ref(true)
+const optimizedHeroImage = (image: string) => ({
+  '/heritage/布达拉宫3.jpg': '/optimized/potala-1280.webp',
+  '/heritage/纳木错.jpg': '/optimized/namtso-999.webp',
+  '/heritage/藏戏.jpg': '/optimized/opera-500.webp'
+}[image] || image)
+const heroSrcset = (image: string) => {
+  if (image === '/optimized/potala-1280.webp') return '/optimized/potala-640.webp 640w, /optimized/potala-1280.webp 1280w, /optimized/potala-1920.webp 1920w'
+  if (image === '/optimized/namtso-999.webp') return '/optimized/namtso-640.webp 640w, /optimized/namtso-999.webp 999w'
+  return undefined
+}
 const createDefaultHeroSlides = () => [
   {
-    image: '/heritage/布达拉宫3.jpg',
+    image: '/optimized/potala-1280.webp',
     title: t('home.carousel1Title'),
     subtitle: t('home.carousel1Sub'),
     tag: t('home.carousel1Tag'),
     linkUrl: '/spots'
   },
   {
-    image: '/heritage/纳木错.jpg',
+    image: '/optimized/namtso-999.webp',
     title: t('home.carousel2Title'),
     subtitle: t('home.carousel2Sub'),
     tag: t('home.carousel2Tag'),
     linkUrl: '/spots'
   },
   {
-    image: '/heritage/藏戏.jpg',
+    image: '/optimized/opera-500.webp',
     title: t('home.carousel3Title'),
     subtitle: t('home.carousel3Sub'),
     tag: t('home.carousel3Tag'),
@@ -400,7 +418,7 @@ const fetchCarousels = async () => {
     const response = await api.get(endpoints.carousels.list)
     if (response.data && response.data.length > 0) {
       heroSlides.value = response.data.map((c: CarouselResponse) => ({
-        image: c.imageUrl,
+        image: optimizedHeroImage(c.imageUrl),
         title: c.title,
         subtitle: c.subtitle || '',
         tag: c.tag || '',
@@ -426,7 +444,7 @@ const goToSlide = (index: number) => {
 
 const startCarousel = () => {
   stopCarousel()
-  if (prefersReducedMotion.value || heroSlides.value.length < 2) return
+  if (carouselPaused.value || prefersReducedMotion.value || heroSlides.value.length < 2) return
 
   slideTimer = window.setInterval(() => {
     currentSlide.value = (currentSlide.value + 1) % heroSlides.value.length

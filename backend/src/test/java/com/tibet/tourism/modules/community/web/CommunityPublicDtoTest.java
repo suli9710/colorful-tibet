@@ -234,6 +234,8 @@ class CommunityPublicDtoTest {
                 nullable(String.class),
                 nullable(Integer.class),
                 nullable(String.class),
+                nullable(String.class),
+                nullable(String.class),
                 nullable(String.class)))
                 .thenThrow(new IllegalArgumentException("storage path C:/private/uploads/secret.html"));
 

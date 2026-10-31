@@ -107,7 +107,7 @@ describe('route planner draft storage safety', () => {
     expect(stored).toMatchObject({
       version: 2,
       form: {
-        days: 30,
+        days: 15,
         budget: defaultForm.budget,
         preference: defaultForm.preference
       },

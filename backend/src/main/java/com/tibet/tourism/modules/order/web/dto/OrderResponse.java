@@ -30,4 +30,17 @@ public record OrderResponse(
         List<VoucherResponse> vouchers,
         List<InvoiceResponse> invoices
 ) {
+    @com.fasterxml.jackson.annotation.JsonProperty("fulfillmentStatus")
+    public String fulfillmentStatus() {
+        return "SUPPLIER_CONFIRMATION_REQUIRED";
+    }
+
+    @com.fasterxml.jackson.annotation.JsonProperty("paymentMode")
+    public String paymentMode() {
+        if (paymentTransactions == null || paymentTransactions.isEmpty()) return "NOT_CONNECTED";
+        if (paymentTransactions.stream().allMatch(payment -> "MOCK".equalsIgnoreCase(payment.provider()))) return "SIMULATION";
+        if (paymentTransactions.stream().allMatch(payment -> payment.provider() != null
+                && (payment.provider().startsWith("MANUAL") || payment.provider().startsWith("LEGACY")))) return "MANUAL_RECORD";
+        return "RECORDED_UNVERIFIED";
+    }
 }

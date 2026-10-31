@@ -35,6 +35,22 @@ public interface InventoryLockRepository extends JpaRepository<InventoryLock, Lo
             @Param("serviceDate") LocalDate serviceDate,
             @Param("statuses") Collection<InventoryLock.Status> statuses);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            SELECT l FROM InventoryLock l
+            WHERE l.productType = :productType
+              AND l.productId = :productId
+              AND l.skuId = :skuId
+              AND l.serviceDate = :serviceDate
+              AND l.status IN :statuses
+            """)
+    List<InventoryLock> findActiveSkuDateLocksForUpdate(
+            @Param("productType") OrderItem.ProductType productType,
+            @Param("productId") Long productId,
+            @Param("skuId") Long skuId,
+            @Param("serviceDate") LocalDate serviceDate,
+            @Param("statuses") Collection<InventoryLock.Status> statuses);
+
     @Query("""
             SELECT COALESCE(SUM(l.quantity), 0)
             FROM InventoryLock l

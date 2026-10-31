@@ -177,6 +177,7 @@
                 <p class="text-lg font-bold tabular-nums text-tibet-dark">{{ formatCurrency(order.payableAmount, order.currency) }}</p>
                 <p class="mt-1 text-xs font-medium" :class="confirmationMeta(order.paymentStatus).textClass">
                   {{ confirmationMeta(order.paymentStatus).label }}
+                  <span class="block mt-1 text-xs text-amber-800">{{ order.paymentMode === 'SIMULATION' ? '模拟支付记录，不代表真实扣款' : '付款与履约请核对实际渠道确认' }}</span>
                 </p>
               </div>
             </div>
@@ -448,6 +449,8 @@ interface ThirdPartyConfirmation {
 }
 
 interface Order {
+  fulfillmentStatus?: string
+  paymentMode?: string
   id: number
   orderNo: string
   status: string

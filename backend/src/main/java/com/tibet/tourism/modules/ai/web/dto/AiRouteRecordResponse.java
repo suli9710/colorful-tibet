@@ -20,6 +20,15 @@ public record AiRouteRecordResponse(
         LocalDateTime createdAt,
         LocalDateTime updatedAt
 ) {
+    @com.fasterxml.jackson.annotation.JsonProperty("trustStatus")
+    public String trustStatus() {
+        return com.tibet.tourism.modules.route.application.ItineraryTrustPolicy.violatesOvernightPolicy(content)
+                ? "BLOCKED" : "NEEDS_CONFIRMATION";
+    }
+    @com.fasterxml.jackson.annotation.JsonProperty("verificationNotice")
+    public String verificationNotice() {
+        return "历史生成内容与保存状态不等于路线已核验；请重新确认出行日期、预约、交通、住宿和报价。";
+    }
     public static AiRouteRecordResponse from(AiRouteRecord record) {
         return from(record, false);
     }
