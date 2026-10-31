@@ -66,14 +66,21 @@ class ApplicationContextSmokeTest {
         ResponseEntity<String> response =
                 restTemplate.getForEntity("http://localhost:" + port + "/actuator/health/readiness", String.class);
 
-        assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
+        assertThat(response.getStatusCode().is2xxSuccessful())
+                .withFailMessage("Unexpected HTTP status %s; body: %s", response.getStatusCode(), response.getBody())
+                .isTrue();
         assertThat(response.getBody()).contains("UP");
     }
     @Test
     void httpJsonPreservesDateDecimalAndIgnoredPropertyContract() throws Exception {
+        // Exact numeric test-only mapping follows the existing public read allowlist;
+        // arbitrary /api/spots/* paths correctly require authentication.
+        assertThat(com.tibet.tourism.common.security.ApiSecurityPaths.isPublicRequest("GET", "/api/spots/0")).isTrue();
         ResponseEntity<String> response = restTemplate.getForEntity(
-                "http://localhost:" + port + "/api/spots/migration-json-contract", String.class);
-        assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
+                "http://localhost:" + port + "/api/spots/0", String.class);
+        assertThat(response.getStatusCode().is2xxSuccessful())
+                .withFailMessage("Unexpected HTTP status %s; body: %s", response.getStatusCode(), response.getBody())
+                .isTrue();
         var json = applicationContext.getBean(ObjectMapper.class).readTree(response.getBody());
         assertThat(json.path("departAt").asText()).isEqualTo("2030-02-03T04:05:06");
         assertThat(json.path("price").decimalValue()).isEqualByComparingTo("123.45");
@@ -84,11 +91,18 @@ class ApplicationContextSmokeTest {
     void openApiEndpointGeneratesValidPathsWithUpgradedSpringdoc() throws Exception {
         ResponseEntity<String> response = restTemplate.getForEntity(
                 "http://localhost:" + port + "/v3/api-docs", String.class);
-        assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
+        assertThat(response.getStatusCode().is2xxSuccessful())
+                .withFailMessage("Unexpected HTTP status %s; body: %s", response.getStatusCode(), response.getBody())
+                .isTrue();
         var json = applicationContext.getBean(ObjectMapper.class).readTree(response.getBody());
         assertThat(json.path("openapi").asText()).startsWith("3.");
         assertThat(json.path("paths").isObject()).isTrue();
-        assertThat(json.path("paths").has("/api/hotels")).isTrue();
+        assertThat(json.path("paths").has("/api/hotel-bookings/hotels"))
+                .withFailMessage("Hotel list route missing from OpenAPI paths: %s", json.path("paths"))
+                .isTrue();
+        assertThat(json.path("paths").has("/api/hotel-bookings/room-types/{hotelId}"))
+                .withFailMessage("Room type route missing from OpenAPI paths: %s", json.path("paths"))
+                .isTrue();
     }
 
     @TestConfiguration(proxyBeanMethods = false)
@@ -98,7 +112,7 @@ class ApplicationContextSmokeTest {
 
     @RestController
     static class JsonContractProbe {
-        @GetMapping("/api/spots/migration-json-contract")
+        @GetMapping("/api/spots/0")
         JsonContract contract() {
             return new JsonContract(LocalDateTime.of(2030, 2, 3, 4, 5, 6), new BigDecimal("123.45"), "must-not-leak");
         }
