@@ -25,6 +25,9 @@ import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import static org.junit.jupiter.api.Assertions.*;
@@ -45,6 +48,7 @@ class HotelInventoryConcurrencyIntegrationTest {
     @Autowired private HotelBookingService hotelBookingService;
     @Autowired private OrderCenterService orderCenterService;
     @Autowired private JdbcTemplate jdbc;
+    @Autowired private PlatformTransactionManager transactionManager;
 
     @Test
     void concurrentLegacyAndUnifiedReservationsCannotOversellTwoRooms() throws Exception {
@@ -83,6 +87,43 @@ class HotelInventoryConcurrencyIntegrationTest {
             }
         } finally {
             start.countDown();
+            pool.shutdownNow();
+            assertTrue(pool.awaitTermination(10, TimeUnit.SECONDS));
+        }
+    }
+
+    @Test
+    void currentReadIncludesOrderProvenanceAfterEarlierRepeatableReadSnapshot() throws Exception {
+        Fixture fixture = fixture(2);
+        ExecutorService pool = Executors.newSingleThreadExecutor();
+        TransactionTemplate transaction = new TransactionTemplate(transactionManager);
+        transaction.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
+        try {
+            transaction.executeWithoutResult(status -> {
+                // Establish a consistent snapshot before another transaction commits its order.
+                assertEquals(0L, jdbc.queryForObject("SELECT COUNT(*) FROM orders WHERE user_id=?",
+                        Long.class, fixture.user().getId()));
+                try {
+                    pool.submit(() -> orderCenterService.createOrder(fixture.user(), unifiedRequest(fixture),
+                            UUID.randomUUID().toString())).get(20, TimeUnit.SECONDS);
+                } catch (Exception failure) {
+                    throw new AssertionError("Competing reservation must commit before current-read check", failure);
+                }
+                // Prove this transaction still has the old snapshot, rather than changing isolation
+                // or weakening the original failure to a sequential test.
+                assertEquals(0L, jdbc.queryForObject("SELECT COUNT(*) FROM orders WHERE user_id=?",
+                        Long.class, fixture.user().getId()));
+                assertNotNull(hotelBookingService.createBooking(fixture.user(), legacyRequest(fixture)).getId());
+            });
+            for (int day = 0; day < 2; day++) {
+                assertEquals(2L, jdbc.queryForObject("SELECT SUM(quantity) FROM inventory_locks "
+                        + "WHERE product_type='HOTEL_ROOM' AND sku_id=? AND service_date=? "
+                        + "AND status IN ('LOCKED','CONFIRMED')", Long.class,
+                        fixture.room().getId(), fixture.date().plusDays(day)));
+            }
+            assertThrows(IllegalStateException.class,
+                    () -> orderCenterService.createOrder(fixture.user(), unifiedRequest(fixture), UUID.randomUUID().toString()));
+        } finally {
             pool.shutdownNow();
             assertTrue(pool.awaitTermination(10, TimeUnit.SECONDS));
         }

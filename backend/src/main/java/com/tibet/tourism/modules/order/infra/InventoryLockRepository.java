@@ -35,9 +35,11 @@ public interface InventoryLockRepository extends JpaRepository<InventoryLock, Lo
             @Param("serviceDate") LocalDate serviceDate,
             @Param("statuses") Collection<InventoryLock.Status> statuses);
 
+    // Fetch provenance in this same current locking read: a later lazy order load could
+    // use an older MySQL REPEATABLE_READ snapshot and miss a newly committed order.
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
-            SELECT l FROM InventoryLock l
+            SELECT l FROM InventoryLock l JOIN FETCH l.order
             WHERE l.productType = :productType
               AND l.productId = :productId
               AND l.skuId = :skuId
