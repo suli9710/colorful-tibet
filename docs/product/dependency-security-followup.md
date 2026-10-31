@@ -43,3 +43,17 @@ MySQL 的加锁当前读可以看到较新提交，但随后的关联对象延�
 保持 Vue 3 / Vite 8，升级存在漏洞的公开依赖。Vue I18n 9→11、ECharts 5→6 保留现有组合式国际化与图表模块接口，并验证实际 OpenAPI 引用打包、类型生成、URL glob 匹配和 SVG SSR 输出。前端测试/构建不替代真浏览器视觉验收。
 
 OpenAPI 工具链的临时 Redocly/minimatch 兼容处理及退出条件见 [`frontend/scripts/DEPENDENCY_SECURITY.md`](../../frontend/scripts/DEPENDENCY_SECURITY.md)。该处理使用实际修复版 minimatch，仅适配旧导入形式，具有版本/源文件哈希/接口守卫；不是忽略漏洞或伪造审计。常规安装、明确省略开发依赖的安装及 Docker 安装顺序分别验证。
+
+## Docker 基础镜像与操作系统补丁（2026-10-31）
+
+实际镜像扫描暴露了旧 Temurin Alpine 3.23.4 中的 11 项可修复 HIGH（Expat、p11-kit/p11-kit-trust、SQLite），不是 Maven 依赖问题。保持 Java 17、Python 3.11、Node 22 和现有 Nginx 运行方式，通过官方 Docker Registry v2 重新核验 Dockerfile 基础镜像的多架构摘要；未改动 Compose 中其他服务镜像。`docker-digest-evidence.json` 的逐项 `verifiedAt` 区分本次重验与历史记录。
+
+后端改为更新全部已安装 Alpine 系统包后安装工具；Scrapler 改为更新全部已安装 Debian 系统包，而不是只更新 OpenSSL。前端原有 `apk upgrade` 保留。仍使用发行版原有软件源、摘要固定基础镜像、非 root 用户与 Python 哈希锁定依赖，没有引入测试版软件源或降低扫描阈值。系统包更新随发行版安全仓库变化，最终镜像应以 CI 产物摘要和 SBOM 留档，不能把固定基础摘要等同于最终镜像逐字节可复现。
+
+远程扫描的**基础镜像**结果不等于应用最终镜像结果：
+- 新 Temurin 基础镜像仍含 1 项 Brotli CRITICAL；新 Nginx 基础镜像仍含 Brotli/Curl 共 3 项 HIGH/CRITICAL。官方 Alpine 3.24 的 `main/x86_64/APKINDEX.tar.gz` 已提供 Brotli 1.2.1-r0、Curl 8.23.0-r0；同库也提供 Expat 2.9.0-r0、p11-kit 0.26.2-r0、SQLite 3.53.4-r0。最终构建中的全量 `apk upgrade` 必须应用这些补丁，并通过 CI 镜像扫描确认。
+- 新 Python 3.11 / Debian 13.7 基础镜像在**不忽略未修复项**的扫描下仍有 44 项 OS HIGH，目前扫描数据库未列出发行版修复版本，另有 2 项基础镜像自带构建工具的 Python 漏洞；既有最终构建会卸载 pip/setuptools/wheel。不能据此声称所有 Python 镜像漏洞已清零。保留原 CI 的 `ignore-unfixed: true` 设置，没有放宽既有规则；未修复项仍需持续跟踪发行版安全公告。
+
+本地无法构建 Docker 镜像。基础镜像远程扫描、官方仓库补丁核验、摘要校验和 Dockerfile 回归检查均不替代下一轮 CI 的三张最终镜像扫描与 SBOM。完整构建结果通过之前，不宣称镜像安全门槛已通过。
+
+补丁核验源：https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/APKINDEX.tar.gz 。摘要核验使用仓库既有 `scripts/resolve-docker-image-digests.mjs` 的 `resolveDockerHubDigest`，对 `auth.docker.io` / `registry-1.docker.io` 使用正常 TLS 验证。

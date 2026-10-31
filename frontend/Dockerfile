@@ -1,5 +1,5 @@
 # 多阶段构建：先构建前端，再使用nginx服务
-FROM node:22-alpine@sha256:968df39aedcea65eeb078fb336ed7191baf48f972b4479711397108be0966920 AS builder
+FROM node:22-alpine@sha256:fe4f6d74e20370acb04ad889077d14d0f64a9c8ea6a42bc60cddf1e844699914 AS builder
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY scripts/patch-redocly-minimatch.mjs ./scripts/patch-redocly-minimatch.mjs
@@ -22,7 +22,7 @@ ENV VITE_AMAP_SECURITY_CODE=$VITE_AMAP_SECURITY_CODE
 
 RUN npm run build
 
-FROM nginx:alpine@sha256:8b1e78743a03dbb2c95171cc58639fef29abc8816598e27fb910ed2e621e589a
+FROM nginx:alpine@sha256:785835ea65db4bba6f021acc0f3be91b0fef76a53fe41f8588c6698d2aed0606
 RUN apk add --no-cache gettext \
     && apk upgrade --no-cache \
     && mkdir -p /etc/nginx/certs /var/cache/nginx /var/run /run \

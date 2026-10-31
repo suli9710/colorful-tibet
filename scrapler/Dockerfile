@@ -1,4 +1,4 @@
-FROM python:3.11-slim@sha256:a3ab0b966bc4e91546a033e22093cb840908979487a9fc0e6e38295747e49ac0
+FROM python:3.11-slim@sha256:673719e071ecf27434fd2635bbd8d00f49f4fdd81f243143438a42ced8bedf60
 
 WORKDIR /app
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
@@ -7,8 +7,8 @@ ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
     HOME=/tmp
 
 RUN apt-get update \
+    && apt-get upgrade -y \
     && apt-get install -y --no-install-recommends curl \
-    && apt-get install -y --only-upgrade libssl3t64 openssl openssl-provider-legacy \
     && rm -rf /var/lib/apt/lists/*
 
 RUN addgroup --system app && adduser --system --group app
