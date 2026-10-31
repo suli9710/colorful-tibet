@@ -3,6 +3,7 @@ import com.tibet.tourism.common.security.antibot.BehaviorData;
 import com.tibet.tourism.common.security.antibot.RiskAssessmentService;
 import com.tibet.tourism.common.security.antibot.RiskResult;
 import com.tibet.tourism.modules.order.application.OrderCenterService;
+import com.tibet.tourism.modules.order.application.ScenicReferencePrice;
 import com.tibet.tourism.modules.order.domain.Booking;
 import com.tibet.tourism.modules.order.infra.BookingRepository;
 import com.tibet.tourism.modules.order.web.dto.BookingRequest;
@@ -14,7 +15,6 @@ import com.tibet.tourism.modules.user.infra.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.math.BigDecimal;
-import java.time.MonthDay;
 import java.util.List;
 import java.util.Map;
 import org.springframework.data.domain.Page;
@@ -91,30 +91,7 @@ public class BookingController {
         booking.setTicketCount(payload.getTicketCount());
         booking.setStatus(Booking.Status.PENDING);
 
-        // Calculate total price with seasonal rules (按“每年”月份/日期判断，而不是具体年份):
-        // 旺季：5月1日 - 10月31日
-        // 淡季：11月1日 - 次年4月30日
-        // 其中每年 1 月 1 日 - 3 月 31 日统一实施免票政策
-        BigDecimal unitPrice = spot.getTicketPrice() == null ? BigDecimal.ZERO : spot.getTicketPrice();
-        MonthDay md = MonthDay.from(payload.getVisitDate());
-        MonthDay may1 = MonthDay.of(5, 1);
-        MonthDay oct31 = MonthDay.of(10, 31);
-
-        // 1-3 月统一免票（全区冬季旅游季政策）
-        int month = payload.getVisitDate().getMonthValue();
-        if (month >= 1 && month <= 3) {
-            unitPrice = BigDecimal.ZERO;
-        } else {
-            // 其余日期再按旺季/淡季和景点自身价格配置来计算
-            boolean isPeakSeason = !md.isBefore(may1) && !md.isAfter(oct31);
-            if (isPeakSeason && spot.getPeakSeasonPrice() != null) {
-                // 旺季价格（5月1日-10月31日）
-                unitPrice = spot.getPeakSeasonPrice();
-            } else if (!isPeakSeason && spot.getOffSeasonPrice() != null) {
-                // 淡季价格（11月1日-次年4月30日）
-                unitPrice = spot.getOffSeasonPrice();
-            }
-        }
+        BigDecimal unitPrice = ScenicReferencePrice.resolve(spot, payload.getVisitDate());
 
         booking.setTotalPrice(unitPrice.multiply(new BigDecimal(payload.getTicketCount())));
 

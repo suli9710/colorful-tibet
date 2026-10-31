@@ -1,12 +1,12 @@
 # Multi-stage build: compile with Maven, then run with a slim JRE image.
-FROM maven:3.9-eclipse-temurin-17@sha256:e8ef73dbd33b69fe497fd96b3bbbd85aff84ac4c564a5784ab02ad941b32c12b AS builder
+FROM maven:3.9-eclipse-temurin-17@sha256:1a352420f7aba21f5ad08df31bab55f74c013fb491f1ae8ab1dd7ff9ed698584 AS builder
 WORKDIR /app
 COPY pom.xml .
 RUN mvn -B -DskipTests dependency:go-offline
 COPY src ./src
 RUN mvn -B clean package -DskipTests
 
-FROM eclipse-temurin:17-jre-alpine@sha256:b0ae54a36f82e04dc6c45e40ca5c55762e20b9a0858ee457faf557d440a9b571
+FROM eclipse-temurin:17-jre-alpine@sha256:c4a33e6ddb738fe4be0a28a613ea0940cec42d25d7263c3e2238c43354cb19b0
 WORKDIR /app
 
 ARG APP_UID=10001
@@ -14,7 +14,8 @@ ARG APP_GID=10001
 
 # Install runtime tools, apply security patches for base-image OS packages,
 # and create the non-root application user.
-RUN apk add --no-cache --upgrade curl libcrypto3 libssl3 openssl \
+RUN apk upgrade --no-cache \
+    && apk add --no-cache curl libcrypto3 libssl3 openssl \
     && addgroup -S -g "$APP_GID" app \
     && adduser -S -D -H -u "$APP_UID" -G app app \
     && mkdir -p /app/data /app/logs \

@@ -15,4 +15,8 @@ public record ItineraryQuoteItemResponse(
         String bookingStatus,
         String priceType
 ) {
+    @com.fasterxml.jackson.annotation.JsonProperty("priceStatus")
+    public String priceStatus() { return "ESTIMATE"; }
+    @com.fasterxml.jackson.annotation.JsonProperty("availabilityStatus")
+    public String availabilityStatus() { return Boolean.TRUE.equals(bookable) ? "CONSULTATION_ONLY" : "UNRESOLVED"; }
 }

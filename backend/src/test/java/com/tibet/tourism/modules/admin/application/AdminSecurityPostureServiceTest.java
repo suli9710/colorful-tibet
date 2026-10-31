@@ -11,8 +11,9 @@ import com.tibet.tourism.common.security.antibot.AntibotProperties;
 import com.tibet.tourism.modules.admin.web.dto.SecurityPostureResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.actuate.health.Health;
-import org.springframework.boot.actuate.health.HealthEndpoint;
+import org.springframework.boot.health.actuate.endpoint.IndicatedHealthDescriptor;
+import org.springframework.boot.health.contributor.Status;
+import org.springframework.boot.health.actuate.endpoint.HealthEndpoint;
 import org.springframework.core.env.Environment;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -24,9 +25,11 @@ class AdminSecurityPostureServiceTest {
     @BeforeEach
     void setUp() {
         healthEndpoint = mock(HealthEndpoint.class);
-        when(healthEndpoint.healthForPath("scrapling")).thenReturn(Health.up().build());
-        when(healthEndpoint.healthForPath("db")).thenReturn(Health.up().build());
-        when(healthEndpoint.healthForPath("redis")).thenReturn(Health.up().build());
+        IndicatedHealthDescriptor up = mock(IndicatedHealthDescriptor.class);
+        when(up.getStatus()).thenReturn(Status.UP);
+        when(healthEndpoint.healthForPath("scrapling")).thenReturn(up);
+        when(healthEndpoint.healthForPath("db")).thenReturn(up);
+        when(healthEndpoint.healthForPath("redis")).thenReturn(up);
 
         Environment environment = mock(Environment.class);
         when(environment.getActiveProfiles()).thenReturn(new String[] {"prod"});

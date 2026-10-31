@@ -6,6 +6,12 @@ server:
     min-response-size: 1024
 
 spring:
+  # Preserve existing JSON contracts using the supported Jackson 2 migration bridge.
+  http:
+    converters:
+      preferred-json-mapper: jackson2
+    codecs:
+      preferred-json-mapper: jackson2
   application:
     name: colorful-tibet-tourism
   data:
@@ -84,9 +90,9 @@ management:
   tracing:
     sampling:
       probability: ${TRACING_SAMPLING_PROBABILITY:0.0}
-  zipkin:
-    tracing:
-      endpoint: ${ZIPKIN_ENDPOINT:http://localhost:9411/api/v2/spans}
+    export:
+      zipkin:
+        endpoint: ${ZIPKIN_ENDPOINT:http://localhost:9411/api/v2/spans}
 
 logging:
   level:

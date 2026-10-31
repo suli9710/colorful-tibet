@@ -38,6 +38,17 @@ public class SharedRoute {
     @Column(length = 20)
     private SourceType sourceType = SourceType.USER;
 
+    @Column(name = "travel_status", length = 20)
+    private String travelStatus;
+
+    @Column(name = "travel_month", length = 7)
+    private String travelMonth;
+
+    public String getTravelStatus() { return travelStatus; }
+    public void setTravelStatus(String travelStatus) { this.travelStatus = travelStatus; }
+    public String getTravelMonth() { return travelMonth; }
+    public void setTravelMonth(String travelMonth) { this.travelMonth = travelMonth; }
+
     @Column(name = "source_route_id")
     private Long sourceRouteId;
 

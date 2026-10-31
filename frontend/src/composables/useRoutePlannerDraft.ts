@@ -128,7 +128,7 @@ const normalizeDraftForm = (
 ): RoutePlannerFormState => {
   const days = Number(draftForm?.days)
   return {
-    days: Number.isFinite(days) ? Math.min(30, Math.max(1, Math.round(days))) : defaultForm.days,
+    days: Number.isFinite(days) ? Math.min(15, Math.max(1, Math.round(days))) : defaultForm.days,
     budget: normalizeFormKey(draftForm?.budget, defaultForm.budget),
     preference: normalizeFormKey(draftForm?.preference, defaultForm.preference)
   }

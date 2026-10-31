@@ -38,8 +38,8 @@ import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -59,37 +59,37 @@ class ScenicSpotCurrentUserRecommendationTest {
     @Autowired
     private MockMvc mockMvc;
 
-    @MockBean
+    @MockitoBean
     private JwtUtils jwtUtils;
 
-    @MockBean
+    @MockitoBean
     private UserDetailsServiceImpl userDetailsService;
 
-    @MockBean
+    @MockitoBean
     private CsrfTokenService csrfTokenService;
 
-    @MockBean
+    @MockitoBean
     private TokenRevocationService tokenRevocationService;
 
-    @MockBean
+    @MockitoBean
     private UserSessionVersionService userSessionVersionService;
 
-    @MockBean
+    @MockitoBean
     private ScenicSpotService scenicSpotService;
 
-    @MockBean
+    @MockitoBean
     private RecommendationService recommendationService;
 
-    @MockBean
+    @MockitoBean
     private CompanionInferenceService companionInferenceService;
 
-    @MockBean
+    @MockitoBean
     private ItemBasedRecommendationService itemBasedRecommendationService;
 
-    @MockBean
+    @MockitoBean
     private ColdStartOptimizationService coldStartOptimizationService;
 
-    @MockBean
+    @MockitoBean
     private UserRepository userRepository;
 
     @Test

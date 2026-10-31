@@ -98,6 +98,9 @@
         </motion.div>
       </AnimatePresence>
 
+      <a v-if="bookableItinerary" href="#trip-workbench-heading" class="mb-6 flex min-h-12 items-center justify-between rounded-xl border border-tibet-gold/30 bg-white px-5 py-3 text-sm font-semibold text-tibet-red focus-visible:outline focus-visible:outline-2">
+        <span>查看我的逐日行程、待确认事项与行前准备</span><span aria-hidden="true">↓</span>
+      </a>
       <!-- ===== MAIN CONTENT ===== -->
       <div class="grid gap-8 lg:grid-cols-5 items-start">
         <!-- LEFT: Form (takes 2 cols on lg) -->
@@ -126,6 +129,10 @@
               </div>
 
               <form @submit.prevent="generateRoute" class="p-6 space-y-6" aria-describedby="route-planner-form-hint route-planner-status-message">
+                <div class="grid grid-cols-2 gap-3">
+                  <div><label for="trip-start-date" class="mb-2 block text-sm font-semibold">出发日期</label><input id="trip-start-date" v-model="departureDate" type="date" required :min="minimumDepartureDate" :disabled="loading" class="min-h-11 w-full min-w-0 rounded-xl border border-stone-300 bg-white px-3 py-2"></div>
+                  <div><label for="trip-travelers" class="mb-2 block text-sm font-semibold">出行人数</label><input id="trip-travelers" v-model.number="travelers" type="number" required min="1" max="20" step="1" :disabled="loading" class="min-h-11 w-full min-w-0 rounded-xl border border-stone-300 bg-white px-3 py-2"></div>
+                </div>
                 <!-- Days Selector -->
                 <motion.div layout>
                   <label class="block text-sm font-semibold text-tibet-dark/80 mb-3">{{ t('routePlanner.plannedDays') }}</label>
@@ -152,7 +159,7 @@
                       >{{ form.days }}</motion.span>
                       <span class="text-[10px] uppercase tracking-[0.2em] text-tibet-brown/50 mt-1">{{ t('routePlanner.daysCounterUnit') }}</span>
                     </div>
-                    <motion.button type="button" @click="adjustDays(1)" :disabled="loading || form.days >= 30"
+                    <motion.button type="button" @click="adjustDays(1)" :disabled="loading || form.days >= 15"
                             :aria-label="t('routePlanner.increaseDaysAria')"
                             aria-controls="route-planner-days-value"
                             :whileHover="{ backgroundColor: 'rgba(255, 255, 255, 0.82)' }"
@@ -464,6 +471,7 @@
               :exit="{ opacity: 0, y: -12, scale: 0.98 }"
               :transition="revealTransition"
             >
+              <p class="border-b border-amber-200 bg-amber-50 px-6 py-3 text-sm leading-relaxed text-amber-950">参考草案：开放时间、交通、住宿、价格与预约均未核验。生成中的文本可能调整，请以完整行程和待确认事项为准。</p>
               <!-- Result header -->
               <div class="px-6 py-5 border-b border-white/60 bg-white/40 flex flex-wrap items-center justify-between gap-3">
                 <div class="flex items-center gap-3">
@@ -775,7 +783,7 @@
 
       <div
         v-if="bookableItinerary || itineraryLoading || tibetTravelKit || tibetTravelKitLoading"
-        class="mt-8 grid items-start gap-6 xl:grid-cols-2"
+        class="mt-8 grid items-start gap-6"
       >
           <motion.div
             v-if="bookableItinerary || itineraryLoading"
@@ -827,79 +835,7 @@
               <p class="text-sm font-medium">{{ t('routePlanner.bookableItineraryLoading') }}</p>
             </div>
 
-            <div v-else-if="bookableItinerary" class="p-5 md:p-6 space-y-5">
-              <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div class="rounded-2xl border border-tibet-gold/20 bg-white/70 px-4 py-3">
-                  <p class="text-xs text-tibet-brown/50">{{ t('routePlanner.quoteTotalEstimated') }}</p>
-                  <p class="mt-1 text-xl font-bold text-tibet-dark">{{ formatCurrency(itineraryQuote?.totalEstimatedCost || bookableItinerary.totalEstimatedCost, itineraryQuote?.currency) }}</p>
-                </div>
-                <div class="rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3">
-                  <p class="text-xs text-emerald-700/70">{{ t('routePlanner.quoteBookable') }}</p>
-                  <p class="mt-1 text-xl font-bold text-emerald-700">{{ formatCurrency(itineraryQuote?.bookableTotal, itineraryQuote?.currency) }}</p>
-                </div>
-                <div class="rounded-2xl border border-sky-200 bg-sky-50/70 px-4 py-3">
-                  <p class="text-xs text-sky-700/70">{{ t('routePlanner.quoteInformational') }}</p>
-                  <p class="mt-1 text-xl font-bold text-sky-700">{{ formatCurrency(itineraryQuote?.informationalTotal, itineraryQuote?.currency) }}</p>
-                </div>
-              </div>
-
-              <div class="space-y-4">
-                <section
-                  v-for="day in bookableItinerary.itineraryDays"
-                  :key="day.id"
-                  class="rounded-2xl border border-tibet-gold/15 bg-white/75 overflow-hidden"
-                >
-                  <div class="px-4 py-3 border-b border-tibet-gold/10 flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <h3 class="text-sm font-bold text-tibet-dark">{{ day.title }}</h3>
-                      <p class="mt-0.5 text-xs text-tibet-brown/50">{{ formatItineraryDayMeta(day) }}</p>
-                    </div>
-                    <span class="inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold" :class="riskClass(day.altitudeRisk)">
-                      {{ riskLabel(day.altitudeRisk) }}
-                    </span>
-                  </div>
-
-                  <div class="divide-y divide-tibet-gold/10">
-                    <div
-                      v-for="item in day.items"
-                      :key="item.id"
-                      class="px-4 py-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between"
-                    >
-                      <div class="flex gap-3 min-w-0">
-                        <span class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-tibet-gold/10 text-tibet-gold">
-                          <component :is="itemIcon(item.itemType)" class="h-4 w-4" />
-                        </span>
-                        <div class="min-w-0">
-                          <div class="flex flex-wrap items-center gap-2">
-                            <p class="text-sm font-semibold text-tibet-dark">{{ item.startTime }} · {{ item.title }}</p>
-                            <span class="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-600">{{ itemTypeLabel(item.itemType) }}</span>
-                            <span v-if="item.bookingStatus === 'BOOKED'" class="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">{{ t('routePlanner.bookingSubmitted') }}</span>
-                          </div>
-                          <p class="mt-1 text-xs leading-relaxed text-tibet-brown/60 line-clamp-2">{{ item.description }}</p>
-                          <p v-if="item.alternatives" class="mt-1 text-[11px] text-tibet-blue/70">{{ t('routePlanner.alternativesPrefix', { alternatives: item.alternatives }) }}</p>
-                        </div>
-                      </div>
-                      <div class="flex shrink-0 items-center justify-between gap-3 md:justify-end">
-                        <span class="text-sm font-bold text-tibet-dark">{{ formatCurrency(item.estimatedCost, itineraryQuote?.currency) }}</span>
-                        <motion.button
-                          v-if="isBookableItem(item)"
-                          @click="bookItineraryItem(item)"
-                          :disabled="itineraryBookingItemId === item.id"
-                          :aria-busy="itineraryBookingItemId === item.id"
-                          :aria-label="getExternalBookingAriaLabel(item)"
-                          :whileHover="{ y: -1, scale: 1.02 }"
-                          :whileTap="{ scale: 0.96 }"
-                          class="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-tibet-red px-3.5 py-2 text-xs font-semibold text-tibet-yellow shadow-md shadow-tibet-red/20 disabled:opacity-50"
-                        >
-                          <CalendarCheck class="h-3.5 w-3.5" />
-                          {{ itineraryBookingItemId === item.id ? t('routePlanner.bookingOpening') : t('routePlanner.thirdPartyBooking') }}
-                        </motion.button>
-                      </div>
-                    </div>
-                  </div>
-                </section>
-              </div>
-            </div>
+            <TripWorkbench v-else-if="bookableItinerary" :trip="bookableItinerary" :booking-item-id="itineraryBookingItemId" :editing-item-id="editingItineraryItemId" :edit-error="itineraryEditError" @book="bookItineraryItem" @edit="editItineraryItem" />
           </motion.div>
 
           <motion.div
@@ -1116,6 +1052,8 @@ import {
   type RouteGenerationJobSnapshot
 } from '../api/stream'
 import api, { endpoints, type AiRouteRecordResponse } from '../api'
+import TripWorkbench from '../components/TripWorkbench.vue'
+import { buildOfflineTrip, type TripReadiness } from '../utils/tripWorkbench'
 import MobileStickyActionBar from '../components/MobileStickyActionBar.vue'
 import { useRoutePlannerDraft, type RoutePlannerFormState } from '../composables/useRoutePlannerDraft'
 import { useAuthGuard } from '../composables/useAuthGuard'
@@ -1154,6 +1092,7 @@ interface RouteSummarySection {
 
 interface ItineraryItem {
   id: number
+  version?: number
   itemType: string
   title: string
   description?: string
@@ -1166,7 +1105,7 @@ interface ItineraryItem {
   bookingAction?: string
   bookingStatus?: string
   bookingReferenceType?: string
-  bookingReferenceId?: number
+  bookingReferenceId?: number | null
   scenicSpotId?: number
   scenicSpotName?: string
   hotelId?: number
@@ -1188,6 +1127,7 @@ interface ItineraryDay {
 }
 
 interface BookableItinerary {
+  readiness?: TripReadiness
   id: number
   title: string
   days: number
@@ -1321,6 +1261,9 @@ const onAuthExpired = () => {
 }
 
 const form = ref<RoutePlannerFormState>({ ...defaultForm })
+const departureDate = ref('')
+const travelers = ref(2)
+const minimumDepartureDate = new Date().toLocaleDateString('en-CA')
 
 const presets = computed(() => [
   { label: t('routePlanner.presetNatural'), days: 6, budget: 'comfort', preference: 'natural' },
@@ -1440,7 +1383,7 @@ const itemIcon = (type: string) => {
 }
 
 const isBookableItem = (item: ItineraryItem) =>
-  (item.bookingAction === 'BOOK_SPOT' || item.bookingAction === 'BOOK_HOTEL') && item.bookingStatus !== 'BOOKED'
+  (item.bookingAction === 'BOOK_SPOT' || item.bookingAction === 'BOOK_HOTEL') && !['BOOKED', 'INQUIRY_SUBMITTED'].includes(item.bookingStatus || '')
 
 const getExternalBookingAriaLabel = (item: ItineraryItem) =>
   itineraryBookingItemId.value === item.id
@@ -1454,6 +1397,8 @@ const copying = ref(false)
 const itineraryLoading = ref(false)
 const itineraryVersionLoading = ref<string | null>(null)
 const itineraryBookingItemId = ref<number | null>(null)
+const editingItineraryItemId = ref<number | null>(null)
+const itineraryEditError = ref('')
 const tibetTravelKitLoading = ref(false)
 const streaming = ref(false)
 const waitingForFirstToken = ref(false)
@@ -1707,7 +1652,7 @@ const getRouteDayIndex = (label: string) => {
 
 const expectedRouteDayCount = computed(() => {
   const days = Math.round(Number(form.value.days) || defaultForm.days)
-  return Math.min(30, Math.max(1, days))
+  return Math.min(15, Math.max(1, days))
 })
 
 const routeDaySections = computed<RouteSummarySection[]>(() => {
@@ -1953,7 +1898,7 @@ const scheduleMarkdownRender = (markdown: string, immediate = false) => {
 }
 
 const adjustDays = (delta: number) => {
-  form.value.days = Math.min(30, Math.max(1, form.value.days + delta))
+  form.value.days = Math.min(15, Math.max(1, form.value.days + delta))
 }
 
 const applyPreset = (preset: { label: string; days: number; budget: string; preference: string }) => {
@@ -2011,7 +1956,8 @@ const generateBookableItinerary = async (versionType = 'default') => {
           budget: form.value.budget,
           preference: form.value.preference,
           versionType,
-          travelers: 2,
+          travelers: travelers.value,
+          startDate: departureDate.value,
           locale
         })
 
@@ -2339,6 +2285,10 @@ const resumeRouteJobFromDraft = async () => {
 
 const generateRoute = async () => {
   if (loading.value || streaming.value || activeRouteJobId.value) return
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(departureDate.value) || departureDate.value < minimumDepartureDate || !Number.isInteger(travelers.value) || travelers.value < 1 || travelers.value > 20) {
+    errorMessage.value = '请填写有效的出发日期与出行人数（1–20人）。'
+    return
+  }
 
   const requestId = ++routeGenerationRequestId
   loading.value = true
@@ -2539,6 +2489,21 @@ const shareRoute = async () => {
   }
 }
 
+const editItineraryItem = async (itemId: number, values: { startTime: string; durationMinutes: number; expectedVersion: number }) => {
+  if (!bookableItinerary.value || editingItineraryItemId.value) return
+  const itineraryId = bookableItinerary.value.id
+  editingItineraryItemId.value = itemId
+  itineraryEditError.value = ''
+  try {
+    const { data } = await api.patch<BookableItinerary>(endpoints.itineraries.updateItem(itineraryId, itemId), values)
+    if (bookableItinerary.value?.id === itineraryId) bookableItinerary.value = data
+  } catch (error) {
+    itineraryEditError.value = responseStatus(error) === 409 ? '行程已被其他操作修改。请重新加载后再调整，未覆盖新版本。' : '修改未保存，请检查网络或重新登录后再试。原安排仍保留。'
+  } finally {
+    editingItineraryItemId.value = null
+  }
+}
+
 const bookItineraryItem = (item: ItineraryItem) => {
   if (!bookableItinerary.value || !isBookableItem(item)) return
 
@@ -2561,17 +2526,16 @@ const bookItineraryItem = (item: ItineraryItem) => {
 }
 
 const downloadOfflinePackage = () => {
-  if (!tibetTravelKit.value) return
-  const payload = JSON.stringify(tibetTravelKit.value, null, 2)
-  const blob = new Blob([payload], { type: 'application/json;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
+  if (!bookableItinerary.value) return
+  const payload = buildOfflineTrip(bookableItinerary.value, new Set())
+  const url = URL.createObjectURL(new Blob([payload], { type: 'text/html;charset=utf-8' }))
   const link = document.createElement('a')
   link.href = url
-  link.download = `tibet-travel-kit-${tibetTravelKit.value.itineraryId}.json`
+  link.download = `tibet-travel-kit-${bookableItinerary.value.id}.html`
   document.body.appendChild(link)
   link.click()
-  document.body.removeChild(link)
-  URL.revokeObjectURL(url)
+  link.remove()
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
 watch(

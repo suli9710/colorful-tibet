@@ -44,7 +44,8 @@
         :animate="{ opacity: 1, y: 0 }"
         :transition="{ duration: 0.38, ease: motionEase }"
       >
-        <form
+        <div class="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-relaxed text-amber-900">价格为参考价，内部库存不等于供应商实时库存。提交后仍需提供方确认；未知库存时暂停受理，不保证预订成功。</div>
+          <form
           class="lg:col-span-2 space-y-6"
           novalidate
           :aria-describedby="bookingFormDescribedBy"
@@ -383,6 +384,10 @@ interface ApiHotelResponse {
 }
 
 interface BookingRoom extends HotelRoom {
+  inventoryUnits?: number | null
+  inventoryStatus?: string
+  priceStatus?: string
+  fulfillmentStatus?: string
   amenities?: string
   capacity?: number | string | null
   maxGuests?: number | string | null
@@ -461,7 +466,11 @@ const normalizeApiRoom = (value: unknown): BookingRoom | null => {
     desc,
     amenities: readText(value, 'amenities') || desc,
     capacity: readAmount(value, 'capacity') ?? null,
-    maxGuests: readAmount(value, 'maxGuests') ?? null
+    maxGuests: readAmount(value, 'maxGuests') ?? null,
+    inventoryUnits: typeof value.inventoryUnits === 'number' ? value.inventoryUnits : null,
+    inventoryStatus: readText(value, 'inventoryStatus') || 'UNKNOWN',
+    priceStatus: readText(value, 'priceStatus') || 'UNAVAILABLE',
+    fulfillmentStatus: readText(value, 'fulfillmentStatus') || 'SUPPLIER_CONFIRMATION_REQUIRED'
   }
 }
 
@@ -659,6 +668,8 @@ const bookingUnavailable = computed(() =>
   !apiHotel.value ||
   !hotel.value ||
   !selectedRoom.value ||
+  selectedRoomSource.value?.inventoryStatus !== 'CONFIGURED' ||
+  selectedRoomSource.value?.priceStatus !== 'REFERENCE' ||
   hotel.value.available === false
 )
 const bookingAssuranceItems = computed<BookingAssuranceItem[]>(() => [

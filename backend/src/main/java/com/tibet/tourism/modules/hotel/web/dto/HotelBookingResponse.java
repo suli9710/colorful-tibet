@@ -25,6 +25,9 @@ public record HotelBookingResponse(
         String status,
         LocalDateTime createdAt
 ) {
+    @com.fasterxml.jackson.annotation.JsonProperty("fulfillmentStatus")
+    public String fulfillmentStatus() { return "SUPPLIER_CONFIRMATION_REQUIRED"; }
+
     public record HotelSummary(
             Long id,
             String name,

@@ -33,9 +33,9 @@ import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -49,25 +49,25 @@ class CommunityPublicDtoTest {
     @Autowired
     private MockMvc mockMvc;
 
-    @MockBean
+    @MockitoBean
     private SharedRouteService routeService;
 
-    @MockBean
+    @MockitoBean
     private TravelQAService qaService;
 
-    @MockBean
+    @MockitoBean
     private UserRepository userRepository;
 
-    @MockBean
+    @MockitoBean
     private JwtUtils jwtUtils;
 
-    @MockBean
+    @MockitoBean
     private JwtAuthSupport jwtAuthSupport;
 
-    @MockBean
+    @MockitoBean
     private CsrfTokenService csrfTokenService;
 
-    @MockBean
+    @MockitoBean
     private TrustedProxyIpResolver trustedProxyIpResolver;
 
     @Test
@@ -233,6 +233,8 @@ class CommunityPublicDtoTest {
                 nullable(String.class),
                 nullable(String.class),
                 nullable(Integer.class),
+                nullable(String.class),
+                nullable(String.class),
                 nullable(String.class),
                 nullable(String.class)))
                 .thenThrow(new IllegalArgumentException("storage path C:/private/uploads/secret.html"));

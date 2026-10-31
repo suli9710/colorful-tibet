@@ -4,6 +4,7 @@ import hotelBookingSource from './HotelBooking.vue?raw'
 import hotelDetailSource from './HotelDetail.vue?raw'
 import hotelOrdersSource from './HotelOrders.vue?raw'
 import routeDetailSource from './RouteDetail.vue?raw'
+import tripWorkbenchSource from '../components/TripWorkbench.vue?raw'
 import routePlannerSource from './RoutePlanner.vue?raw'
 
 describe('route planner and hotel flow UX accessibility guardrails', () => {
@@ -98,7 +99,8 @@ describe('route planner and hotel flow UX accessibility guardrails', () => {
     expect(routePlannerSource).toContain('role="progressbar"')
     expect(routePlannerSource).toContain(':aria-valuenow="routeGenerationProgressPercent"')
     expect(routePlannerSource).toContain(':aria-expanded="resultExpanded"')
-    expect(routePlannerSource).toContain(':aria-label="getExternalBookingAriaLabel(item)"')
+    expect(tripWorkbenchSource).toContain(`@click="$emit('book', item)"`)
+    expect(tripWorkbenchSource).toContain('前往第三方查询')
   })
 
   it('keeps hotel booking form validation described without raw backend details', () => {

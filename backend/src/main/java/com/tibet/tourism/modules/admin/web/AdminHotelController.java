@@ -37,8 +37,13 @@ public class AdminHotelController {
             @Min(value = 1, message = "入住人数至少为1") @Max(value = 20, message = "入住人数过大") Integer capacity,
             @Size(max = 512, message = "图片地址长度不能超过512个字符") String imageUrl,
             @Size(max = 500, message = "设施描述长度不能超过500个字符") String amenities,
-            @Min(value = 0, message = "排序值不能为负数") @Max(value = 10000, message = "排序值过大") Integer sortOrder
-    ) {}
+            @Min(value = 0, message = "排序值不能为负数") @Max(value = 10000, message = "排序值过大") Integer sortOrder,
+            @Min(value = 0) @Max(value = 10000) Integer inventoryUnits
+    ) {
+        public RoomTypeRequest(String name, BigDecimal price, Integer capacity, String imageUrl, String amenities, Integer sortOrder) {
+            this(name, price, capacity, imageUrl, amenities, sortOrder, null);
+        }
+    }
 
     private final HotelRepository hotelRepository;
     private final RoomTypeRepository roomTypeRepository;
@@ -132,9 +137,10 @@ public class AdminHotelController {
         return ResponseEntity.ok(RoomTypeResponse.from(roomTypeRepository.save(roomType)));
     }
 
+    @Transactional
     @PutMapping("/room-types/{id}")
     public ResponseEntity<?> updateRoomType(@PathVariable Long id, @Valid @RequestBody RoomTypeRequest request) {
-        RoomType existing = roomTypeRepository.findById(id).orElse(null);
+        RoomType existing = roomTypeRepository.findByIdForUpdate(id).orElse(null);
         if (existing == null) return ResponseEntity.notFound().build();
         applyRoomTypeRequest(existing, request);
         return ResponseEntity.ok(RoomTypeResponse.from(roomTypeRepository.save(existing)));
@@ -154,6 +160,7 @@ public class AdminHotelController {
         roomType.setImageUrl(safeImageUrl(request.imageUrl(), "房型图片"));
         roomType.setAmenities(InputSanitizer.optionalPlainText(request.amenities(), 500, "房型设施"));
         roomType.setSortOrder(request.sortOrder() == null ? 0 : request.sortOrder());
+        roomType.setInventoryUnits(request.inventoryUnits());
     }
 
     public record HotelResponse(
@@ -188,7 +195,8 @@ public class AdminHotelController {
             Integer capacity,
             String imageUrl,
             String amenities,
-            Integer sortOrder
+            Integer sortOrder,
+            Integer inventoryUnits
     ) {
         private static RoomTypeResponse from(RoomType roomType) {
             return new RoomTypeResponse(
@@ -198,7 +206,8 @@ public class AdminHotelController {
                     roomType.getCapacity(),
                     roomType.getImageUrl(),
                     roomType.getAmenities(),
-                    roomType.getSortOrder());
+                    roomType.getSortOrder(),
+                    roomType.getInventoryUnits());
         }
     }
 }

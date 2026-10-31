@@ -8,6 +8,18 @@ const prometheusConfig = readFileSync('monitoring/prometheus/prometheus.yml', 'u
 const uploadScript = readFileSync('upload-server.ps1', 'utf8').replace(/\r\n/g, '\n')
 
 describe('production security defaults', () => {
+  it('patches the complete installed runtime OS package set without changing runtime baselines', () => {
+    const backend = readFileSync('backend/Dockerfile', 'utf8')
+    const scrapler = readFileSync('scrapler/Dockerfile', 'utf8')
+    assert.match(backend, /FROM eclipse-temurin:17-jre-alpine@sha256:[a-f0-9]{64}/)
+    assert.match(backend, /RUN apk upgrade --no-cache/)
+    assert.match(backend, /USER app/)
+    assert.match(scrapler, /FROM python:3\.11-slim@sha256:[a-f0-9]{64}/)
+    assert.match(scrapler, /apt-get update[\s\S]*apt-get upgrade -y[\s\S]*apt-get install/)
+    assert.match(scrapler, /pip install --no-cache-dir --require-hashes/)
+    assert.match(scrapler, /USER app/)
+  })
+
   it('keeps anonymous production metrics disabled by default', () => {
     assert.match(prodCompose, /PUBLIC_METRICS_ENABLED=\$\{PUBLIC_METRICS_ENABLED:-false\}/)
     assert.doesNotMatch(prodCompose, /PUBLIC_METRICS_ENABLED=\$\{PUBLIC_METRICS_ENABLED:-true\}/)

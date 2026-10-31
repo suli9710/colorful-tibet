@@ -3,12 +3,34 @@ package com.tibet.tourism.modules.ai.application;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.tibet.tourism.common.security.OutboundUrlValidator;
+import java.net.InetAddress;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.reactive.function.client.WebClient;
 
 class AiRouteServiceConfigTest {
+
+    private MockedStatic<InetAddress> dns;
+
+    @BeforeEach
+    void useDeterministicPublicServiceAddress() throws Exception {
+        InetAddress publicAddress = InetAddress.getByAddress(new byte[] {8, 8, 8, 8});
+        dns = Mockito.mockStatic(InetAddress.class, Mockito.CALLS_REAL_METHODS);
+        dns.when(() -> InetAddress.getAllByName("ark.cn-beijing.volces.com"))
+                .thenReturn(new InetAddress[] {publicAddress});
+    }
+
+    @AfterEach
+    void releaseDnsStub() {
+        if (dns != null) {
+            dns.close();
+        }
+    }
 
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
             .withBean(WebClient.Builder.class, WebClient::builder)

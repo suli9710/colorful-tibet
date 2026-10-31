@@ -1,6 +1,7 @@
 package com.tibet.tourism.modules.community.web.dto;
 
 import com.tibet.tourism.modules.community.domain.SharedRoute;
+import com.tibet.tourism.common.security.PublicTravelText;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
@@ -22,7 +23,10 @@ public record SharedRouteResponse(
         Integer likeCount,
         Integer commentCount,
         LocalDateTime createdAt,
-        LocalDateTime updatedAt
+        LocalDateTime updatedAt,
+        String travelStatus,
+        String travelMonth,
+        String verificationStatus
 ) {
     public static SharedRouteResponse fromEntity(SharedRoute route) {
         return fromEntity(route, null);
@@ -35,8 +39,8 @@ public record SharedRouteResponse(
         return new SharedRouteResponse(
                 route.getId(),
                 PublicUserResponse.fromEntity(route.getAuthor(), currentUserId),
-                route.getTitle(),
-                route.getContent(),
+                PublicTravelText.minimize(route.getTitle()),
+                PublicTravelText.minimize(route.getContent()),
                 route.getDays(),
                 route.getBudget(),
                 route.getPreference(),
@@ -50,6 +54,9 @@ public record SharedRouteResponse(
                 route.getLikeCount(),
                 route.getCommentCount(),
                 route.getCreatedAt(),
-                route.getUpdatedAt());
+                route.getUpdatedAt(),
+                route.getTravelStatus() == null ? "UNKNOWN" : route.getTravelStatus(),
+                route.getTravelMonth(),
+                route.getSourceType() == SharedRoute.SourceType.USER ? "SELF_REPORTED" : "NOT_INDEPENDENTLY_VERIFIED");
     }
 }

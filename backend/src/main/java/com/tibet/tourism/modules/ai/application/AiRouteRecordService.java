@@ -3,6 +3,7 @@ package com.tibet.tourism.modules.ai.application;
 import com.tibet.tourism.common.error.BusinessException;
 import com.tibet.tourism.common.error.ResourceNotFoundException;
 import com.tibet.tourism.common.validation.InputSanitizer;
+import com.tibet.tourism.modules.route.application.ItineraryTrustPolicy;
 import com.tibet.tourism.modules.ai.domain.AiRouteRecord;
 import com.tibet.tourism.modules.ai.infra.AiRouteRecordRepository;
 import com.tibet.tourism.modules.ai.web.dto.AiRouteRecordResponse;
@@ -181,6 +182,9 @@ public class AiRouteRecordService {
                 .orElseThrow(() -> new ResourceNotFoundException("AI route record not found"));
         if (!hasContent(record.getContent())) {
             throw new BusinessException("AI route content is empty");
+        }
+        if (ItineraryTrustPolicy.violatesOvernightPolicy(record.getContent())) {
+            throw new BusinessException("该路线与住宿规划规则冲突，请重新生成并核验");
         }
         record.setManuallySaved(true);
         return AiRouteRecordResponse.from(routeRecordRepository.save(record));

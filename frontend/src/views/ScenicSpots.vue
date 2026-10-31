@@ -248,7 +248,7 @@
           <!-- Image Container -->
           <div class="relative h-56 overflow-hidden bg-gray-200 sm:h-72">
             <img v-if="hasSpotImage(spot)"
-                 :src="spot.imageUrl"
+                 :src="responsiveImage(spot.imageUrl || '')" :srcset="responsiveSrcset(spot.imageUrl || '')" sizes="(max-width: 640px) 100vw, 50vw" width="1280" height="850" decoding="async"
                  :alt="spot.name"
                  loading="lazy"
                  class="w-full h-full object-cover tibet-image-hover img-fade-in will-change-transform"
@@ -352,6 +352,7 @@
 </template>
 
 <script setup lang="ts">
+import { responsiveImage, responsiveSrcset } from '../utils/responsiveImages'
 import { ref, computed, onMounted, watch } from 'vue'
 import { AnimatePresence, motion } from 'motion-v'
 import { useRouter } from 'vue-router'

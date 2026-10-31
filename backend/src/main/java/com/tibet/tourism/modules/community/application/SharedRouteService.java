@@ -3,6 +3,7 @@ import com.tibet.tourism.common.error.BusinessException;
 import com.tibet.tourism.common.error.ResourceNotFoundException;
 import com.tibet.tourism.common.error.UnauthorizedActionException;
 import com.tibet.tourism.common.validation.InputSanitizer;
+import com.tibet.tourism.common.security.PublicTravelText;
 import com.tibet.tourism.modules.community.domain.RouteComment;
 import com.tibet.tourism.modules.community.domain.SharedRoute;
 import com.tibet.tourism.modules.community.infra.CommentRepository;
@@ -62,13 +63,44 @@ public class SharedRouteService {
     // 分享路线
     @Transactional
     public SharedRoute shareRoute(Long userId, String title, String content, Integer days, String budget, String preference) {
+        return shareRoute(userId, title, content, days, budget, preference, null, null);
+    }
+
+    @Transactional
+    public SharedRoute shareRoute(Long userId, String title, String content, Integer days, String budget,
+            String preference, String travelStatus, String travelMonth) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        String status = travelStatus == null || travelStatus.isBlank() ? "PLANNED" : travelStatus.trim();
+        if (!Set.of("PLANNED", "COMPLETED").contains(status)) {
+            throw new IllegalArgumentException("Invalid self-reported travel status");
+        }
+        String month = travelMonth == null || travelMonth.isBlank() ? null : travelMonth.trim();
+        if (month != null) {
+            if (!month.matches("[0-9]{4}-[0-9]{2}")) {
+                throw new IllegalArgumentException("Travel month must be YYYY-MM");
+            }
+            java.time.YearMonth parsed;
+            try {
+                parsed = java.time.YearMonth.parse(month);
+            } catch (java.time.format.DateTimeParseException ex) {
+                throw new IllegalArgumentException("Travel month must be a valid YYYY-MM", ex);
+            }
+            if (parsed.getYear() < 1900 || parsed.getYear() > java.time.YearMonth.now().getYear() + 10
+                    || ("COMPLETED".equals(status) && parsed.isAfter(java.time.YearMonth.now()))) {
+                throw new IllegalArgumentException("Travel month contradicts self-reported status");
+            }
+        }
+        if ("COMPLETED".equals(status) && month == null) {
+            throw new IllegalArgumentException("Completed travel requires a travel month");
+        }
 
         SharedRoute route = new SharedRoute();
+        route.setTravelStatus(status);
+        route.setTravelMonth(month);
         route.setAuthor(user);
-        route.setTitle(InputSanitizer.requiredPlainText(title, 200, "路线标题"));
-        route.setContent(InputSanitizer.requiredTextBlock(content, 12000, "路线内容"));
+        route.setTitle(PublicTravelText.minimize(InputSanitizer.requiredPlainText(title, 200, "路线标题")));
+        route.setContent(PublicTravelText.minimize(InputSanitizer.requiredTextBlock(content, 12000, "路线内容")));
         route.setDays(validateDays(days));
         route.setBudget(normalizeBudget(budget));
         route.setPreference(normalizePreference(preference));
@@ -236,7 +268,7 @@ public class SharedRouteService {
         return new SharedRouteSummaryResponse(
                 row.id(),
                 publicAuthor(row.authorId(), row.authorUsername(), row.authorNickname(), row.authorAvatar(), currentUserId),
-                row.title(),
+                PublicTravelText.minimize(row.title()),
                 row.days(),
                 row.budget(),
                 row.preference(),

@@ -1,6 +1,7 @@
 package com.tibet.tourism.modules.community.web.dto;
 
 import com.tibet.tourism.modules.community.domain.SharedRoute;
+import com.tibet.tourism.common.security.PublicTravelText;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
@@ -23,6 +24,11 @@ public record SharedRouteSummaryResponse(
         LocalDateTime createdAt,
         LocalDateTime updatedAt
 ) {
+    @com.fasterxml.jackson.annotation.JsonProperty("verificationStatus")
+    public String verificationStatus() {
+        return sourceType == SharedRoute.SourceType.USER ? "SELF_REPORTED" : "NOT_INDEPENDENTLY_VERIFIED";
+    }
+
     public static SharedRouteSummaryResponse fromEntity(SharedRoute route) {
         return fromEntity(route, null);
     }
@@ -34,7 +40,7 @@ public record SharedRouteSummaryResponse(
         return new SharedRouteSummaryResponse(
                 route.getId(),
                 PublicUserResponse.fromEntity(route.getAuthor(), currentUserId),
-                route.getTitle(),
+                PublicTravelText.minimize(route.getTitle()),
                 route.getDays(),
                 route.getBudget(),
                 route.getPreference(),

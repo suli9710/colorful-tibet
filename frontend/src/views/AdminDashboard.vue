@@ -1032,6 +1032,7 @@
                     <div class="flex-1 min-w-0">
                       <span class="font-medium text-stone-700">{{ rt.name }}</span>
                       <span class="ml-2 text-xs text-stone-400">{{ t('admin.pricePerNightWithCapacity', { price: rt.price, capacity: rt.capacity }) }}</span>
+                      <span class="ml-2 text-xs text-amber-800">内部库存：{{ rt.inventoryUnits ?? '未知（暂停受理）' }}</span>
                       <span v-if="rt.amenities" class="ml-2 text-xs text-stone-300">· {{ rt.amenities }}</span>
                     </div>
                     <button @click="deleteRoomTypeInline(rt.id, h.id)" class="shrink-0 ml-2 text-xs text-red-400 hover:text-red-600 transition-colors">{{ t('common.delete') }}</button>
@@ -1042,6 +1043,7 @@
                 <div class="flex items-center gap-1.5 bg-white rounded-lg border border-stone-200 px-2.5 py-2">
                   <input v-model="roomTypeForm.name" :placeholder="t('admin.roomNamePlaceholder')" class="flex-1 min-w-0 text-xs border-0 outline-none px-1" @keyup.enter="addRoomTypeInline(h.id)">
                   <input v-model.number="roomTypeForm.price" type="number" placeholder="¥" class="w-14 text-xs border-0 outline-none text-right px-1" @keyup.enter="addRoomTypeInline(h.id)">
+                  <input v-model.number="roomTypeForm.inventoryUnits" type="number" min="0" max="10000" step="1" placeholder="库存（未知留空）" aria-label="经核对的内部房间数量，未知请留空" class="w-28 text-xs border-0 outline-none px-1">
                   <input v-model.number="roomTypeForm.capacity" type="number" :placeholder="t('admin.capacityPlaceholder')" class="w-8 text-xs border-0 outline-none text-right px-1" @keyup.enter="addRoomTypeInline(h.id)">
                   <button @click="addRoomTypeInline(h.id)" class="shrink-0 text-xs px-2.5 py-1.5 rounded-md bg-green-500 text-white hover:bg-green-600 transition-colors">+</button>
                 </div>
@@ -1448,6 +1450,7 @@ interface AdminHotelItem {
 }
 
 interface AdminRoomType {
+  inventoryUnits?: number | null
   id: number
   name?: string | null
   price?: number | string | null
@@ -2543,7 +2546,7 @@ const deleteHotel = async (id: number) => {
 const expandedHotelId = ref<number | null>(null)
 const expandedRoomTypes = ref<AdminRoomType[]>([])
 const loadingRoomTypes = ref(false)
-const roomTypeForm = ref({ name: '', price: 0, capacity: 2, amenities: '' })
+const roomTypeForm = ref({ name: '', price: 0, capacity: 2, amenities: '', inventoryUnits: null as number | null })
 
 const toggleHotelExpand = async (hotel: AdminHotelItem) => {
   if (expandedHotelId.value === hotel.id) {
@@ -2566,8 +2569,8 @@ const toggleHotelExpand = async (hotel: AdminHotelItem) => {
 const addRoomTypeInline = async (hotelId: number) => {
   if (!roomTypeForm.value.name) return
   try {
-    await api.post(endpoints.adminHotels.roomTypes(hotelId), roomTypeForm.value)
-    roomTypeForm.value = { name: '', price: 0, capacity: 2, amenities: '' }
+    await api.post(endpoints.adminHotels.roomTypes(hotelId), { ...roomTypeForm.value, inventoryUnits: roomTypeForm.value.inventoryUnits === null || String(roomTypeForm.value.inventoryUnits) === '' ? null : Number(roomTypeForm.value.inventoryUnits) })
+    roomTypeForm.value = { name: '', price: 0, capacity: 2, amenities: '', inventoryUnits: null as number | null }
     const res = await api.get<unknown>(endpoints.adminHotels.roomTypes(hotelId))
     expandedRoomTypes.value = toList<AdminRoomType>(res.data)
   } catch (e) { showToast(t('admin.addFailed'), 'error') }

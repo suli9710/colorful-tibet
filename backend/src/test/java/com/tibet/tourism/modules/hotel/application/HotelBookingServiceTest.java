@@ -157,9 +157,6 @@ class HotelBookingServiceTest {
         HotelBookingRequest request = hotelBookingRequest(hotel.getId(), roomType.getId());
         when(hotelRepository.findById(hotel.getId())).thenReturn(Optional.of(hotel));
         when(roomTypeRepository.findByIdForUpdate(roomType.getId())).thenReturn(Optional.of(roomType));
-        when(hotelBookingRepository.findOverlappingActiveBookingsForUpdate(
-                eq(roomType.getId()), any(), eq(request.getCheckInDate()), eq(request.getCheckOutDate())))
-                .thenReturn(List.of());
         when(hotelBookingRepository.save(any(HotelBooking.class))).thenAnswer(invocation -> {
             HotelBooking saved = invocation.getArgument(0);
             saved.setId(77L);
@@ -213,9 +210,6 @@ class HotelBookingServiceTest {
         HotelBooking booking = pendingBookingWithDates(99L, 6L, "2026-09-01", "2026-09-03");
         when(hotelBookingRepository.findById(99L)).thenReturn(Optional.of(booking));
         when(hotelBookingRepository.save(booking)).thenReturn(booking);
-        when(hotelBookingRepository.findOverlappingActiveBookingsForUpdate(
-                eq(6L), any(), eq(LocalDate.parse("2026-09-01")), eq(LocalDate.parse("2026-09-03"))))
-                .thenReturn(List.of(booking));
 
         hotelBookingService.updateStatus(admin, 99L, "confirmed");
 
@@ -226,16 +220,16 @@ class HotelBookingServiceTest {
     @Test
     void adminConfirmRejectedWhenAnotherActiveBookingOverlaps() {
         HotelBooking booking = pendingBookingWithDates(99L, 6L, "2026-09-01", "2026-09-03");
-        HotelBooking conflicting = pendingBookingWithDates(100L, 6L, "2026-09-01", "2026-09-03");
         when(hotelBookingRepository.findById(99L)).thenReturn(Optional.of(booking));
-        when(hotelBookingRepository.save(booking)).thenReturn(booking);
-        when(hotelBookingRepository.findOverlappingActiveBookingsForUpdate(
-                eq(6L), any(), eq(LocalDate.parse("2026-09-01")), eq(LocalDate.parse("2026-09-03"))))
-                .thenReturn(List.of(booking, conflicting));
+        org.mockito.Mockito.doThrow(new IllegalStateException("Room type is unavailable for the selected dates"))
+                .when(orderCenterService).ensureHotelRoomAvailable(any(), eq(6L),
+                        eq(LocalDate.parse("2026-09-01")), eq(LocalDate.parse("2026-09-03")), eq(99L));
 
         assertThrows(IllegalStateException.class, () -> hotelBookingService.updateStatus(admin, 99L, "confirmed"));
 
         verify(orderCenterService, never()).createFromLegacyHotelBooking(any());
+        verify(hotelBookingRepository, never()).save(any());
+        assertEquals(HotelBooking.Status.PENDING, booking.getStatus());
     }
 
     @Test
@@ -392,9 +386,35 @@ class HotelBookingServiceTest {
     private HotelBooking pendingBookingWithDates(Long id, Long roomTypeId, String checkIn, String checkOut) {
         HotelBooking booking = booking(id, user, HotelBooking.Status.PENDING);
         booking.setRoomTypeId(roomTypeId);
+        booking.setCreatedAt(LocalDateTime.now());
+        booking.setHotel(publicHotelEntity());
         booking.setCheckInDate(LocalDate.parse(checkIn));
         booking.setCheckOutDate(LocalDate.parse(checkOut));
         return booking;
+    }
+
+    @Test
+    void expiredHoldCannotBeResurrectedByAdminConfirmation() {
+        HotelBooking booking = pendingBookingWithDates(99L, 6L,
+                LocalDate.now().plusDays(1).toString(), LocalDate.now().plusDays(2).toString());
+        booking.setCreatedAt(LocalDateTime.now().minusMinutes(16));
+        when(hotelBookingRepository.findById(99L)).thenReturn(Optional.of(booking));
+        assertThrows(IllegalStateException.class, () -> hotelBookingService.updateStatus(admin, 99L, "confirmed"));
+        assertEquals(HotelBooking.Status.PENDING, booking.getStatus());
+        verify(orderCenterService, never()).createFromLegacyHotelBooking(any());
+        verify(hotelBookingRepository, never()).save(any());
+    }
+
+    @Test
+    void missingPriceNeverBecomesFreeLegacyReservation() {
+        Hotel hotel = publicHotelEntity();
+        RoomType room = roomType(hotel);
+        room.setPrice(null);
+        when(hotelRepository.findById(hotel.getId())).thenReturn(Optional.of(hotel));
+        when(roomTypeRepository.findByIdForUpdate(room.getId())).thenReturn(Optional.of(room));
+        assertThrows(IllegalStateException.class,
+                () -> hotelBookingService.createBooking(user, hotelBookingRequest(hotel.getId(), room.getId())));
+        verify(hotelBookingRepository, never()).save(any());
     }
 
     private HotelBooking bookingWithPii(Long id, User owner) {

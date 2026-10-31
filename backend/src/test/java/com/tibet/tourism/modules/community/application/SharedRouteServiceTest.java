@@ -53,6 +53,51 @@ class SharedRouteServiceTest {
     private SharedRouteService service;
 
     @Test
+    void sharesOnlySelfReportedProvenanceAndMinimizesPublicIdentifiers() {
+        when(userRepository.findById(7L)).thenReturn(Optional.of(user()));
+        when(routeRepository.save(any(SharedRoute.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        SharedRoute route = service.shareRoute(7L, "行程13812345678", "拉萨\n病史：私人记录", 5,
+                "comfort", "natural", "COMPLETED", "2025-10");
+        assertThat(route.getTravelStatus()).isEqualTo("COMPLETED");
+        assertThat(route.getTravelMonth()).isEqualTo("2025-10");
+        assertThat(route.getTitle()).doesNotContain("13812345678");
+        assertThat(route.getContent()).doesNotContain("私人记录");
+        assertThat(com.tibet.tourism.modules.community.web.dto.SharedRouteResponse.fromEntity(route)
+                .verificationStatus()).isEqualTo("SELF_REPORTED");
+    }
+
+    @Test
+    void rejectsInventedVerificationAndFutureCompletedTravel() {
+        when(userRepository.findById(7L)).thenReturn(Optional.of(user()));
+        for (String status : List.of("VERIFIED", "CERTIFIED", "completed")) {
+            assertThatThrownBy(() -> service.shareRoute(7L, "title", "content", 5,
+                    "comfort", "natural", status, "2025-10")).isInstanceOf(IllegalArgumentException.class);
+        }
+        assertThatThrownBy(() -> service.shareRoute(7L, "title", "content", 5,
+                "comfort", "natural", "COMPLETED", java.time.YearMonth.now().plusMonths(1).toString()))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> service.shareRoute(7L, "title", "content", 5,
+                "comfort", "natural", "COMPLETED", null)).isInstanceOf(IllegalArgumentException.class);
+        for (String month : List.of("2025-00", "2025-13", "2025-1", "invalid", "1899-12")) {
+            assertThatThrownBy(() -> service.shareRoute(7L, "title", "content", 5,
+                    "comfort", "natural", "PLANNED", month)).isInstanceOf(IllegalArgumentException.class);
+        }
+        verify(routeRepository, never()).save(any());
+    }
+
+    @Test
+    void legacyProvenanceStaysUnknownAndHistoricalContentIsMinimizedOnRead() {
+        SharedRoute route = new SharedRoute();
+        route.setTitle("legacy trip");
+        route.setContent("trip@example.com");
+        var response = com.tibet.tourism.modules.community.web.dto.SharedRouteResponse.fromEntity(route);
+        assertThat(response.travelStatus()).isEqualTo("UNKNOWN");
+        assertThat(response.travelMonth()).isNull();
+        assertThat(response.content()).doesNotContain("trip@example.com");
+        assertThat(route.getContent()).isEqualTo("trip@example.com");
+    }
+
+    @Test
     void shareRouteNormalizesCanonicalBudgetAndPreferenceKeys() {
         when(userRepository.findById(7L)).thenReturn(Optional.of(user()));
         when(routeRepository.save(any(SharedRoute.class))).thenAnswer(invocation -> invocation.getArgument(0));

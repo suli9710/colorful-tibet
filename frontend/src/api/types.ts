@@ -59,6 +59,9 @@ export interface RegisterRequest {
 export type SharedRouteSourceType = 'USER' | 'OFFICIAL'
 
 export interface SharedRouteResponse {
+  travelStatus?: 'PLANNED' | 'COMPLETED' | 'UNKNOWN'
+  travelMonth?: string | null
+  verificationStatus?: string
   id: number
   author?: PublicUserResponse | null
   title: string

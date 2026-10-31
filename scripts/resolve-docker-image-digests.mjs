@@ -15,7 +15,7 @@ export const REQUIRED_IMAGE_REFS = [
   { source: 'backend/Dockerfile:2', image: 'maven:3.9-eclipse-temurin-17' },
   { source: 'backend/Dockerfile:9', image: 'eclipse-temurin:17-jre-alpine' },
   { source: 'frontend/Dockerfile:2', image: 'node:22-alpine' },
-  { source: 'frontend/Dockerfile:24', image: 'nginx:alpine' },
+  { source: 'frontend/Dockerfile:25', image: 'nginx:alpine' },
   { source: 'scrapler/Dockerfile:1', image: 'python:3.11-slim' },
   { source: 'docker-compose.yml:3', image: 'mysql:8.4' },
   { source: 'docker-compose.yml:118', image: 'redis:7-alpine' },

@@ -144,6 +144,51 @@ class BookingControllerAnonymousOwnerTest {
         assertEquals(BigDecimal.valueOf(600), mirrored.getTotalPrice());
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(ints = {1, 2, 3})
+    void winterLegacyInquiryUsesConfiguredTariff(int month) {
+        BookingRequest request = winterRequest(month);
+        ScenicSpot spot = new ScenicSpot();
+        spot.setId(10L);
+        spot.setTicketPrice(BigDecimal.valueOf(200));
+        spot.setOffSeasonPrice(BigDecimal.valueOf(80));
+        allowScenicInquiry(spot);
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(i -> {
+            Booking booking = i.getArgument(0);
+            booking.setId(88L);
+            return booking;
+        });
+        controller.createBooking(request, null, null, null, new MockHttpServletRequest());
+        ArgumentCaptor<Booking> captor = ArgumentCaptor.forClass(Booking.class);
+        verify(bookingRepository).save(captor.capture());
+        assertEquals(BigDecimal.valueOf(160), captor.getValue().getTotalPrice());
+    }
+
+    @Test
+    void unknownLegacyScenicPriceDoesNotPersistFreeInquiry() {
+        ScenicSpot spot = new ScenicSpot();
+        spot.setId(10L);
+        allowScenicInquiry(spot);
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
+                () -> controller.createBooking(winterRequest(1), null, null, null, new MockHttpServletRequest()));
+        verify(bookingRepository, never()).save(any());
+        verify(orderCenterService, never()).createFromLegacySpotBooking(any());
+    }
+
+    private BookingRequest winterRequest(int month) {
+        BookingRequest request = new BookingRequest();
+        request.setSpotId(10L);
+        request.setVisitDate(LocalDate.of(2030, month, 15));
+        request.setTicketCount(2);
+        return request;
+    }
+
+    private void allowScenicInquiry(ScenicSpot spot) {
+        when(riskAssessmentService.assess(any(), any(), eq(user.getId()), any(), any(), eq("/api/bookings")))
+                .thenReturn(RiskResult.allow());
+        when(scenicSpotRepository.findById(10L)).thenReturn(Optional.of(spot));
+    }
+
     @Test
     void getMyBookingsDelegatesPagedLookupAndKeepsLegacyArrayBody() {
         BookingResponse booking = new BookingResponse(

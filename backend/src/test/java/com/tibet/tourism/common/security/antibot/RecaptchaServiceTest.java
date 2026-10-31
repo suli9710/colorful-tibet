@@ -57,6 +57,15 @@ class RecaptchaServiceTest {
     }
 
     @Test
+    void oversizedResponseRemainsBoundedAndFailsClosed() {
+        RecaptchaService service = serviceWithResponse(
+                "{\"success\":true,\"padding\":\"" + "x".repeat(300_000) + "\"}");
+        // A plain WebClient keeps its default 256 KiB codec bound; decoding to String
+        // must not bypass that limit before the Jackson 2 tree is parsed.
+        assertThat(service.verify("token", "203.0.113.10")).isEmpty();
+    }
+
+    @Test
     void failedVerificationReturnsEmpty() {
         RecaptchaService service = serviceWithResponse("""
                 {
