@@ -91,8 +91,6 @@ public class OrderCenterService {
             Set.of(RefundOrder.Status.REQUESTED, RefundOrder.Status.APPROVED);
     private static final Set<RefundOrder.Status> COUNTED_REFUND_STATUSES =
             Set.of(RefundOrder.Status.REQUESTED, RefundOrder.Status.APPROVED, RefundOrder.Status.COMPLETED);
-    private static final Set<HotelBooking.Status> ACTIVE_HOTEL_BOOKING_STATUSES =
-            Set.of(HotelBooking.Status.PENDING, HotelBooking.Status.CONFIRMED);
     private static final Set<String> ORDER_PAGE_SORT_FIELDS =
             Set.of("id", "createdAt", "status", "paymentStatus");
     private static final Set<String> BOOKING_PAGE_SORT_FIELDS =
@@ -769,7 +767,7 @@ public class OrderCenterService {
 
     /** Serialize all reservation channels on the room row. Count each legacy/mirrored stay once. */
     private void ensureHotelCapacity(RoomType room, LocalDate date, int requested, Long excludedLegacyBookingId) {
-        Integer units = room.getInventoryUnits();
+        Integer units = roomTypeRepository.findInventoryUnitsForUpdate(room.getId());
         if (units == null) {
             throw new IllegalStateException("Room inventory is unverified; supplier confirmation is required");
         }
@@ -784,18 +782,18 @@ public class OrderCenterService {
                     lock.setActiveLockKey(null);
                     inventoryLockRepository.saveAndFlush(lock);
                 });
-        List<InventoryLock> locks = inventoryLockRepository.findActiveSkuDateLocksForUpdate(
-                OrderItem.ProductType.HOTEL_ROOM, hotelId, room.getId(), date, ACTIVE_INVENTORY_STATUSES).stream()
+        List<InventoryLockRepository.HotelAllocation> locks = inventoryLockRepository.findHotelAllocationsForUpdate(
+                hotelId, room.getId(), date).stream()
                 .filter(lock -> room.getId().equals(lock.getSkuId()))
                 .filter(lock -> !isLegacyLockFor(lock, excludedLegacyBookingId))
                 .toList();
         long reserved = locks.stream().mapToLong(lock -> Math.max(1, defaultQuantity(lock.getQuantity()))).sum();
         LocalDateTime cutoff = LocalDateTime.now().minusMinutes(LOCK_MINUTES);
-        List<HotelBooking> legacy = hotelBookingRepository.findOverlappingActiveBookingsForUpdate(
-                room.getId(), ACTIVE_HOTEL_BOOKING_STATUSES, date, date.plusDays(1));
+        List<HotelBookingRepository.ActiveReservation> legacy = hotelBookingRepository.findOverlappingActiveBookingsForUpdate(
+                room.getId(), date, date.plusDays(1));
         reserved += legacy.stream()
                 .filter(booking -> excludedLegacyBookingId == null || !excludedLegacyBookingId.equals(booking.getId()))
-                .filter(booking -> booking.getStatus() != HotelBooking.Status.PENDING
+                .filter(booking -> !"PENDING".equals(booking.getStatus())
                         || booking.getCreatedAt() == null || !booking.getCreatedAt().isBefore(cutoff))
                 .filter(booking -> locks.stream().noneMatch(lock -> isLegacyLockFor(lock, booking.getId())))
                 .count();
@@ -804,10 +802,9 @@ public class OrderCenterService {
         }
     }
 
-    private boolean isLegacyLockFor(InventoryLock lock, Long bookingId) {
-        return bookingId != null && lock.getOrder() != null
-                && "LEGACY_HOTEL_BOOKING".equals(lock.getOrder().getSourceType())
-                && bookingId.equals(lock.getOrder().getSourceReferenceId());
+    private boolean isLegacyLockFor(InventoryLockRepository.HotelAllocation lock, Long bookingId) {
+        return bookingId != null && "LEGACY_HOTEL_BOOKING".equals(lock.getSourceType())
+                && bookingId.equals(lock.getSourceReferenceId());
     }
 
     public boolean verifyCallbackSignature(PaymentCallbackRequest request) {

@@ -708,9 +708,9 @@ class OrderCenterServiceTest {
         when(hotelRepository.findById(20L)).thenReturn(Optional.of(hotel));
         when(roomTypeRepository.findByIdForUpdate(30L)).thenReturn(Optional.of(roomType));
         when(orderRepository.save(any(PlatformOrder.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(inventoryLockRepository.findActiveSkuDateLocksForUpdate(
-                eq(OrderItem.ProductType.HOTEL_ROOM), eq(20L), eq(30L), any(LocalDate.class), any()))
-                .thenReturn(List.of(hotelLock(1, null)));
+        when(inventoryLockRepository.findHotelAllocationsForUpdate(
+                eq(20L), eq(30L), any(LocalDate.class)))
+                .thenReturn(List.of(hotelAllocation(hotelLock(1, null))));
 
         IllegalStateException error = assertThrows(
                 IllegalStateException.class,
@@ -728,8 +728,8 @@ class OrderCenterServiceTest {
         when(hotelRepository.findById(20L)).thenReturn(Optional.of(hotel));
         when(roomTypeRepository.findByIdForUpdate(30L)).thenReturn(Optional.of(roomType));
         when(hotelBookingRepository.findOverlappingActiveBookingsForUpdate(
-                eq(30L), any(), any(LocalDate.class), any(LocalDate.class)))
-                .thenReturn(List.of(new HotelBooking()));
+                eq(30L), any(LocalDate.class), any(LocalDate.class)))
+                .thenReturn(List.of(legacyHotel(null, null, null)));
         when(orderRepository.save(any(PlatformOrder.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         IllegalStateException error = assertThrows(
@@ -781,7 +781,8 @@ class OrderCenterServiceTest {
         booking.setCheckOutDate(LocalDate.of(2026, 6, 3));
         booking.setStatus(HotelBooking.Status.PENDING);
 
-        when(roomTypeRepository.findByIdForUpdate(30L)).thenReturn(Optional.of(roomType(booking.getHotel())));
+        var mirroredRoom = roomType(booking.getHotel());
+        when(roomTypeRepository.findByIdForUpdate(30L)).thenReturn(Optional.of(mirroredRoom));
         when(orderRepository.findBySourceTypeAndSourceReferenceId("LEGACY_HOTEL_BOOKING", 502L))
                 .thenReturn(Optional.empty());
         when(inventoryLockRepository.saveAndFlush(any(InventoryLock.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -1433,6 +1434,8 @@ class OrderCenterServiceTest {
         roomType.setPrice(BigDecimal.valueOf(500));
         roomType.setCapacity(2);
         roomType.setInventoryUnits(1);
+        lenient().when(roomTypeRepository.findInventoryUnitsForUpdate(30L))
+                .thenAnswer(invocation -> roomType.getInventoryUnits());
         return roomType;
     }
 
@@ -1459,9 +1462,18 @@ class OrderCenterServiceTest {
         var room = roomType(hotel());
         room.setInventoryUnits(3);
         when(roomTypeRepository.findByIdForUpdate(30L)).thenReturn(Optional.of(room));
-        when(inventoryLockRepository.findActiveSkuDateLocksForUpdate(any(), any(), any(), any(), any()))
-                .thenReturn(List.of(hotelLock(2, null)));
+        when(inventoryLockRepository.findHotelAllocationsForUpdate(any(), any(), any()))
+                .thenReturn(List.of(hotelAllocation(hotelLock(2, null))));
         assertDoesNotThrow(() -> checkRoom(null));
+    }
+
+    @Test
+    void currentScalarCapacityOverridesStaleManagedRoomInventory() {
+        var staleRoom = roomType(hotel());
+        staleRoom.setInventoryUnits(5);
+        when(roomTypeRepository.findByIdForUpdate(30L)).thenReturn(Optional.of(staleRoom));
+        when(roomTypeRepository.findInventoryUnitsForUpdate(30L)).thenReturn(0);
+        assertThrows(IllegalStateException.class, () -> checkRoom(null));
     }
 
     @Test
@@ -1469,8 +1481,8 @@ class OrderCenterServiceTest {
         var room = roomType(hotel());
         room.setInventoryUnits(2);
         when(roomTypeRepository.findByIdForUpdate(30L)).thenReturn(Optional.of(room));
-        when(inventoryLockRepository.findActiveSkuDateLocksForUpdate(any(), any(), any(), any(), any()))
-                .thenReturn(List.of(hotelLock(2, null)));
+        when(inventoryLockRepository.findHotelAllocationsForUpdate(any(), any(), any()))
+                .thenReturn(List.of(hotelAllocation(hotelLock(2, null))));
         assertThrows(IllegalStateException.class, () -> checkRoom(null));
     }
 
@@ -1481,13 +1493,12 @@ class OrderCenterServiceTest {
         when(roomTypeRepository.findByIdForUpdate(30L)).thenReturn(Optional.of(room));
         InventoryLock unrelated = hotelLock(100, null);
         unrelated.setSkuId(31L);
-        when(inventoryLockRepository.findActiveSkuDateLocksForUpdate(any(), any(), any(), any(), any()))
-                .thenAnswer(invocation -> LocalDate.now().plusDays(11).equals(invocation.getArgument(3))
-                        ? List.of(hotelLock(2, null), unrelated) : List.of(unrelated));
+        when(inventoryLockRepository.findHotelAllocationsForUpdate(any(), any(), any()))
+                .thenAnswer(invocation -> LocalDate.now().plusDays(11).equals(invocation.getArgument(2))
+                        ? List.of(hotelAllocation(hotelLock(2, null)), hotelAllocation(unrelated)) : List.of(hotelAllocation(unrelated)));
         assertThrows(IllegalStateException.class, () -> checkRoom(null));
-        verify(inventoryLockRepository).findActiveSkuDateLocksForUpdate(
-                eq(OrderItem.ProductType.HOTEL_ROOM), eq(20L), eq(30L), eq(LocalDate.now().plusDays(10)),
-                eq(java.util.Set.of(InventoryLock.Status.LOCKED, InventoryLock.Status.CONFIRMED)));
+        verify(inventoryLockRepository).findHotelAllocationsForUpdate(
+                eq(20L), eq(30L), eq(LocalDate.now().plusDays(10)));
     }
 
     @Test
@@ -1495,9 +1506,9 @@ class OrderCenterServiceTest {
         var room = roomType(hotel());
         room.setInventoryUnits(2);
         when(roomTypeRepository.findByIdForUpdate(30L)).thenReturn(Optional.of(room));
-        when(inventoryLockRepository.findActiveSkuDateLocksForUpdate(any(), any(), any(), any(), any()))
-                .thenReturn(List.of(hotelLock(1, 77L)));
-        when(hotelBookingRepository.findOverlappingActiveBookingsForUpdate(any(), any(), any(), any()))
+        when(inventoryLockRepository.findHotelAllocationsForUpdate(any(), any(), any()))
+                .thenReturn(List.of(hotelAllocation(hotelLock(1, 77L))));
+        when(hotelBookingRepository.findOverlappingActiveBookingsForUpdate(any(), any(), any()))
                 .thenReturn(List.of(legacyHotel(77L, HotelBooking.Status.CONFIRMED, LocalDateTime.now())));
         assertDoesNotThrow(() -> checkRoom(null));
     }
@@ -1507,9 +1518,9 @@ class OrderCenterServiceTest {
         var room = roomType(hotel());
         room.setInventoryUnits(2);
         when(roomTypeRepository.findByIdForUpdate(30L)).thenReturn(Optional.of(room));
-        when(inventoryLockRepository.findActiveSkuDateLocksForUpdate(any(), any(), any(), any(), any()))
-                .thenReturn(List.of(hotelLock(1, null)));
-        when(hotelBookingRepository.findOverlappingActiveBookingsForUpdate(any(), any(), any(), any()))
+        when(inventoryLockRepository.findHotelAllocationsForUpdate(any(), any(), any()))
+                .thenReturn(List.of(hotelAllocation(hotelLock(1, null))));
+        when(hotelBookingRepository.findOverlappingActiveBookingsForUpdate(any(), any(), any()))
                 .thenReturn(List.of(legacyHotel(77L, HotelBooking.Status.CONFIRMED, LocalDateTime.now())));
         assertThrows(IllegalStateException.class, () -> checkRoom(null));
     }
@@ -1518,7 +1529,7 @@ class OrderCenterServiceTest {
     void expiredPendingLegacyStayDoesNotConsumeStock() {
         var room = roomType(hotel());
         when(roomTypeRepository.findByIdForUpdate(30L)).thenReturn(Optional.of(room));
-        when(hotelBookingRepository.findOverlappingActiveBookingsForUpdate(any(), any(), any(), any()))
+        when(hotelBookingRepository.findOverlappingActiveBookingsForUpdate(any(), any(), any()))
                 .thenReturn(List.of(legacyHotel(77L, HotelBooking.Status.PENDING, LocalDateTime.now().minusMinutes(16))));
         assertDoesNotThrow(() -> checkRoom(null));
     }
@@ -1527,9 +1538,9 @@ class OrderCenterServiceTest {
     void legacyConfirmationExcludesItselfAndItsMirror() {
         var room = roomType(hotel());
         when(roomTypeRepository.findByIdForUpdate(30L)).thenReturn(Optional.of(room));
-        when(inventoryLockRepository.findActiveSkuDateLocksForUpdate(any(), any(), any(), any(), any()))
-                .thenReturn(List.of(hotelLock(1, 77L)));
-        when(hotelBookingRepository.findOverlappingActiveBookingsForUpdate(any(), any(), any(), any()))
+        when(inventoryLockRepository.findHotelAllocationsForUpdate(any(), any(), any()))
+                .thenReturn(List.of(hotelAllocation(hotelLock(1, 77L))));
+        when(hotelBookingRepository.findOverlappingActiveBookingsForUpdate(any(), any(), any()))
                 .thenReturn(List.of(legacyHotel(77L, HotelBooking.Status.PENDING, LocalDateTime.now())));
         assertDoesNotThrow(() -> checkRoom(77L));
     }
@@ -1566,9 +1577,10 @@ class OrderCenterServiceTest {
         when(roomTypeRepository.findByIdForUpdate(30L)).thenReturn(Optional.of(room));
         when(orderRepository.save(any(PlatformOrder.class))).thenAnswer(invocation -> invocation.getArgument(0));
         List<InventoryLock> persisted = new java.util.ArrayList<>();
-        when(inventoryLockRepository.findActiveSkuDateLocksForUpdate(any(), any(), any(), any(), any()))
+        when(inventoryLockRepository.findHotelAllocationsForUpdate(any(), any(), any()))
                 .thenAnswer(invocation -> persisted.stream()
-                        .filter(lock -> lock.getServiceDate().equals(invocation.getArgument(3))).toList());
+                        .filter(lock -> lock.getServiceDate().equals(invocation.getArgument(2)))
+                        .map(this::hotelAllocation).toList());
         when(inventoryLockRepository.saveAndFlush(any(InventoryLock.class))).thenAnswer(invocation -> {
             InventoryLock lock = invocation.getArgument(0);
             persisted.add(lock);
@@ -1592,6 +1604,15 @@ class OrderCenterServiceTest {
                 LocalDate.now().plusDays(12), excludedLegacyId);
     }
 
+    private InventoryLockRepository.HotelAllocation hotelAllocation(InventoryLock lock) {
+        return new InventoryLockRepository.HotelAllocation() {
+            public Long getSkuId() { return lock.getSkuId(); }
+            public Integer getQuantity() { return lock.getQuantity(); }
+            public String getSourceType() { return lock.getOrder() == null ? null : lock.getOrder().getSourceType(); }
+            public Long getSourceReferenceId() { return lock.getOrder() == null ? null : lock.getOrder().getSourceReferenceId(); }
+        };
+    }
+
     private InventoryLock hotelLock(int quantity, Long legacyId) {
         InventoryLock lock = new InventoryLock();
         lock.setProductType(OrderItem.ProductType.HOTEL_ROOM);
@@ -1608,12 +1629,12 @@ class OrderCenterServiceTest {
         return lock;
     }
 
-    private HotelBooking legacyHotel(Long id, HotelBooking.Status status, LocalDateTime createdAt) {
-        HotelBooking booking = new HotelBooking();
-        booking.setId(id);
-        booking.setStatus(status);
-        booking.setCreatedAt(createdAt);
-        return booking;
+    private HotelBookingRepository.ActiveReservation legacyHotel(Long id, HotelBooking.Status status, LocalDateTime createdAt) {
+        return new HotelBookingRepository.ActiveReservation() {
+            public Long getId() { return id; }
+            public String getStatus() { return status == null ? null : status.name(); }
+            public LocalDateTime getCreatedAt() { return createdAt; }
+        };
     }
 
     private String signature(String orderNo, String transactionNo, BigDecimal amount, String status) {
