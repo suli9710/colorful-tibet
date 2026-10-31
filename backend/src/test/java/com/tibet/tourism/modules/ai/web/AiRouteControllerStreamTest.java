@@ -35,9 +35,9 @@ import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -53,25 +53,25 @@ class AiRouteControllerStreamTest {
     @Autowired
     private MockMvc mockMvc;
 
-    @MockBean
+    @MockitoBean
     private AiRouteService aiRouteService;
 
-    @MockBean
+    @MockitoBean
     private AiQuotaService aiQuotaService;
 
-    @MockBean
+    @MockitoBean
     private AiRouteGenerationJobService aiRouteGenerationJobService;
 
-    @MockBean
+    @MockitoBean
     private AiRouteRecordService aiRouteRecordService;
 
-    @MockBean
+    @MockitoBean
     private JwtAuthSupport jwtAuthSupport;
 
-    @MockBean
+    @MockitoBean
     private CsrfTokenService csrfTokenService;
 
-    @MockBean
+    @MockitoBean
     private TrustedProxyIpResolver trustedProxyIpResolver;
 
     @Test

@@ -1,5 +1,6 @@
 package com.tibet.tourism.common.security.antibot;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tibet.tourism.common.security.OutboundUrlValidator;
 import com.tibet.tourism.common.security.PiiMasker;
 import com.tibet.tourism.common.security.SensitiveLogSanitizer;
@@ -23,6 +24,7 @@ public class RecaptchaService {
 
     private static final Logger log = LoggerFactory.getLogger(RecaptchaService.class);
     private static final double RECAPTCHA_V2_SUCCESS_SCORE = 1.0;
+    private static final ObjectMapper RESPONSE_MAPPER = new ObjectMapper();
 
     private final AntibotProperties properties;
     private final WebClient webClient;
@@ -67,13 +69,15 @@ public class RecaptchaService {
                 formData.add("remoteip", remoteIp);
             }
 
-            JsonNode response = webClient.post()
+            String responseBody = webClient.post()
                     .uri(cfg.getVerifyUrl())
                     .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                     .body(BodyInserters.fromFormData(formData))
                     .retrieve()
-                    .bodyToMono(JsonNode.class)
+                    .bodyToMono(String.class)
                     .block(Duration.ofSeconds(3));
+            // Parse into the retained Jackson 2 tree explicitly; a plain WebClient now defaults to Jackson 3.
+            JsonNode response = responseBody == null ? null : RESPONSE_MAPPER.readTree(responseBody);
 
             if (response != null && response.path("success").asBoolean(false)) {
                 JsonNode scoreNode = response.get("score");

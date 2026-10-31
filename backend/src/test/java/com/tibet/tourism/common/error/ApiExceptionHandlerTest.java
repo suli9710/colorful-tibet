@@ -84,7 +84,7 @@ class ApiExceptionHandlerTest {
     @Test
     void handlesMalformedJsonAsBadRequestWithoutErrorLog() {
         ResponseEntity<Map<String, String>> response = handler.handleUnreadableMessage(
-                new HttpMessageNotReadableException("JSON parse error"));
+                new HttpMessageNotReadableException("JSON parse error", new org.springframework.mock.http.MockHttpInputMessage(new byte[0])));
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody()).containsEntry("error", "Invalid request");
