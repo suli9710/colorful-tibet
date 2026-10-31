@@ -2,6 +2,7 @@
 FROM node:22-alpine@sha256:968df39aedcea65eeb078fb336ed7191baf48f972b4479711397108be0966920 AS builder
 WORKDIR /app
 COPY package.json package-lock.json ./
+COPY scripts/patch-redocly-minimatch.mjs ./scripts/patch-redocly-minimatch.mjs
 RUN npm ci
 COPY . .
 

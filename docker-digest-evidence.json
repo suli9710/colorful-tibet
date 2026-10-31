@@ -35,7 +35,7 @@
       "digest": "sha256:9385cd9f3001dfc3431e8ead12c43e9e1f87cc1b9b5c6cfd0f73865d405b27c4"
     },
     {
-      "source": "frontend/Dockerfile:24",
+      "source": "frontend/Dockerfile:25",
       "image": "nginx:alpine",
       "pinned": "nginx:alpine@sha256:8b1e78743a03dbb2c95171cc58639fef29abc8816598e27fb910ed2e621e589a",
       "repository": "library/nginx",
