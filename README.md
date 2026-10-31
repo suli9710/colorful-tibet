@@ -18,7 +18,7 @@
 后端：
 
 - Java 17
-- Spring Boot 3.5.12
+- Spring Boot 4.1.2
 - Spring Security + JWT
 - Spring Data JPA
 - Flyway

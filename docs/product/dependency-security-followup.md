@@ -1,0 +1,45 @@
+# 依赖安全与兼容性验收
+
+## 决策原则
+
+- 保持现有公开 API、序列化字段/日期、身份权限及数据迁移行为；不通过关闭测试、调低扫描阈值或忽略漏洞获取绿色状态。
+- 使用官方发布源及锁文件完整性校验。开发测试夹具不替代生产密钥，依赖升级不授权部署或真实交易。
+- 扫描器的包版本发现与应用实际可利用性是两个问题；有条件的漏洞不能直接断言已可利用，也不能据此不经审查忽略扫描结果。
+
+## Spring 版本边界
+
+官方公告说明，CVE-2026-47884、CVE-2026-47890、CVE-2026-47892 的 Spring Framework 6.2 修复版 6.2.20 为企业支持发行，公开修复发行是 7.0.9。仅升级公开 Boot 3.5 补丁不能消除这些版本发现。因此采用公开且对齐的 Boot 4 / Framework 7 版本线，保留 Java 17，不引入商业仓库或收费依赖。
+
+兼容验收重点：
+
+1. 使用官方 Jackson 2 兼容模块维持现有 JSON 契约，不在安全补丁中静默改为不同字段/日期格式。
+2. MVC/WebFlux、认证、CSRF、错误响应与 OpenAPI 契约必须继续通过回归。
+3. Hibernate、Flyway 与真实 MySQL 的上下文、既有迁移、库存事务必须实测；单元 mock 不证明数据库语义。
+4. 版本升级必须通过完整后端测试与现有安全扫描，未通过前保留草稿状态。
+
+参考：
+- https://spring.io/security/cve-2026-47884/
+- https://spring.io/security/cve-2026-47890/
+- https://spring.io/security/cve-2026-47892/
+- https://docs.spring.io/spring-boot/4.1/system-requirements.html
+- https://github.com/spring-projects/spring-boot/wiki/Spring-Boot-4.0-Migration-Guide
+
+## Python 固定版本修复
+
+AnyIO 4.14.2、Protego 0.6.2、Starlette 1.3.1、Certifi 2026.10.18 修复扫描中对应的请求处理/解析问题。生产与开发 requirements 同步固定版本和 PyPI 发布 SHA-256；安装保留 `--require-hashes`。与既有 FastAPI 依赖约束兼容，安装一致性检查与爬虫 16 项回归通过。
+
+官方发布信息：
+- https://pypi.org/project/anyio/4.14.2/
+- https://pypi.org/project/protego/0.6.2/
+- https://pypi.org/project/starlette/1.3.1/
+- https://pypi.org/project/certifi/2026.10.18/
+
+## 库存事务补充验证
+
+MySQL 的加锁当前读可以看到较新提交，但随后的关联对象延迟加载可能仍使用旧 REPEATABLE_READ 快照。库存查询现在在同一次加锁读取中获取订单来源，不依赖第二次快照读取；原混合渠道并发测试保留，并增加明确建立旧快照后的回归场景。此修复不降低隔离级别，不吞掉数据库异常，也不等同于完成所有生产负载测试。
+
+## 前端兼容升级
+
+保持 Vue 3 / Vite 8，升级存在漏洞的公开依赖。Vue I18n 9→11、ECharts 5→6 保留现有组合式国际化与图表模块接口，并验证实际 OpenAPI 引用打包、类型生成、URL glob 匹配和 SVG SSR 输出。前端测试/构建不替代真浏览器视觉验收。
+
+OpenAPI 工具链的临时 Redocly/minimatch 兼容处理及退出条件见 [`frontend/scripts/DEPENDENCY_SECURITY.md`](../../frontend/scripts/DEPENDENCY_SECURITY.md)。该处理使用实际修复版 minimatch，仅适配旧导入形式，具有版本/源文件哈希/接口守卫；不是忽略漏洞或伪造审计。常规安装、明确省略开发依赖的安装及 Docker 安装顺序分别验证。
