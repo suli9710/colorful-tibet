@@ -107,6 +107,11 @@
             </MotionBlock>
           </div>
 
+          <div class="grid gap-4 rounded-2xl border border-tibet-gold/25 bg-white/60 p-4 sm:grid-cols-2">
+            <div><label for="travel-status" class="mb-2 block text-sm font-medium">这是一份计划，还是旅行回顾？</label><select id="travel-status" v-model="form.travelStatus" class="min-h-11 w-full rounded-xl border border-stone-300 p-3"><option value="PLANNED">计划中</option><option value="COMPLETED">已走过（作者自述）</option></select></div>
+            <div><label for="travel-month" class="mb-2 block text-sm font-medium">出行月份（可选）</label><input id="travel-month" v-model="form.travelMonth" type="month" class="min-h-11 w-full rounded-xl border border-stone-300 p-3"></div>
+            <p class="text-xs leading-relaxed text-stone-600 sm:col-span-2">作者自述不代表平台认证。请标明信息来源和更新日期，不公开手机号、证件或健康信息。</p>
+          </div>
           <MotionBlock :index="4" :delay="0.16">
             <label for="create-route-content" class="block text-sm font-medium text-tibet-dark/80 mb-2">
               {{ t('createRoute.routeContent') }} <span class="text-red-500">*</span>
@@ -207,7 +212,9 @@ const form = ref({
   content: '',
   days: 7,
   budget: '',
-  preference: ''
+  preference: '',
+  travelStatus: 'PLANNED',
+  travelMonth: ''
 })
 
 const submitting = ref(false)
@@ -237,7 +244,9 @@ const submitRoute = async () => {
       content: form.value.content,
       days: form.value.days,
       budget: form.value.budget,
-      preference: form.value.preference
+      preference: form.value.preference,
+      travelStatus: form.value.travelStatus,
+      travelMonth: form.value.travelMonth || null
     })
     showToast(t('createRoute.publishSuccess'), 'success')
     router.push('/community')

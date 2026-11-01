@@ -9,6 +9,7 @@ import com.tibet.tourism.modules.route.web.dto.itinerary.CreateItineraryVersionR
 import com.tibet.tourism.modules.route.web.dto.itinerary.GenerateItineraryRequest;
 import com.tibet.tourism.modules.route.web.dto.itinerary.ItineraryResponse;
 import com.tibet.tourism.modules.route.web.dto.itinerary.ItinerarySummaryResponse;
+import com.tibet.tourism.modules.route.web.dto.itinerary.UpdateItineraryItemRequest;
 import com.tibet.tourism.modules.user.domain.User;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -87,6 +88,24 @@ public class ItineraryController {
             log.warn("Itinerary quote lookup failed: itineraryId={}, detail={}",
                     id, SensitiveLogSanitizer.exceptionSummary(e));
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", ITINERARY_NOT_FOUND_ERROR));
+        }
+    }
+
+    @PatchMapping("/{id}/items/{itemId}")
+    public ResponseEntity<?> updateItem(@PathVariable Long id, @PathVariable Long itemId,
+                                       @Valid @RequestBody UpdateItineraryItemRequest request,
+                                       HttpServletRequest httpRequest) {
+        User user = jwtAuthSupport.resolveCurrentUser(httpRequest);
+        try {
+            return ResponseEntity.ok(itineraryService.updateItem(user, id, itemId, request));
+        } catch (NoSuchElementException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", ITINERARY_ITEM_NOT_FOUND_ERROR));
+        } catch (SecurityException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", ITINERARY_FORBIDDEN_ERROR));
+        } catch (org.springframework.dao.OptimisticLockingFailureException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", "行程已更新，请重新加载后再调整"));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "时间调整无效；已提交咨询的项目须先处理对应订单"));
         }
     }
 

@@ -702,6 +702,13 @@
               <p>{{ itineraryError }}</p><button class="planner-secondary mt-3" :disabled="itineraryLoading || !!itineraryVersionLoading || isOffline" @click="generateBookableItinerary()">{{ t('plannerFlow.retryDetails') }}</button>
             </div>
             <div v-if="bookableItinerary && !itineraryLoading" class="p-5 md:p-6 space-y-5">
+              <aside class="planner-notice" aria-label="行程核验边界">
+                <p>参考草案：实际价格、库存、预约与履约仍需向提供方确认。未提供人数时，不核验住宿容量。</p>
+                <p v-if="bookableItinerary.readiness">{{ bookableItinerary.readiness.disclaimer }}</p>
+                <ul v-if="bookableItinerary.readiness?.issues.length" class="mt-2 list-disc pl-5">
+                  <li v-for="(issue, index) in bookableItinerary.readiness.issues" :key="`${issue.code}-${issue.itemId ?? index}`">{{ issue.message }}</li>
+                </ul>
+              </aside>
               <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div class="rounded-2xl border border-tibet-gold/20 bg-white/70 px-4 py-3">
                   <p class="text-xs text-tibet-brown/50">{{ t('routePlanner.quoteTotalEstimated') }}</p>
@@ -747,7 +754,7 @@
                           <div class="flex flex-wrap items-center gap-2">
                             <p class="text-sm font-semibold text-tibet-dark">{{ item.startTime }} · {{ item.title }}</p>
                             <span class="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-600">{{ itemTypeLabel(item.itemType) }}</span>
-                            <span v-if="item.bookingStatus === 'BOOKED'" class="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">{{ t('routePlanner.bookingSubmitted') }}</span>
+                            <span v-if="['BOOKED', 'INQUIRY_SUBMITTED'].includes(item.bookingStatus || '')" class="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">{{ t('routePlanner.bookingSubmitted') }}</span>
                           </div>
                           <p class="mt-1 text-xs leading-relaxed text-tibet-brown/60 line-clamp-2">{{ item.description }}</p>
                           <p v-if="item.alternatives" class="mt-1 text-[11px] text-tibet-blue/70">{{ t('routePlanner.alternativesPrefix', { alternatives: item.alternatives }) }}</p>
@@ -797,7 +804,7 @@
                 </div>
               </div>
               <motion.button
-                v-if="tibetTravelKit"
+                v-if="tibetTravelKit && bookableItinerary"
                 @click="downloadOfflinePackage"
                 :aria-label="t('routePlanner.travelKitDownloadAria')"
                 :whileHover="{ y: -1, scale: 1.02 }"
@@ -1001,6 +1008,7 @@ import { useRouteGenerationStore } from '../stores/routeGeneration'
 import { readBrowserStorage, removeBrowserStorage, writeBrowserStorage } from '../utils/browserStorage'
 import { summarizeClientError } from '../utils/errorMonitoring'
 import { openExternalBooking } from '../utils/externalBooking'
+import { buildOfflineTrip, type TripReadiness } from '../utils/tripWorkbench'
 import { toFiniteAmount, toIntlLocale } from '../i18n/formatting'
 import {
   cardInitial,
@@ -1064,6 +1072,8 @@ interface ItineraryDay {
 }
 
 interface BookableItinerary {
+  readiness?: TripReadiness
+  travelers?: number | null
   id: number
   title: string
   days: number
@@ -1250,7 +1260,7 @@ const formatInteger = (value?: number | string | null) =>
   new Intl.NumberFormat(toIntlLocale(locale.value), { maximumFractionDigits: 0 }).format(toFiniteAmount(value))
 
 const formatCurrency = (value?: number | string | null, currency?: string | null) =>
-  value == null || value === '' || !Number.isFinite(Number(value)) ? t('plannerFlow.amountPending') : new Intl.NumberFormat(toIntlLocale(locale.value), {
+  value == null || value === '' || !Number.isFinite(Number(value)) || Number(value) < 0 ? t('plannerFlow.amountPending') : new Intl.NumberFormat(toIntlLocale(locale.value), {
     style: 'currency',
     currency: currency || 'CNY',
     maximumFractionDigits: 0
@@ -1318,7 +1328,7 @@ const itemIcon = (type: string) => {
 }
 
 const isBookableItem = (item: ItineraryItem) =>
-  (item.bookingAction === 'BOOK_SPOT' || item.bookingAction === 'BOOK_HOTEL') && item.bookingStatus !== 'BOOKED'
+  (item.bookingAction === 'BOOK_SPOT' || item.bookingAction === 'BOOK_HOTEL') && !['BOOKED', 'INQUIRY_SUBMITTED'].includes(item.bookingStatus || '')
 
 const getExternalBookingAriaLabel = (item: ItineraryItem) =>
   itineraryBookingItemId.value === item.id
@@ -1879,7 +1889,8 @@ const generateBookableItinerary = async (versionType = 'default') => {
       const response = await api.post<BookableItinerary>(endpoints.itineraries.generate, {
         ...parameters,
         versionType,
-        travelers: 2,
+        // No party size has been supplied in this flow; do not invent a verified capacity.
+        travelers: null,
         locale
       })
       itinerary = response.data
@@ -2473,17 +2484,16 @@ const bookItineraryItem = (item: ItineraryItem) => {
 }
 
 const downloadOfflinePackage = () => {
-  if (!tibetTravelKit.value) return
-  const payload = JSON.stringify(tibetTravelKit.value, null, 2)
-  const blob = new Blob([payload], { type: 'application/json;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
+  if (!bookableItinerary.value) return
+  const payload = buildOfflineTrip(bookableItinerary.value, new Set())
+  const url = URL.createObjectURL(new Blob([payload], { type: 'text/html;charset=utf-8' }))
   const link = document.createElement('a')
   link.href = url
-  link.download = `tibet-travel-kit-${tibetTravelKit.value.itineraryId}.json`
+  link.download = `tibet-travel-kit-${bookableItinerary.value.id}.html`
   document.body.appendChild(link)
   link.click()
-  document.body.removeChild(link)
-  URL.revokeObjectURL(url)
+  link.remove()
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
 watch(

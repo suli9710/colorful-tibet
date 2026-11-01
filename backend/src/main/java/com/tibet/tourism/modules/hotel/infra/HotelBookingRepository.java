@@ -71,17 +71,20 @@ public interface HotelBookingRepository extends JpaRepository<HotelBooking, Long
                                                  @Param("createdAt") LocalDateTime createdAt,
                                                  Pageable pageable);
 
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("""
-            SELECT hb FROM HotelBooking hb
-            WHERE hb.roomTypeId = :roomTypeId
-              AND hb.deletedAt IS NULL
-              AND hb.status IN :statuses
-              AND hb.checkInDate < :checkOut
-              AND hb.checkOutDate > :checkIn
-            """)
-    List<HotelBooking> findOverlappingActiveBookingsForUpdate(@Param("roomTypeId") Long roomTypeId,
-                                                              @Param("statuses") Collection<HotelBooking.Status> statuses,
+    interface ActiveReservation {
+        Long getId();
+        String getStatus();
+        LocalDateTime getCreatedAt();
+    }
+
+    @Query(value = """
+            SELECT hb.id AS id, hb.status AS status, hb.created_at AS createdAt FROM hotel_bookings hb
+            WHERE hb.room_type_id = :roomTypeId AND hb.deleted_at IS NULL
+              AND hb.status IN ('PENDING', 'CONFIRMED')
+              AND hb.check_in_date < :checkOut AND hb.check_out_date > :checkIn
+            FOR UPDATE
+            """, nativeQuery = true)
+    List<ActiveReservation> findOverlappingActiveBookingsForUpdate(@Param("roomTypeId") Long roomTypeId,
                                                               @Param("checkIn") LocalDate checkIn,
                                                               @Param("checkOut") LocalDate checkOut);
 

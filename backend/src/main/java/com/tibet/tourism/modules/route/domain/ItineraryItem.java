@@ -146,6 +146,6 @@ public class ItineraryItem {
     }
 
     public enum BookingStatus {
-        BOOKABLE, BOOKED, NOT_BOOKABLE
+        BOOKABLE, BOOKED, INQUIRY_SUBMITTED, NOT_BOOKABLE
     }
 }

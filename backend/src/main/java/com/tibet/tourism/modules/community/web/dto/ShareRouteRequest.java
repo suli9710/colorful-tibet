@@ -15,6 +15,13 @@ public class ShareRouteRequest {
     private String budget;
 
     private String preference;
+    private String travelStatus;
+    private String travelMonth;
+
+    public String getTravelStatus() { return travelStatus; }
+    public void setTravelStatus(String travelStatus) { this.travelStatus = travelStatus; }
+    public String getTravelMonth() { return travelMonth; }
+    public void setTravelMonth(String travelMonth) { this.travelMonth = travelMonth; }
 
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }

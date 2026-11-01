@@ -31,6 +31,9 @@ public class Itinerary {
     private String title;
 
     private Integer days;
+    private Integer travelers;
+    @Column(name = "generation_rule_version", length = 48)
+    private String generationRuleVersion;
     private LocalDate startDate;
 
     @Column(length = 32)
@@ -92,6 +95,11 @@ public class Itinerary {
 
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }
+
+    public Integer getTravelers() { return travelers; }
+    public void setTravelers(Integer travelers) { this.travelers = travelers; }
+    public String getGenerationRuleVersion() { return generationRuleVersion; }
+    public void setGenerationRuleVersion(String generationRuleVersion) { this.generationRuleVersion = generationRuleVersion; }
 
     public Integer getDays() { return days; }
     public void setDays(Integer days) { this.days = days; }

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tibet.tourism.common.security.OutboundUrlValidator;
 import com.tibet.tourism.common.security.PiiMasker;
 import com.tibet.tourism.common.validation.InputSanitizer;
+import com.tibet.tourism.modules.route.application.ItineraryTrustPolicy;
 import com.tibet.tourism.modules.ai.web.dto.AiRouteGenerateResponse;
 import com.tibet.tourism.modules.hotel.domain.Hotel;
 import com.tibet.tourism.modules.route.domain.Itinerary;
@@ -182,7 +183,9 @@ public class AiRouteService {
                 "model", blankToPlaceholder(model),
                 "days", String.valueOf(safeDays),
                 "budget", displayBudgetLabel,
-                "preference", displayPreferenceLabel
+                "preference", displayPreferenceLabel,
+                "trustStatus", "UNVALIDATED_DRAFT",
+                "ruleVersion", ItineraryTrustPolicy.VERSION
         ));
 
         String configIssue = configIssue(streamApiUrl);
@@ -804,6 +807,7 @@ public class AiRouteService {
                 + "- **高原适应**：第1天只安排拉萨低强度适应，后续再逐步进入高海拔区域。\n"
                 + "- **每日负载**：每一天固定4-8条可执行安排，避免赶场和时间冲突。\n"
                 + "- **路线完整性**：不得输出空路线、缺失天数或重复天数；如不确定，给出保守 fallback。\n"
+                + "- **规则与来源**：规则版本 " + ItineraryTrustPolicy.VERSION + "；官方公告参考 https://wlt.xizang.gov.cn/ ，逐项有效期、预约和路况尚待确认。\n"
                 + "- **医疗免责声明**：本路线不是医疗建议；出现胸闷、持续头痛、呼吸困难等症状应立即停止行程并就医。\n\n"
                 + "## 进藏必读\n"
                 + "列出4-5条最关键实用信息：高原反应、边防证、穿衣防晒、通讯现金、尊重风俗。\n\n"
@@ -994,6 +998,7 @@ public class AiRouteService {
             return "";
         }
 
+        if (ItineraryTrustPolicy.violatesOvernightPolicy(sanitized)) return "";
         if (isTibetanLocale(locale)) {
             return sanitized;
         }
@@ -1016,6 +1021,7 @@ public class AiRouteService {
         if (sanitized.isBlank()) {
             return "";
         }
+        if (ItineraryTrustPolicy.violatesOvernightPolicy(sanitized)) return "";
         if (isTibetanLocale(locale)) {
             return sanitized;
         }
@@ -1050,6 +1056,7 @@ public class AiRouteService {
     }
 
     private String validateMarkdownRoute(String content, int days, String budgetLabel, String preferenceLabel) {
+        if (ItineraryTrustPolicy.violatesOvernightPolicy(content)) return null;
         String normalized = content.replace("\uFEFF", "").trim();
         if (normalized.isBlank()) {
             return "";
@@ -1249,9 +1256,10 @@ public class AiRouteService {
     private String buildSafetyGuardrailSection(int days) {
         return "## 安全与执行校验\n"
                 + "- **高原适应**：第1天限定拉萨低强度适应，不安排羊湖、纳木错、珠峰等高海拔目的地。\n"
-                + "- **每日负载**：已校验" + days + "天行程完整，且每天为"
-                + MIN_DAILY_ROUTE_ITEMS + "-" + MAX_DAILY_ROUTE_ITEMS + "条可执行安排。\n"
+                + "- **结构检查**：按" + days + "天组织参考内容，每天建议为"
+                + MIN_DAILY_ROUTE_ITEMS + "-" + MAX_DAILY_ROUTE_ITEMS + "条草案安排；结构完整不代表交通、开放、住宿或库存已核验。\n"
                 + "- **路线完整性**：如 AI 输出为空、缺天、重复天数或每日项目过少/过多，系统改用保守基准路线。\n"
+                + "- **规则与来源**：规则版本 " + ItineraryTrustPolicy.VERSION + "；官方公告参考 https://wlt.xizang.gov.cn/ ，逐项有效期、预约和路况尚待确认。\n"
                 + "- **医疗免责声明**：本路线不是医疗建议；出现胸闷、持续头痛、呼吸困难等症状应立即停止行程并就医。";
     }
 
@@ -1417,7 +1425,7 @@ public class AiRouteService {
         StringBuilder builder = new StringBuilder();
         builder.append("# 西藏").append(days).append("天经典").append(preferenceLabel).append("之旅\n\n");
         builder.append("## 路线概览\n");
-        builder.append("本条路线以").append(preferenceLabel).append("为核心，兼顾高原适应、顺路游览和预算可控。以下为结合经典线路、海拔节奏和预算约束生成的基准路线。\n\n");
+        builder.append("本条路线以").append(preferenceLabel).append("为核心，兼顾高原适应、顺路游览和预算可控。以下为保守基准路线，仅供参考草案使用，未核验开放时间、交通、预约、住宿与价格，不保证可执行或医疗安全。\n\n");
         builder.append("## 行程亮点\n");
         builder.append("- 拉萨市区深度游览，感受藏文化心脏\n");
         builder.append("- 探访西藏经典自然与人文景观\n");
@@ -1429,43 +1437,14 @@ public class AiRouteService {
         builder.append("- **上午**：抵达拉萨，机场/火车站前往市区（约1小时），入住酒店后休息\n");
         builder.append("- **下午**：布达拉宫广场漫步，八廓街转经，适应高原环境\n");
         builder.append("- **晚上/住宿**：甜茶+藏面，入住拉萨市区").append(budgetLabel).append("酒店\n");
-        builder.append("- **贴心提示**：拉萨海拔3650米，第一天不洗澡、不饮酒、避免剧烈运动\n\n");
+        builder.append("- **贴心提示**：住宿海拔与身体适应需要核实；健康问题咨询专业人士，不以本路线代替医学建议\n\n");
 
-        // Route definitions based on days
-        String[][] spots;
-        if (days <= 3) {
-            spots = new String[][]{
-                {"拉萨 —— 圣城朝圣", "布达拉宫参观（需提前预约，游览约3小时）", "大昭寺朝圣，在八廓街跟随信徒转经", "八廓街藏式餐厅，品尝酥油茶和糌粑", "拉萨市区" + budgetLabel + "酒店", "布达拉宫需爬台阶，放慢节奏；大昭寺下午光线最佳"},
-                {"羊卓雍措 —— 碧玉湖一日游", "拉萨出发前往羊卓雍措（车程约2.5小时），沿途欣赏雅鲁藏布江河谷", "环湖游览，在岗巴拉山口俯瞰羊卓雍措全景", "返回拉萨，享用藏式火锅", "拉萨市区" + budgetLabel + "酒店", "羊卓雍措海拔4441米，山口风大注意保暖；沿途限速，车程较长"}
-            };
-        } else if (days <= 5) {
-            spots = new String[][]{
-                {"拉萨 —— 圣城朝圣", "布达拉宫参观（需提前预约，游览约3小时）", "大昭寺+八廓街深度游，色拉寺观辩经（15:00开始）", "八廓街周边藏式餐厅", "拉萨市区" + budgetLabel + "酒店", "布达拉宫需爬台阶，放慢节奏"},
-                {"拉萨 → 巴松措 → 林芝（车程约5小时）", "沿318国道前往林芝，途中游览巴松措湖心岛", "巴松措徒步或乘船游览（2小时），继续前往林芝八一镇", "林芝石锅鸡（特色美食），尼洋河畔散步", "林芝八一镇" + budgetLabel + "酒店", "林芝海拔约3000米，气候湿润舒适；巴松措门票120元"},
-                {"林芝 —— 鲁朗林海与南迦巴瓦", "前往鲁朗林海（车程约1.5小时），骑马或徒步穿越原始森林", "色季拉山口远眺南迦巴瓦峰（海拔7782米），前往雅鲁藏布大峡谷入口", "鲁朗石锅鸡，夜宿峡谷入口处", "派镇或峡谷入口" + budgetLabel + "客栈", "南迦巴瓦峰常年云雾缭绕，冬季和清晨最易看到"},
-                {"雅鲁藏布大峡谷 → 拉萨（车程约6小时）", "上午游览雅鲁藏布大峡谷，拍摄南迦巴瓦峰与雅鲁藏布江同框", "沿318国道返回拉萨", "抵达拉萨后休息，回顾行程", "拉萨市区" + budgetLabel + "酒店", "返程车程较长，备好零食和水"}
-            };
-        } else if (days <= 8) {
-            spots = new String[][]{
-                {"拉萨 —— 圣城深度游", "布达拉宫参观（约3小时）", "大昭寺+八廓街，下午色拉寺观辩经", "八廓街藏式餐厅", "拉萨市区" + budgetLabel + "酒店", "初到高原放慢节奏，适应为主"},
-                {"拉萨 → 羊卓雍措 → 江孜（车程约5小时）", "沿307省道前往羊卓雍措，岗巴拉山口俯瞰全景（停留1小时）", "沿湖前行至浪卡子县，继续前往江孜，参观白居寺和宗山古堡", "江孜县城藏餐", "江孜县城" + budgetLabel + "酒店", "羊卓雍措海拔4441米，山口风大；江孜海拔约4000米"},
-                {"江孜 → 日喀则（车程约2小时）", "上午继续游览江孜白居寺十万佛塔", "前往日喀则，参观扎什伦布寺（班禅驻锡地，游览约3小时）", "日喀则市区藏式餐厅", "日喀则市区" + budgetLabel + "酒店", "日喀则海拔约3840米；扎什伦布寺是后藏最重要寺院"},
-                {"日喀则 → 珠峰大本营（车程约8小时）", "清晨出发，经加乌拉山口（可同时看到5座8000米级雪山）", "抵达珠峰大本营（海拔5200米），等待日落金山", "大本营简餐，拍摄星空（如天气允许）", "大本营帐篷营地或绒布寺招待所", "海拔5200米，注意高反！备好氧气瓶、保暖衣物和头灯"},
-                {"珠峰大本营 → 日喀则（车程约8小时）", "拍摄珠峰日出金山，随后返程", "沿318国道返回日喀则，途中可停靠拉孜县休息", "日喀则市区休息", "日喀则市区" + budgetLabel + "酒店", "返程漫长，备好食物和水；注意限速"},
-                {"日喀则 → 拉萨（车程约5小时）", "沿雅鲁藏布江河谷返回拉萨", "抵达拉萨后自由活动，可逛冲赛康市场或小昭寺", "藏式告别晚餐，推荐娜玛瑟德餐厅", "拉萨市区" + budgetLabel + "酒店", "最后一天放松为主，整理旅途照片和回忆"}
-            };
-        } else {
-            spots = new String[][]{
-                {"拉萨 —— 圣城深度游", "布达拉宫参观（约3小时）", "大昭寺+八廓街，下午色拉寺观辩经", "八廓街藏式餐厅", "拉萨市区" + budgetLabel + "酒店", "初到高原放慢节奏，适应为主"},
-                {"拉萨 —— 人文探索", "西藏博物馆（了解藏地历史文化，约2小时）", "小昭寺+罗布林卡（达赖夏宫）", "拉萨河畔散步，甜茶馆体验", "拉萨市区" + budgetLabel + "酒店", "博物馆周一闭馆，注意避开"},
-                {"拉萨 → 羊卓雍措 → 江孜（车程约5小时）", "沿307省道前往羊卓雍措，岗巴拉山口俯瞰全景", "沿湖至浪卡子，前往江孜参观白居寺和宗山古堡", "江孜县城藏餐", "江孜县城" + budgetLabel + "酒店", "羊卓雍措海拔4441米"},
-                {"江孜 → 日喀则（车程约2小时）", "继续游览白居寺十万佛塔", "参观扎什伦布寺（约3小时）", "日喀则市区藏式餐厅", "日喀则市区" + budgetLabel + "酒店", "扎什伦布寺是后藏格鲁派最重要寺院"},
-                {"日喀则 → 珠峰大本营（车程约8小时）", "清晨出发，经加乌拉山口", "抵达珠峰大本营，等待日落金山", "大本营简餐，星空拍摄", "大本营帐篷营地", "海拔5200米，注意高反"},
-                {"珠峰大本营 → 日喀则（车程约8小时）", "拍摄珠峰日出，随后返程", "返回日喀则休整", "日喀则市区休息", "日喀则市区" + budgetLabel + "酒店", "返程漫长，备好食物"},
-                {"日喀则 → 纳木错（车程约7小时）", "经拉萨绕行至纳木错，途经当雄草原", "纳木错扎西半岛游览，拍摄湖光山色", "纳木错湖边简易客栈", "纳木错湖边客栈", "纳木错海拔4718米，夜间极冷"},
-                {"纳木错 → 拉萨（车程约4小时）", "拍摄纳木错日出，环扎西半岛", "返回拉萨，自由活动", "藏式告别晚餐", "拉萨市区" + budgetLabel + "酒店", "旅途结束，整理美好回忆"}
-            };
-        }
+        // Conservative local draft. Without dated routing/availability evidence do not invent
+        // multi-day remote transfers or overnight stays above the product's own policy.
+        String[][] spots = {
+                {"拉萨 —— 预约后的人文探索", "核对布达拉宫等场馆的官方预约与开放时间，未确认前保留备选", "按体力选择一处已确认开放的市区文化场馆，安排休息", "自行选择餐饮并核对营业情况", "拉萨市区" + budgetLabel + "住宿待核验", "开放、预约、房型与价格均待确认，不承诺可订"},
+                {"拉萨 —— 文化与休整", "根据前日状态调整或取消游览，必要时寻求专业帮助", "从已核验的市区场馆选择替代项目，避免密集赶路", "整理次日待办与官方公告", "拉萨市区" + budgetLabel + "住宿待核验", "跨地区路线、实际路况及住宿海拔需另行核实"}
+        };
 
         int remainingDays = days - 1; // Day 1 already handled
         for (int i = 0; i < remainingDays && i < spots.length; i++) {
@@ -1491,12 +1470,14 @@ public class AiRouteService {
         builder.append("按").append(budgetLabel).append("标准估算：交通约占40%，住宿占30%，餐饮占15%，门票占10%，其他占5%。实际花费以出行时市场价格为准。\n\n");
         builder.append(buildSafetyGuardrailSection(days)).append("\n\n");
         builder.append("## 进藏必读\n");
-        builder.append("- **边防证**：前往珠峰、阿里、墨脱等边境地区需提前在户籍所在地办理边防证\n");
-        builder.append("- **高原反应**：抵达后放慢节奏，多喝水，备好氧气瓶和常用药\n");
+        builder.append("- **边防证**：按身份、目的地和出行日期通过国家移民管理局官方渠道确认所需证件，不混同不同手续\n");
+        builder.append("- **高原反应**：高海拔行程须核实适应节奏；出现不适及时求助，药物和氧疗请咨询专业人士\n");
         builder.append("- **穿衣防晒**：昼夜温差大，备冲锋衣、墨镜、SPF50+防晒霜\n");
         builder.append("- **通讯现金**：偏远地区信号不稳，提前下载离线地图并备少量现金\n");
         builder.append("- **尊重风俗**：寺庙内遵守拍照规则，顺时针转经，不踩门槛\n");
-        return builder.toString().trim();
+        String draft = builder.toString().trim();
+        if (ItineraryTrustPolicy.violatesOvernightPolicy(draft)) throw new IllegalStateException("Fallback violates itinerary policy");
+        return draft;
     }
 
     private String toChineseDay(int day) {
