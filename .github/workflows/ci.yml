@@ -132,8 +132,14 @@ jobs:
       - name: Validate Prometheus configuration
         run: |
           set -euo pipefail
+          metrics_token_file="$(mktemp)"
+          trap 'rm -f "$metrics_token_file"' EXIT
+          # Non-secret fixture; promtool runs as the image's unprivileged user.
+          printf '%s' 'ci-prometheus-config-validation-only' > "$metrics_token_file"
+          chmod 644 "$metrics_token_file"
           docker run --rm \
             -v "$PWD/monitoring/prometheus:/etc/prometheus:ro" \
+            -v "$metrics_token_file:/tmp/metrics-scrape-token:ro" \
             --entrypoint promtool \
             prom/prometheus:v2.55.1@sha256:2659f4c2ebb718e7695cb9b25ffa7d6be64db013daba13e05c875451cf51b0d3 \
             check config /etc/prometheus/prometheus.yml
@@ -233,8 +239,8 @@ jobs:
           # as a security finding - but it must not pass silently either.
           dependency_check_failed=0
           if [ "${{ steps.backend_dependency_check.outcome }}" = "failure" ]; then
-            if [ -d backend/target/dependency-check-report ] \
-              && [ -n "$(ls -A backend/target/dependency-check-report 2>/dev/null)" ]; then
+            if [ -d "$GITHUB_WORKSPACE/backend/target/dependency-check-report" ] \
+              && [ -n "$(ls -A "$GITHUB_WORKSPACE/backend/target/dependency-check-report" 2>/dev/null)" ]; then
               echo "::error::dependency-check reported findings at or above CVSS 7. Review the uploaded report."
               dependency_check_failed=1
             else

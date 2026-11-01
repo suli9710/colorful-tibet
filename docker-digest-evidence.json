@@ -123,7 +123,7 @@
       "digest": "sha256:c2830e93d95de43f0d10e00a3784a9ee101cdf4909370196c8802514fd7f1954"
     },
     {
-      "source": ".github/workflows/ci.yml:138",
+      "source": ".github/workflows/ci.yml:144",
       "image": "prom/prometheus:v2.55.1",
       "pinned": "prom/prometheus:v2.55.1@sha256:2659f4c2ebb718e7695cb9b25ffa7d6be64db013daba13e05c875451cf51b0d3",
       "repository": "prom/prometheus",
@@ -131,7 +131,7 @@
       "digest": "sha256:2659f4c2ebb718e7695cb9b25ffa7d6be64db013daba13e05c875451cf51b0d3"
     },
     {
-      "source": ".github/workflows/ci.yml:143",
+      "source": ".github/workflows/ci.yml:149",
       "image": "prom/prometheus:v2.55.1",
       "pinned": "prom/prometheus:v2.55.1@sha256:2659f4c2ebb718e7695cb9b25ffa7d6be64db013daba13e05c875451cf51b0d3",
       "repository": "prom/prometheus",
@@ -139,7 +139,7 @@
       "digest": "sha256:2659f4c2ebb718e7695cb9b25ffa7d6be64db013daba13e05c875451cf51b0d3"
     },
     {
-      "source": ".github/workflows/ci.yml:261",
+      "source": ".github/workflows/ci.yml:267",
       "image": "mysql:8.4",
       "pinned": "mysql:8.4@sha256:8dbcf531a03aade657e181b9cf2f1d1803ce621a1d55610cb44cb531ab7d7db6",
       "repository": "library/mysql",

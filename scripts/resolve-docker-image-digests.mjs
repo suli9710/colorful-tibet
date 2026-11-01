@@ -28,9 +28,9 @@ export const REQUIRED_IMAGE_REFS = [
   { source: 'docker-compose.prod.yml:758', image: 'prom/alertmanager:v0.27.0' },
   { source: 'docker-compose.prod.yml:805', image: 'grafana/grafana:11.4.0' },
   { source: 'docker-compose.prod.yml:840', image: 'openzipkin/zipkin:3.4' },
-  { source: '.github/workflows/ci.yml:138', image: 'prom/prometheus:v2.55.1' },
-  { source: '.github/workflows/ci.yml:143', image: 'prom/prometheus:v2.55.1' },
-  { source: '.github/workflows/ci.yml:261', image: 'mysql:8.4' }
+  { source: '.github/workflows/ci.yml:144', image: 'prom/prometheus:v2.55.1' },
+  { source: '.github/workflows/ci.yml:149', image: 'prom/prometheus:v2.55.1' },
+  { source: '.github/workflows/ci.yml:267', image: 'mysql:8.4' }
 ]
 
 export const splitDockerImageRef = (imageRef) => {
