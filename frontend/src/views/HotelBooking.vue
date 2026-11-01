@@ -50,6 +50,7 @@
           :aria-describedby="bookingFormDescribedBy"
           @submit.prevent="submitBooking"
         >
+          <div class="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-relaxed text-amber-900">价格为参考价，内部库存不等于供应商实时库存。提交后仍需提供方确认；未知库存时暂停受理，不保证预订成功。</div>
           <div
             v-if="bookingDataLoading"
             class="rounded-2xl bg-tibet-gold/10 px-4 py-3 text-center text-sm font-medium text-tibet-brown/70"
@@ -123,6 +124,7 @@
               <select
                 id="hotel-booking-guests"
                 v-model="form.guests"
+                :disabled="selectedRoomCapacity === null"
                 class="w-full px-4 py-3 rounded-2xl border border-tibet-gold/25 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all"
                 :aria-describedby="guestHelpId"
                 :aria-invalid="guestsInvalid"
@@ -130,7 +132,7 @@
                 <option v-for="n in guestOptions" :key="n" :value="n">{{ n }}{{ t('hotel.guests') }}</option>
               </select>
               <p :id="guestHelpId" class="mt-2 text-xs leading-relaxed text-gray-500">
-                {{ t('hotel.guestCapacityHelp', { capacity: selectedRoomCapacity }) }}
+                {{ selectedRoomCapacity === null ? '住宿容量尚未核实，暂停受理' : t('hotel.guestCapacityHelp', { capacity: selectedRoomCapacity }) }}
               </p>
             </div>
           </motion.div>
@@ -339,6 +341,7 @@
 </template>
 
 <script setup lang="ts">
+import { canRequestRoom, explicitRoomCapacity } from '../utils/hotelInquiry'
 import { computed, ref, watch } from 'vue'
 import { AnimatePresence, motion } from 'motion-v'
 import { useRoute, useRouter } from 'vue-router'
@@ -383,6 +386,10 @@ interface ApiHotelResponse {
 }
 
 interface BookingRoom extends HotelRoom {
+  inventoryUnits?: number | null
+  inventoryStatus?: string
+  priceStatus?: string
+  fulfillmentStatus?: string
   amenities?: string
   capacity?: number | string | null
   maxGuests?: number | string | null
@@ -461,7 +468,11 @@ const normalizeApiRoom = (value: unknown): BookingRoom | null => {
     desc,
     amenities: readText(value, 'amenities') || desc,
     capacity: readAmount(value, 'capacity') ?? null,
-    maxGuests: readAmount(value, 'maxGuests') ?? null
+    maxGuests: readAmount(value, 'maxGuests') ?? null,
+    inventoryUnits: typeof value.inventoryUnits === 'number' ? value.inventoryUnits : null,
+    inventoryStatus: readText(value, 'inventoryStatus') || 'UNKNOWN',
+    priceStatus: readText(value, 'priceStatus') || 'UNAVAILABLE',
+    fulfillmentStatus: readText(value, 'fulfillmentStatus') || 'SUPPLIER_CONFIRMATION_REQUIRED'
   }
 }
 
@@ -583,7 +594,6 @@ const form = ref({
 })
 
 const MAX_BOOKING_NIGHTS = 30
-const DEFAULT_ROOM_CAPACITY = 2
 
 const padDatePart = (value: number) => String(value).padStart(2, '0')
 const formatDate = (d: Date) =>
@@ -637,21 +647,9 @@ const bookingAvailabilityLabel = computed(() =>
     : t('hotel.availability.needsConfirm')
 )
 
-const parseRoomCapacity = (room: BookingRoom | null) => {
-  const explicitCapacity = Number(room?.capacity || room?.maxGuests)
-  if (Number.isFinite(explicitCapacity) && explicitCapacity > 0) return explicitCapacity
-
-  const text = [room?.desc, room?.amenities].filter(Boolean).join(' ')
-  const match = text.match(/(?:可住|适合)\s*(\d+)\s*人|(\d+)\s*人/)
-  const parsed = Number(match?.[1] || match?.[2])
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_ROOM_CAPACITY
-}
-
-const selectedRoomCapacity = computed(() =>
-  Math.min(6, Math.max(1, Math.round(parseRoomCapacity(selectedRoomSource.value))))
-)
+const selectedRoomCapacity = computed(() => explicitRoomCapacity(selectedRoomSource.value))
 const guestOptions = computed(() =>
-  Array.from({ length: selectedRoomCapacity.value }, (_, index) => index + 1)
+  Array.from({ length: Math.min(6, selectedRoomCapacity.value ?? 0) }, (_, index) => index + 1)
 )
 const bookingUnavailable = computed(() =>
   bookingDataLoading.value ||
@@ -659,6 +657,7 @@ const bookingUnavailable = computed(() =>
   !apiHotel.value ||
   !hotel.value ||
   !selectedRoom.value ||
+  !canRequestRoom(selectedRoomSource.value) ||
   hotel.value.available === false
 )
 const bookingAssuranceItems = computed<BookingAssuranceItem[]>(() => [
@@ -721,7 +720,7 @@ const dateInvalid = computed(() =>
     nights.value > MAX_BOOKING_NIGHTS
   )
 )
-const guestsInvalid = computed(() => submitAttempted.value && Number(form.value.guests) > selectedRoomCapacity.value)
+const guestsInvalid = computed(() => submitAttempted.value && (selectedRoomCapacity.value === null || Number(form.value.guests) > selectedRoomCapacity.value))
 const guestNameInvalid = computed(() => submitAttempted.value && !form.value.guestName.trim())
 const phoneInvalid = computed(() => submitAttempted.value && phoneDigits.value.length < 6)
 const bookingFormDescribedBy = computed(() =>
@@ -743,7 +742,7 @@ const hasAntibotCode = (value: unknown) =>
   value.code.startsWith('ANTIBOT_')
 
 watch(selectedRoomCapacity, capacity => {
-  if (Number(form.value.guests) > capacity) {
+  if (capacity !== null && Number(form.value.guests) > capacity) {
     form.value.guests = capacity
   }
 })
@@ -784,7 +783,7 @@ const submitBooking = async () => {
     submitError.value = bookingValidationMessages.value.nightsTooLong
     return
   }
-  if (Number(form.value.guests) > selectedRoomCapacity.value) {
+  if (selectedRoomCapacity.value === null || Number(form.value.guests) > selectedRoomCapacity.value) {
     submitError.value = bookingValidationMessages.value.guestsTooHigh
     return
   }

@@ -30,6 +30,11 @@
           </div>
         </div>
 
+        <aside class="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-relaxed text-amber-950">
+          <strong>{{ routeData.travelStatus === 'COMPLETED' ? '已走过 · 作者自述' : routeData.travelStatus === 'PLANNED' ? '计划路线' : '出行状态未说明' }}</strong><span v-if="routeData.travelMonth"> · 出行月份 {{ routeData.travelMonth }}</span>
+          <p>内容未经平台实地核验，点赞不代表准确性。预约、报价和道路情况请向官方或实际服务方确认。</p>
+          <p v-if="routeData.updatedAt" class="mt-1 text-xs">内容更新时间：{{ formatDate(routeData.updatedAt) }}</p>
+        </aside>
         <!-- Content -->
         <div class="glass-card rounded-2xl p-4 mb-6 sm:rounded-3xl sm:p-8 sm:mb-8">
           <div class="prose route-detail-markdown max-w-none overflow-x-auto prose-headings:text-tibet-dark prose-p:text-tibet-brown/80 prose-strong:text-tibet-gold sm:prose-lg">

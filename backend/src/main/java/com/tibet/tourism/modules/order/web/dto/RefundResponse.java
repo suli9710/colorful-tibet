@@ -12,4 +12,8 @@ public record RefundResponse(
         LocalDateTime requestedAt,
         LocalDateTime processedAt
 ) {
+    @com.fasterxml.jackson.annotation.JsonProperty("settlementStatus")
+    public String settlementStatus() {
+        return "COMPLETED".equals(status) ? "MANUAL_RECORD_ONLY" : "NOT_SETTLED";
+    }
 }

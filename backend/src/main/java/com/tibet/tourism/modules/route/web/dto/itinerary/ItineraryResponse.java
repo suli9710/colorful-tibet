@@ -19,6 +19,15 @@ public record ItineraryResponse(
         String status,
         String sourceContent,
         LocalDateTime createdAt,
-        List<ItineraryDayResponse> itineraryDays
+        List<ItineraryDayResponse> itineraryDays,
+        ItineraryReadinessResponse readiness,
+        Integer travelers,
+        String generationRuleVersion
 ) {
+    public ItineraryResponse(Long id, Long parentItineraryId, String title, Integer days, LocalDate startDate,
+            String budget, String preference, String versionType, String versionLabel, BigDecimal totalEstimatedCost,
+            String status, String sourceContent, LocalDateTime createdAt, List<ItineraryDayResponse> itineraryDays) {
+        this(id, parentItineraryId, title, days, startDate, budget, preference, versionType, versionLabel,
+                totalEstimatedCost, status, sourceContent, createdAt, itineraryDays, null, null, null);
+    }
 }

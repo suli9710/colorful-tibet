@@ -48,7 +48,15 @@ import org.springframework.test.web.servlet.MockMvc;
         "app.security.brute-force.redis-enabled=false",
         "springdoc.api-docs.enabled=true",
         "recommendation.item-similarity.preload-on-startup=false",
-        "scrapling.health.enabled=false"
+        "scrapling.health.enabled=false",
+        // Contract generation never calls external AI. Leave optional clients unconfigured,
+        // rather than making OpenAPI export depend on public DNS or bypassing URL validation.
+        "ark.api.url=",
+        "ark.api.stream-url=",
+        "ark.api.key=",
+        "doubao.api.url=",
+        "doubao.api.stream-url=",
+        "doubao.api.key="
 })
 class OpenApiContractGenerationTest {
 

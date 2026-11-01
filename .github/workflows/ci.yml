@@ -288,16 +288,27 @@ jobs:
           java-version: '17'
           cache: maven
 
-      - name: Verify Spring context, Flyway, and payment reservation locking against MySQL
+      - name: Prepare isolated migration-upgrade database
+        env:
+          MYSQL_PWD: ci-root-password
+        run: |
+          docker exec -e MYSQL_PWD="$MYSQL_PWD" "${{ job.services.mysql.id }}" mysql -uroot -e "CREATE DATABASE colorful_tibet_upgrade_test; GRANT ALL ON colorful_tibet_upgrade_test.* TO 'colorful_tibet_app'@'%';"
+
+      - name: Verify Spring context, inventory concurrency, and additive migration upgrade against MySQL
         env:
           RUN_CONTEXT_TESTS: 'true'
+          RUN_MIGRATION_UPGRADE_TESTS: 'true'
+          MYSQL_UPGRADE_TEST_DATABASE: colorful_tibet_upgrade_test
+          MYSQL_UPGRADE_TEST_PORT: '3306'
+          MYSQL_UPGRADE_TEST_USER: colorful_tibet_app
+          MYSQL_UPGRADE_TEST_PASSWORD: ci-app-password
           MYSQL_TEST_HOST: 127.0.0.1
           MYSQL_TEST_PORT: '3306'
           MYSQL_TEST_DATABASE: colorful_tibet_test
           MYSQL_TEST_USERNAME: colorful_tibet_app
           MYSQL_TEST_PASSWORD: ci-app-password
           MYSQL_TEST_ALLOW_PUBLIC_KEY_RETRIEVAL: 'true'
-        run: mvn -q test -Dtest=ApplicationContextSmokeTest
+        run: mvn -q test -Dtest=ApplicationContextSmokeTest,HotelInventoryConcurrencyIntegrationTest,MigrationUpgradeIntegrationTest
 
   api-contract:
     name: OpenAPI contract drift

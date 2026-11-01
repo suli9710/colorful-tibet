@@ -21,6 +21,10 @@ public class AiRouteGenerateResponse {
         this.prompt = prompt;
     }
 
+    public String getTrustStatus() { return "NEEDS_CONFIRMATION"; }
+    public String getRuleVersion() { return com.tibet.tourism.modules.route.application.ItineraryTrustPolicy.VERSION; }
+    public String getVerificationNotice() { return "AI与本地备用路线均为草案，未核验交通、开放、预约、住宿和价格，不构成医疗建议或可订保证。"; }
+
     public String getContent() {
         return content;
     }

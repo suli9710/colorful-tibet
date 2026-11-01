@@ -35,6 +35,29 @@ public interface InventoryLockRepository extends JpaRepository<InventoryLock, Lo
             @Param("serviceDate") LocalDate serviceDate,
             @Param("statuses") Collection<InventoryLock.Status> statuses);
 
+    interface HotelAllocation {
+        Long getSkuId();
+        Integer getQuantity();
+        String getSourceType();
+        Long getSourceReferenceId();
+    }
+
+    // One native current read includes scalar provenance; no follow-on locking or
+    // lazy entity load may consult an older REPEATABLE_READ snapshot.
+    @Query(value = """
+            SELECT l.sku_id AS skuId, l.quantity AS quantity,
+                   o.source_type AS sourceType, o.source_reference_id AS sourceReferenceId
+            FROM inventory_locks l JOIN orders o ON o.id = l.order_id
+            WHERE l.product_type = 'HOTEL_ROOM' AND l.product_id = :hotelId
+              AND l.sku_id = :roomTypeId AND l.service_date = :serviceDate
+              AND l.status IN ('LOCKED', 'CONFIRMED')
+            FOR UPDATE
+            """, nativeQuery = true)
+    List<HotelAllocation> findHotelAllocationsForUpdate(
+            @Param("hotelId") Long hotelId,
+            @Param("roomTypeId") Long roomTypeId,
+            @Param("serviceDate") LocalDate serviceDate);
+
     @Query("""
             SELECT COALESCE(SUM(l.quantity), 0)
             FROM InventoryLock l

@@ -97,7 +97,7 @@ public class HotelBookingService {
         ensureRoomAvailable(roomType, request.getCheckInDate(), request.getCheckOutDate());
 
         long nights = ChronoUnit.DAYS.between(request.getCheckInDate(), request.getCheckOutDate());
-        BigDecimal roomPrice = roomType.getPrice() == null ? BigDecimal.ZERO : roomType.getPrice();
+        BigDecimal roomPrice = roomType.getPrice();
         BigDecimal subtotal = roomPrice.multiply(BigDecimal.valueOf(nights));
         BigDecimal serviceFee = BigDecimal.ZERO;
         BigDecimal discount = BigDecimal.ZERO;
@@ -161,12 +161,13 @@ public class HotelBookingService {
         }
         HotelBooking.Status previousStatus =
                 booking.getStatus() == null ? HotelBooking.Status.PENDING : booking.getStatus();
-        transitionStatus(booking, HotelBooking.Status.valueOf(status.trim().toUpperCase()));
+        HotelBooking.Status nextStatus = HotelBooking.Status.valueOf(status.trim().toUpperCase());
+        if (nextStatus == HotelBooking.Status.CONFIRMED && previousStatus != HotelBooking.Status.CONFIRMED) {
+            ensureRoomAvailableForConfirmation(booking);
+        }
+        transitionStatus(booking, nextStatus);
         HotelBooking saved = hotelBookingRepository.save(booking);
         if (saved.getStatus() == HotelBooking.Status.CONFIRMED) {
-            if (previousStatus != HotelBooking.Status.CONFIRMED) {
-                ensureRoomAvailableForConfirmation(saved);
-            }
             orderCenterService.createFromLegacyHotelBooking(saved);
         } else if (previousStatus != HotelBooking.Status.CANCELLED
                 && saved.getStatus() == HotelBooking.Status.CANCELLED) {
@@ -256,6 +257,12 @@ public class HotelBookingService {
             throw new IllegalArgumentException("Invalid guest count");
         }
 
+        if (roomType.getPrice() == null || roomType.getPrice().signum() <= 0) {
+            throw new IllegalStateException("Room price requires confirmation");
+        }
+        if (request.getCheckInDate() == null || request.getCheckOutDate() == null) {
+            throw new IllegalArgumentException("Check-in and check-out dates are required");
+        }
         long nights = ChronoUnit.DAYS.between(request.getCheckInDate(), request.getCheckOutDate());
         if (request.getCheckInDate().isBefore(LocalDate.now()) || nights < 1 || nights > MAX_NIGHTS) {
             throw new IllegalArgumentException("Invalid check-in or check-out date");
@@ -263,30 +270,23 @@ public class HotelBookingService {
     }
 
     private void ensureRoomAvailableForConfirmation(HotelBooking booking) {
+        if (booking.getStatus() == HotelBooking.Status.PENDING
+                && (booking.getCreatedAt() == null
+                    || !booking.getCreatedAt().plusMinutes(PENDING_HOLD_MINUTES).isAfter(LocalDateTime.now()))) {
+            throw new IllegalStateException("Booking hold has expired; create a new inquiry");
+        }
         Long roomTypeId = booking.getRoomTypeId();
         LocalDate checkIn = booking.getCheckInDate();
         LocalDate checkOut = booking.getCheckOutDate();
         if (roomTypeId == null || checkIn == null || checkOut == null) {
-            return;
-        }
-        boolean conflict = hotelBookingRepository
-                .findOverlappingActiveBookingsForUpdate(roomTypeId, ACTIVE_BOOKING_STATUSES, checkIn, checkOut)
-                .stream()
-                .anyMatch(other -> other.getId() != null && !other.getId().equals(booking.getId()));
-        if (conflict) {
-            throw new IllegalStateException("Room type is unavailable for the selected dates");
+            throw new IllegalStateException("Room and stay dates must be reconciled before confirmation");
         }
         Long hotelId = booking.getHotel() == null ? null : booking.getHotel().getId();
-        orderCenterService.ensureHotelRoomAvailable(hotelId, roomTypeId, checkIn, checkOut);
+        orderCenterService.ensureHotelRoomAvailable(hotelId, roomTypeId, checkIn, checkOut, booking.getId());
     }
 
     private void ensureRoomAvailable(RoomType roomType, LocalDate checkIn, LocalDate checkOut) {
         expireStalePendingBookings();
-        List<HotelBooking> overlapping = hotelBookingRepository.findOverlappingActiveBookingsForUpdate(
-                roomType.getId(), ACTIVE_BOOKING_STATUSES, checkIn, checkOut);
-        if (!overlapping.isEmpty()) {
-            throw new IllegalStateException("Room type is unavailable for the selected dates");
-        }
         Long hotelId = roomType.getHotel() == null ? null : roomType.getHotel().getId();
         orderCenterService.ensureHotelRoomAvailable(hotelId, roomType.getId(), checkIn, checkOut);
     }

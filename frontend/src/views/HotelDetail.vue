@@ -131,6 +131,7 @@
                    role="listitem"
                    class="group rounded-xl border border-tibet-gold/15 p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 hover:border-tibet-gold/40 hover:shadow-lg hover:shadow-tibet-red/5 transition-all duration-300">
                 <div class="flex-1">
+                  <p class="text-xs text-amber-800">实际可订、付款与退改以第三方确认为准</p>
                   <h3 class="text-lg font-semibold text-tibet-dark">{{ room.name }}</h3>
                   <p class="text-sm text-tibet-brown/50 mt-1">{{ room.amenities || (room.capacity ? room.capacity + t('common.peopleUnit') : '') }}</p>
                 </div>
@@ -140,7 +141,7 @@
                       <span class="text-xs text-tibet-brown/40">¥</span>
                       <span class="text-2xl font-bold text-tibet-red">{{ room.price }}</span>
                     </div>
-                    <span class="text-xs text-tibet-brown/40">{{ t('hotel.perNight') }}</span>
+                    <span class="text-xs text-tibet-brown/40">{{ t('hotel.perNight') }} · 参考价</span>
                   </div>
                   <button type="button" class="tibet-btn text-sm" :aria-label="`${t('hotel.externalBook')} ${room.name}`" @click="openHotelBooking(room)">{{ t('hotel.externalBook') }}</button>
                 </div>

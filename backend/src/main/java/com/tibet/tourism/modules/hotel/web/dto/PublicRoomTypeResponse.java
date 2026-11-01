@@ -9,8 +9,17 @@ public record PublicRoomTypeResponse(
         BigDecimal price,
         Integer capacity,
         String imageUrl,
-        String amenities
+        String amenities,
+        Integer inventoryUnits,
+        String inventoryStatus,
+        String priceStatus,
+        String fulfillmentStatus
 ) {
+    public PublicRoomTypeResponse(Long id, String name, BigDecimal price, Integer capacity, String imageUrl, String amenities) {
+        this(id, name, price, capacity, imageUrl, amenities, null, "UNKNOWN",
+                price == null || price.signum() <= 0 ? "UNAVAILABLE" : "REFERENCE", "SUPPLIER_CONFIRMATION_REQUIRED");
+    }
+
     public static PublicRoomTypeResponse from(RoomType roomType) {
         return new PublicRoomTypeResponse(
                 roomType.getId(),
@@ -18,6 +27,10 @@ public record PublicRoomTypeResponse(
                 roomType.getPrice(),
                 roomType.getCapacity(),
                 roomType.getImageUrl(),
-                roomType.getAmenities());
+                roomType.getAmenities(),
+                roomType.getInventoryUnits(),
+                roomType.getInventoryUnits() == null ? "UNKNOWN" : roomType.getInventoryUnits() == 0 ? "SOLD_OUT" : "CONFIGURED",
+                roomType.getPrice() == null || roomType.getPrice().signum() <= 0 ? "UNAVAILABLE" : "REFERENCE",
+                "SUPPLIER_CONFIRMATION_REQUIRED");
     }
 }

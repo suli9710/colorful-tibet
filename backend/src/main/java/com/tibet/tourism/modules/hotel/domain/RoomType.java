@@ -20,6 +20,10 @@ public class RoomType {
 
     private BigDecimal price; // 每晚价格
     private Integer capacity; // 可住人数
+
+    // Operator-maintained internal stock, not a supplier availability guarantee.
+    @Column(name = "inventory_units")
+    private Integer inventoryUnits;
     private String imageUrl;
     private String amenities; // 房型设施
 
@@ -40,6 +44,14 @@ public class RoomType {
 
     public Integer getCapacity() { return capacity; }
     public void setCapacity(Integer capacity) { this.capacity = capacity; }
+
+    public Integer getInventoryUnits() { return inventoryUnits; }
+    public void setInventoryUnits(Integer inventoryUnits) {
+        if (inventoryUnits != null && (inventoryUnits < 0 || inventoryUnits > 10000)) {
+            throw new IllegalArgumentException("Room inventory must be between 0 and 10000");
+        }
+        this.inventoryUnits = inventoryUnits;
+    }
 
     public String getImageUrl() { return imageUrl; }
     public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }

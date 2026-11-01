@@ -1284,6 +1284,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/itineraries/{id}/items/{itemId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["updateItem_1"];
+        trace?: never;
+    };
     "/api/tibet-specialty/sustainable-options": {
         parameters: {
             query?: never;
@@ -2460,6 +2476,8 @@ export interface components {
             amenities?: string;
             /** Format: int32 */
             sortOrder?: number;
+            /** Format: int32 */
+            inventoryUnits?: number;
         };
         NewsRequest: {
             autoTranslate?: boolean;
@@ -2705,6 +2723,8 @@ export interface components {
             days?: number;
             budget?: string;
             preference?: string;
+            travelStatus?: string;
+            travelMonth?: string;
         };
         AiRouteGenerateRequest: {
             /** Format: int32 */
@@ -2912,6 +2932,13 @@ export interface components {
             action: "APPROVE" | "REJECT" | "COMPLETE";
             note?: string;
             providerTransactionNo?: string;
+        };
+        UpdateItineraryItemRequest: {
+            startTime: string;
+            /** Format: int32 */
+            durationMinutes: number;
+            /** Format: int64 */
+            expectedVersion: number;
         };
         Pageable: {
             /** Format: int32 */
@@ -6282,6 +6309,33 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["CarouselRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": Record<string, never>;
+                };
+            };
+        };
+    };
+    updateItem_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+                itemId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateItineraryItemRequest"];
             };
         };
         responses: {

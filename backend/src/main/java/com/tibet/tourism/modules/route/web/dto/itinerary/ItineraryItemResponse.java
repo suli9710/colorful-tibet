@@ -23,6 +23,7 @@ public record ItineraryItemResponse(
         String hotelName,
         Long roomTypeId,
         String roomTypeName,
-        Integer sortOrder
+        Integer sortOrder,
+        Long version
 ) {
 }

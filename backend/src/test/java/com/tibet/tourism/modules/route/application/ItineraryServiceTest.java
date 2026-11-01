@@ -95,6 +95,7 @@ class ItineraryServiceTest {
         roomType.setName("舒适双床房");
         roomType.setPrice(BigDecimal.valueOf(520));
         roomType.setCapacity(2);
+        roomType.setInventoryUnits(2);
     }
 
     @Test
@@ -260,7 +261,7 @@ class ItineraryServiceTest {
 
         assertEquals("SPOT_BOOKING", response.bookingType());
         assertEquals(900L, response.bookingId());
-        assertEquals(ItineraryItem.BookingStatus.BOOKED, item.getBookingStatus());
+        assertEquals(ItineraryItem.BookingStatus.INQUIRY_SUBMITTED, item.getBookingStatus());
         verify(itineraryItemRepository).save(item);
     }
 
@@ -296,6 +297,75 @@ class ItineraryServiceTest {
         verify(bookingRepository, never()).save(any(Booking.class));
     }
 
+    @Test
+    void bookingRejectsMissingAndNegativePriceWithoutCreatingAnOrder() {
+        ItineraryItem item = bookableSpotItemOn(LocalDate.now().plusDays(1));
+        item.setScenicSpot(potala);
+        when(itineraryItemRepository.findByIdForUpdate(102L)).thenReturn(Optional.of(item));
+        BookItineraryItemRequest request = new BookItineraryItemRequest();
+        request.setTravelers(2);
+        potala.setTicketPrice(null);
+        assertThrows(IllegalStateException.class, () -> itineraryService.bookItem(user, 100L, 102L, request));
+        potala.setTicketPrice(BigDecimal.valueOf(-1));
+        assertThrows(IllegalStateException.class, () -> itineraryService.bookItem(user, 100L, 102L, request));
+        verifyNoInteractions(bookingRepository, orderCenterService);
+    }
+
+    @Test
+    void bookingUsesRecordedPartySizeAndKeepsExplicitZeroPrice() {
+        ItineraryItem item = bookableSpotItemOn(LocalDate.now().plusDays(1));
+        item.setScenicSpot(potala);
+        item.getDay().getItinerary().setTravelers(4);
+        potala.setTicketPrice(BigDecimal.ZERO);
+        when(itineraryItemRepository.findByIdForUpdate(102L)).thenReturn(Optional.of(item));
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(invocation -> {
+            Booking booking = invocation.getArgument(0);
+            booking.setId(901L);
+            return booking;
+        });
+        itineraryService.bookItem(user, 100L, 102L, new BookItineraryItemRequest());
+        ArgumentCaptor<Booking> saved = ArgumentCaptor.forClass(Booking.class);
+        verify(bookingRepository).save(saved.capture());
+        assertEquals(4, saved.getValue().getTicketCount());
+        assertEquals(new BigDecimal("0.00"), saved.getValue().getTotalPrice());
+    }
+
+    @Test
+    void bookingNeverGuessesAnUnknownPartySize() {
+        ItineraryItem item = bookableSpotItemOn(LocalDate.now().plusDays(1));
+        item.setScenicSpot(potala);
+        when(itineraryItemRepository.findByIdForUpdate(102L)).thenReturn(Optional.of(item));
+        assertThrows(IllegalArgumentException.class,
+                () -> itineraryService.bookItem(user, 100L, 102L, new BookItineraryItemRequest()));
+        verifyNoInteractions(bookingRepository, orderCenterService);
+    }
+
+    @Test
+    void draftWithUnknownScenicPriceCannotPretendToBeAFreeBookableTicket() {
+        potala.setTicketPrice(null);
+        when(scenicSpotRepository.findAllWithoutTags(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(potala)));
+        when(hotelRepository.findAll(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(hotel)));
+        when(roomTypeRepository.findByHotelIdOrderBySortOrderAsc(20L)).thenReturn(List.of(roomType));
+        when(itineraryRepository.save(any(Itinerary.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        GenerateItineraryRequest request = new GenerateItineraryRequest();
+        request.setDays(1);
+        request.setTravelers(2);
+        ItineraryResponse response = itineraryService.generateItinerary(user, request);
+        assertTrue(response.readiness().issues().stream().anyMatch(i -> i.code().equals("PRICE_UNKNOWN")));
+        assertTrue(response.sourceContent().contains("价格待确认，未计入合计"));
+        ArgumentCaptor<Itinerary> saved = ArgumentCaptor.forClass(Itinerary.class);
+        verify(itineraryRepository).save(saved.capture());
+        when(itineraryRepository.findByIdAndUserId(100L, user.getId())).thenReturn(Optional.of(saved.getValue()));
+        var quote = itineraryService.quoteItinerary(user, 100L);
+        var spotQuote = quote.items().stream().filter(i -> i.itemType().equals("SCENIC_SPOT")).findFirst().orElseThrow();
+        assertEquals("UNKNOWN", spotQuote.priceStatus());
+        assertFalse(spotQuote.bookable());
+        assertTrue(spotQuote.priceType().contains("合计未包含"));
+        assertTrue(response.itineraryDays().get(0).items().stream()
+                .filter(i -> i.itemType().equals("SCENIC_SPOT"))
+                .allMatch(i -> i.bookingStatus().equals("NOT_BOOKABLE")));
+    }
+
     private ItineraryItem bookableSpotItemOn(LocalDate travelDate) {
         Itinerary itinerary = new Itinerary();
         itinerary.setId(100L);
@@ -315,6 +385,136 @@ class ItineraryServiceTest {
         item.setBookingStatus(ItineraryItem.BookingStatus.BOOKABLE);
         item.setEstimatedCost(BigDecimal.valueOf(200));
         return item;
+    }
+
+    @Test
+    void generationNeverSubstitutesUnrelatedHotelOrInsufficientRoom() {
+        hotel.setLocation("林芝");
+        when(scenicSpotRepository.findAllWithoutTags(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(potala)));
+        when(hotelRepository.findAll(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(hotel)));
+        when(itineraryRepository.save(any(Itinerary.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        var request = new GenerateItineraryRequest(); request.setDays(1); request.setTravelers(2);
+        var response=itineraryService.generateItinerary(user,request);
+        var lodging=response.itineraryDays().get(0).items().stream().filter(i -> i.itemType().equals("HOTEL")).findFirst().orElseThrow();
+        assertNull(lodging.hotelId()); assertEquals("NOT_BOOKABLE",lodging.bookingStatus());
+        assertEquals("BLOCKED",response.readiness().status());
+        verifyNoInteractions(roomTypeRepository);
+    }
+
+    @Test
+    void insufficientRoomIsNotSubstitutedAndQueriesAreBoundedByHotel() {
+        when(scenicSpotRepository.findAllWithoutTags(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(potala)));
+        when(hotelRepository.findAll(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(hotel)));
+        when(roomTypeRepository.findByHotelIdOrderBySortOrderAsc(20L)).thenReturn(List.of(roomType));
+        when(itineraryRepository.save(any(Itinerary.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        var request = new GenerateItineraryRequest(); request.setDays(15); request.setTravelers(4);
+        var response=itineraryService.generateItinerary(user,request);
+        assertEquals(4,response.travelers());
+        assertTrue(response.itineraryDays().stream().flatMap(d -> d.items().stream()).filter(i -> i.itemType().equals("HOTEL")).allMatch(i -> i.roomTypeId()==null && i.bookingStatus().equals("NOT_BOOKABLE")));
+        verify(roomTypeRepository,times(1)).findByHotelIdOrderBySortOrderAsc(20L);
+    }
+
+    @Test
+    void winterQuoteDoesNotInventFreeAdmission() {
+        var itinerary=savedItinerary(44L); itinerary.setTravelers(2);
+        var day=new ItineraryDay(); day.setDayNumber(1);day.setTravelDate(LocalDate.of(2027,1,5));itinerary.addDay(day);
+        var item=new ItineraryItem();item.setItemType(ItineraryItem.ItemType.SCENIC_SPOT);item.setScenicSpot(potala);item.setEstimatedCost(BigDecimal.valueOf(200));item.setBookingAction(ItineraryItem.BookingAction.BOOK_SPOT);day.addItem(item);
+        when(itineraryRepository.findByIdAndUserId(44L,user.getId())).thenReturn(Optional.of(itinerary));
+        var quote=itineraryService.quoteItinerary(user,44L);
+        assertEquals(new BigDecimal("200.00"),quote.totalEstimatedCost());
+        assertEquals("参考估价 · 未确认库存/履约",quote.items().get(0).priceType());
+    }
+
+
+    @Test
+    void versionPreservesPartyAndRecordsGenerationRule() {
+        Itinerary original=savedItinerary(300L);original.setTravelers(4);
+        when(itineraryRepository.findByIdAndUserId(300L,user.getId())).thenReturn(Optional.of(original));
+        when(scenicSpotRepository.findAllWithoutTags(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(potala)));
+        when(hotelRepository.findAll(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(hotel)));
+        when(roomTypeRepository.findByHotelIdOrderBySortOrderAsc(20L)).thenReturn(List.of(roomType));
+        when(itineraryRepository.save(any(Itinerary.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        var version=itineraryService.createVersion(user,300L,new com.tibet.tourism.modules.route.web.dto.itinerary.CreateItineraryVersionRequest());
+        assertEquals(4,version.travelers());assertEquals(ItineraryTrustPolicy.VERSION,version.generationRuleVersion());
+        assertTrue(version.sourceContent().contains(ItineraryTrustPolicy.VERSION));
+    }
+    @Test
+    void legacyVersionPreservesUnknownPartyAndCannotMatchAccommodation() {
+        when(itineraryRepository.findByIdAndUserId(301L,user.getId())).thenReturn(Optional.of(savedItinerary(301L)));
+        when(scenicSpotRepository.findAllWithoutTags(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(potala)));
+        when(hotelRepository.findAll(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(hotel)));
+        when(itineraryRepository.save(any(Itinerary.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        var response = itineraryService.createVersion(user,301L,
+                new com.tibet.tourism.modules.route.web.dto.itinerary.CreateItineraryVersionRequest());
+        assertUnknownPartyDraft(response);
+        verifyNoInteractions(roomTypeRepository);
+    }
+
+    @Test
+    void generationPreservesNullPartyInsteadOfInventingTwoTravelers() {
+        when(scenicSpotRepository.findAllWithoutTags(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(potala)));
+        when(hotelRepository.findAll(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(hotel)));
+        when(itineraryRepository.save(any(Itinerary.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        var request = new GenerateItineraryRequest();
+        request.setDays(1);
+        request.setTravelers(null);
+        var response = itineraryService.generateItinerary(user, request);
+        assertUnknownPartyDraft(response);
+        ArgumentCaptor<Itinerary> saved = ArgumentCaptor.forClass(Itinerary.class);
+        verify(itineraryRepository).save(saved.capture());
+        assertNull(saved.getValue().getTravelers());
+        assertTrue(saved.getValue().getItineraryDays().stream().flatMap(day -> day.getItems().stream())
+                .filter(item -> item.getItemType() == ItineraryItem.ItemType.MEAL
+                        || item.getItemType() == ItineraryItem.ItemType.SCENIC_SPOT
+                        || item.getItemType() == ItineraryItem.ItemType.HOTEL)
+                .allMatch(item -> item.getEstimatedCost() == null));
+        verifyNoInteractions(roomTypeRepository);
+    }
+
+    private void assertUnknownPartyDraft(ItineraryResponse response) {
+        assertNull(response.travelers());
+        assertEquals("BLOCKED", response.readiness().status());
+        assertTrue(response.readiness().issues().stream().anyMatch(issue -> issue.code().equals("TRAVELERS_UNKNOWN")));
+        assertTrue(response.readiness().issues().stream().anyMatch(issue -> issue.code().equals("PRICE_UNKNOWN")));
+        var hotels = response.itineraryDays().stream().flatMap(day -> day.items().stream())
+                .filter(item -> item.itemType().equals("HOTEL")).toList();
+        assertFalse(hotels.isEmpty());
+        assertTrue(hotels.stream().allMatch(item -> item.hotelId() == null && item.roomTypeId() == null
+                && item.bookingStatus().equals("NOT_BOOKABLE")));
+        assertTrue(response.sourceContent().contains("价格待确认，未计入合计"));
+    }
+
+
+    @Test
+    void manualScheduleChangeRecomputesReadinessAndSource() {
+        Itinerary itinerary=savedItinerary(500L);itinerary.setDays(1);itinerary.setTravelers(2);itinerary.setStartDate(LocalDate.now().plusDays(1));
+        ItineraryDay day=new ItineraryDay();day.setDayNumber(1);day.setTravelDate(itinerary.getStartDate());itinerary.addDay(day);
+        ItineraryItem item=new ItineraryItem();item.setId(501L);item.setItemType(ItineraryItem.ItemType.TRANSPORT);item.setTitle("transport");item.setStartTime("09:00");item.setDurationMinutes(90);day.addItem(item);
+        when(itineraryItemRepository.findByIdForUpdate(501L)).thenReturn(Optional.of(item));
+        when(itineraryRepository.save(any(Itinerary.class))).thenAnswer(invocation->invocation.getArgument(0));
+        var result=itineraryService.updateItem(user,500L,501L,new com.tibet.tourism.modules.route.web.dto.itinerary.UpdateItineraryItemRequest("23:30",120,0L));
+        assertEquals("23:30",item.getStartTime());assertTrue(result.sourceContent().contains("23:30"));
+        assertTrue(result.readiness().issues().stream().anyMatch(i->i.code().equals("CROSSES_MIDNIGHT")));
+        verify(itineraryItemRepository).saveAndFlush(item);
+    }
+    @Test
+    void manualChangeRejectsOtherOwnerAndStaleVersion() {
+        Itinerary itinerary=savedItinerary(510L);ItineraryDay day=new ItineraryDay();itinerary.addDay(day);
+        ItineraryItem item=new ItineraryItem();item.setId(511L);item.setVersion(2L);day.addItem(item);
+        when(itineraryItemRepository.findByIdForUpdate(511L)).thenReturn(Optional.of(item));
+        var request=new com.tibet.tourism.modules.route.web.dto.itinerary.UpdateItineraryItemRequest("12:00",60,0L);
+        assertThrows(org.springframework.dao.OptimisticLockingFailureException.class,()->itineraryService.updateItem(user,510L,511L,request));
+        User other=new User();other.setId(999L);
+        assertThrows(SecurityException.class,()->itineraryService.updateItem(other,510L,511L,request));
+        verify(itineraryItemRepository,never()).saveAndFlush(any());
+    }
+    @Test
+    void manualChangeDoesNotAlterSubmittedInquiry() {
+        Itinerary itinerary=savedItinerary(520L);ItineraryDay day=new ItineraryDay();itinerary.addDay(day);
+        ItineraryItem item=new ItineraryItem();item.setId(521L);item.setBookingReferenceId(99L);day.addItem(item);
+        when(itineraryItemRepository.findByIdForUpdate(521L)).thenReturn(Optional.of(item));
+        assertThrows(IllegalArgumentException.class,()->itineraryService.updateItem(user,520L,521L,new com.tibet.tourism.modules.route.web.dto.itinerary.UpdateItineraryItemRequest("12:00",60,0L)));
+        verify(itineraryItemRepository,never()).saveAndFlush(any());
     }
 
     private Itinerary savedItinerary(Long id) {
