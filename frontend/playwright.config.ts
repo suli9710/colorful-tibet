@@ -1,7 +1,10 @@
 import { defineConfig, devices } from '@playwright/test'
 
+const baseURL = process.env.E2E_BASE_URL || 'http://127.0.0.1:5173'
+
 export default defineConfig({
   testDir: './tests/e2e',
+  testMatch: ['**/app-smoke.spec.ts', '**/planner-flow.spec.ts', '**/planner-state.spec.ts'],
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
@@ -12,7 +15,7 @@ export default defineConfig({
   ],
   outputDir: 'test-results',
   use: {
-    baseURL: 'http://127.0.0.1:5173',
+    baseURL,
     actionTimeout: 10_000,
     navigationTimeout: 30_000,
     screenshot: 'only-on-failure',
@@ -25,9 +28,9 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] }
     }
   ],
-  webServer: {
+  webServer: process.env.E2E_BASE_URL ? undefined : {
     command: 'npm run dev -- --host 127.0.0.1',
-    url: 'http://127.0.0.1:5173',
+    url: baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000
   }

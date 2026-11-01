@@ -40,6 +40,8 @@ test('boots, lazy-loads Tibetan, persists locale, and navigates', async ({ page 
   await expect(page).toHaveTitle('首页 | 七彩西藏')
   await expect(page.getByRole('heading', { level: 1, name: '走进西藏' })).toBeVisible()
 
+  const menuToggle = page.locator('button[aria-controls="mobile-primary-menu"]')
+  if (await menuToggle.isVisible()) await menuToggle.click()
   await page.getByRole('button', { name: '藏文' }).click()
   await expect(page.locator('html')).toHaveAttribute('lang', 'bo')
   await expect(page).toHaveTitle('ཁྱིམ་ཤོག | བོད་ཀྱི་ཚོན་མདངས།')
@@ -49,6 +51,7 @@ test('boots, lazy-loads Tibetan, persists locale, and navigates', async ({ page 
   await expect(page.locator('html')).toHaveAttribute('lang', 'bo')
   await expect(page).toHaveTitle('ཁྱིམ་ཤོག | བོད་ཀྱི་ཚོན་མདངས།')
 
+  if (await menuToggle.isVisible()) await menuToggle.click()
   await page.getByRole('link', { name: 'གཟིགས་སྐོར་ས་གནས།', exact: true }).first().click()
   await expect(page).toHaveURL(/\/spots$/)
   await expect(page).toHaveTitle('གཟིགས་སྐོར་ས་གནས། | བོད་ཀྱི་ཚོན་མདངས།')

@@ -1,0 +1,17 @@
+{
+  "date": "2026-11-01",
+  "command": "mvn -q test",
+  "exitCode": 0,
+  "totals": {
+    "tests": 1674,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 7
+  },
+  "skippedSuites": [
+    {
+      "name": "com.tibet.tourism.ApplicationContextSmokeTest",
+      "skipped": 7
+    }
+  ]
+}

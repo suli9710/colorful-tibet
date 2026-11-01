@@ -1,0 +1,87 @@
+{
+  "date": "2026-11-01",
+  "method": "WCAG sRGB relative luminance, opaque design tokens",
+  "scope": "Token pair checks only. This is not a full-page accessibility audit; image-backed text, translucent legacy utility colors and all interaction states require separate inspection.",
+  "checks": [
+    {
+      "pair": "body on paper",
+      "foreground": "#1a1520",
+      "background": "#f7f3ee",
+      "ratio": 16.22,
+      "requiredRatio": 4.5,
+      "passes": true
+    },
+    {
+      "pair": "muted on paper",
+      "foreground": "#69594c",
+      "background": "#f7f3ee",
+      "ratio": 6.07,
+      "requiredRatio": 4.5,
+      "passes": true
+    },
+    {
+      "pair": "muted on surface",
+      "foreground": "#69594c",
+      "background": "#fffdf9",
+      "ratio": 6.6,
+      "requiredRatio": 4.5,
+      "passes": true
+    },
+    {
+      "pair": "white on primary",
+      "foreground": "#ffffff",
+      "background": "#8b2e3a",
+      "ratio": 8.24,
+      "requiredRatio": 4.5,
+      "passes": true
+    },
+    {
+      "pair": "accent on surface",
+      "foreground": "#8b2e3a",
+      "background": "#fffdf9",
+      "ratio": 8.11,
+      "requiredRatio": 4.5,
+      "passes": true
+    },
+    {
+      "pair": "hero primary",
+      "foreground": "#6b1d2a",
+      "background": "#fff8e9",
+      "ratio": 10.82,
+      "requiredRatio": 4.5,
+      "passes": true
+    },
+    {
+      "pair": "focus on paper",
+      "foreground": "#2d5f8a",
+      "background": "#f7f3ee",
+      "ratio": 6.1,
+      "requiredRatio": 3,
+      "passes": true
+    },
+    {
+      "pair": "focus on surface",
+      "foreground": "#2d5f8a",
+      "background": "#fffdf9",
+      "ratio": 6.63,
+      "requiredRatio": 3,
+      "passes": true
+    },
+    {
+      "pair": "planner muted on white",
+      "foreground": "#716257",
+      "background": "#ffffff",
+      "ratio": 5.85,
+      "requiredRatio": 4.5,
+      "passes": true
+    },
+    {
+      "pair": "sticky action gold on red",
+      "foreground": "#f2c94c",
+      "background": "#8b2e3a",
+      "ratio": 5.19,
+      "requiredRatio": 4.5,
+      "passes": true
+    }
+  ]
+}

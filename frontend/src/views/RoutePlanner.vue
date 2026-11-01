@@ -1,32 +1,22 @@
 <template>
   <div class="route-planner-page tibet-page-shell min-h-screen relative overflow-hidden">
-    <div class="absolute inset-0 pointer-events-none overflow-hidden opacity-45 tibet-cloud-pattern"></div>
-
-    <div class="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-20">
-      <!-- ===== HEADER ===== -->
-      <motion.header
-        class="text-center mb-12"
-        :initial="revealInitial"
-        :animate="revealInView"
-        :transition="revealTransition"
-      >
-        <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/70 border border-tibet-gold/30 backdrop-blur text-xs font-semibold text-tibet-red tracking-widest uppercase mb-6">
-          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-          {{ t('routePlanner.aiGeneratorLabel') }}
+    <div class="planner-workspace relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-10">
+      <header class="planner-heading">
+        <div>
+          <p class="planner-eyebrow">{{ t('plannerFlow.eyebrow') }}</p>
+          <h1>{{ t('plannerFlow.title') }}</h1>
+          <p class="planner-intro">{{ t('plannerFlow.intro') }}</p>
         </div>
-        <h1 class="tibet-heading inline-flex justify-center text-4xl md:text-5xl lg:text-6xl font-bold text-tibet-dark leading-tight">
-          {{ t('routePlanner.title') }}
-        </h1>
-        <p class="mt-4 text-lg text-tibet-brown/70 max-w-2xl mx-auto leading-relaxed">
-          {{ t('routePlanner.subtitle') }}
-        </p>
-        <!-- Tibetan ornament divider -->
-        <div class="mt-6 flex items-center justify-center gap-3">
-          <span class="h-px w-12 bg-gradient-to-r from-transparent to-tibet-gold/50"></span>
-          <span class="h-2.5 w-2.5 rotate-45 border border-tibet-gold/70 bg-tibet-gold/20"></span>
-          <span class="h-px w-12 bg-gradient-to-l from-transparent to-tibet-gold/50"></span>
-        </div>
-      </motion.header>
+        <router-link to="/spots" class="planner-back">{{ t('plannerFlow.browse') }} <span aria-hidden="true">↗</span></router-link>
+      </header>
+      <nav class="planner-steps" :aria-label="t('plannerFlow.stepsLabel')">
+        <a href="#planner-preferences"><span>01</span>{{ t('plannerFlow.stepPreferences') }}</a>
+        <a v-if="result" href="#planner-review"><span>02</span>{{ t('plannerFlow.stepReview') }}</a>
+        <span v-else><span>02</span>{{ t('plannerFlow.stepReview') }}</span>
+        <a v-if="result" href="#planner-check"><span>03</span>{{ t('plannerFlow.stepCheck') }}</a>
+        <span v-else><span>03</span>{{ t('plannerFlow.stepCheck') }}</span>
+      </nav>
+      <p v-if="isOffline" class="planner-notice" role="status">{{ t('plannerFlow.offline') }}</p>
 
       <!-- ===== STATUS / ERROR BANNER ===== -->
       <AnimatePresence mode="popLayout">
@@ -75,8 +65,9 @@
                 {{ routeResumeLoading ? t('routePlanner.resumingGeneration') : t('routePlanner.resumeGeneration') }}
               </button>
               <button
-                v-if="errorMessage"
+                v-if="errorMessage && !result"
                 type="button"
+                :disabled="loading || isOffline"
                 class="min-h-11 rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2"
                 :aria-label="t('routePlanner.regenerate')"
                 @click="generateRoute"
@@ -99,10 +90,10 @@
       </AnimatePresence>
 
       <!-- ===== MAIN CONTENT ===== -->
-      <div class="grid gap-8 lg:grid-cols-5 items-start">
+      <div class="planner-columns grid gap-6 lg:grid-cols-5 items-start">
         <!-- LEFT: Form (takes 2 cols on lg) -->
         <div class="lg:col-span-2">
-          <div class="sticky top-20 space-y-6">
+          <div id="planner-preferences" class="planner-preferences space-y-4">
             <!-- Form Card -->
             <motion.div
               class="glass-card rounded-3xl border border-white/50 shadow-xl shadow-slate-900/3 overflow-hidden"
@@ -119,13 +110,14 @@
                     </svg>
                   </span>
                   <div>
-                    <h2 class="text-lg font-bold text-tibet-dark">{{ t('routePlanner.aiRouteGenTitle') }}</h2>
-                    <p class="text-xs text-tibet-brown/50">{{ t('routePlanner.aiRouteGenDesc') }}</p>
+                    <h2 class="text-lg font-bold text-tibet-dark">{{ t('plannerFlow.preferencesTitle') }}</h2>
+                    <p class="text-xs text-tibet-brown/50">{{ t('plannerFlow.destination') }}</p>
                   </div>
                 </div>
               </div>
 
-              <form @submit.prevent="generateRoute" class="p-6 space-y-6" aria-describedby="route-planner-form-hint route-planner-status-message">
+              <form @submit.prevent="generateRoute" class="planner-form p-5 space-y-4" aria-describedby="route-planner-form-hint route-planner-status-message">
+                <p class="planner-context">{{ t('plannerFlow.scope') }}</p>
                 <!-- Days Selector -->
                 <motion.div layout>
                   <label class="block text-sm font-semibold text-tibet-dark/80 mb-3">{{ t('routePlanner.plannedDays') }}</label>
@@ -141,7 +133,7 @@
                     <div class="flex-1 flex flex-col items-center justify-center py-3 border-x border-tibet-gold/20">
                       <motion.span
                         :key="form.days"
-                        class="text-4xl font-bold text-tibet-dark leading-none tabular-nums"
+                        class="text-3xl font-bold text-tibet-dark leading-none tabular-nums"
                         :initial="{ opacity: 0, y: 8, scale: 0.94 }"
                         :animate="{ opacity: 1, y: 0, scale: 1 }"
                         :transition="{ duration: 0.22, ease: motionEase }"
@@ -167,9 +159,9 @@
                 <!-- Budget: card-style radio -->
                 <div>
                   <label class="block text-sm font-semibold text-tibet-dark/80 mb-3">{{ t('routePlanner.budgetRange') }}</label>
-                  <div class="grid gap-2">
+                  <div class="planner-choice-grid grid gap-2">
                     <motion.label v-for="opt in budgetOptions" :key="opt.value"
-                           class="relative flex min-h-12 items-center gap-3 rounded-xl border-2 cursor-pointer transition-all duration-200 px-4 py-3 focus-within:ring-2 focus-within:ring-tibet-gold/60 focus-within:ring-offset-2"
+                           class="planner-choice relative flex min-h-12 items-center gap-3 rounded-xl border-2 cursor-pointer transition-all duration-200 px-4 py-3 focus-within:ring-2 focus-within:ring-tibet-gold/60 focus-within:ring-offset-2"
                            layout
                            :whileHover="{ y: -2, scale: 1.01 }"
                            :whileTap="{ scale: 0.99 }"
@@ -207,9 +199,9 @@
                 <!-- Preference: card-style radio -->
                 <div>
                   <label class="block text-sm font-semibold text-tibet-dark/80 mb-3">{{ t('routePlanner.preference') }}</label>
-                  <div class="grid gap-2">
+                  <div class="planner-choice-grid grid gap-2">
                     <motion.label v-for="opt in preferenceOptions" :key="opt.value"
-                           class="relative flex min-h-12 items-center gap-3 rounded-xl border-2 cursor-pointer transition-all duration-200 px-4 py-3 focus-within:ring-2 focus-within:ring-tibet-blue/60 focus-within:ring-offset-2"
+                           class="planner-choice relative flex min-h-12 items-center gap-3 rounded-xl border-2 cursor-pointer transition-all duration-200 px-4 py-3 focus-within:ring-2 focus-within:ring-tibet-blue/60 focus-within:ring-offset-2"
                            layout
                            :whileHover="{ y: -2, scale: 1.01 }"
                            :whileTap="{ scale: 0.99 }"
@@ -244,28 +236,14 @@
                   </div>
                 </div>
 
-                <!-- Quick Presets -->
-                <div>
-                  <label class="block text-sm font-semibold text-tibet-dark/80 mb-3">{{ t('routePlanner.quickPresets') }}</label>
-                  <div class="grid grid-cols-2 gap-2">
-                    <motion.button type="button" v-for="preset in presets" :key="preset.label" @click="applyPreset(preset)" :disabled="loading"
-                            :aria-label="getPresetAriaLabel(preset)"
-                            :whileHover="{ y: -2, scale: 1.01 }"
-                            :whileTap="{ scale: 0.98 }"
-                            class="group flex min-h-12 flex-col items-start gap-0.5 rounded-xl border border-tibet-gold/20 bg-white/60 px-3.5 py-3 text-left transition-all hover:border-tibet-gold/40 hover:bg-amber-50/40 hover:shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">
-                      <span class="text-xs font-semibold text-tibet-dark/80 group-hover:text-tibet-dark">{{ preset.label }}</span>
-                      <span class="text-[11px] text-tibet-brown/50">{{ preset.days }}{{ t('routePlanner.daysUnit') }} · {{ getBudgetShort(preset.budget) }}</span>
-                    </motion.button>
-                  </div>
-                </div>
-
+                <p v-if="form.days > 15" class="planner-notice">{{ t('plannerFlow.longTrip') }}</p>
                 <!-- Generate Button -->
-                <motion.button type="submit" :disabled="loading"
+                <motion.button type="submit" :disabled="loading || isOffline || confirmingRegenerate"
                         :aria-busy="loading"
                         aria-describedby="route-planner-form-hint route-planner-status-message"
                         :whileHover="loading ? {} : { y: -2, scale: 1.01 }"
                         :whileTap="loading ? {} : { scale: 0.98 }"
-                        class="w-full rounded-2xl bg-gradient-to-r from-tibet-red via-rose-600 to-tibet-gold px-6 py-4 font-bold text-white shadow-lg shadow-tibet-red/20 transition-all duration-300 hover:shadow-xl hover:shadow-tibet-red/25 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-3">
+                        class="planner-generate w-full rounded-2xl bg-tibet-red px-6 py-4 font-bold text-white shadow-lg shadow-tibet-red/20 transition-all duration-300 hover:shadow-xl hover:shadow-tibet-red/25 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-3">
                   <span v-if="loading" class="flex items-center gap-2">
                     <svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                       <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -283,6 +261,17 @@
                 <p id="route-planner-form-hint" class="text-xs leading-relaxed text-tibet-brown/55">
                   {{ t('routePlanner.formDraftHint') }}
                 </p>
+                <details v-if="result" class="border-t border-tibet-gold/20 pt-3">
+                  <summary class="cursor-pointer py-2 text-sm font-semibold text-tibet-dark">{{ t('routePlanner.quickPresets') }}</summary>
+                  <div class="mt-2 grid grid-cols-2 gap-2">
+                    <button v-for="preset in presets" :key="preset.label" type="button" :disabled="loading"
+                      :aria-label="getPresetAriaLabel(preset)" @click="applyPreset(preset)"
+                      class="min-h-12 rounded-xl border border-tibet-gold/25 bg-white px-3 py-3 text-left disabled:opacity-50">
+                      <span class="block text-xs font-semibold">{{ preset.label }}</span>
+                      <span class="mt-1 block text-xs text-tibet-brown/70">{{ preset.days }}{{ t('routePlanner.daysUnit') }} · {{ getBudgetShort(preset.budget) }}</span>
+                    </button>
+                  </div>
+                </details>
               </form>
             </motion.div>
 
@@ -327,76 +316,59 @@
                     :aria-label="routeGenerationProgressLabel"
                     aria-valuemin="0"
                     aria-valuemax="100"
-                    :aria-valuenow="routeGenerationProgressPercent"
+                    :aria-valuetext="t('plannerFlow.progressUnknown')"
                   ></div>
                 </div>
-                <p class="mt-2 text-xs text-tibet-brown/60">{{ t('routePlanner.waitingTime') }}</p>
+                <p class="mt-2 text-xs text-tibet-brown/60">{{ t('plannerFlow.progressUnknown') }}</p>
                 <p class="mt-1 text-xs leading-relaxed text-tibet-brown/55">
                   {{ t('routePlanner.pauseWaitingHint') }}
                 </p>
               </motion.div>
             </AnimatePresence>
 
-            <motion.div
-              class="glass-card rounded-2xl border border-white/50 p-5 shadow-lg shadow-slate-900/3"
-              :initial="cardInitial"
-              :animate="cardInView"
-              :transition="cardTransition(0, 0.1)"
-            >
-              <div class="mb-4 flex items-center gap-3">
-                <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-tibet-blue/10 text-tibet-blue">
-                  <Sparkles class="h-4 w-4" />
-                </span>
-                <div>
-                  <h3 class="text-sm font-bold text-tibet-dark">{{ t('routePlanner.currentPlan') }}</h3>
-                  <p class="text-xs text-tibet-brown/50">{{ result ? t('routePlanner.generatedRouteSummary') : t('routePlanner.pendingRouteParams') }}</p>
-                </div>
-              </div>
 
-              <div class="grid grid-cols-3 gap-2">
-                <div v-for="stat in plannerSnapshotStats" :key="stat.label" class="rounded-xl border border-tibet-gold/15 bg-white/70 px-3 py-2">
-                  <p class="text-[11px] font-semibold text-tibet-brown/45">{{ stat.label }}</p>
-                  <p class="mt-1 truncate text-sm font-bold text-tibet-dark">{{ stat.value }}</p>
-                </div>
-              </div>
-
-              <div class="mt-4 space-y-2">
-                <div v-for="item in planningPulseItems" :key="item" class="flex gap-2 rounded-xl border border-tibet-gold/10 bg-white/65 px-3 py-2">
-                  <span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-tibet-gold"></span>
-                  <p class="text-xs leading-relaxed text-tibet-brown/65">{{ item }}</p>
-                </div>
-              </div>
-            </motion.div>
           </div>
         </div>
 
         <!-- RIGHT: Results (takes 3 cols on lg) -->
-        <div class="lg:col-span-3">
+        <div id="planner-result" class="lg:col-span-3 min-w-0">
           <!-- Empty state -->
           <AnimatePresence mode="wait">
           <motion.div
             v-if="!result && !loading"
             key="route-planner-empty"
-            class="flex flex-col items-center justify-center py-20 text-center"
+            class="planner-guide flex flex-col items-start p-6 md:p-8 text-left"
             :initial="{ opacity: 0, y: 18, scale: 0.98 }"
             :animate="{ opacity: 1, y: 0, scale: 1 }"
             :exit="{ opacity: 0, y: -10, scale: 0.98 }"
             :transition="revealTransition"
           >
-            <div class="relative mb-8">
-              <div class="w-32 h-32 rounded-3xl bg-gradient-to-br from-tibet-red/5 via-tibet-gold/5 to-tibet-blue/5 border border-tibet-gold/10 flex items-center justify-center">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-tibet-gold/30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l5.447 2.724A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-                </svg>
-              </div>
-              <div class="absolute -bottom-2 -right-2 w-10 h-10 rounded-xl bg-tibet-gold/10 flex items-center justify-center">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-tibet-gold/50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-              </div>
+            <div class="planner-guide-number" aria-hidden="true">01 — 03</div>
+            <h2 class="text-2xl font-bold text-tibet-dark">{{ t('plannerFlow.guideTitle') }}</h2>
+            <p class="mt-3 text-sm leading-relaxed">{{ t('plannerFlow.guideDesc') }}</p>
+            <div class="mt-6 w-full text-left">
+                <!-- Quick Presets -->
+                <div>
+                  <label class="block text-sm font-semibold text-tibet-dark/80 mb-3">{{ t('routePlanner.quickPresets') }}</label>
+                  <div class="grid grid-cols-2 gap-2">
+                    <motion.button type="button" v-for="preset in presets" :key="preset.label" @click="applyPreset(preset)" :disabled="loading"
+                            :aria-label="getPresetAriaLabel(preset)"
+                            :whileHover="{ y: -2, scale: 1.01 }"
+                            :whileTap="{ scale: 0.98 }"
+                            class="group flex min-h-12 flex-col items-start gap-0.5 rounded-xl border border-tibet-gold/20 bg-white/60 px-3.5 py-3 text-left transition-all hover:border-tibet-gold/40 hover:bg-amber-50/40 hover:shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">
+                      <span class="text-xs font-semibold text-tibet-dark/80 group-hover:text-tibet-dark">{{ preset.label }}</span>
+                      <span class="text-[11px] text-tibet-brown/50">{{ preset.days }}{{ t('routePlanner.daysUnit') }} · {{ getBudgetShort(preset.budget) }}</span>
+                    </motion.button>
+                  </div>
+                </div>
+
             </div>
-            <h3 class="text-xl font-bold text-tibet-brown/50 mb-2">{{ t('routePlanner.emptyTitle') }}</h3>
-            <p class="text-sm text-tibet-brown/40 max-w-sm">{{ t('routePlanner.emptyDescription') }}</p>
+            <ol class="planner-guide-list">
+              <li><b>01</b><div><strong>{{ t('plannerFlow.stepPreferences') }}</strong><p>{{ t('plannerFlow.guideOne') }}</p></div></li>
+              <li><b>02</b><div><strong>{{ t('plannerFlow.stepReview') }}</strong><p>{{ t('plannerFlow.guideTwo') }}</p></div></li>
+              <li><b>03</b><div><strong>{{ t('plannerFlow.stepCheck') }}</strong><p>{{ t('plannerFlow.guideThree') }}</p></div></li>
+            </ol>
+            <p class="planner-guide-footnote">{{ t('plannerFlow.priceBoundary') }}</p>
           </motion.div>
 
             <!-- First-token wait state -->
@@ -438,7 +410,7 @@
                 <p class="mt-3 text-xs leading-relaxed text-tibet-brown/55">{{ t('routePlanner.firstTokenSubtitle') }}</p>
               </div>
 
-              <div class="mt-6 grid gap-3 sm:grid-cols-3">
+              <div class="mt-6 grid gap-3">
                 <div
                   v-for="step in routeGenerationProgressSteps"
                   :key="step.key"
@@ -478,7 +450,7 @@
                   </div>
                 </div>
                 <div class="flex flex-wrap gap-1.5">
-                  <motion.button v-if="!isLongRoute && resultShouldCollapse" @click="resultExpanded = !resultExpanded"
+                  <motion.button v-if="resultShouldCollapse" @click="resultExpanded = !resultExpanded"
                           :aria-expanded="resultExpanded"
                           :aria-label="resultToggleLabel"
                           :whileHover="{ y: -1, scale: 1.02 }"
@@ -501,6 +473,26 @@
                 </div>
               </div>
 
+              <div id="planner-review" class="planner-review-section px-5 py-5">
+                <RouteReviewPanel :days="routeDaySections" :route-key="String(reviewRevision)" @update:notes="reviewNotes = $event" @jump="scrollToRouteDay" />
+              </div>
+              <section id="planner-check" class="planner-check px-5 py-5">
+                <h2 class="text-lg font-bold">{{ t('plannerFlow.checkTitle') }}</h2>
+                <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p class="text-xs">{{ t('plannerFlow.referenceTotal') }}</p>
+                    <p class="mt-1 text-2xl font-bold">{{ formatCurrency(itineraryQuote?.totalEstimatedCost ?? bookableItinerary?.totalEstimatedCost, itineraryQuote?.currency) }}</p>
+                  </div>
+                  <a v-if="bookableItinerary || itineraryLoading || itineraryError" class="planner-secondary" href="#planner-budget">{{ t('plannerFlow.viewDetails') }}</a>
+                </div>
+                <p class="mt-2 text-sm leading-relaxed">{{ t('plannerFlow.priceBoundary') }}</p>
+                <p class="mt-2 text-sm leading-relaxed">{{ t('plannerFlow.saveBoundary') }}</p>
+                <div class="mt-4 flex flex-wrap gap-2">
+                  <button type="button" class="planner-primary" :disabled="saving || loading || isOffline || currentAiRouteManuallySaved" @click="saveRoute">{{ currentAiRouteManuallySaved ? t('plannerFlow.saved') : saving ? t('routePlanner.saving') : t('routePlanner.saveRoute') }}</button>
+                  <button type="button" class="planner-secondary" :disabled="loading" @click="downloadRoute">{{ t('plannerFlow.exportReview') }}</button>
+                  <a class="planner-secondary" href="#planner-preferences">{{ t('plannerFlow.backPreferences') }}</a>
+                </div>
+              </section>
               <!-- Compact summary -->
               <div
                 v-if="!isLongRoute"
@@ -541,9 +533,9 @@
 
               <!-- Day outline -->
               <div
-                v-if="visibleRouteDaySections.length"
+                v-if="visibleRouteDaySections.length && loading"
                 class="border-b border-white/60 bg-white/45 px-5 py-5 md:px-6"
-                :class="{ 'xl:hidden': isLongRoute }"
+
               >
                 <div class="mb-3 flex items-center justify-between gap-3">
                   <div class="flex items-center gap-2 text-tibet-dark">
@@ -565,139 +557,17 @@
                 </div>
               </div>
 
-              <!-- Long-route desktop navigation -->
-              <aside
-                v-if="isLongRoute"
-                class="hidden border-b border-white/60 bg-gradient-to-br from-white/80 via-amber-50/45 to-sky-50/35 p-4 xl:block"
-              >
-                <div class="route-long-reader rounded-2xl border border-white/70 bg-white/65 p-5">
-                  <div class="mb-4 flex items-center justify-between gap-3">
-                    <div>
-                      <p class="text-sm font-bold text-tibet-dark">{{ t('routePlanner.routeFullText') }}</p>
-                      <p class="text-xs text-tibet-brown/50">{{ t('routePlanner.routeLongReaderHint') }}</p>
-                    </div>
-                  </div>
-
-                  <div
-                    ref="routeResultReaderRef"
-                    class="prose prose-slate route-result-prose route-result-prose-compact route-long-flow flow-root max-w-none prose-headings:text-tibet-dark prose-p:text-tibet-brown/80 prose-p:leading-relaxed prose-a:text-tibet-blue prose-strong:text-tibet-dark/90 prose-li:text-tibet-brown/80 prose-h2:border-b prose-h2:border-tibet-gold/20 prose-h2:pb-2 prose-h2:mt-8 prose-h2:mb-4 prose-img:rounded-2xl prose-img:shadow-md"
-                    tabindex="-1"
-                  >
-                    <div class="not-prose route-long-nav float-left mb-4 mr-5 w-[260px] rounded-2xl border border-white/70 bg-white/75 p-4 shadow-sm">
-                      <div class="mb-3 flex items-center gap-2 text-tibet-dark">
-                        <ListChecks class="h-4 w-4 text-tibet-blue" />
-                        <h3 class="text-sm font-bold">{{ t('routePlanner.routeNavigation') }}</h3>
-                      </div>
-
-                      <div class="grid grid-cols-2 gap-2">
-                        <div v-for="stat in resultStats" :key="stat.label" class="rounded-xl border border-tibet-gold/10 bg-white/75 px-3 py-2">
-                          <p class="text-[10px] font-semibold text-tibet-brown/45">{{ stat.label }}</p>
-                          <p class="mt-1 truncate text-xs font-bold text-tibet-dark">{{ stat.value }}</p>
-                        </div>
-                      </div>
-
-                      <div class="mt-3 rounded-2xl border border-amber-200/80 bg-amber-50/75 px-3 py-3">
-                        <div class="mb-1.5 flex items-center gap-2 text-amber-800">
-                          <ShieldAlert class="h-3.5 w-3.5" />
-                          <h4 class="text-xs font-bold">{{ t('routePlanner.preTripCheckTitle') }}</h4>
-                        </div>
-                        <p class="text-[11px] leading-relaxed text-amber-800/80">
-                          {{ t('routePlanner.preTripCheckCompactDesc') }}
-                        </p>
-                      </div>
-
-                      <div v-if="routeOverviewText" class="mt-3 rounded-2xl border border-tibet-gold/15 bg-white/75 px-3 py-3">
-                        <div class="mb-2 flex items-center gap-2 text-tibet-dark">
-                          <Sparkles class="h-3.5 w-3.5 text-tibet-gold" />
-                          <h4 class="text-xs font-bold">{{ t('routePlanner.routeOverview') }}</h4>
-                        </div>
-                        <p class="line-clamp-5 text-xs leading-relaxed text-tibet-brown/65">{{ routeOverviewText }}</p>
-                      </div>
-
-                      <div v-if="routeHighlightItems.length" class="mt-3 space-y-2">
-                        <p class="text-xs font-bold text-tibet-dark">{{ t('routePlanner.routeHighlights') }}</p>
-                        <div v-for="item in routeHighlightItems" :key="item" class="flex gap-2 rounded-xl border border-tibet-gold/10 bg-white/70 px-3 py-2">
-                          <span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-tibet-gold"></span>
-                          <p class="line-clamp-2 text-[11px] leading-relaxed text-tibet-brown/65">{{ item }}</p>
-                        </div>
-                      </div>
-
-                      <div v-if="routeDaySections.length" class="mt-3 space-y-2">
-                        <div class="flex items-center justify-between gap-2">
-                          <p class="text-xs font-bold text-tibet-dark">{{ t('routePlanner.routeDailyDirectory') }}</p>
-                          <span class="text-[11px] font-medium text-tibet-brown/45">{{ t('routePlanner.routeAllDays', { count: routeDaySections.length }) }}</span>
-                        </div>
-                        <div class="max-h-[42vh] space-y-1.5 overflow-y-auto pr-1 route-day-nav">
-                          <button
-                            v-for="day in routeDaySections"
-                            :key="day.day"
-                            type="button"
-                            @click="scrollToRouteDay(day.day)"
-                            :aria-label="getRouteDayAriaLabel(day)"
-                            class="min-h-11 w-full rounded-xl border border-tibet-gold/10 bg-white/70 px-3 py-2 text-left transition hover:border-tibet-blue/25 hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tibet-blue/60"
-                          >
-                            <p class="text-[11px] font-bold text-tibet-blue">{{ day.day }}</p>
-                            <p class="mt-0.5 line-clamp-1 text-xs font-semibold text-tibet-dark">{{ day.title }}</p>
-                          </button>
-                        </div>
-                      </div>
-
-                      <div class="mt-4 grid grid-cols-2 gap-1.5">
-                        <button
-                          type="button"
-                          @click="copyResult"
-                          :disabled="copying"
-                          :aria-label="copying ? t('routePlanner.copying') : t('routePlanner.copyText')"
-                          class="min-h-11 truncate rounded-xl border border-tibet-gold/20 bg-white/80 px-2 py-2 text-xs font-medium text-gray-600 transition hover:bg-gray-50 disabled:opacity-50"
-                        >
-                          {{ t('routePlanner.copyText') }}
-                        </button>
-                        <button
-                          type="button"
-                          @click="saveRoute"
-                          :disabled="saving || !result"
-                          :aria-label="saving ? t('routePlanner.saving') : t('routePlanner.saveRoute')"
-                          class="min-h-11 truncate rounded-xl border border-tibet-gold/20 bg-white/80 px-2 py-2 text-xs font-medium text-gray-600 transition hover:bg-gray-50 disabled:opacity-50"
-                        >
-                          {{ t('routePlanner.saveRoute') }}
-                        </button>
-                        <button
-                          type="button"
-                          @click="downloadRoute"
-                          :disabled="!result"
-                          :aria-label="t('routePlanner.downloadMarkdown')"
-                          class="min-h-11 truncate rounded-xl border border-tibet-gold/20 bg-white/80 px-2 py-2 text-xs font-medium text-gray-600 transition hover:bg-gray-50 disabled:opacity-50"
-                        >
-                          {{ t('routePlanner.downloadMarkdown') }}
-                        </button>
-                        <button
-                          type="button"
-                          @click="shareRoute"
-                          :disabled="sharing || !result"
-                          :aria-label="sharing ? t('routePlanner.sharing') : t('routePlanner.shareToCommunity')"
-                          class="min-h-11 truncate rounded-xl bg-tibet-blue px-2 py-2 text-xs font-semibold text-white transition hover:bg-tibet-blue/90 disabled:opacity-50"
-                        >
-                          {{ t('routePlanner.shareToCommunity') }}
-                        </button>
-                      </div>
-                    </div>
-
-                    <div class="route-long-markdown contents" v-html="renderedResult"></div>
-                  </div>
-                </div>
-              </aside>
-
               <!-- Markdown content -->
               <div
                 class="px-6 pb-6 pt-5 md:px-8 md:pb-8 lg:px-10"
-                :class="{ 'xl:hidden': isLongRoute }"
+
               >
                 <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p class="text-sm font-bold text-tibet-dark">{{ t('routePlanner.routeFullText') }}</p>
                     <p class="text-xs text-tibet-brown/50">{{ t('routePlanner.routeShortReaderHint') }}</p>
                   </div>
-                  <motion.button v-if="!isLongRoute && resultShouldCollapse" @click="resultExpanded = !resultExpanded"
+                  <motion.button v-if="resultShouldCollapse" @click="resultExpanded = !resultExpanded"
                           :aria-expanded="resultExpanded"
                           :aria-label="resultToggleLabel"
                           :whileHover="{ y: -1, scale: 1.02 }"
@@ -710,21 +580,21 @@
                 </div>
                 <div class="relative">
                   <div
-                    class="prose prose-slate route-result-prose max-w-none prose-headings:text-tibet-dark prose-p:text-tibet-brown/80 prose-p:leading-relaxed prose-a:text-tibet-blue prose-strong:text-tibet-dark/90 prose-li:text-tibet-brown/80 prose-h2:border-b prose-h2:border-tibet-gold/20 prose-h2:pb-2 prose-h2:mt-8 prose-h2:mb-4 prose-img:rounded-2xl prose-img:shadow-md"
+                    ref="routeResultReaderRef" class="prose prose-slate route-result-prose max-w-none prose-headings:text-tibet-dark prose-p:text-tibet-brown/80 prose-p:leading-relaxed prose-a:text-tibet-blue prose-strong:text-tibet-dark/90 prose-li:text-tibet-brown/80 prose-h2:border-b prose-h2:border-tibet-gold/20 prose-h2:pb-2 prose-h2:mt-8 prose-h2:mb-4 prose-img:rounded-2xl prose-img:shadow-md"
                     :class="{
-                      'max-h-[420px] overflow-hidden': !isLongRoute && resultShouldCollapse && !resultExpanded,
+                      'max-h-[420px] overflow-hidden': resultShouldCollapse && !resultExpanded,
                       'route-result-prose-compact': isLongRoute
                     }"
                     v-html="renderedResult"
                   ></div>
-                  <div v-if="!isLongRoute && resultShouldCollapse && !resultExpanded" class="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-white via-white/95 to-transparent"></div>
+                  <div v-if="resultShouldCollapse && !resultExpanded" class="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-white via-white/95 to-transparent"></div>
                 </div>
               </div>
 
               <!-- Result actions -->
               <div
                 class="px-6 py-4 border-t border-white/60 bg-white/30 flex flex-wrap items-center justify-end gap-2"
-                :class="{ 'xl:hidden': isLongRoute }"
+
               >
                 <motion.button @click="generateRoute" :disabled="loading"
                         :aria-busy="loading"
@@ -737,7 +607,7 @@
                   </svg>
                   {{ t('routePlanner.regenerate') }}
                 </motion.button>
-                <motion.button @click="saveRoute" :disabled="saving || !result"
+                <motion.button @click="saveRoute" :disabled="saving || loading || isOffline || currentAiRouteManuallySaved || !result"
                         :aria-busy="saving"
                         :aria-label="saving ? t('routePlanner.saving') : t('routePlanner.saveRoute')"
                         :whileHover="{ y: -1, scale: 1.02 }"
@@ -748,7 +618,7 @@
                   </svg>
                   {{ saving ? t('routePlanner.saving') : t('routePlanner.saveRoute') }}
                 </motion.button>
-                <motion.button @click="downloadRoute" :disabled="!result"
+                <motion.button @click="downloadRoute" :disabled="loading || !result"
                         :aria-label="t('routePlanner.downloadMarkdown')"
                         :whileHover="{ y: -1, scale: 1.02 }"
                         :whileTap="{ scale: 0.96 }"
@@ -756,12 +626,12 @@
                   <Download class="h-4 w-4" />
                   {{ t('routePlanner.downloadMarkdown') }}
                 </motion.button>
-                <motion.button @click="shareRoute" :disabled="sharing || !result"
+                <motion.button @click="shareRoute" :disabled="sharing || loading || isOffline || !result"
                         :aria-busy="sharing"
                         :aria-label="sharing ? t('routePlanner.sharing') : t('routePlanner.shareToCommunity')"
                         :whileHover="{ y: -1, scale: 1.02 }"
                         :whileTap="{ scale: 0.96 }"
-                        class="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-gradient-to-r from-tibet-blue to-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-tibet-blue/20 transition-all hover:from-tibet-blue/90 hover:to-indigo-700 hover:shadow-lg disabled:opacity-50">
+                        class="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-tibet-blue px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-tibet-blue/20 transition-all hover:from-tibet-blue/90 hover:to-indigo-700 hover:shadow-lg disabled:opacity-50">
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                   </svg>
@@ -774,11 +644,12 @@
       </div>
 
       <div
-        v-if="bookableItinerary || itineraryLoading || tibetTravelKit || tibetTravelKitLoading"
+        id="planner-budget"
+        v-if="bookableItinerary || itineraryLoading || itineraryError || tibetTravelKit || tibetTravelKitLoading || travelKitError"
         class="mt-8 grid items-start gap-6 xl:grid-cols-2"
       >
           <motion.div
-            v-if="bookableItinerary || itineraryLoading"
+            v-if="bookableItinerary || itineraryLoading || itineraryError"
             class="glass-card rounded-3xl border border-white/50 shadow-xl shadow-slate-900/3 overflow-hidden"
             :class="{ 'xl:col-span-2': !tibetTravelKit && !tibetTravelKitLoading }"
             :initial="{ opacity: 0, y: 18, scale: 0.98 }"
@@ -827,11 +698,14 @@
               <p class="text-sm font-medium">{{ t('routePlanner.bookableItineraryLoading') }}</p>
             </div>
 
-            <div v-else-if="bookableItinerary" class="p-5 md:p-6 space-y-5">
+            <div v-if="itineraryError" class="planner-notice m-5" role="alert">
+              <p>{{ itineraryError }}</p><button class="planner-secondary mt-3" :disabled="itineraryLoading || !!itineraryVersionLoading || isOffline" @click="generateBookableItinerary()">{{ t('plannerFlow.retryDetails') }}</button>
+            </div>
+            <div v-if="bookableItinerary && !itineraryLoading" class="p-5 md:p-6 space-y-5">
               <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div class="rounded-2xl border border-tibet-gold/20 bg-white/70 px-4 py-3">
                   <p class="text-xs text-tibet-brown/50">{{ t('routePlanner.quoteTotalEstimated') }}</p>
-                  <p class="mt-1 text-xl font-bold text-tibet-dark">{{ formatCurrency(itineraryQuote?.totalEstimatedCost || bookableItinerary.totalEstimatedCost, itineraryQuote?.currency) }}</p>
+                  <p class="mt-1 text-xl font-bold text-tibet-dark">{{ formatCurrency(itineraryQuote?.totalEstimatedCost ?? bookableItinerary.totalEstimatedCost, itineraryQuote?.currency) }}</p>
                 </div>
                 <div class="rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3">
                   <p class="text-xs text-emerald-700/70">{{ t('routePlanner.quoteBookable') }}</p>
@@ -903,7 +777,7 @@
           </motion.div>
 
           <motion.div
-            v-if="tibetTravelKit || tibetTravelKitLoading"
+            v-if="tibetTravelKit || tibetTravelKitLoading || travelKitError"
             class="glass-card rounded-3xl border border-white/50 shadow-xl shadow-slate-900/3 overflow-hidden"
             :class="{ 'xl:col-span-2': !bookableItinerary && !itineraryLoading }"
             :initial="{ opacity: 0, y: 18, scale: 0.98 }"
@@ -935,6 +809,9 @@
               </motion.button>
             </div>
 
+            <div v-if="travelKitError" class="planner-notice m-5" role="alert">
+              <p>{{ t('plannerFlow.kitFailed') }}</p><button class="planner-secondary mt-3" :disabled="tibetTravelKitLoading || isOffline" @click="bookableItinerary && fetchTibetTravelKit(bookableItinerary.id)">{{ t('plannerFlow.retryKit') }}</button>
+            </div>
             <div v-if="tibetTravelKitLoading" class="p-8 text-center text-tibet-brown/60" role="status" aria-live="polite" aria-busy="true">
               <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-500 mx-auto mb-3"></div>
               <p class="text-sm font-medium">{{ t('routePlanner.travelKitLoading') }}</p>
@@ -1070,21 +947,18 @@
   </div>
 
   <MobileStickyActionBar
-    :show="Boolean(result)"
-    :eyebrow="t('routePlanner.routeGenerated')"
-    :title="routeResultMobileTitle"
-    :meta="routeResultMobileMeta"
-    :secondary-label="t('routePlanner.copyText')"
-    :primary-label="sharing ? t('routePlanner.sharing') : t('routePlanner.shareToCommunity')"
+    :show="true"
+    :secondary-label="result ? t('routePlanner.copyText') : ''"
+    :primary-label="result ? t('plannerFlow.checkTitle') : loading ? t('routePlanner.aiPlanning') : t('routePlanner.generateRoute')"
     :secondary-disabled="copying"
-    :primary-disabled="sharing || !result"
+    :primary-disabled="loading || confirmingRegenerate || (!result && isOffline)"
     @secondary="copyResult"
-    @primary="shareRoute"
+    @primary="result ? goToReview() : generateRoute()"
   />
 </template>
 
 <script setup lang="ts">
-import { ref, computed, shallowRef, onBeforeUnmount, onMounted, watch } from 'vue'
+import { nextTick, ref, computed, shallowRef, onBeforeUnmount, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { AnimatePresence, motion } from 'motion-v'
@@ -1116,6 +990,8 @@ import {
   type RouteGenerationJobSnapshot
 } from '../api/stream'
 import api, { endpoints, type AiRouteRecordResponse } from '../api'
+import RouteReviewPanel from '../components/RouteReviewPanel.vue'
+import { showConfirm } from '../composables/useConfirm'
 import MobileStickyActionBar from '../components/MobileStickyActionBar.vue'
 import { useRoutePlannerDraft, type RoutePlannerFormState } from '../composables/useRoutePlannerDraft'
 import { useAuthGuard } from '../composables/useAuthGuard'
@@ -1321,6 +1197,8 @@ const onAuthExpired = () => {
 }
 
 const form = ref<RoutePlannerFormState>({ ...defaultForm })
+// Inputs describe the next request; generated content keeps its original parameters.
+const generatedForm = ref<RoutePlannerFormState>({ ...defaultForm })
 
 const presets = computed(() => [
   { label: t('routePlanner.presetNatural'), days: 6, budget: 'comfort', preference: 'natural' },
@@ -1372,7 +1250,7 @@ const formatInteger = (value?: number | string | null) =>
   new Intl.NumberFormat(toIntlLocale(locale.value), { maximumFractionDigits: 0 }).format(toFiniteAmount(value))
 
 const formatCurrency = (value?: number | string | null, currency?: string | null) =>
-  new Intl.NumberFormat(toIntlLocale(locale.value), {
+  value == null || value === '' || !Number.isFinite(Number(value)) ? t('plannerFlow.amountPending') : new Intl.NumberFormat(toIntlLocale(locale.value), {
     style: 'currency',
     currency: currency || 'CNY',
     maximumFractionDigits: 0
@@ -1474,6 +1352,14 @@ const itineraryQuote = ref<ItineraryQuote | null>(null)
 const tibetTravelKit = ref<TibetTravelKit | null>(null)
 const statusMessage = ref('')
 const errorMessage = ref('')
+const itineraryError = ref('')
+const travelKitError = ref(false)
+const isOffline = ref(!navigator.onLine)
+const confirmingRegenerate = ref(false)
+const reviewNotes = ref<Record<string, string>>({})
+const reviewRevision = ref(0)
+const updateConnection = () => { isOffline.value = !navigator.onLine }
+const goToReview = () => document.getElementById('planner-check')?.scrollIntoView({ block: 'start', behavior: 'smooth' })
 const markdownRenderDebounceMs = 120
 let markdownWorker: Worker | null = null
 let markdownRenderTimer: number | null = null
@@ -1482,16 +1368,27 @@ let latestRenderJobId = 0
 let latestAppliedRenderId = 0
 let latestMarkdownSnapshot = ''
 let routeGenerationRequestId = 0
+let itineraryRequestId = 0
+let travelKitRequestId = 0
+
+const invalidateItineraryRequests = () => {
+  itineraryRequestId += 1
+  travelKitRequestId += 1
+  itineraryLoading.value = false
+  itineraryVersionLoading.value = null
+  tibetTravelKitLoading.value = false
+}
+
+const isCurrentItineraryRequest = (requestId: number, itineraryId?: number) =>
+  requestId === itineraryRequestId &&
+  (itineraryId === undefined || bookableItinerary.value?.id === itineraryId)
 
 const routeStatusRole = computed(() => errorMessage.value ? 'alert' : 'status')
 const routeStatusLive = computed(() => errorMessage.value ? 'assertive' : 'polite')
-const routeStatusTitle = computed(() => errorMessage.value ? t('routePlanner.generationFailed') : t('routePlanner.statusHint'))
+const routeStatusTitle = computed(() => errorMessage.value ? t('plannerFlow.actionFailed') : t('routePlanner.statusHint'))
 const routeStatusText = computed(() => errorMessage.value || statusMessage.value)
 const daysValueLabel = computed(() => t('routePlanner.daysValueAria', { count: form.value.days }))
-const routeGenerationProgressLabel = computed(() => t('routePlanner.progressAria', {
-  label: routeGenerationStatusLabel.value,
-  percent: routeGenerationProgressPercent.value
-}))
+const routeGenerationProgressLabel = computed(() => t('plannerFlow.progressUnknown'))
 const resultToggleButtonLabel = computed(() =>
   resultExpanded.value ? t('routePlanner.collapseFullText') : t('routePlanner.expandFullText')
 )
@@ -1508,7 +1405,7 @@ const bookableItinerarySubtitle = computed(() => {
     version: bookableItinerary.value.versionLabel,
     days: t('routePlanner.daysValueCompact', { count: bookableItinerary.value.days }),
     price: formatCurrency(
-      itineraryQuote.value?.totalEstimatedCost || bookableItinerary.value.totalEstimatedCost,
+      itineraryQuote.value?.totalEstimatedCost ?? bookableItinerary.value.totalEstimatedCost,
       itineraryQuote.value?.currency
     )
   })
@@ -1640,8 +1537,8 @@ const routeOverviewText = computed(() => {
 const routeResultMobileTitle = computed(() => {
   if (!result.value) return ''
   return t('routePlanner.routeTitle', {
-    days: formatInteger(form.value.days),
-    preference: getPreferenceText(form.value.preference)
+    days: formatInteger(generatedForm.value.days),
+    preference: getPreferenceText(generatedForm.value.preference)
   })
 })
 
@@ -1706,7 +1603,7 @@ const getRouteDayIndex = (label: string) => {
 }
 
 const expectedRouteDayCount = computed(() => {
-  const days = Math.round(Number(form.value.days) || defaultForm.days)
+  const days = Math.round(Number(generatedForm.value.days) || defaultForm.days)
   return Math.min(30, Math.max(1, days))
 })
 
@@ -1770,17 +1667,14 @@ const hiddenDayCount = computed(() => Math.max(routeDaySections.value.length - v
 const isLongRoute = computed(() => result.value.length >= 2600 || routeDaySections.value.length >= 6)
 const resultShouldCollapse = computed(() => result.value.length > 1200 || routeDaySections.value.length > 4)
 const resultStats = computed(() => [
-  { label: t('routePlanner.statDays'), value: t('routePlanner.daysValueSpaced', { count: form.value.days }) },
-  { label: t('routePlanner.statBudget'), value: getBudgetShort(form.value.budget) },
-  { label: t('routePlanner.statPreference'), value: getPreferenceText(form.value.preference) },
+  { label: t('routePlanner.statDays'), value: t('routePlanner.daysValueSpaced', { count: generatedForm.value.days }) },
+  { label: t('routePlanner.statBudget'), value: getBudgetShort(generatedForm.value.budget) },
+  { label: t('routePlanner.statPreference'), value: getPreferenceText(generatedForm.value.preference) },
   { label: t('routePlanner.statLength'), value: t('routePlanner.charsValue', { count: formatInteger(charCount.value || result.value.length) }) }
 ])
-const plannerSnapshotStats = computed(() => [
-  { label: t('routePlanner.statDays'), value: t('routePlanner.daysValueCompact', { count: form.value.days }) },
-  { label: t('routePlanner.statBudget'), value: getBudgetShort(form.value.budget) },
-  { label: t('routePlanner.statPreference'), value: getPreferenceText(form.value.preference) }
-])
-const scrollToRouteDay = (dayLabel: string) => {
+const scrollToRouteDay = async (dayLabel: string) => {
+  resultExpanded.value = true
+  await nextTick()
   const root = routeResultReaderRef.value
   if (!root || !dayLabel) return
 
@@ -1792,68 +1686,14 @@ const scrollToRouteDay = (dayLabel: string) => {
   target?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
-const routeGenerationStage = computed(() => {
-  if (!waitingForFirstToken.value || result.value) return 'streaming'
-  if (generationElapsedSeconds.value < 4) return 'collecting'
-  if (generationElapsedSeconds.value < 11) return 'thinking'
-  return 'composing'
-})
-const routeGenerationProgressPercent = computed(() => {
-  if (!loading.value) return 0
-  if (!waitingForFirstToken.value || result.value) return 100
-  return Math.min(88, 18 + generationElapsedSeconds.value * 5)
-})
-const routeGenerationStatusLabel = computed(() => {
-  if (waitingForFirstToken.value && !result.value) {
-    if (routeGenerationStage.value === 'collecting') return t('routePlanner.firstTokenCollecting')
-    if (routeGenerationStage.value === 'thinking') return t('routePlanner.firstTokenThinking')
-    return t('routePlanner.firstTokenComposing')
-  }
-  return streaming.value ? t('routePlanner.aiStreamingLabel') : t('routePlanner.preparingLabel')
-})
-const routeGenerationProgressSteps = computed(() => [
-  {
-    key: 'collecting',
-    label: t('routePlanner.firstTokenStepCollecting'),
-    description: t('routePlanner.firstTokenStepCollectingDesc'),
-    active: routeGenerationStage.value === 'collecting'
-  },
-  {
-    key: 'thinking',
-    label: t('routePlanner.firstTokenStepThinking'),
-    description: t('routePlanner.firstTokenStepThinkingDesc'),
-    active: routeGenerationStage.value === 'thinking'
-  },
-  {
-    key: 'composing',
-    label: t('routePlanner.firstTokenStepComposing'),
-    description: t('routePlanner.firstTokenStepComposingDesc'),
-    active: routeGenerationStage.value === 'composing'
-  }
-])
-const planningPulseItems = computed(() => {
-  if (result.value) {
-    const dayCount = routeDaySections.value.length
-    const highlightItems = routeHighlightItems.value.slice(0, 3)
-
-    return [
-      dayCount > 0
-        ? t('routePlanner.planningPulseGeneratedDayNodes', { count: formatInteger(dayCount) })
-        : t('routePlanner.planningPulseGeneratedRouteReady'),
-      ...highlightItems
-    ].slice(0, 4)
-  }
-
-  return [
-    t('routePlanner.planningPulseDaysPreference', {
-      days: t('routePlanner.daysValueCompact', { count: form.value.days }),
-      preference: getPreferenceText(form.value.preference)
-    }),
-    t('routePlanner.planningPulseBudget', { budget: getBudgetShort(form.value.budget) }),
-    t('routePlanner.planningPulseBookable')
-  ]
-})
-
+const routeGenerationProgressPercent = computed(() => loading.value ? 40 : 0)
+const routeGenerationStatusLabel = computed(() =>
+  result.value ? t('routePlanner.aiStreamingLabel') : t('plannerFlow.waitingResponse')
+)
+const routeGenerationProgressSteps = computed(() => [{
+  key: 'waiting', label: routeGenerationStatusLabel.value,
+  description: t('plannerFlow.elapsed', { seconds: generationElapsedSeconds.value }), active: true
+}])
 const routeDraftStorageKey = computed(() => {
   return auth.user ? 'colorful-tibet:route-planner:draft:session' : 'colorful-tibet:route-planner:draft:anonymous'
 })
@@ -1893,6 +1733,12 @@ const persistRouteDraft = (overrides: Parameters<typeof persistRoutePlannerDraft
 }
 
 function suspendRouteDraftPersistence() {
+  invalidateItineraryRequests()
+  bookableItinerary.value = null
+  itineraryQuote.value = null
+  tibetTravelKit.value = null
+  reviewRevision.value++
+  reviewNotes.value = {}
   routeDraftPersistenceSuspended.value = true
   clearRouteDraft()
 }
@@ -1965,69 +1811,100 @@ const applyPreset = (preset: { label: string; days: number; budget: string; pref
   }
 }
 
-const fetchItineraryQuote = async (itineraryId: number) => {
-  const { data } = await api.get(endpoints.itineraries.quote(itineraryId))
+const fetchItineraryQuote = async (itineraryId: number, requestId = itineraryRequestId) => {
+  const { data } = await api.get<ItineraryQuote>(endpoints.itineraries.quote(itineraryId))
+  if (!isCurrentItineraryRequest(requestId, itineraryId)) return
   itineraryQuote.value = data
 }
 
-const fetchTibetTravelKit = async (itineraryId: number) => {
+const fetchTibetTravelKit = async (itineraryId: number, requestId = itineraryRequestId) => {
+  if (!isCurrentItineraryRequest(requestId, itineraryId)) return
+  const kitRequestId = ++travelKitRequestId
   tibetTravelKitLoading.value = true
+  travelKitError.value = false
+  tibetTravelKit.value = null
+  const isCurrent = () => kitRequestId === travelKitRequestId && isCurrentItineraryRequest(requestId, itineraryId)
   try {
-    const { data } = await api.get(endpoints.tibetSpecialty.travelKit(itineraryId))
+    const { data } = await api.get<TibetTravelKit>(endpoints.tibetSpecialty.travelKit(itineraryId))
+    if (!isCurrent()) return
     tibetTravelKit.value = data
   } catch (error: unknown) {
+    if (!isCurrent()) return
     console.error('Failed to fetch Tibet travel kit:', summarizeClientError(error))
     tibetTravelKit.value = null
+    travelKitError.value = true
   } finally {
-    tibetTravelKitLoading.value = false
+    if (isCurrent()) tibetTravelKitLoading.value = false
   }
 }
 
 const refreshBookableItinerary = async () => {
   if (!bookableItinerary.value) return
-  const { data } = await api.get(endpoints.itineraries.detail(bookableItinerary.value.id))
+  const itineraryId = bookableItinerary.value.id
+  const requestId = itineraryRequestId
+  const { data } = await api.get<BookableItinerary>(endpoints.itineraries.detail(itineraryId))
+  if (!isCurrentItineraryRequest(requestId, itineraryId)) return
   bookableItinerary.value = data
 }
 
 const generateBookableItinerary = async (versionType = 'default') => {
-  if (!(await auth.ensureSession())) {
-    await requireAuth()
-    return
-  }
+  if (loading.value || streaming.value || itineraryLoading.value || itineraryVersionLoading.value || isOffline.value) return
+  const existingItinerary = bookableItinerary.value
+  const parameters = { ...generatedForm.value }
+  if (!existingItinerary && parameters.days > 15) { itineraryError.value = t('plannerFlow.longTrip'); return }
+  const requestId = ++itineraryRequestId
+  travelKitRequestId += 1
+  itineraryLoading.value = true
+  itineraryError.value = ''
+  itineraryQuote.value = null
+  tibetTravelKit.value = null
+  tibetTravelKitLoading.value = false
+  travelKitError.value = false
 
-  const isVersion = versionType !== 'default' && !!bookableItinerary.value
+  const isVersion = versionType !== 'default' && !!existingItinerary
   if (isVersion) {
     itineraryVersionLoading.value = versionType
-  } else {
-    itineraryLoading.value = true
   }
 
   try {
+    if (!(await auth.ensureSession())) { await requireAuth(); return }
+    if (!isCurrentItineraryRequest(requestId)) return
     const locale = readBrowserStorage('localStorage', 'locale', 'zh')
-    const response = isVersion
-      ? await api.post(endpoints.itineraries.createVersion(bookableItinerary.value!.id), { versionType })
-      : await api.post(endpoints.itineraries.generate, {
-          days: form.value.days,
-          budget: form.value.budget,
-          preference: form.value.preference,
-          versionType,
-          travelers: 2,
-          locale
-        })
-
-    bookableItinerary.value = response.data
-    await fetchItineraryQuote(response.data.id)
-    await fetchTibetTravelKit(response.data.id)
+    // Retrying missing prices must not generate another itinerary or discard a selected version.
+    let itinerary = existingItinerary
+    if (isVersion) {
+      const response = await api.post<BookableItinerary>(endpoints.itineraries.createVersion(existingItinerary!.id), { versionType })
+      itinerary = response.data
+    } else if (!itinerary) {
+      const response = await api.post<BookableItinerary>(endpoints.itineraries.generate, {
+        ...parameters,
+        versionType,
+        travelers: 2,
+        locale
+      })
+      itinerary = response.data
+    }
+    if (!isCurrentItineraryRequest(requestId)) return
+    bookableItinerary.value = itinerary
+    const [quoteResult] = await Promise.allSettled([
+      fetchItineraryQuote(itinerary.id, requestId),
+      fetchTibetTravelKit(itinerary.id, requestId)
+    ])
+    if (!isCurrentItineraryRequest(requestId, itinerary.id)) return
+    if (quoteResult.status === 'rejected') throw quoteResult.reason
     statusMessage.value = t('routePlanner.bookableItineraryGeneratedStatus', {
-      version: response.data.versionLabel || t('routePlanner.bookableVersionFallback')
+      version: itinerary.versionLabel || t('routePlanner.bookableVersionFallback')
     })
     errorMessage.value = ''
   } catch (error: unknown) {
+    if (!isCurrentItineraryRequest(requestId)) return
     console.error('Failed to generate bookable itinerary:', summarizeClientError(error))
-    errorMessage.value = t('routePlanner.generateFailed')
+    itineraryError.value = t('plannerFlow.detailsFailed')
   } finally {
-    itineraryLoading.value = false
-    itineraryVersionLoading.value = null
+    if (isCurrentItineraryRequest(requestId)) {
+      itineraryLoading.value = false
+      itineraryVersionLoading.value = null
+    }
   }
 }
 
@@ -2045,13 +1922,22 @@ const fetchLatestAiRouteRecord = async () => {
 }
 
 const applyAiRouteRecord = (record: AiRouteRecordResponse) => {
+  if (currentAiRouteRecordId.value !== record.id) {
+    invalidateItineraryRequests()
+    bookableItinerary.value = null
+    itineraryQuote.value = null
+    tibetTravelKit.value = null
+    reviewRevision.value++
+    reviewNotes.value = {}
+  }
   currentAiRouteRecordId.value = record.id
   currentAiRouteManuallySaved.value = Boolean(record.manuallySaved)
-  form.value = {
+  generatedForm.value = {
     days: Number(record.days) || defaultForm.days,
     budget: record.budget || defaultForm.budget,
     preference: record.preference || defaultForm.preference
   }
+  form.value = { ...generatedForm.value }
 
   if (record.content?.trim()) {
     updateGeneratedRouteContent(record.content, true)
@@ -2078,7 +1964,7 @@ const applyAiRouteRecord = (record: AiRouteRecordResponse) => {
     errorMessage.value = ''
     statusMessage.value = t('routePlanner.aiGeneratingRoute', {
       days: formatInteger(record.days),
-      pref: getPreferenceText(record.preference || form.value.preference)
+      pref: getPreferenceText(generatedForm.value.preference)
     })
     if (!record.content?.trim()) {
       startFirstTokenProgress()
@@ -2178,6 +2064,11 @@ const applyRouteJobSnapshot = (snapshot: RouteGenerationJobSnapshot) => {
   if (pausedRouteJobId.value === snapshot.jobId && !loading.value && !streaming.value) return
 
   activeRouteJobId.value = snapshot.jobId
+  generatedForm.value = {
+    days: snapshot.days,
+    budget: snapshot.budget,
+    preference: snapshot.preference
+  }
   if (snapshot.routeRecordId) {
     currentAiRouteRecordId.value = snapshot.routeRecordId
   }
@@ -2193,7 +2084,7 @@ const applyRouteJobSnapshot = (snapshot: RouteGenerationJobSnapshot) => {
     errorMessage.value = ''
     statusMessage.value = t('routePlanner.aiGeneratingRoute', {
       days: formatInteger(snapshot.days),
-      pref: getPreferenceText(form.value.preference)
+      pref: getPreferenceText(generatedForm.value.preference)
     })
     persistRouteDraft({ jobId: snapshot.jobId, completed: false })
   } else if (snapshot.status === 'FAILED') {
@@ -2339,8 +2230,16 @@ const resumeRouteJobFromDraft = async () => {
 
 const generateRoute = async () => {
   if (loading.value || streaming.value || activeRouteJobId.value) return
+  if (confirmingRegenerate.value || isOffline.value) return
+  if (result.value) {
+    confirmingRegenerate.value = true
+    const confirmed = await showConfirm({ title: t('plannerFlow.replaceTitle'), message: t('plannerFlow.replaceMessage'), confirmLabel: t('routePlanner.regenerate'), cancelLabel: t('plannerFlow.keepCurrent') })
+    confirmingRegenerate.value = false
+    if (!confirmed) return
+  }
 
   const requestId = ++routeGenerationRequestId
+  const parameters = { ...form.value }
   loading.value = true
   let hasSession = false
   try {
@@ -2355,9 +2254,15 @@ const generateRoute = async () => {
   }
 
   streaming.value = true
+  invalidateItineraryRequests()
+  generatedForm.value = parameters
   streamAbortController.value?.abort()
   streamAbortController.value = null
   clearPausedRouteJob()
+  reviewRevision.value++
+  reviewNotes.value = {}
+  itineraryError.value = ''
+  travelKitError.value = false
   result.value = ''
   renderedResult.value = ''
   resultExpanded.value = false
@@ -2377,7 +2282,7 @@ const generateRoute = async () => {
   generationStore.startGeneration()
 
   try {
-    const snapshot = await startRouteGenerationJob(form.value)
+    const snapshot = await startRouteGenerationJob(parameters)
     if (requestId !== routeGenerationRequestId || !loading.value || !streaming.value) {
       if (snapshot.jobId) {
         rememberPausedRouteJob(snapshot.jobId)
@@ -2427,20 +2332,21 @@ const copyResult = async () => {
 }
 
 const saveRoute = async () => {
-  if (!result.value || saving.value) return
-
-  if (!(await auth.ensureSession())) {
-    await requireAuth()
-    return
-  }
-
+  if (!result.value || saving.value || loading.value || isOffline.value || currentAiRouteManuallySaved.value) return
   saving.value = true
+  const revision = reviewRevision.value
+  const content = result.value
+  const parameters = { ...generatedForm.value }
+  const isCurrent = () => revision === reviewRevision.value && content === result.value
   try {
+    if (!(await auth.ensureSession())) { await requireAuth(); return }
+    if (!isCurrent()) return
     let recordId = currentAiRouteRecordId.value
     if (!recordId) {
       const latest = await fetchLatestAiRouteRecord()
-      if (latest?.content?.trim()) {
-        applyAiRouteRecord(latest)
+      if (!isCurrent()) return
+      if (latest?.content === content && latest.days === parameters.days &&
+          latest.budget === parameters.budget && latest.preference === parameters.preference) {
         recordId = latest.id
       }
     }
@@ -2449,12 +2355,14 @@ const saveRoute = async () => {
     }
 
     const response = await api.post<AiRouteRecordResponse>(endpoints.routes.saveAiRoute(recordId))
+    if (!isCurrent()) return
     currentAiRouteRecordId.value = response.data.id
     currentAiRouteManuallySaved.value = true
     statusMessage.value = t('routePlanner.routeSavedPrivate')
     errorMessage.value = ''
     persistRouteDraft()
   } catch (error: unknown) {
+    if (!isCurrent()) return
     console.error('Failed to save AI route record:', summarizeClientError(error))
     errorMessage.value = t('routePlanner.saveFailed')
     persistRouteDraft()
@@ -2465,11 +2373,13 @@ const saveRoute = async () => {
 
 const downloadRoute = () => {
   if (!result.value) return
-  const blob = new Blob([result.value], { type: 'text/markdown;charset=utf-8' })
+  const notes = Object.entries(reviewNotes.value).filter(([, note]) => note.trim()).map(([day, note]) => `### ${day}\n${note}`).join('\n\n')
+  const exportText = `${result.value}\n\n---\n${t('plannerFlow.priceBoundary')}${notes ? `\n\n## ${t('plannerFlow.notesTitle')}\n${t('plannerFlow.notesBoundary')}\n\n${notes}` : ''}`
+  const blob = new Blob([exportText], { type: 'text/markdown;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
-  link.download = t('routePlanner.downloadFilename', { days: formatInteger(form.value.days) })
+  link.download = t('routePlanner.downloadFilename', { days: formatInteger(generatedForm.value.days) })
   document.body.appendChild(link)
   link.click()
   document.body.removeChild(link)
@@ -2505,6 +2415,8 @@ const shareRoute = async () => {
   if (!result.value || sharing.value) return
 
   sharing.value = true
+  const content = result.value
+  const parameters = { ...generatedForm.value }
   let hasSession = false
   try {
     hasSession = await auth.ensureSession()
@@ -2519,11 +2431,11 @@ const shareRoute = async () => {
 
   try {
     await api.post(endpoints.routes.share, {
-      title: t('routePlanner.routeTitle', { days: formatInteger(form.value.days), preference: getPreferenceText(form.value.preference) }),
-      content: result.value,
-      days: form.value.days,
-      budget: communityBudgetValue(form.value.budget),
-      preference: communityPreferenceValue(form.value.preference)
+      title: t('routePlanner.routeTitle', { days: formatInteger(parameters.days), preference: getPreferenceText(parameters.preference) }),
+      content,
+      days: parameters.days,
+      budget: communityBudgetValue(parameters.budget),
+      preference: communityPreferenceValue(parameters.preference)
     })
     showToast(t('routePlanner.shareSuccess'), 'success')
     router.push('/community')
@@ -2590,6 +2502,8 @@ watch(form, () => persistRouteDraft(), { deep: true })
 
 onMounted(async () => {
   window.addEventListener('auth-expired', onAuthExpired)
+  window.addEventListener('online', updateConnection)
+  window.addEventListener('offline', updateConnection)
   generationStore.acknowledgeResult()
   restorePausedRouteJob()
   const hasSession = await auth.ensureSession()
@@ -2603,7 +2517,10 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  invalidateItineraryRequests()
   window.removeEventListener('auth-expired', onAuthExpired)
+  window.removeEventListener('online', updateConnection)
+  window.removeEventListener('offline', updateConnection)
   if (streamAbortController.value) {
     streamAbortController.value.abort()
     streamAbortController.value = null
@@ -2622,6 +2539,63 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+.planner-workspace { padding-bottom: 9rem; container-type: inline-size; }
+@container (max-width: 850px) {
+  .planner-columns { display: flex; flex-direction: column; }
+  .planner-columns > * { width: 100%; }
+}
+.planner-heading { display: flex; align-items: end; justify-content: space-between; gap: 1.5rem; margin-bottom: 1.75rem; }
+.planner-eyebrow { color: #8b2e3a; font-size: .75rem; font-weight: 700; letter-spacing: .12em; margin-bottom: .75rem; }
+.planner-heading h1 { font-size: clamp(1.75rem, 3vw, 2.5rem); line-height: 1.35; }
+.planner-intro { color: #685b51; margin-top: .75rem; line-height: 1.7; }
+.planner-back { color: #71313c; font-size: .875rem; padding: .75rem 0; flex-shrink: 0; }
+.planner-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-block: 1px solid #dcd3c7; margin-bottom: 1.5rem; }
+.planner-steps > * { display: flex; align-items: center; gap: .6rem; padding: 1rem .75rem; font-size: .875rem; color: #6b6058; }
+.planner-steps > a { color: #802b38; font-weight: 700; }
+.planner-steps > * > span { font-family: Georgia, serif; font-size: 1rem; }
+.planner-guide { background: #ece8dd; border-radius: 1rem; color: #564d45; border: 1px solid #ddd5c8; }
+.planner-guide-number { color: #856c45; font-family: Georgia, serif; letter-spacing: .2em; margin-bottom: 1.25rem; }
+.planner-guide-list { margin-top: 2rem; width: 100%; }
+.planner-guide-list li { display: flex; gap: 1rem; border-top: 1px solid #d6cebf; padding: 1rem 0; }
+.planner-guide-list b { color: #8b2e3a; font-family: Georgia, serif; }
+.planner-guide-list strong { font-size: .9rem; }
+.planner-guide-list p { font-size: .8125rem; margin-top: .35rem; line-height: 1.7; }
+.planner-guide-footnote { border-top: 1px solid #d6cebf; padding-top: 1rem; font-size: .8125rem; line-height: 1.8; }
+.planner-context { font-size: .8125rem; line-height: 1.7; color: #62564d; }
+.planner-choice { padding: .7rem; border-width: 1px; gap: .65rem; }
+.planner-choice-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.planner-choice > span:first-of-type { display: none; }
+.planner-choice > span:last-child { width: 1rem; height: 1rem; }
+.planner-choice p { line-height: 1.6; }
+.planner-form label { margin-bottom: .5rem; }
+.planner-generate { background: #8b2e3a; box-shadow: none; }
+.planner-check { background: #f3eee4; border-block: 1px solid #ded4c4; color: #554b43; }
+.planner-primary, .planner-secondary { min-height: 44px; border-radius: .65rem; padding: .65rem 1rem; display: inline-flex; align-items: center; justify-content: center; font-size: .875rem; font-weight: 600; }
+.planner-primary { background: #8b2e3a; color: white; }
+.planner-secondary { border: 1px solid #c9bfb1; background: #fff; color: #5d493f; }
+.planner-notice { padding: 1rem; background: #fff5df; border: 1px solid #d9bc78; border-radius: .75rem; color: #6c4e1b; font-size: .875rem; line-height: 1.7; margin-bottom: 1rem; }
+.route-planner-page :is(button, a, input):focus-visible { outline: 3px solid #2d5f8a; outline-offset: 3px; }
+.route-planner-page button:disabled { cursor: not-allowed; opacity: .55; }
+.route-planner-page :is([id^="planner-"], h2, h3, h4) { scroll-margin-top: 7rem; }
+.route-planner-page :deep([class*="text-tibet-brown/"]) { color: #716257; }
+.route-planner-page .glass-card { border: 1px solid #e1d9cd; border-radius: 1rem; box-shadow: 0 4px 18px #33291f05; }
+@media (max-width: 1023px) {
+  .planner-columns { display: flex; flex-direction: column; }
+  .planner-columns > * { width: 100%; }
+}
+@media (max-width: 639px) {
+  .planner-review-section { padding: 0; }
+  .planner-review-section :deep(.route-review) { border: 0; border-radius: 0; }
+  .planner-heading { display: block; margin-bottom: 1.25rem; }
+  .planner-back { display: inline-flex; margin-top: .5rem; }
+  .planner-steps > * { padding: .85rem .25rem; gap: .3rem; font-size: .75rem; }
+  .planner-choice { align-items: flex-start; }
+  .planner-guide { padding: 1.25rem; }
+  .planner-intro { font-size: .875rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .route-planner-page * { scroll-behavior: auto !important; }
+}
 /* ===== Animations ===== */
 .animate-shimmer-stream::after {
   content: '';

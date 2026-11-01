@@ -1,0 +1,28 @@
+{
+  "plannerReview": {
+    "title": "调整想法，逐项核对",
+    "localNotice": "备注仅在当前页面会话中保留，导出时可一并带走；不会更改原行程或保存到云端。刷新或关闭页面前请先导出。",
+    "hasNote": "有调整备注",
+    "noteLabel": "这一天想怎么调整？",
+    "notePlaceholder": "例如：下午减少一个景点，给高原适应留出休息时间。",
+    "noteCount": "{count} / 600 字",
+    "jump": "查看原安排",
+    "jumpAria": "查看{day}的原安排",
+    "clearDayAria": "清空{day}的调整备注",
+    "clearNote": "清空备注",
+    "noDays": "暂未识别出每日安排。请先阅读路线全文，再核对下面的待办事项。",
+    "clearedDay": "已清空{day}的备注。",
+    "undo": "撤销清空",
+    "clearTitle": "清空这一天的备注？",
+    "clearMessage": "将清空{day}的调整备注。原行程不受影响，清空后可立即撤销。",
+    "keepNote": "保留备注",
+    "checklistTitle": "出发前，还需要自己确认",
+    "checklistNotice": "以下仅是个人核对清单。勾选不代表平台已核验价格、库存、开放情况或健康风险。",
+    "checklist": {
+      "budget": "向供应方核对实际价格、人数、房型、税费及退改规则。",
+      "availability": "确认出行日期的门票与住宿库存、景区开放时间及所需证件。",
+      "highland": "根据自身状况安排高原适应、交通与休息；需要时咨询专业人士。"
+    },
+    "checklistProgress": "个人已勾选 {count} / {total} 项 · 未经平台核验"
+  }
+}

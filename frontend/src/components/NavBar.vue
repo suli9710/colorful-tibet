@@ -13,6 +13,9 @@ const { t, locale } = useI18n()
 const auth = useAuthStore()
 const isOpen = ref(false)
 const isScrolled = ref(false)
+const navShell = ref<HTMLElement | null>(null)
+const compactNav = ref(window.innerWidth < 1280)
+let navResizeObserver: ResizeObserver | undefined
 const menuButton = ref<HTMLButtonElement | null>(null)
 const mobileMenuPanel = ref<HTMLElement | null>(null)
 let ticking = false
@@ -109,12 +112,18 @@ watch(() => route.fullPath, () => {
 })
 
 onMounted(() => {
+  navResizeObserver = new ResizeObserver(entries => {
+    compactNav.value = (entries[0]?.contentRect.width ?? 0) < 1200
+    if (!compactNav.value) closeMobileMenu()
+  })
+  if (navShell.value) navResizeObserver.observe(navShell.value)
   updateScrolledState()
   window.addEventListener('scroll', handleScroll, { passive: true })
   window.addEventListener('keydown', handleGlobalKeydown)
 })
 
 onUnmounted(() => {
+  navResizeObserver?.disconnect()
   window.removeEventListener('scroll', handleScroll)
   window.removeEventListener('keydown', handleGlobalKeydown)
   syncBodyScrollLock(false)
@@ -131,7 +140,7 @@ const currentUserInitial = computed(() => currentUserLabel.value.charAt(0).toUpp
 const navItems = computed<NavItem[]>(() => [
   { path: '/', label: t('common.home'), matchPaths: ['/'] },
   { path: '/spots', label: t('common.spots'), matchPaths: ['/spots'] },
-  { path: '/route-planner', label: t('common.routePlanner'), matchPaths: ['/route-planner', '/route'] },
+  { path: '/route-planner', label: t('common.planTrip'), matchPaths: ['/route-planner', '/route'] },
   { path: '/community', label: t('common.community'), matchPaths: ['/community', '/create-route'] },
   { path: '/hotels', label: t('common.hotels'), matchPaths: ['/hotels', '/hotel-booking'] },
   { path: '/heritage', label: t('common.heritage'), matchPaths: ['/heritage'] },
@@ -168,6 +177,7 @@ const logout = async () => {
 <template>
   <div class="nav-safe-frame fixed top-0 left-0 w-full z-50 flex justify-center px-3 sm:px-4 pointer-events-none">
     <nav
+      ref="navShell"
       class="pointer-events-auto rounded-[1.35rem] sm:rounded-full border px-3 sm:px-6 tibet-nav-shell nav-shell-optimized"
       :class="isScrolled ? 'nav-shell-scrolled' : 'nav-shell-top'"
       :aria-label="t('mobileNav.ariaLabel')"
@@ -176,18 +186,18 @@ const logout = async () => {
         <div class="flex-shrink-0 flex items-center">
           <router-link to="/" class="flex min-w-0 items-center space-x-2 rounded-full group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tibet-gold/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white/80">
             <span class="tibet-brand-sigil flex-shrink-0"></span>
-            <span class="max-w-[12rem] truncate text-[1.05rem] font-bold bg-clip-text text-transparent bg-gradient-to-r from-tibet-yellow via-tibet-gold to-tibet-red sm:max-w-none sm:text-2xl tibetan-font"
+            <span class="max-w-[12rem] truncate text-[1.05rem] font-bold text-tibet-red sm:text-2xl tibetan-font"
               :class="isScrolled ? 'opacity-100' : 'opacity-90'">
               {{ t('common.brandName') }}
             </span>
           </router-link>
         </div>
 
-        <div class="hidden md:flex items-center space-x-1">
+        <div v-show="!compactNav" class="flex items-center space-x-1">
           <router-link v-for="item in navItems" :key="item.path" :to="item.path" custom v-slot="{ href, navigate }">
             <a
               :href="href"
-              class="relative px-4 py-2 rounded-full text-sm font-medium text-tibet-brown/80 hover:text-tibet-dark transition-all duration-300 ease-out-expo group will-change-transform hover:-translate-y-0.5 hover:scale-[1.03] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tibet-gold/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white/80"
+              class="relative px-2.5 py-2 rounded-full text-sm font-medium text-tibet-brown/80 hover:text-tibet-dark transition-all duration-300 ease-out-expo group will-change-transform hover:-translate-y-0.5 hover:scale-[1.03] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tibet-gold/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white/80"
               :class="isNavItemActive(item) ? 'text-tibet-red' : ''"
               :aria-current="isNavItemActive(item) ? 'page' : undefined"
               @click="navigate"
@@ -204,7 +214,7 @@ const logout = async () => {
           <router-link v-if="auth.user && auth.user.role === 'ADMIN'" to="/admin" custom v-slot="{ href, navigate }">
             <a
               :href="href"
-              class="relative px-4 py-2 rounded-full text-sm font-medium text-tibet-brown/80 hover:text-tibet-dark transition-all duration-200 hover:-translate-y-0.5 hover:scale-[1.03] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tibet-gold/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white/80"
+              class="relative px-2.5 py-2 rounded-full text-sm font-medium text-tibet-brown/80 hover:text-tibet-dark transition-all duration-200 hover:-translate-y-0.5 hover:scale-[1.03] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tibet-gold/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white/80"
               :class="isAdminActive ? 'text-tibet-red' : ''"
               :aria-current="isAdminActive ? 'page' : undefined"
               @click="navigate"
@@ -218,7 +228,7 @@ const logout = async () => {
           </router-link>
         </div>
 
-        <div class="hidden md:flex items-center space-x-2 mr-4">
+        <div v-show="!compactNav" class="flex items-center space-x-2 mr-4">
           <button
             type="button"
             @click="switchLanguage('zh')"
@@ -245,7 +255,7 @@ const logout = async () => {
           </button>
         </div>
 
-        <div class="hidden md:flex items-center space-x-4">
+        <div v-show="!compactNav" class="flex items-center space-x-4">
           <div v-if="auth.user" class="flex items-center space-x-3 bg-white/50 backdrop-blur-sm px-4 py-1.5 rounded-full border border-white/20 shadow-sm">
             <img
               v-if="currentUserAvatar"
@@ -256,7 +266,7 @@ const logout = async () => {
             <span v-else class="flex h-7 w-7 items-center justify-center rounded-full bg-tibet-red text-xs font-bold text-tibet-yellow">
               {{ currentUserInitial }}
             </span>
-            <span class="text-sm font-medium text-tibet-dark/80">{{ currentUserLabel }}</span>
+            <span class="max-w-24 truncate text-sm font-medium text-tibet-dark/80" :title="currentUserLabel">{{ currentUserLabel }}</span>
             <button type="button" @click="logout" class="rounded-full text-tibet-brown/70 hover:text-red-500 transition-transform hover:-rotate-6 hover:scale-110 active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tibet-gold/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white/80" :aria-label="t('common.logout')" :title="t('common.logout')">
               <LogOut class="w-4 h-4" aria-hidden="true" />
             </button>
@@ -271,7 +281,7 @@ const logout = async () => {
           </div>
         </div>
 
-        <div class="flex items-center md:hidden">
+        <div v-show="compactNav" class="flex items-center">
           <button
             ref="menuButton"
             type="button"
@@ -293,7 +303,7 @@ const logout = async () => {
   <button
       v-if="isOpen"
       type="button"
-      class="fixed inset-0 z-30 cursor-default bg-tibet-dark/10 backdrop-blur-[1px] md:hidden"
+      class="fixed inset-0 z-30 cursor-default bg-tibet-dark/10 backdrop-blur-[1px]"
       aria-hidden="true"
       tabindex="-1"
       @click="closeMobileMenu()"
@@ -304,7 +314,7 @@ const logout = async () => {
       ref="mobileMenuPanel"
       id="mobile-primary-menu"
       key="mobile-nav"
-      class="mobile-menu-panel fixed z-40 origin-top overflow-y-auto overscroll-contain rounded-3xl border border-white/20 shadow-2xl md:hidden glass animate-fade-in"
+      class="mobile-menu-panel fixed z-40 origin-top overflow-y-auto overscroll-contain rounded-3xl border border-white/20 shadow-2xl glass animate-fade-in"
       tabindex="-1"
       :aria-label="t('mobileNav.ariaLabel')"
       @keydown.tab="handleMobileMenuTab"
@@ -418,20 +428,32 @@ const logout = async () => {
 }
 
 .nav-shell-top {
-  padding-top: 1rem;
-  padding-bottom: 1rem;
-  background-color: rgba(247, 243, 238, 0.5);
-  border-color: rgba(197, 150, 75, 0.08);
+  padding-top: 0.625rem;
+  padding-bottom: 0.625rem;
+  background-color: #fffdf9;
+  border-color: #ded6cb;
   box-shadow: none;
 }
 
 .nav-shell-scrolled {
-  width: min(100%, 1024px);
+  width: min(100%, 1280px);
   padding-top: 0.625rem;
   padding-bottom: 0.625rem;
-  background-color: rgba(247, 243, 238, 0.92);
+  background-color: #fffdf9;
   border-color: rgba(197, 150, 75, 0.24);
   box-shadow: 0 4px 22px rgba(139, 46, 58, 0.1);
+}
+
+.nav-shell-optimized a,
+.nav-shell-optimized button {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nav-shell-optimized button {
+  min-width: 44px;
 }
 
 .mobile-menu-panel {

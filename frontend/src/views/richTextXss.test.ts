@@ -301,7 +301,8 @@ describe('rich text XSS safeguards', () => {
   it('keeps route planner worker HTML sanitized before assigning it to v-html content', () => {
     expect(routePlannerSource).toContain('renderedResult.value = sanitizeHtml(html)')
     expect(routePlannerSource).toContain('renderMarkdownToSafeHtml(markdown)')
-    expect(routePlannerSource.match(/v-html="renderedResult"/g)?.length).toBe(2)
+    // The responsive reader now uses one sanitized HTML sink for every viewport.
+    expect(routePlannerSource.match(/v-html="renderedResult"/g)?.length).toBe(1)
 
     const workerHtml = `
       <p onclick="alert(1)">Generated route</p>

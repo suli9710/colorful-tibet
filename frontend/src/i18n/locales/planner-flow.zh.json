@@ -1,0 +1,53 @@
+{
+  "plannerFlow": {
+    "eyebrow": "七彩西藏 · 旅行手册",
+    "title": "把向往，安排成旅程",
+    "intro": "选好偏好，逐日梳理，再带着确认过的计划出发。",
+    "browse": "先看看目的地",
+    "stepsLabel": "行程规划步骤",
+    "stepPreferences": "选择偏好",
+    "stepReview": "逐日调整",
+    "stepCheck": "核对与保存",
+    "preferencesTitle": "这次，想怎样旅行？",
+    "destination": "目的地：西藏 · 地区由系统按偏好推荐",
+    "scope": "先选天数、预算档位和兴趣。生成需要登录，偏好在本次浏览会话内保留。",
+    "guideTitle": "一份行程，从你的偏好开始",
+    "guideDesc": "还没有想好？选一个灵感组合，再按自己的节奏调整。",
+    "guideOne": "设定旅行节奏与预算档位。",
+    "guideTwo": "阅读每日安排，写下自己的调整备注。",
+    "guideThree": "核对费用、开放与预订信息，保存原行程或导出附备注版本。",
+    "priceBoundary": "费用均为参考估算，不代表实时价格、库存或可订承诺。酒店与门票需在提供方核实日期、价格和余量；外部链接不等于已预订。",
+    "saveBoundary": "保存仅收藏云端原行程；每日备注请导出留存。现有结构行程预算默认按 2 人估算，不含已确认的订单。",
+    "checkTitle": "核对与保存",
+    "saved": "已保存原行程",
+    "exportReview": "导出行程与备注",
+    "backPreferences": "返回调整偏好",
+    "offline": "当前离线。已显示内容仍可查看，联网后可继续生成或保存；每日备注请及时导出。",
+    "longTrip": "16–30 天仅生成文字行程；每日结构行程和费用明细支持最多 15 天。你仍可阅读、保存和导出文字行程。",
+    "amountPending": "待获取",
+    "actionFailed": "本次操作未完成",
+    "progressUnknown": "正在等待服务返回，完成时间暂无法确定。",
+    "detailsFailed": "每日明细或参考费用暂未完整获取，文字行程仍可查看。请重试明细，不必重新生成全文。",
+    "retryDetails": "重试每日明细",
+    "kitFailed": "出行提醒暂未获取，请勿将空白视为没有风险。",
+    "retryKit": "重试出行提醒",
+    "replaceTitle": "重新生成行程？",
+    "replaceMessage": "当前展示的行程与本页调整备注将被替换。请先导出需要保留的内容；已保存的云端行程不受影响。",
+    "keepCurrent": "保留当前行程",
+    "notesTitle": "我的每日调整备注",
+    "notesBoundary": "以下为用户自行填写的备注，不代表原行程、费用或预订已变更。",
+    "waitingResponse": "等待行程服务返回",
+    "elapsed": "已等待 {seconds} 秒，服务完成时间暂无法确定。",
+    "referenceTotal": "参考总预算 · 结构行程按 2 人估算",
+    "viewDetails": "查看每日明细与费用"
+  },
+  "home": {
+    "planTrip": "规划我的行程"
+  },
+  "common": {
+    "planTrip": "行程规划"
+  },
+  "mobileNav": {
+    "plan": "行程"
+  }
+}

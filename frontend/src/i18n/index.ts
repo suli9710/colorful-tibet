@@ -1,5 +1,7 @@
 import { createI18n } from 'vue-i18n'
 import zh from './locales/zh.json'
+import plannerFlowZh from './locales/planner-flow.zh.json'
+import plannerReviewZh from './locales/planner-review.zh.json'
 import heritageContentZh from './locales/heritage-content.zh.json'
 import extraZh from './locales/extra.zh.json'
 import securityZh from './locales/security.zh.json'
@@ -40,7 +42,7 @@ export const initialLocale = normalizeLocale(readBrowserStorage('localStorage', 
 
 const zhMessages = mergeMessages(
   mergeMessages(mergeMessages(zh, heritageContentZh), extraZh),
-  securityZh
+  mergeMessages(mergeMessages(securityZh, plannerFlowZh), plannerReviewZh)
 )
 
 const i18n = createI18n({
