@@ -63,7 +63,7 @@ const createTestI18n = () => createI18n({
       },
       footer: {
         phone: '123-456',
-        email: 'hello@example.test',
+        email: "hello{'@'}example.test",
         addressLine1: 'Lhasa',
         addressLine2: 'Tibet'
       },
