@@ -53,9 +53,9 @@
 
 | 项目 | 结果与实际范围 |
 | --- | --- |
-| `frontend: npm run check` | 通过：TypeScript、57个测试文件/387项测试、生产构建。[日志](verification/ui-flow/frontend-check.log) |
+| `frontend: npm run check` | 通过：TypeScript、57个测试文件/387项测试、生产构建。[日志](verification/ui-flow/frontend-check.txt) |
 | `backend: mvn -q test` | 退出码0；1674项，失败0、错误0、跳过7。默认真实MySQL上下文测试未启用。没有为本轮修改后端测试门槛 |
-| 生产构建 Chromium 回归 | 8项通过。包括原轮播/藏文切换、备注/取消/撤销/导出/保存/往返/取消刷新、重复生成、报价重试、离线、偏好刷新、旧响应隔离及多尺寸布局。[日志](verification/ui-flow/browser-production-check.log) |
+| 生产构建 Chromium 回归 | 8项通过。包括原轮播/藏文切换、备注/取消/撤销/导出/保存/往返/取消刷新、重复生成、报价重试、离线、偏好刷新、旧响应隔离及多尺寸布局。[日志](verification/ui-flow/browser-production-check.txt) |
 | 键盘 | 偏好控件、每日原安排、平板菜单Tab/Esc与焦点恢复已检查；固定操作条的滚动避让已修正 |
 | 对比度 | 10组主要颜色数学检查通过对应4.5:1或3:1要求。[数据](verification/ui-flow/contrast.json)。不等于所有旧页面、图片背景和状态完成WCAG认证 |
 | 性能 | 生产构建通过；未找到现有数值型页面性能门禁，未降低或新增“临时通过”阈值。[测量方法与数据](verification/ui-flow/performance.json)。单次本机无节流采样、访客空API响应，非真实后端性能或现场p75/INP |
@@ -74,6 +74,6 @@
 
 ## 推送前独立检出核验
 
-上表387项前端测试、8项浏览器测试及后端测试是实现阶段完整工作区的验证记录。推送时将本轮UI变更从此前未提交工作中隔离，并用Git索引导出一份独立源码，按其原有package-lock执行npm ci；独立提交的检查结果另见[推送核验记录](verification/ui-flow/push-verification.log)。独立提交不包含此前的轮播暂停用例，因此浏览器用例数量比完整工作区少1项。
+上表387项前端测试、8项浏览器测试及后端测试是实现阶段完整工作区的验证记录。推送时将本轮UI变更从此前未提交工作中隔离，并用Git索引导出一份独立源码，按其原有package-lock执行npm ci；独立提交的检查结果另见[推送核验记录](verification/ui-flow/push-verification.txt)。独立提交不包含此前的轮播暂停用例，因此浏览器用例数量比完整工作区少1项。
 
 独立提交核验结果：TypeScript通过，56个测试文件/380项前端测试通过，生产构建通过，7项生产构建浏览器回归通过。此前未提交工作的相关测试仍在本地，未删除或降低标准。
