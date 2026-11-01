@@ -2715,7 +2715,7 @@ export interface components {
         };
         SseEmitter: {
             /** Format: int64 */
-            timeout?: number | null;
+            timeout?: number;
         };
         PaymentCallbackRequest: {
             orderNo: string;

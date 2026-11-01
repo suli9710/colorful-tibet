@@ -28,7 +28,7 @@ spring:
       idle-timeout: 600000
       max-lifetime: 1800000
   jpa:
-    database-platform: org.hibernate.dialect.MySQL8Dialect
+    database-platform: org.hibernate.dialect.MySQLDialect
     hibernate:
       ddl-auto: validate
     show-sql: false
@@ -88,9 +88,9 @@ management:
   tracing:
     sampling:
       probability: ${TRACING_SAMPLING_PROBABILITY:0.1}
-  zipkin:
-    tracing:
-      endpoint: ${ZIPKIN_ENDPOINT:http://zipkin:9411/api/v2/spans}
+    export:
+      zipkin:
+        endpoint: ${ZIPKIN_ENDPOINT:http://zipkin:9411/api/v2/spans}
 
 # AI API 配置，ARK_* 优先，兼容旧的 DOUBAO_* 环境变量
 ark:

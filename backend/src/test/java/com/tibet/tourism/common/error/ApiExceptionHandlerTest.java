@@ -24,6 +24,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.mock.http.MockHttpInputMessage;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -104,7 +105,7 @@ class ApiExceptionHandlerTest {
     @Test
     void handlesMalformedJsonAsBadRequestWithoutErrorLog() {
         ResponseEntity<Map<String, String>> response = handler.handleUnreadableMessage(
-                new HttpMessageNotReadableException("JSON parse error"));
+                new HttpMessageNotReadableException("JSON parse error", new MockHttpInputMessage(new byte[0])));
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody()).containsEntry("error", "Invalid request");

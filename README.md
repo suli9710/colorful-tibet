@@ -18,7 +18,7 @@
 后端：
 
 - Java 17
-- Spring Boot 3.5.12
+- Spring Boot 4.0.9（Java 17；迁移说明见 [框架维护](docs/framework-maintenance.md)）
 - Spring Security + JWT
 - Spring Data JPA
 - Flyway

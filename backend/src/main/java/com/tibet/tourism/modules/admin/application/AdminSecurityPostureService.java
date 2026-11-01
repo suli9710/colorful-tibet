@@ -14,9 +14,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.actuate.health.HealthComponent;
-import org.springframework.boot.actuate.health.HealthEndpoint;
-import org.springframework.boot.actuate.health.Status;
+import org.springframework.boot.health.actuate.endpoint.HealthDescriptor;
+import org.springframework.boot.health.actuate.endpoint.HealthEndpoint;
+import org.springframework.boot.health.contributor.Status;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -288,7 +288,7 @@ public class AdminSecurityPostureService {
 
     private String resolveHealthComponent(String name) {
         try {
-            HealthComponent component = healthEndpoint.healthForPath(name);
+            HealthDescriptor component = healthEndpoint.healthForPath(name);
             if (component == null) {
                 return "UNKNOWN";
             }

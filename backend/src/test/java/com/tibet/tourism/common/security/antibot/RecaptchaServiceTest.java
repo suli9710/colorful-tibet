@@ -3,6 +3,7 @@ package com.tibet.tourism.common.security.antibot;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.tibet.tourism.common.config.WebMvcConfig;
 import com.tibet.tourism.common.security.OutboundUrlValidator;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
@@ -17,12 +18,18 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.codec.json.Jackson2JsonDecoder;
 import org.springframework.web.reactive.function.client.ClientResponse;
+import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
 class RecaptchaServiceTest {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    // A synthetic ClientResponse owns its codecs independently of the WebClient builder.
+    private static final ExchangeStrategies RESPONSE_STRATEGIES = ExchangeStrategies.builder()
+            .codecs(codecs -> codecs.defaultCodecs().jackson2JsonDecoder(new Jackson2JsonDecoder(OBJECT_MAPPER)))
+            .build();
 
     @Test
     void v2SuccessWithoutScoreCountsAsVerified() {
@@ -81,7 +88,7 @@ class RecaptchaServiceTest {
             String verifyUrl = "http://127.0.0.1:" + server.getAddress().getPort() + "/recaptcha/api/siteverify";
             AntibotProperties properties = enabledProperties("form-secret value+&=", verifyUrl);
             RecaptchaService service = new RecaptchaService(
-                    properties, WebClient.builder(), new OutboundUrlValidator());
+                    properties, new WebMvcConfig().webClientBuilder(OBJECT_MAPPER), new OutboundUrlValidator());
 
             OptionalDouble result = service.verify("token value+&=", "203.0.113.10");
 
@@ -126,7 +133,7 @@ class RecaptchaServiceTest {
                 "https://www.recaptcha.net/recaptcha/api/siteverify");
 
         WebClient.Builder builder = WebClient.builder().exchangeFunction(request ->
-                Mono.just(ClientResponse.create(HttpStatus.OK)
+                Mono.just(ClientResponse.create(HttpStatus.OK, RESPONSE_STRATEGIES)
                         .header(HttpHeaders.CONTENT_TYPE, "application/json")
                         .body(body)
                         .build()));

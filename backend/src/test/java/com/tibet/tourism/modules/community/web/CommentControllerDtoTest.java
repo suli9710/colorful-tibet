@@ -29,9 +29,9 @@ import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -46,28 +46,28 @@ class CommentControllerDtoTest {
     @Autowired
     private MockMvc mockMvc;
 
-    @MockBean
+    @MockitoBean
     private CommentRepository commentRepository;
 
-    @MockBean
+    @MockitoBean
     private ScenicSpotRepository spotRepository;
 
-    @MockBean
+    @MockitoBean
     private CommentLikeRepository commentLikeRepository;
 
-    @MockBean
+    @MockitoBean
     private FileStorageService fileStorageService;
 
-    @MockBean
+    @MockitoBean
     private JwtAuthSupport jwtAuthSupport;
 
-    @MockBean
+    @MockitoBean
     private JwtUtils jwtUtils;
 
-    @MockBean
+    @MockitoBean
     private CsrfTokenService csrfTokenService;
 
-    @MockBean
+    @MockitoBean
     private TrustedProxyIpResolver trustedProxyIpResolver;
 
     @Test

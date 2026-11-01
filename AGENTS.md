@@ -1,7 +1,7 @@
 # Project Instructions
 
 ## Tech Stack
-- Backend: Spring Boot 3.5.12, Java 17, Spring Security JWT, Spring Data JPA, Redis cache, MySQL.
+- Backend: Spring Boot 4.0.9, Java 17, Spring Security JWT, Spring Data JPA, Redis cache, MySQL. `backend/pom.xml` is the version source of truth; see `docs/framework-maintenance.md`.
 - Frontend: Vue 3, Vite 8, TypeScript, Pinia, Vue Router, vue-i18n, Tailwind CSS.
 - Deployment: Docker Compose with separate backend, frontend, and Redis services.
 
