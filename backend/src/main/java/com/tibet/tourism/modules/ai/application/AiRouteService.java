@@ -154,6 +154,14 @@ public class AiRouteService {
         default void onDone(String content) {
         }
 
+        /**
+         * Signals that the upstream model produced nothing usable and the canned local itinerary is
+         * being emitted instead. Callers that cache or bill for the result must not treat it as a real
+         * generation.
+         */
+        default void onFallback() {
+        }
+
         default void onError(String message) {
         }
     }
@@ -501,6 +509,7 @@ public class AiRouteService {
     private String emitFallbackRoute(RouteStreamListener listener, int days, String budgetLabel,
                                      String preferenceLabel, boolean replaceExistingContent) {
         String fallbackContent = buildFallbackMarkdown(days, budgetLabel, preferenceLabel);
+        listener.onFallback();
         if (replaceExistingContent) {
             listener.onReplace(fallbackContent);
         } else {

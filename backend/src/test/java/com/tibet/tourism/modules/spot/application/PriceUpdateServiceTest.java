@@ -3,6 +3,7 @@ package com.tibet.tourism.modules.spot.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -44,27 +45,42 @@ class PriceUpdateServiceTest {
     @Mock
     private SpotPriceObservationRepository priceObservationRepository;
 
+    @Mock
+    private PriceUpdatePersistenceService priceUpdatePersistenceService;
+
     private PriceUpdateService service;
-    private SingleSpotPriceUpdateService transactionalService;
+    private SingleSpotPriceUpdateService fetchService;
+    private PriceUpdatePersistenceService persistenceService;
 
     @BeforeEach
     void setUp() {
         service = new PriceUpdateService(scenicSpotRepository, singleSpotPriceUpdateService, Runnable::run);
-        transactionalService = new SingleSpotPriceUpdateService(
+        fetchService = new SingleSpotPriceUpdateService(
                 scenicSpotRepository,
                 priceFetchService,
+                priceUpdatePersistenceService);
+        persistenceService = new PriceUpdatePersistenceService(
+                scenicSpotRepository,
                 priceObservationRepository);
         ReflectionTestUtils.setField(service, "maxBatchSpots", 1000);
     }
 
     @Test
-    void singleSpotUpdaterUsesIndependentTransaction() throws Exception {
-        Method method = SingleSpotPriceUpdateService.class.getMethod("updateSpotPrice", Long.class, boolean.class);
+    void externalFetchIsOutsideTransactionAndPersistenceUsesIndependentShortTransactions() throws Exception {
+        Method fetchMethod = SingleSpotPriceUpdateService.class.getMethod("updateSpotPrice", Long.class, boolean.class);
+        Method publishMethod = PriceUpdatePersistenceService.class.getMethod(
+                "publishFetchedPrice", Long.class, boolean.class, PriceInfo.class);
+        Method reviewMethod = PriceUpdatePersistenceService.class.getMethod(
+                "saveReviewObservation", Long.class, PriceInfo.class);
 
-        Transactional transactional = method.getAnnotation(Transactional.class);
+        Transactional publishTransaction = publishMethod.getAnnotation(Transactional.class);
+        Transactional reviewTransaction = reviewMethod.getAnnotation(Transactional.class);
 
-        assertThat(transactional).isNotNull();
-        assertThat(transactional.propagation()).isEqualTo(Propagation.REQUIRES_NEW);
+        assertThat(fetchMethod.getAnnotation(Transactional.class)).isNull();
+        assertThat(publishTransaction).isNotNull();
+        assertThat(publishTransaction.propagation()).isEqualTo(Propagation.REQUIRES_NEW);
+        assertThat(reviewTransaction).isNotNull();
+        assertThat(reviewTransaction.propagation()).isEqualTo(Propagation.REQUIRES_NEW);
     }
 
     @Test
@@ -81,24 +97,14 @@ class PriceUpdateServiceTest {
         when(priceFetchService.fetchPrice(spot)).thenReturn(priceInfo);
         when(priceFetchService.isPublishablePrice(priceInfo)).thenReturn(false);
 
-        PriceUpdateService.PriceUpdateResult result = transactionalService.updateSpotPrice(1L, true);
+        PriceUpdateService.PriceUpdateResult result = fetchService.updateSpotPrice(1L, true);
 
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getMessage()).contains("SKIPPED_REFERENCE_PRICE");
         assertThat(result.getPriceInfo()).isSameAs(priceInfo);
         assertThat(spot.getTicketPrice()).isNull();
-        verify(scenicSpotRepository, never()).save(any(ScenicSpot.class));
-
-        ArgumentCaptor<SpotPriceObservation> observationCaptor =
-                ArgumentCaptor.forClass(SpotPriceObservation.class);
-        verify(priceObservationRepository).save(observationCaptor.capture());
-        SpotPriceObservation observation = observationCaptor.getValue();
-        assertThat(observation.getSpot()).isSameAs(spot);
-        assertThat(observation.getBasePrice()).isEqualByComparingTo("200.00");
-        assertThat(observation.isReferenceOnly()).isTrue();
-        assertThat(observation.isPublishable()).isFalse();
-        assertThat(observation.getStatus()).isEqualTo(SpotPriceObservation.Status.REVIEW_REQUIRED);
-        assertThat(observation.getReviewReason()).contains("Reference-only");
+        verify(priceUpdatePersistenceService).saveReviewObservation(1L, priceInfo);
+        verify(priceUpdatePersistenceService, never()).publishFetchedPrice(any(), anyBoolean(), any());
     }
 
     @Test
@@ -113,21 +119,79 @@ class PriceUpdateServiceTest {
         when(scenicSpotRepository.findById(1L)).thenReturn(Optional.of(spot));
         when(priceFetchService.fetchPrice(spot)).thenReturn(priceInfo);
         when(priceFetchService.isPublishablePrice(priceInfo)).thenReturn(true);
+        when(priceUpdatePersistenceService.publishFetchedPrice(1L, true, priceInfo))
+                .thenReturn(new PriceUpdateService.PriceUpdateResult(true, "PRICE_UPDATED", priceInfo));
 
-        PriceUpdateService.PriceUpdateResult result = transactionalService.updateSpotPrice(1L, true);
+        PriceUpdateService.PriceUpdateResult result = fetchService.updateSpotPrice(1L, true);
 
         assertThat(result.isSuccess()).isTrue();
-        assertThat(spot.getTicketPrice()).isEqualByComparingTo("200.00");
-        verify(scenicSpotRepository).save(spot);
+        verify(priceUpdatePersistenceService).publishFetchedPrice(1L, true, priceInfo);
+    }
+
+    @Test
+    void persistenceReloadsAndLocksSpotAfterFetchBeforePublishing() {
+        ScenicSpot currentSpot = new ScenicSpot();
+        currentSpot.setId(1L);
+        currentSpot.setName("Potala Palace");
+
+        PriceInfo priceInfo = new PriceInfo(new BigDecimal("200.00"), "Scrapling verified");
+        priceInfo.setConfidence(0.95);
+
+        when(scenicSpotRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(currentSpot));
+
+        PriceUpdateService.PriceUpdateResult result =
+                persistenceService.publishFetchedPrice(1L, true, priceInfo);
+
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(currentSpot.getTicketPrice()).isEqualByComparingTo("200.00");
+        verify(scenicSpotRepository).findByIdForUpdate(1L);
+        verify(scenicSpotRepository).save(currentSpot);
 
         ArgumentCaptor<SpotPriceObservation> observationCaptor =
                 ArgumentCaptor.forClass(SpotPriceObservation.class);
         verify(priceObservationRepository).save(observationCaptor.capture());
         SpotPriceObservation observation = observationCaptor.getValue();
-        assertThat(observation.getSpot()).isSameAs(spot);
+        assertThat(observation.getSpot()).isSameAs(currentSpot);
         assertThat(observation.getSource()).isEqualTo("Scrapling verified");
         assertThat(observation.isPublishable()).isTrue();
         assertThat(observation.getStatus()).isEqualTo(SpotPriceObservation.Status.PUBLISHED);
+    }
+
+    @Test
+    void nonForcedPersistenceDoesNotOverwritePriceAddedDuringProviderCall() {
+        ScenicSpot currentSpot = new ScenicSpot();
+        currentSpot.setId(1L);
+        currentSpot.setTicketPrice(new BigDecimal("180.00"));
+        PriceInfo fetchedPrice = new PriceInfo(new BigDecimal("200.00"), "Provider");
+        when(scenicSpotRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(currentSpot));
+
+        PriceUpdateService.PriceUpdateResult result =
+                persistenceService.publishFetchedPrice(1L, false, fetchedPrice);
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getMessage()).contains(SingleSpotPriceUpdateService.SKIPPED_EXISTING_PRICE);
+        assertThat(currentSpot.getTicketPrice()).isEqualByComparingTo("180.00");
+        verify(scenicSpotRepository, never()).save(any(ScenicSpot.class));
+        verify(priceObservationRepository, never()).save(any(SpotPriceObservation.class));
+    }
+
+    @Test
+    void reviewObservationIsSavedInPersistenceTransaction() {
+        ScenicSpot currentSpot = new ScenicSpot();
+        currentSpot.setId(1L);
+        PriceInfo priceInfo = new PriceInfo(new BigDecimal("200.00"), "Reference provider");
+        priceInfo.setReferenceOnly(true);
+        when(scenicSpotRepository.findById(1L)).thenReturn(Optional.of(currentSpot));
+
+        persistenceService.saveReviewObservation(1L, priceInfo);
+
+        ArgumentCaptor<SpotPriceObservation> observationCaptor =
+                ArgumentCaptor.forClass(SpotPriceObservation.class);
+        verify(priceObservationRepository).save(observationCaptor.capture());
+        SpotPriceObservation observation = observationCaptor.getValue();
+        assertThat(observation.getSpot()).isSameAs(currentSpot);
+        assertThat(observation.isPublishable()).isFalse();
+        assertThat(observation.getStatus()).isEqualTo(SpotPriceObservation.Status.REVIEW_REQUIRED);
     }
 
     @Test
@@ -140,7 +204,7 @@ class PriceUpdateServiceTest {
         when(priceFetchService.fetchPrice(spot))
                 .thenThrow(new IllegalStateException("upstream save should roll back"));
 
-        assertThatThrownBy(() -> transactionalService.updateSpotPrice(2L, true))
+        assertThatThrownBy(() -> fetchService.updateSpotPrice(2L, true))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("upstream save should roll back");
 

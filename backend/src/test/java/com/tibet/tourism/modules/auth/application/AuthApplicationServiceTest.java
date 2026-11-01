@@ -3,8 +3,10 @@ package com.tibet.tourism.modules.auth.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -12,6 +14,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.tibet.tourism.common.logging.IpLocationService;
+import com.tibet.tourism.common.security.CacheKeyHasher;
 import com.tibet.tourism.common.security.CsrfTokenService;
 import com.tibet.tourism.common.security.JwtUtils;
 import com.tibet.tourism.common.security.LoginAttemptService;
@@ -28,6 +31,7 @@ import com.tibet.tourism.modules.user.infra.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.OptionalDouble;
 import java.util.Optional;
@@ -45,7 +49,10 @@ import org.springframework.mock.env.MockEnvironment;
 
 class AuthApplicationServiceTest {
 
-    private static final String TOTP_SECRET = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ";
+    private static final String BASE32_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+    private static final String TOTP_SECRET = randomCanonicalBase32Secret();
+    private static final String ADMIN_TOTP_SECRET = randomCanonicalBase32SecretDifferentFrom(TOTP_SECRET);
 
     private AuthenticationManager authenticationManager;
     private UserRepository userRepository;
@@ -69,7 +76,7 @@ class AuthApplicationServiceTest {
         passwordEncoder = mock(PasswordEncoder.class);
         ipLocationService = mock(IpLocationService.class);
         loginAttemptService = mock(LoginAttemptService.class);
-        totpService = new TotpService();
+        totpService = new TotpService((org.springframework.data.redis.core.StringRedisTemplate) null, new CacheKeyHasher("test-cache-key-hmac-secret"));
         recaptchaService = mock(RecaptchaService.class);
         antibotProperties = new AntibotProperties();
         httpRequest = mock(HttpServletRequest.class);
@@ -79,7 +86,9 @@ class AuthApplicationServiceTest {
                 .thenReturn(new LoginAttemptService.LoginAttemptDecision(true, false, "", 0, 0));
         when(loginAttemptService.recordFailure(anyString(), anyString()))
                 .thenReturn(new LoginAttemptService.LoginAttemptDecision(true, false, "", 0, 1));
-        when(jwtUtils.generateJwtToken(any(Authentication.class), anyLong())).thenReturn("jwt-token");
+        when(jwtUtils.generateJwtToken(
+                any(Authentication.class), anyLong(), anyBoolean(), anyString()))
+                .thenReturn("jwt-token");
         when(csrfTokenService.generateToken("jwt-token")).thenReturn("csrf-token");
         when(ipLocationService.getClientIpAddress(any(HttpServletRequest.class))).thenReturn("127.0.0.1");
         when(ipLocationService.getCityByIp("127.0.0.1")).thenReturn("拉萨");
@@ -154,7 +163,8 @@ class AuthApplicationServiceTest {
                 .hasMessageNotContaining("secret-token");
 
         verify(loginAttemptService, never()).recordFailure(anyString(), anyString());
-        verify(jwtUtils, never()).generateJwtToken(any(Authentication.class), anyLong());
+        verify(jwtUtils, never()).generateJwtToken(
+                any(Authentication.class), anyLong(), anyBoolean(), anyString());
     }
 
     @Test
@@ -173,7 +183,8 @@ class AuthApplicationServiceTest {
                 .isInstanceOf(AuthFailureException.class)
                 .hasMessageContaining("Invalid username or password");
 
-        verify(jwtUtils, never()).generateJwtToken(any(Authentication.class), anyLong());
+        verify(jwtUtils, never()).generateJwtToken(
+                any(Authentication.class), anyLong(), anyBoolean(), anyString());
     }
 
     @Test
@@ -205,17 +216,25 @@ class AuthApplicationServiceTest {
     }
 
     @Test
-    void regularAdminLoginDoesNotRequireSecondaryPassword() {
+    void regularAdminLoginRequiresItsConfiguredTotpCode() {
         User admin = user("admin", User.Role.ADMIN);
         stubAuthenticatedUser("admin", admin);
 
-        LoginResult result = service.login(loginRequest("admin", "admin-pass", ""), httpRequest);
+        assertThatThrownBy(() -> service.login(loginRequest("admin", "admin-pass", ""), httpRequest))
+                .isInstanceOf(SecondaryAuthRequiredException.class);
+
+        LoginResult result = service.login(adminLoginRequest("admin", "admin-pass"), httpRequest);
 
         assertThat(result.jwt()).isEqualTo("jwt-token");
         assertThat(result.user())
                 .doesNotContainKeys("id", "username", "nickname")
                 .containsEntry("role", User.Role.ADMIN)
                 .containsEntry("mustChangePassword", false);
+        verify(jwtUtils).generateJwtToken(
+                any(Authentication.class),
+                anyLong(),
+                eq(true),
+                argThat(binding -> binding != null && binding.matches("[0-9a-f]{32}")));
     }
 
     @Test
@@ -256,7 +275,7 @@ class AuthApplicationServiceTest {
                 .thenReturn(new LoginAttemptService.LoginAttemptDecision(true, true, "", 0, 8));
         when(recaptchaService.verify("valid-token", "127.0.0.1")).thenReturn(OptionalDouble.of(0.9));
 
-        LoginResult result = service.login(loginRequest("admin", "admin-pass", ""), httpRequest);
+        LoginResult result = service.login(adminLoginRequest("admin", "admin-pass"), httpRequest);
 
         assertThat(result.jwt()).isEqualTo("jwt-token");
         verify(loginAttemptService).reset("admin", "127.0.0.1");
@@ -273,9 +292,24 @@ class AuthApplicationServiceTest {
                 .thenReturn(new LoginAttemptService.LoginAttemptDecision(true, true, "", 0, 8));
         when(recaptchaService.verify(null, "127.0.0.1")).thenReturn(OptionalDouble.empty());
 
-        assertThatThrownBy(() -> service.login(loginRequest("admin", "admin-pass", ""), httpRequest))
+        assertThatThrownBy(() -> service.login(adminLoginRequest("admin", "admin-pass"), httpRequest))
                 .isInstanceOf(AuthForbiddenException.class)
                 .hasMessageContaining("Additional verification required");
+    }
+
+    @Test
+    void accountStepUpFailsClosedWhenRecaptchaIsNotConfigured() {
+        User admin = user("admin", User.Role.ADMIN);
+        stubAuthenticatedUser("admin", admin);
+        antibotProperties.setEnabled(false);
+        when(loginAttemptService.evaluate("admin", "127.0.0.1"))
+                .thenReturn(new LoginAttemptService.LoginAttemptDecision(true, true, "", 0, 8));
+
+        assertThatThrownBy(() -> service.login(adminLoginRequest("admin", "admin-pass"), httpRequest))
+                .isInstanceOf(AuthForbiddenException.class)
+                .hasMessageContaining("Additional verification required");
+
+        verify(recaptchaService, never()).verify(any(), any());
     }
 
     @Test
@@ -299,18 +333,14 @@ class AuthApplicationServiceTest {
 
     @Test
     void rejectsInvalidTotpSecretDuringStartup() {
-        service = serviceWithTotpSecret("not-a-valid-secret!");
-
-        assertThatThrownBy(service::validateSuperAdminConfiguration)
+        assertThatThrownBy(() -> serviceWithTotpSecret("not-a-valid-secret!"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("valid Base32");
     }
 
     @Test
     void rejectsShortTotpSecretDuringStartup() {
-        service = serviceWithTotpSecret("JBSWY3DPEHPK3PXP");
-
-        assertThatThrownBy(service::validateSuperAdminConfiguration)
+        assertThatThrownBy(() -> serviceWithTotpSecret("JBSWY3DPEHPK3PXP"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("128 bits");
     }
@@ -404,6 +434,14 @@ class AuthApplicationServiceTest {
     }
 
     private AuthApplicationService serviceWithTotpSecret(String totpSecret, boolean requireStrongSecrets) {
+        AdminMfaPolicy adminMfaPolicy = new AdminMfaPolicy(
+                totpService,
+                new CacheKeyHasher("test-cache-key-hmac-secret"),
+                "lzh",
+                totpSecret,
+                "admin=" + ADMIN_TOTP_SECRET,
+                requireStrongSecrets,
+                new MockEnvironment());
         return new AuthApplicationService(
                 authenticationManager,
                 userRepository,
@@ -412,11 +450,9 @@ class AuthApplicationServiceTest {
                 passwordEncoder,
                 ipLocationService,
                 loginAttemptService,
-                totpService,
+                adminMfaPolicy,
                 recaptchaService,
                 antibotProperties,
-                "lzh",
-                totpSecret,
                 requireStrongSecrets,
                 false,
                 new MockEnvironment());
@@ -451,5 +487,89 @@ class AuthApplicationServiceTest {
         request.setPassword(password);
         request.setSecondaryPassword(secondaryPassword);
         return request;
+    }
+
+    private LoginRequest adminLoginRequest(String username, String password) {
+        return loginRequest(
+                username,
+                password,
+                totpService.generateCodeForTime(ADMIN_TOTP_SECRET, Instant.now()));
+    }
+
+    private static String randomCanonicalBase32SecretDifferentFrom(String existingSecret) {
+        String candidate;
+        do {
+            candidate = randomCanonicalBase32Secret();
+        } while (candidate.equals(existingSecret));
+        return candidate;
+    }
+
+    private static String randomCanonicalBase32Secret() {
+        String candidate;
+        do {
+            candidate = encodeCanonicalBase32(randomBytes(20));
+        } while (!isSuitableProductionFixture(candidate));
+        return candidate;
+    }
+
+    private static byte[] randomBytes(int length) {
+        byte[] bytes = new byte[length];
+        SECURE_RANDOM.nextBytes(bytes);
+        return bytes;
+    }
+
+    private static String encodeCanonicalBase32(byte[] bytes) {
+        StringBuilder encoded = new StringBuilder(32);
+        int buffer = 0;
+        int bitsLeft = 0;
+        for (byte rawByte : bytes) {
+            buffer = (buffer << 8) | (rawByte & 0xff);
+            bitsLeft += 8;
+            while (bitsLeft >= 5) {
+                encoded.append(BASE32_ALPHABET.charAt((buffer >> (bitsLeft - 5)) & 31));
+                bitsLeft -= 5;
+                buffer &= (1 << bitsLeft) - 1;
+            }
+        }
+        if (bitsLeft > 0) {
+            encoded.append(BASE32_ALPHABET.charAt((buffer << (5 - bitsLeft)) & 31));
+        }
+        return encoded.toString();
+    }
+
+    private static boolean isSuitableProductionFixture(String candidate) {
+        if (candidate.chars().distinct().count() < 8
+                || candidate.equals("GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ")
+                || candidate.equals("JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP")
+                || candidate.equals("MZXW6YTBOJQXGZJAMZXXE3DEMF2GK3LQ")
+                || candidate.equals("NBSWY3DPEB3W64TMMQXG6ZRAMZXXE3DE")
+                || candidate.equals("MFRGGZDFMZTWQ2LKMFRGGZDFMZTWQ2LK")) {
+            return false;
+        }
+        for (int period = 1; period <= candidate.length() / 2; period++) {
+            if (candidate.length() % period != 0) {
+                continue;
+            }
+            boolean repeated = true;
+            for (int index = period; index < candidate.length(); index++) {
+                if (candidate.charAt(index) != candidate.charAt(index % period)) {
+                    repeated = false;
+                    break;
+                }
+            }
+            if (repeated) {
+                return false;
+            }
+        }
+        boolean ascending = true;
+        boolean descending = true;
+        for (int index = 1; index < candidate.length() && (ascending || descending); index++) {
+            int previous = BASE32_ALPHABET.indexOf(candidate.charAt(index - 1));
+            int current = BASE32_ALPHABET.indexOf(candidate.charAt(index));
+            ascending &= current == (previous + 1) % BASE32_ALPHABET.length();
+            descending &= current == (previous - 1 + BASE32_ALPHABET.length())
+                    % BASE32_ALPHABET.length();
+        }
+        return !ascending && !descending;
     }
 }

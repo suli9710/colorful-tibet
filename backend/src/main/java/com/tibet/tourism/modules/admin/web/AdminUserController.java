@@ -2,13 +2,16 @@ package com.tibet.tourism.modules.admin.web;
 
 import com.tibet.tourism.common.api.PageResponse;
 import com.tibet.tourism.common.security.LoginAttemptService;
+import com.tibet.tourism.common.validation.InputSanitizer;
 import com.tibet.tourism.modules.admin.application.AdminUserService;
+import com.tibet.tourism.modules.admin.application.AdminAuditLogService;
 import com.tibet.tourism.modules.upload.application.FileStorageService;
 import com.tibet.tourism.modules.user.domain.User;
 import com.tibet.tourism.modules.user.infra.UserRepository;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
@@ -34,22 +37,32 @@ public class AdminUserController {
     private final LoginAttemptService loginAttemptService;
     private final FileStorageService fileStorageService;
     private final AdminUserService adminUserService;
+    private final AdminAuditLogService auditLogService;
 
     public AdminUserController(UserRepository userRepository,
                                LoginAttemptService loginAttemptService,
                                FileStorageService fileStorageService,
-                               AdminUserService adminUserService) {
+                               AdminUserService adminUserService,
+                               AdminAuditLogService auditLogService) {
         this.userRepository = userRepository;
         this.loginAttemptService = loginAttemptService;
         this.fileStorageService = fileStorageService;
         this.adminUserService = adminUserService;
+        this.auditLogService = auditLogService;
     }
+
+    // Binding ?sort= straight into findAll lets a caller order by any entity property, including the
+    // password hash, which turns result ordering into a blind oracle over those values.
+    private static final Set<String> USER_SORT_FIELDS = Set.of("id", "username", "nickname", "role", "createdAt");
+    private static final Sort DEFAULT_USER_SORT = Sort.by(Sort.Direction.DESC, "createdAt");
 
     @GetMapping("/users")
     public ResponseEntity<PageResponse<AdminUserSummary>> getAllUsers(
             @PageableDefault(size = 50, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable,
             Authentication authentication) {
-        return ResponseEntity.ok(PageResponse.from(userRepository.findAll(pageable)
+        Pageable safePageable = InputSanitizer.sanitizePageable(
+                pageable, USER_SORT_FIELDS, DEFAULT_USER_SORT, 50, 200);
+        return ResponseEntity.ok(PageResponse.from(userRepository.findAll(safePageable)
                 .map(user -> AdminUserSummary.from(
                         user,
                         loginAttemptService,
@@ -130,6 +143,11 @@ public class AdminUserController {
 
     @PostMapping("/upload-image")
     public ResponseEntity<?> uploadImage(@RequestParam("file") MultipartFile file) {
+        return auditLogService.capture("admin_image", null, "admin_image_upload",
+                () -> uploadImageInternal(file));
+    }
+
+    private ResponseEntity<?> uploadImageInternal(MultipartFile file) {
         try {
             String imageUrl = fileStorageService.storeAdminImage(file);
             return ResponseEntity.ok(Map.of("imageUrl", imageUrl));

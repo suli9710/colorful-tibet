@@ -264,6 +264,59 @@ class ItineraryServiceTest {
         verify(itineraryItemRepository).save(item);
     }
 
+    @Test
+    void bookItemRejectsAnItineraryDayThatHasAlreadyPassed() {
+        // The day's travel date is copied straight into the Booking, so it must satisfy the same
+        // @FutureOrPresent contract the direct booking API enforces on a caller-supplied date.
+        ItineraryItem item = bookableSpotItemOn(LocalDate.now().minusDays(1));
+        when(itineraryItemRepository.findByIdForUpdate(102L)).thenReturn(Optional.of(item));
+
+        IllegalArgumentException error = assertThrows(
+                IllegalArgumentException.class,
+                () -> itineraryService.bookItem(user, 100L, 102L, new BookItineraryItemRequest()));
+
+        assertTrue(error.getMessage().contains("已过期"));
+        verify(bookingRepository, never()).save(any(Booking.class));
+        assertEquals(ItineraryItem.BookingStatus.BOOKABLE, item.getBookingStatus());
+    }
+
+    @Test
+    void bookItemRefusesAnItineraryOwnedByAnotherUser() {
+        ItineraryItem item = bookableSpotItemOn(LocalDate.now().plusDays(1));
+        when(itineraryItemRepository.findByIdForUpdate(102L)).thenReturn(Optional.of(item));
+
+        User intruder = new User();
+        intruder.setId(user.getId() + 1);
+        intruder.setUsername("intruder");
+
+        assertThrows(
+                SecurityException.class,
+                () -> itineraryService.bookItem(intruder, 100L, 102L, new BookItineraryItemRequest()));
+
+        verify(bookingRepository, never()).save(any(Booking.class));
+    }
+
+    private ItineraryItem bookableSpotItemOn(LocalDate travelDate) {
+        Itinerary itinerary = new Itinerary();
+        itinerary.setId(100L);
+        itinerary.setUser(user);
+
+        ItineraryDay day = new ItineraryDay();
+        day.setId(101L);
+        day.setItinerary(itinerary);
+        day.setTravelDate(travelDate);
+
+        ItineraryItem item = new ItineraryItem();
+        item.setId(102L);
+        item.setDay(day);
+        item.setItemType(ItineraryItem.ItemType.SCENIC_SPOT);
+        item.setTitle("布达拉宫");
+        item.setBookingAction(ItineraryItem.BookingAction.BOOK_SPOT);
+        item.setBookingStatus(ItineraryItem.BookingStatus.BOOKABLE);
+        item.setEstimatedCost(BigDecimal.valueOf(200));
+        return item;
+    }
+
     private Itinerary savedItinerary(Long id) {
         Itinerary itinerary = new Itinerary();
         itinerary.setId(id);

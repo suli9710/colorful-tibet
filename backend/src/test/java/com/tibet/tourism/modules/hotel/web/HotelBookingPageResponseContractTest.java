@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static com.tibet.tourism.modules.admin.application.AdminAuditTestSupport.passthroughAuditService;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -56,7 +57,7 @@ class HotelBookingPageResponseContractTest {
     @BeforeEach
     void setUp() {
         HotelBookingController controller = new HotelBookingController(
-                hotelBookingService, userRepository, riskAssessmentService);
+                hotelBookingService, userRepository, riskAssessmentService, passthroughAuditService());
         ObjectMapper objectMapper = new ObjectMapper()
                 .registerModule(new JavaTimeModule())
                 .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);

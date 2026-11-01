@@ -157,6 +157,13 @@ public class ItineraryService {
                     item.getBookingReferenceId(), money(item.getEstimatedCost()), "该节点已预订");
         }
 
+        // The day's travel date is copied straight into the booking, so it has to satisfy the same
+        // @FutureOrPresent contract the direct booking APIs enforce on a caller-supplied date.
+        LocalDate travelDate = item.getDay() == null ? null : item.getDay().getTravelDate();
+        if (travelDate == null || travelDate.isBefore(LocalDate.now())) {
+            throw new IllegalArgumentException("该行程节点的日期已过期，无法预订");
+        }
+
         int travelers = Math.max(1, request.getTravelers() == null ? 1 : request.getTravelers());
         if (item.getItemType() == ItineraryItem.ItemType.SCENIC_SPOT) {
             return bookScenicSpotItem(user, item, travelers);

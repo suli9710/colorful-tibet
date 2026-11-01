@@ -1,6 +1,7 @@
 package com.tibet.tourism.modules.admin.web;
 import com.tibet.tourism.common.api.PageResponse;
 import com.tibet.tourism.common.validation.InputSanitizer;
+import com.tibet.tourism.modules.admin.application.AdminAuditLogService;
 import com.tibet.tourism.modules.admin.web.dto.RouteManagementRequest;
 import com.tibet.tourism.modules.community.domain.SharedRoute;
 import com.tibet.tourism.modules.community.domain.TravelRoute;
@@ -15,6 +16,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -29,6 +31,11 @@ import static com.tibet.tourism.modules.admin.web.mapper.AdminDtoMapper.toAdminS
 @PreAuthorize("hasRole('ADMIN')")
 public class AdminRouteController {
 
+    // The Pageable Sort is appended to the method-name ordering, so ?sort= can still name any
+    // entity property - including nested paths such as author.password. Restrict it here.
+    private static final Set<String> ADMIN_LIST_SORT_FIELDS = Set.of("id", "createdAt");
+    private static final Sort ADMIN_LIST_DEFAULT_SORT = Sort.by(Sort.Direction.DESC, "createdAt");
+
     private static final Set<String> ALLOWED_ROUTE_BUDGETS = Set.of("经济型", "舒适型", "豪华型");
     private static final Set<String> ALLOWED_ROUTE_PREFERENCES = Set.of("自然风光", "人文历史", "深度摄影", "休闲度假");
 
@@ -36,27 +43,38 @@ public class AdminRouteController {
     private final RouteLikeRepository routeLikeRepository;
     private final RouteCommentRepository routeCommentRepository;
     private final UserRepository userRepository;
+    private final AdminAuditLogService auditLogService;
 
     public AdminRouteController(SharedRouteRepository sharedRouteRepository,
                                 RouteLikeRepository routeLikeRepository,
                                 RouteCommentRepository routeCommentRepository,
-                                UserRepository userRepository) {
+                                UserRepository userRepository,
+                                AdminAuditLogService auditLogService) {
         this.sharedRouteRepository = sharedRouteRepository;
         this.routeLikeRepository = routeLikeRepository;
         this.routeCommentRepository = routeCommentRepository;
         this.userRepository = userRepository;
+        this.auditLogService = auditLogService;
     }
 
     @GetMapping("/routes")
     public ResponseEntity<PageResponse<Map<String, Object>>> getAllRoutes(
             @PageableDefault(size = 50) Pageable pageable) {
-        return ResponseEntity.ok(PageResponse.from(sharedRouteRepository.findAllByOrderByCreatedAtDesc(pageable)
+        return ResponseEntity.ok(PageResponse.from(sharedRouteRepository.findAllByOrderByCreatedAtDesc(InputSanitizer.sanitizePageable(pageable, ADMIN_LIST_SORT_FIELDS, ADMIN_LIST_DEFAULT_SORT, 50, 200))
                 .map(route -> toAdminSharedRoute(route))));
     }
 
     @PostMapping("/routes")
     @Transactional
     public ResponseEntity<?> createRoute(@Valid @RequestBody RouteManagementRequest request, Authentication authentication) {
+        return auditLogService.captureCreated("official_route", "official_route_create",
+                () -> createRouteInternal(request, authentication),
+                body -> body instanceof Map<?, ?> route && route.get("id") instanceof Number id
+                        ? id.longValue()
+                        : null);
+    }
+
+    private ResponseEntity<?> createRouteInternal(RouteManagementRequest request, Authentication authentication) {
         SharedRoute route = new SharedRoute();
         route.setSourceType(SharedRoute.SourceType.OFFICIAL);
         route.setAuthor(findAuthenticatedUser(authentication).orElse(null));
@@ -72,6 +90,11 @@ public class AdminRouteController {
     @PutMapping("/routes/{id}")
     @Transactional
     public ResponseEntity<?> updateRoute(@PathVariable Long id, @Valid @RequestBody RouteManagementRequest request) {
+        return auditLogService.capture("official_route", id, "official_route_update",
+                () -> updateRouteInternal(id, request));
+    }
+
+    private ResponseEntity<?> updateRouteInternal(Long id, RouteManagementRequest request) {
         Optional<SharedRoute> routeOpt = sharedRouteRepository.findById(id);
         if (routeOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
@@ -89,6 +112,11 @@ public class AdminRouteController {
     @DeleteMapping("/routes/{id}")
     @Transactional
     public ResponseEntity<?> deleteRoute(@PathVariable Long id) {
+        return auditLogService.capture("official_route", id, "official_route_delete",
+                () -> deleteRouteInternal(id));
+    }
+
+    private ResponseEntity<?> deleteRouteInternal(Long id) {
         Optional<SharedRoute> routeOpt = sharedRouteRepository.findById(id);
         if (routeOpt.isEmpty()) {
             return ResponseEntity.notFound().build();

@@ -1,6 +1,7 @@
 package com.tibet.tourism.modules.admin.web;
 import com.tibet.tourism.common.validation.InputSanitizer;
 import com.tibet.tourism.common.validation.RequestParseUtils;
+import com.tibet.tourism.modules.admin.application.AdminAuditLogService;
 import com.tibet.tourism.modules.content.domain.Carousel;
 import com.tibet.tourism.modules.content.infra.CarouselRepository;
 import jakarta.validation.constraints.Max;
@@ -32,9 +33,12 @@ public class AdminCarouselController {
     ) {}
 
     private final CarouselRepository carouselRepository;
+    private final AdminAuditLogService auditLogService;
 
-    public AdminCarouselController(CarouselRepository carouselRepository) {
+    public AdminCarouselController(CarouselRepository carouselRepository,
+                                   AdminAuditLogService auditLogService) {
         this.carouselRepository = carouselRepository;
+        this.auditLogService = auditLogService;
     }
 
     @GetMapping("/carousels")
@@ -44,6 +48,12 @@ public class AdminCarouselController {
 
     @PostMapping("/carousels")
     public ResponseEntity<?> createCarousel(@Valid @RequestBody CarouselRequest request) {
+        return auditLogService.captureCreated("carousel", "carousel_create",
+                () -> createCarouselInternal(request),
+                body -> ((Carousel) body).getId());
+    }
+
+    private ResponseEntity<?> createCarouselInternal(CarouselRequest request) {
         Carousel carousel = new Carousel();
         applyCarouselRequest(carousel, request);
         return ResponseEntity.ok(carouselRepository.save(carousel));
@@ -51,6 +61,11 @@ public class AdminCarouselController {
 
     @PutMapping("/carousels/{id}")
     public ResponseEntity<?> updateCarousel(@PathVariable Long id, @Valid @RequestBody CarouselRequest request) {
+        return auditLogService.capture("carousel", id, "carousel_update",
+                () -> updateCarouselInternal(id, request));
+    }
+
+    private ResponseEntity<?> updateCarouselInternal(Long id, CarouselRequest request) {
         Carousel existing = carouselRepository.findById(id).orElse(null);
         if (existing == null) {
             return ResponseEntity.notFound().build();
@@ -61,6 +76,11 @@ public class AdminCarouselController {
 
     @DeleteMapping("/carousels/{id}")
     public ResponseEntity<?> deleteCarousel(@PathVariable Long id) {
+        return auditLogService.capture("carousel", id, "carousel_delete",
+                () -> deleteCarouselInternal(id));
+    }
+
+    private ResponseEntity<?> deleteCarouselInternal(Long id) {
         if (!carouselRepository.existsById(id)) {
             return ResponseEntity.notFound().build();
         }

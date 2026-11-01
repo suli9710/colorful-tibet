@@ -8,11 +8,16 @@ import com.tibet.tourism.common.security.CsrfTokenService;
 import com.tibet.tourism.common.security.JwtUtils;
 import com.tibet.tourism.common.security.TokenRevocationService;
 import com.tibet.tourism.common.security.antibot.AntibotProperties;
+import com.tibet.tourism.modules.auth.application.AdminMfaPolicy;
 import com.tibet.tourism.modules.admin.web.dto.SecurityPostureResponse;
+import com.tibet.tourism.modules.user.domain.User;
+import com.tibet.tourism.modules.user.infra.UserRepository;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.actuate.health.Health;
-import org.springframework.boot.actuate.health.HealthEndpoint;
+import org.springframework.boot.health.actuate.endpoint.HealthEndpoint;
+import org.springframework.boot.health.actuate.endpoint.IndicatedHealthDescriptor;
+import org.springframework.boot.health.contributor.Status;
 import org.springframework.core.env.Environment;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -20,13 +25,17 @@ class AdminSecurityPostureServiceTest {
 
     private HealthEndpoint healthEndpoint;
     private AdminSecurityPostureService service;
+    private AdminMfaPolicy adminMfaPolicy;
+    private UserRepository userRepository;
 
     @BeforeEach
     void setUp() {
         healthEndpoint = mock(HealthEndpoint.class);
-        when(healthEndpoint.healthForPath("scrapling")).thenReturn(Health.up().build());
-        when(healthEndpoint.healthForPath("db")).thenReturn(Health.up().build());
-        when(healthEndpoint.healthForPath("redis")).thenReturn(Health.up().build());
+        IndicatedHealthDescriptor healthyDependency = mock(IndicatedHealthDescriptor.class);
+        when(healthyDependency.getStatus()).thenReturn(Status.UP);
+        when(healthEndpoint.healthForPath("scrapling")).thenReturn(healthyDependency);
+        when(healthEndpoint.healthForPath("db")).thenReturn(healthyDependency);
+        when(healthEndpoint.healthForPath("redis")).thenReturn(healthyDependency);
 
         Environment environment = mock(Environment.class);
         when(environment.getActiveProfiles()).thenReturn(new String[] {"prod"});
@@ -45,6 +54,12 @@ class AdminSecurityPostureServiceTest {
         recaptcha.setSiteKey("site");
         recaptcha.setSecretKey("secret");
         antibotProperties.setRecaptcha(recaptcha);
+        adminMfaPolicy = mock(AdminMfaPolicy.class);
+        userRepository = mock(UserRepository.class);
+        when(userRepository.findUsernamesByRole(User.Role.ADMIN))
+                .thenReturn(List.of("lzh", "content-admin"));
+        when(adminMfaPolicy.hasConfiguredSecret("lzh")).thenReturn(true);
+        when(adminMfaPolicy.hasConfiguredSecret("content-admin")).thenReturn(true);
 
         service = new AdminSecurityPostureService(
                 environment,
@@ -52,7 +67,9 @@ class AdminSecurityPostureServiceTest {
                 jwtUtils,
                 csrfTokenService,
                 tokenRevocationService,
-                antibotProperties);
+                antibotProperties,
+                adminMfaPolicy,
+                userRepository);
 
         ReflectionTestUtils.setField(service, "publicDocsEnabled", false);
         ReflectionTestUtils.setField(service, "publicMetricsEnabled", false);
@@ -95,6 +112,61 @@ class AdminSecurityPostureServiceTest {
         assertThat(response.getDataProtection().isPiiKeysConfigured()).isTrue();
         assertThat(response.getDependencies().getScrapling()).isEqualTo("UP");
         assertThat(response.getFindings()).extracting(SecurityPostureResponse.Finding::getId)
-                .contains("PUBLIC_DOCS_ENABLED", "JWT_CONFIGURED", "RATE_LIMIT_REDIS_FAIL_CLOSED");
+                .contains("PUBLIC_DOCS_ENABLED", "JWT_CONFIGURED", "RATE_LIMIT_REDIS_FAIL_CLOSED",
+                        "ADMIN_MFA_CONFIGURATION");
+        assertThat(adminMfaFinding(response).getStatus()).isEqualTo("PASS");
     }
+
+    @Test
+    void reportsInfoWhenDatabaseContainsNoAdministrators() {
+        when(userRepository.findUsernamesByRole(User.Role.ADMIN)).thenReturn(List.of());
+
+        SecurityPostureResponse response = service.getSecurityPosture();
+
+        SecurityPostureResponse.Finding finding = adminMfaFinding(response);
+        assertThat(finding.getStatus()).isEqualTo("INFO");
+        assertThat(finding.getMessage()).isEqualTo("No administrator accounts exist");
+        assertThat(response.getScore()).isEqualTo(100);
+    }
+
+    @Test
+    void missingAdministratorSecretFailsFindingAndReducesScoreWithoutNamingAccount() {
+        when(userRepository.findUsernamesByRole(User.Role.ADMIN)).thenReturn(List.of(
+                "lzh", "content-admin", "ops-admin"));
+        when(adminMfaPolicy.hasConfiguredSecret("ops-admin")).thenReturn(false);
+
+        SecurityPostureResponse response = service.getSecurityPosture();
+
+        SecurityPostureResponse.Finding finding = adminMfaFinding(response);
+        assertThat(finding.getStatus()).isEqualTo("FAIL");
+        assertThat(finding.getSeverity()).isEqualTo("HIGH");
+        assertThat(finding.getMessage())
+                .isEqualTo("Administrator MFA is missing for 1 account(s)")
+                .doesNotContain("ops-admin", "content-admin", "lzh");
+        assertThat(response.getScore()).isEqualTo(80);
+        assertThat(response.getStatus()).isEqualTo("DEGRADED");
+    }
+
+    @Test
+    void databaseFailureFailsClosedWithoutLeakingQueryDetails() {
+        when(userRepository.findUsernamesByRole(User.Role.ADMIN))
+                .thenThrow(new IllegalStateException("jdbc:mysql://secret-host/users"));
+
+        SecurityPostureResponse response = service.getSecurityPosture();
+
+        SecurityPostureResponse.Finding finding = adminMfaFinding(response);
+        assertThat(finding.getStatus()).isEqualTo("FAIL");
+        assertThat(finding.getMessage())
+                .isEqualTo("Administrator MFA coverage could not be verified")
+                .doesNotContain("jdbc", "secret-host", "users");
+        assertThat(response.getScore()).isEqualTo(80);
+    }
+
+    private SecurityPostureResponse.Finding adminMfaFinding(SecurityPostureResponse response) {
+        return response.getFindings().stream()
+                .filter(finding -> "ADMIN_MFA_CONFIGURATION".equals(finding.getId()))
+                .findFirst()
+                .orElseThrow();
+    }
+
 }

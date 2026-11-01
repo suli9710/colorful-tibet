@@ -3,6 +3,7 @@ package com.tibet.tourism.common.security;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.security.SecureRandom;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.env.MockEnvironment;
@@ -14,6 +15,7 @@ class ProductionSafetyValidatorTest {
     private static final String PII_ACTIVE_KID = "kid-prod";
     private static final String CACHE_KEY_HMAC_SECRET =
             "cache-key-hmac-secret-that-is-long-enough-for-prod-2026-abcdefghi";
+    private static final String PRODUCTION_TOTP_SECRET = randomCanonicalBase32Secret();
 
     @Test
     void prodProfileRejectsInsecureCookies() {
@@ -170,7 +172,7 @@ class ProductionSafetyValidatorTest {
                 "secret-key",
                 PII_KEYS,
                 PII_ACTIVE_KID,
-                "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ",
+                PRODUCTION_TOTP_SECRET,
                 "replace-with-cache-key-hmac-secret",
                 true,
                 true,
@@ -198,7 +200,7 @@ class ProductionSafetyValidatorTest {
                 "secret-key",
                 PII_KEYS,
                 PII_ACTIVE_KID,
-                "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ",
+                PRODUCTION_TOTP_SECRET,
                 "short-cache-key-secret",
                 true,
                 true,
@@ -285,6 +287,33 @@ class ProductionSafetyValidatorTest {
     }
 
     @Test
+    void productionRejectsTotpReplayFallback() {
+        assertThatThrownBy(() -> ProductionSafetyValidator.validate(
+                        true,
+                        true,
+                        true,
+                        false,
+                        "scrapling-key",
+                        true,
+                        true,
+                        "site-key",
+                        "secret-key",
+                        PII_KEYS,
+                        PII_ACTIVE_KID,
+                        PRODUCTION_TOTP_SECRET,
+                        CACHE_KEY_HMAC_SECRET,
+                        true,
+                        true,
+                        true,
+                        true,
+                        true,
+                        true,
+                        false))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("app.security.totp-replay-fail-closed=true");
+    }
+
+    @Test
     void prodProfileRejectsMissingPiiKeys() {
         ProductionSafetyValidator validator = new ProductionSafetyValidator(
                 productionEnvironment(),
@@ -298,7 +327,7 @@ class ProductionSafetyValidatorTest {
                 "secret-key",
                 "",
                 PII_ACTIVE_KID,
-                "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ",
+                PRODUCTION_TOTP_SECRET,
                 CACHE_KEY_HMAC_SECRET,
                 true,
                 true,
@@ -326,7 +355,7 @@ class ProductionSafetyValidatorTest {
                 "secret-key",
                 PII_KEYS,
                 "kid-missing",
-                "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ",
+                PRODUCTION_TOTP_SECRET,
                 CACHE_KEY_HMAC_SECRET,
                 true,
                 true,
@@ -483,7 +512,7 @@ class ProductionSafetyValidatorTest {
                 "secret-key",
                 PII_KEYS,
                 PII_ACTIVE_KID,
-                "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ",
+                PRODUCTION_TOTP_SECRET,
                 CACHE_KEY_HMAC_SECRET,
                 true,
                 true,
@@ -515,7 +544,7 @@ class ProductionSafetyValidatorTest {
                 recaptchaSecretKey,
                 PII_KEYS,
                 PII_ACTIVE_KID,
-                "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ",
+                PRODUCTION_TOTP_SECRET,
                 CACHE_KEY_HMAC_SECRET,
                 true,
                 true,
@@ -553,7 +582,7 @@ class ProductionSafetyValidatorTest {
                 recaptchaSecretKey,
                 PII_KEYS,
                 PII_ACTIVE_KID,
-                "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ",
+                PRODUCTION_TOTP_SECRET,
                 CACHE_KEY_HMAC_SECRET,
                 rateLimitEnabled,
                 rateLimitRedisEnabled,
@@ -561,5 +590,27 @@ class ProductionSafetyValidatorTest {
                 bruteForceEnabled,
                 bruteForceRedisEnabled,
                 bruteForceRedisFailClosed);
+    }
+
+    private static String randomCanonicalBase32Secret() {
+        final String alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+        byte[] bytes = new byte[20];
+        new SecureRandom().nextBytes(bytes);
+        StringBuilder encoded = new StringBuilder(32);
+        int buffer = 0;
+        int bitsLeft = 0;
+        for (byte rawByte : bytes) {
+            buffer = (buffer << 8) | (rawByte & 0xff);
+            bitsLeft += 8;
+            while (bitsLeft >= 5) {
+                encoded.append(alphabet.charAt((buffer >> (bitsLeft - 5)) & 31));
+                bitsLeft -= 5;
+                buffer &= (1 << bitsLeft) - 1;
+            }
+        }
+        if (bitsLeft > 0) {
+            encoded.append(alphabet.charAt((buffer << (5 - bitsLeft)) & 31));
+        }
+        return encoded.toString();
     }
 }

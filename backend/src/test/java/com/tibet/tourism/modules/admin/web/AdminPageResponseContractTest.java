@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tibet.tourism.common.security.LoginAttemptService;
+import com.tibet.tourism.modules.admin.application.AdminAuditLogService;
 import com.tibet.tourism.modules.admin.application.AdminUserService;
 import com.tibet.tourism.modules.community.infra.CommentLikeRepository;
 import com.tibet.tourism.modules.community.infra.CommentRepository;
@@ -64,6 +65,9 @@ class AdminPageResponseContractTest {
 
     @Mock
     private AdminUserService adminUserService;
+
+    @Mock
+    private AdminAuditLogService auditLogService;
 
     @Mock
     private SharedRouteRepository sharedRouteRepository;
@@ -134,7 +138,8 @@ class AdminPageResponseContractTest {
     void setUp() {
         mockMvc = MockMvcBuilders.standaloneSetup(
                         new AdminUserController(
-                                userRepository, loginAttemptService, fileStorageService, adminUserService),
+                                userRepository, loginAttemptService, fileStorageService, adminUserService,
+                                auditLogService),
                         new AdminCommunityController(
                                 sharedRouteRepository,
                                 routeLikeRepository,
@@ -143,10 +148,12 @@ class AdminPageResponseContractTest {
                                 commentLikeRepository,
                                 travelQuestionRepository,
                                 travelAnswerRepository,
-                                questionLikeRepository),
-                        new AdminNewsController(newsRepository, translationService),
+                                questionLikeRepository,
+                                auditLogService),
+                        new AdminNewsController(newsRepository, translationService, auditLogService),
                         new AdminHotelController(hotelRepository, roomTypeRepository,
-                                org.mockito.Mockito.mock(com.tibet.tourism.modules.hotel.infra.HotelBookingRepository.class)),
+                                org.mockito.Mockito.mock(com.tibet.tourism.modules.hotel.infra.HotelBookingRepository.class),
+                                auditLogService),
                         new AdminScenicSpotController(
                                 scenicSpotRepository,
                                 spotTagRepository,
@@ -154,15 +161,18 @@ class AdminPageResponseContractTest {
                                 commentLikeRepository,
                                 bookingRepository,
                                 userVisitHistoryRepository,
-                                translationService),
+                                translationService,
+                                auditLogService),
                         new AdminHeritageController(
                                 heritageItemRepository,
                                 heritageInheritorRepository,
                                 heritageEventRepository,
                                 heritageLikeRepository,
-                                heritageCommentRepository),
+                                heritageCommentRepository,
+                                auditLogService),
                         new AdminRouteController(
-                                sharedRouteRepository, routeLikeRepository, routeCommentRepository, userRepository))
+                                sharedRouteRepository, routeLikeRepository, routeCommentRepository, userRepository,
+                                auditLogService))
                 .setCustomArgumentResolvers(new PageableHandlerMethodArgumentResolver())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(new ObjectMapper()))
                 .build();

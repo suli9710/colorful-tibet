@@ -1,0 +1,10 @@
+{
+  "security": {
+    "recaptchaFailed": "安全验证未完成，请刷新页面后重试。",
+    "invalidExternalLink": "链接地址不安全，已阻止打开。"
+  },
+  "orderCenter": {
+    "cancelSubmitted": "咨询单取消请求已提交。",
+    "operationFailed": "操作失败，请稍后重试。"
+  }
+}

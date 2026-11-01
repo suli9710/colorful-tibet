@@ -21,6 +21,15 @@ public class TrustedProxyIpResolver {
         return resolveClientIp(request, trustProxyHeaders, trustedProxyCidrs);
     }
 
+    /**
+     * Whether the request arrived from a configured reverse proxy, meaning its {@code X-Forwarded-*}
+     * headers may be believed. Callers that reconstruct the externally visible scheme or host need
+     * this: behind a TLS-terminating proxy the connector itself only ever sees plain HTTP.
+     */
+    public boolean isTrustedProxyPeer(HttpServletRequest request) {
+        return trustProxyHeaders && isTrustedProxy(fallbackRemoteAddr(request), trustedProxyCidrs);
+    }
+
     public String resolveClientIp(HttpServletRequest request, boolean trustProxyHeaders, String trustedProxyCidrs) {
         String remoteAddr = fallbackRemoteAddr(request);
         if (!trustProxyHeaders || !isTrustedProxy(remoteAddr, trustedProxyCidrs)) {

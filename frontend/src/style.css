@@ -5,18 +5,24 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --travel-paper: #f7f3ee;
+    --travel-surface: #fffdf9;
+    --travel-ink: #1a1520;
+    --travel-muted: #69594c;
+    --travel-border: #ded6cb;
+    --travel-accent: #8b2e3a;
+    --travel-focus: #2d5f8a;
+    --travel-radius-control: 0.75rem;
+    --travel-radius-panel: 1.25rem;
+    --travel-shadow: 0 4px 20px rgba(54, 38, 30, 0.06);
+  }
+
   body {
     @apply text-tibet-dark font-sans antialiased;
     font-family: 'Noto Sans SC', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    background-color: #F7F3EE;
-    background-image:
-      linear-gradient(180deg, rgba(45, 95, 138, 0.12) 0%, rgba(247, 243, 238, 0) 280px),
-      linear-gradient(90deg, rgba(45, 95, 138, 0.05) 0 20%, rgba(247, 243, 238, 0.28) 20% 40%, rgba(139, 46, 58, 0.05) 40% 60%, rgba(59, 169, 156, 0.05) 60% 80%, rgba(242, 201, 76, 0.08) 80% 100%),
-      url("data:image/svg+xml,%3Csvg width='180' height='96' viewBox='0 0 180 96' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='%238B2E3A' stroke-opacity='.08' stroke-width='1.4'%3E%3Cpath d='M12 52h26c8 0 8-12 0-12h-6c-3-14 21-18 26-4h18'/%3E%3Cpath d='M98 36h22c7 0 7-10 0-10h-5c-2-12 19-15 23-3h16'/%3E%3Cpath d='M34 76h18c6 0 6-8 0-8h-4c-2-9 14-11 18-2h12'/%3E%3C/g%3E%3C/svg%3E");
-    background-size: 100% 100%, 100% 10px, 180px 96px;
-    background-repeat: no-repeat, repeat-x, repeat;
-    background-position: top center, top left, center top;
-    background-attachment: scroll;
+    background-color: var(--travel-paper);
+    line-height: 1.6;
   }
 
   body.nav-menu-open {
@@ -32,6 +38,16 @@
 
   html {
     @apply scroll-smooth;
+    scroll-padding-top: 6rem;
+  }
+
+  :where(a, button, input, select, textarea, summary):focus-visible {
+    outline: 3px solid var(--travel-focus);
+    outline-offset: 3px;
+  }
+
+  :where(button, a, input, select, textarea) {
+    touch-action: manipulation;
   }
 
   /* 优化滚动性能 */
@@ -52,6 +68,20 @@
   }
   html[lang="bo"] h1, html[lang="bo"] h2, html[lang="bo"] h3, html[lang="bo"] h4 {
     font-family: 'Noto Serif SC', 'Noto Sans Tibetan', serif;
+  }
+}
+
+@media (max-width: 767px) {
+  html {
+    scroll-padding-bottom: calc(6rem + env(safe-area-inset-bottom));
+  }
+
+  html:has(.mobile-sticky-action) {
+    scroll-padding-bottom: calc(12rem + env(safe-area-inset-bottom));
+  }
+
+  .route-planner-page input[type='radio'] {
+    scroll-margin-block: 7rem;
   }
 }
 
@@ -116,11 +146,9 @@
 @layer components {
   /* Glassmorphism 效果 */
   .glass {
-    background: rgba(255, 255, 255, 0.86);
-    backdrop-filter: blur(8px) saturate(135%);
-    -webkit-backdrop-filter: blur(8px) saturate(135%);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+    background: var(--travel-surface);
+    border: 1px solid var(--travel-border);
+    box-shadow: var(--travel-shadow);
   }
 
   .skip-link {
@@ -161,11 +189,9 @@
   /* 用于卡片/组件背景 — 更不透明，保证可读性 */
   .glass-card {
     position: relative;
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(255, 252, 247, 0.9)),
-      rgba(255, 255, 255, 0.9);
-    border: 1px solid rgba(255, 255, 255, 0.5);
-    box-shadow: 0 4px 24px rgba(139, 46, 58, 0.06);
+    background: var(--travel-surface);
+    border: 1px solid var(--travel-border);
+    box-shadow: var(--travel-shadow);
   }
 
   .tibet-nav-shell {
@@ -194,13 +220,7 @@
   }
 
   .tibet-page-shell {
-    background-color: #F7F3EE;
-    background-image:
-      linear-gradient(180deg, rgba(45, 95, 138, 0.10) 0%, rgba(247, 243, 238, 0) 320px),
-      linear-gradient(135deg, rgba(197, 150, 75, 0.08) 0 1px, transparent 1px 22px),
-      url("data:image/svg+xml,%3Csvg width='160' height='84' viewBox='0 0 160 84' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='%23C5964B' stroke-opacity='.13' stroke-width='1.2'%3E%3Cpath d='M16 48h22c7 0 7-10 0-10h-5c-2-11 17-14 22-3h16'/%3E%3Cpath d='M88 30h18c6 0 6-9 0-9h-4c-2-9 15-12 18-2h13'/%3E%3C/g%3E%3C/svg%3E");
-    background-size: 100% 100%, 22px 22px, 160px 84px;
-    background-repeat: no-repeat, repeat, repeat;
+    background-color: var(--travel-paper);
   }
 
   .tibet-section-band {
@@ -406,9 +426,9 @@
 
   /* 藏式祥云纹 — 重复背景图案 */
   .tibet-cloud-pattern {
-    background-color: #F7F3EE;
-    background-image: url("data:image/svg+xml,%3Csvg width='60' height='30' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M15 15c0-5 5-10 10-8s10 8 15 5 5-8 10-5' fill='none' stroke='%238B2E3A' stroke-width='1.5' stroke-opacity='0.15'/%3E%3Ccircle cx='15' cy='12' r='4' fill='%238B2E3A' fill-opacity='0.08'/%3E%3Ccircle cx='40' cy='8' r='3' fill='%238B2E3A' fill-opacity='0.06'/%3E%3C/svg%3E");
-    background-repeat: repeat;
+    background-image: url("data:image/svg+xml,%3Csvg width='240' height='120' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M15 30c0-10 10-20 20-16s20 16 30 10 10-16 20-10' fill='none' stroke='%238B2E3A' stroke-width='1.2' stroke-opacity='0.07'/%3E%3C/svg%3E");
+    background-repeat: repeat-x;
+    background-position: center top;
   }
 
   /* 藏式几何边框 — 用于卡片/容器 */
@@ -496,13 +516,8 @@
     position: absolute;
     inset: 0;
     pointer-events: none;
-    background:
-      linear-gradient(90deg, #2D5F8A 0 20%, #F7F3EE 20% 40%, #8B2E3A 40% 60%, #3BA99C 60% 80%, #F2C94C 80% 100%) top/100% 3px no-repeat,
-      linear-gradient(135deg, rgba(197, 150, 75, 0.42) 0 10px, transparent 10px) top left/28px 28px no-repeat,
-      linear-gradient(225deg, rgba(197, 150, 75, 0.42) 0 10px, transparent 10px) top right/28px 28px no-repeat,
-      linear-gradient(45deg, rgba(139, 46, 58, 0.20) 0 9px, transparent 9px) bottom left/26px 26px no-repeat,
-      linear-gradient(315deg, rgba(139, 46, 58, 0.20) 0 9px, transparent 9px) bottom right/26px 26px no-repeat;
-    opacity: 0.72;
+    background: linear-gradient(90deg, #2D5F8A 0 20%, #F7F3EE 20% 40%, #8B2E3A 40% 60%, #3BA99C 60% 80%, #F2C94C 80% 100%) top/100% 2px no-repeat;
+    opacity: 0.48;
     border-radius: inherit;
   }
 
@@ -518,10 +533,14 @@
 
   /* 藏式按钮 */
   .tibet-btn {
-    background: linear-gradient(135deg, #8B2E3A, #6B1D2A);
-    color: #F2C94C;
+    display: inline-flex;
+    min-height: 44px;
+    align-items: center;
+    justify-content: center;
+    background: var(--travel-accent);
+    color: #fff;
     font-weight: 600;
-    border-radius: 9999px;
+    border-radius: var(--travel-radius-control);
     padding: 0.625rem 1.5rem;
     transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     box-shadow: 0 2px 8px rgba(139, 46, 58, 0.3),
@@ -551,11 +570,15 @@
     100% { transform: scale(3); opacity: 0; }
   }
   .tibet-btn-outline {
+    display: inline-flex;
+    min-height: 44px;
+    align-items: center;
+    justify-content: center;
     background: transparent;
     border: 1.5px solid #C5964B;
     color: #8B2E3A;
     font-weight: 600;
-    border-radius: 9999px;
+    border-radius: var(--travel-radius-control);
     padding: 0.625rem 1.5rem;
     transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   }
@@ -565,11 +588,15 @@
     color: #F2C94C;
   }
   .tibet-btn-ghost {
+    display: inline-flex;
+    min-height: 44px;
+    align-items: center;
+    justify-content: center;
     background: transparent;
     border: 1px solid rgba(197, 150, 75, 0.25);
     color: #8B2E3A;
     font-weight: 500;
-    border-radius: 9999px;
+    border-radius: var(--travel-radius-control);
     padding: 0.5rem 1.25rem;
     transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   }

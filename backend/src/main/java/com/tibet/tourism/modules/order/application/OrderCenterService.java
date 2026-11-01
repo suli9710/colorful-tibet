@@ -242,17 +242,12 @@ public class OrderCenterService {
         order.setProductSummary(buildSummary(order.getItems()));
         order.addAuditLog(audit(user, "CREATE", null, order.getStatus().name(), "Unified order created and inventory locked"));
 
-        PlatformOrder saved;
-        try {
-            saved = orderRepository.save(order);
-        } catch (DataIntegrityViolationException exception) {
-            if (StringUtils.hasText(idempotencyKey)) {
-                return orderRepository.findByUserIdAndIdempotencyKey(user.getId(), idempotencyKey)
-                        .map(existing -> toResponse(expireIfNeeded(existing)))
-                        .orElseThrow(() -> exception);
-            }
-            throw exception;
-        }
+        // Recovering from a duplicate-key violation in-place is not possible: the constraint violation
+        // is raised during flush, which marks the persistence context rollback-only, so any response
+        // built afterwards is discarded and the commit fails anyway. A concurrent submit that loses the
+        // race therefore surfaces as a 409 (see ApiExceptionHandler); retrying hits the idempotency-key
+        // lookup above and returns the order the winning request created.
+        PlatformOrder saved = orderRepository.save(order);
         createInventoryLocks(saved);
         return toResponse(saved);
     }
@@ -316,7 +311,7 @@ public class OrderCenterService {
         order.addRefund(refund);
         transition(order, user, PlatformOrder.Status.REFUND_PENDING, "Confirmed order cancelled, refund pending");
         order.setCancelledAt(LocalDateTime.now());
-        order.getItems().forEach(item -> item.setStatus(OrderItem.Status.REFUND_PENDING));
+        markItemsRefundPending(order);
         return toResponse(order);
     }
 
@@ -338,7 +333,7 @@ public class OrderCenterService {
         if (item != null) {
             item.setStatus(OrderItem.Status.REFUND_PENDING);
         } else {
-            order.getItems().forEach(orderItem -> orderItem.setStatus(OrderItem.Status.REFUND_PENDING));
+            markItemsRefundPending(order);
         }
         return toRefundResponse(refund);
     }
@@ -658,11 +653,21 @@ public class OrderCenterService {
                 booking.getUser(), idempotencyKey, "LEGACY_HOTEL_BOOKING", booking.getId());
         if (existing.isPresent()) {
             PlatformOrder order = existing.get();
-            if (booking.getStatus() == HotelBooking.Status.CONFIRMED && canConfirmPayment(order)) {
-                order.getItems().stream().findFirst()
-                        .filter(item -> order.getPaymentTransactions().isEmpty())
-                        .ifPresent(item -> addLegacyPaymentAndVoucher(order, item));
-                confirmPaidOrder(order, "Legacy hotel booking confirmed");
+            if (booking.getStatus() == HotelBooking.Status.CONFIRMED) {
+                if (canConfirmPayment(order)) {
+                    order.getItems().stream().findFirst()
+                            .filter(item -> order.getPaymentTransactions().isEmpty())
+                            .ifPresent(item -> addLegacyPaymentAndVoucher(order, item));
+                    confirmPaidOrder(order, "Legacy hotel booking confirmed");
+                } else if (!isAlreadyPaid(order)) {
+                    // The mirror is EXPIRED or CANCELLED - its inventory hold was already released.
+                    // Confirming the booking anyway would oversell the room and leave the booking
+                    // CONFIRMED while its order reads EXPIRED, with no way to reconcile the two.
+                    logger.warn("Refusing to confirm legacy hotel booking whose mirror order is no longer confirmable: "
+                            + "orderNo={}, status={}, paymentStatus={}",
+                            order.getOrderNo(), order.getStatus(), order.getPaymentStatus());
+                    throw new IllegalStateException("该预订的订单已过期或已取消，请让客人重新下单");
+                }
             }
             return order;
         }
@@ -717,30 +722,42 @@ public class OrderCenterService {
         return orderRepository.findByUserIdAndIdempotencyKey(user.getId(), idempotencyKey);
     }
 
+    /**
+     * Cancels the unified-order mirror of a legacy booking.
+     *
+     * @return {@code false} when the mirror order was already paid and therefore refused cancellation.
+     *         Callers must not cancel their own source record in that case either, or the order would
+     *         stay CONFIRMED/PAID while the record it mirrors reads CANCELLED.
+     */
     @Transactional
-    public void cancelLegacyMirror(User actor, String sourceType, Long sourceReferenceId, String reason) {
-        orderRepository.findBySourceTypeAndSourceReferenceId(sourceType, sourceReferenceId).ifPresent(order -> {
-            if (order.getStatus() == PlatformOrder.Status.CANCELLED || order.getStatus() == PlatformOrder.Status.EXPIRED) {
-                return;
-            }
-            // Never silently cancel an already-paid/confirmed mirror order: doing so would strip the
-            // user's order and vouchers with no refund record (e.g. the stale-pending sweep firing
-            // after payment succeeded). Such orders must go through the refund flow instead.
-            if (order.getPaymentStatus() == PlatformOrder.PaymentStatus.PAID
-                    || order.getStatus() == PlatformOrder.Status.PAID
-                    || order.getStatus() == PlatformOrder.Status.CONFIRMED) {
-                logger.warn("Skip cancelling already-paid legacy mirror order: orderNo={}, status={}, paymentStatus={}, reason={}",
-                        order.getOrderNo(), order.getStatus(), order.getPaymentStatus(), reason);
-                return;
-            }
-            PlatformOrder.Status from = order.getStatus();
-            order.setStatus(PlatformOrder.Status.CANCELLED);
-            order.setCancelledAt(LocalDateTime.now());
-            order.getItems().forEach(item -> item.setStatus(OrderItem.Status.CANCELLED));
-            order.getVouchers().forEach(voucher -> voucher.setStatus(Voucher.Status.CANCELLED));
-            releaseLocks(order, InventoryLock.Status.RELEASED);
-            order.addAuditLog(audit(actor, "LEGACY_CANCELLED", from.name(), order.getStatus().name(), reason));
-        });
+    public boolean cancelLegacyMirror(User actor, String sourceType, Long sourceReferenceId, String reason) {
+        Optional<PlatformOrder> mirror =
+                orderRepository.findBySourceTypeAndSourceReferenceId(sourceType, sourceReferenceId);
+        if (mirror.isEmpty()) {
+            return true;
+        }
+        PlatformOrder order = mirror.get();
+        if (order.getStatus() == PlatformOrder.Status.CANCELLED || order.getStatus() == PlatformOrder.Status.EXPIRED) {
+            return true;
+        }
+        // Never silently cancel an already-paid/confirmed mirror order: doing so would strip the
+        // user's order and vouchers with no refund record (e.g. the stale-pending sweep firing
+        // after payment succeeded). Such orders must go through the refund flow instead.
+        if (order.getPaymentStatus() == PlatformOrder.PaymentStatus.PAID
+                || order.getStatus() == PlatformOrder.Status.PAID
+                || order.getStatus() == PlatformOrder.Status.CONFIRMED) {
+            logger.warn("Skip cancelling already-paid legacy mirror order: orderNo={}, status={}, paymentStatus={}, reason={}",
+                    order.getOrderNo(), order.getStatus(), order.getPaymentStatus(), reason);
+            return false;
+        }
+        PlatformOrder.Status from = order.getStatus();
+        order.setStatus(PlatformOrder.Status.CANCELLED);
+        order.setCancelledAt(LocalDateTime.now());
+        order.getItems().forEach(item -> item.setStatus(OrderItem.Status.CANCELLED));
+        order.getVouchers().forEach(voucher -> voucher.setStatus(Voucher.Status.CANCELLED));
+        releaseLocks(order, InventoryLock.Status.RELEASED);
+        order.addAuditLog(audit(actor, "LEGACY_CANCELLED", from.name(), order.getStatus().name(), reason));
+        return true;
     }
 
     public void ensureHotelRoomAvailable(Long hotelId, Long roomTypeId, LocalDate checkIn, LocalDate checkOut) {
@@ -831,6 +848,13 @@ public class OrderCenterService {
         ensureNoLegacyHotelBookingOverlap(roomType, checkIn, checkOut);
         BigDecimal roomPrice = defaultMoney(roomType.getPrice());
         int quantity = defaultQuantity(request.getQuantity());
+        // The inventory model reserves a room type exclusively per night: activeLockKey is
+        // HOTEL_ROOM:hotel:roomType:date under a unique index, with no room-count dimension anywhere
+        // (RoomType.capacity is occupancy, not how many rooms exist). Billing quantity x nights would
+        // therefore charge for rooms the platform never reserved and cannot guarantee.
+        if (quantity > 1) {
+            throw new IllegalArgumentException("每个房型每次仅支持预订一间，请分开下单");
+        }
         BigDecimal subtotal = roomPrice.multiply(BigDecimal.valueOf(nights)).multiply(BigDecimal.valueOf(quantity));
 
         OrderItem item = new OrderItem();
@@ -1028,6 +1052,12 @@ public class OrderCenterService {
         releaseLocks(order, InventoryLock.Status.CONFIRMED);
         issueVouchers(order);
         order.addAuditLog(audit(null, "PAYMENT_CONFIRMED", from.name(), order.getStatus().name(), note));
+    }
+
+    private boolean isAlreadyPaid(PlatformOrder order) {
+        return order.getPaymentStatus() == PlatformOrder.PaymentStatus.PAID
+                || order.getStatus() == PlatformOrder.Status.PAID
+                || order.getStatus() == PlatformOrder.Status.CONFIRMED;
     }
 
     private boolean canConfirmPayment(PlatformOrder order) {
@@ -1316,6 +1346,9 @@ public class OrderCenterService {
         if (!isRefundableOrder(order)) {
             throw new IllegalStateException("Order is not refundable");
         }
+        if (item != null && isRefundClosedItem(item)) {
+            throw new IllegalStateException("Order item has already been refunded");
+        }
         if (hasPendingRefund(order, item)) {
             throw new IllegalStateException("Refund already pending");
         }
@@ -1324,9 +1357,39 @@ public class OrderCenterService {
             throw new IllegalStateException("Refund amount must be greater than zero");
         }
         BigDecimal remaining = refundableAmount(order).subtract(countedRefundAmount(order));
+        if (item != null) {
+            // The order-level balance alone would let a single item be refunded repeatedly until it had
+            // consumed the whole order total, while the other items kept their still-valid vouchers.
+            remaining = remaining.min(
+                    refundableBaseForItem(item).subtract(countedRefundAmountForItem(order, item)));
+        }
         if (amount.compareTo(remaining) > 0) {
             throw new IllegalStateException("Refund amount exceeds paid amount");
         }
+    }
+
+    /**
+     * Moves the still-refundable items to REFUND_PENDING. Items that were already refunded or
+     * cancelled are left alone: stamping them too would let a later rejection of this refund restore
+     * an already-REFUNDED item to CONFIRMED, reviving a voucher the customer was already paid out for.
+     */
+    private void markItemsRefundPending(PlatformOrder order) {
+        order.getItems().stream()
+                .filter(item -> !isRefundClosedItem(item))
+                .forEach(item -> item.setStatus(OrderItem.Status.REFUND_PENDING));
+    }
+
+    private boolean isRefundClosedItem(OrderItem item) {
+        return item.getStatus() == OrderItem.Status.REFUNDED
+                || item.getStatus() == OrderItem.Status.CANCELLED;
+    }
+
+    private BigDecimal countedRefundAmountForItem(PlatformOrder order, OrderItem item) {
+        return order.getRefunds().stream()
+                .filter(refund -> COUNTED_REFUND_STATUSES.contains(refund.getStatus()))
+                .filter(refund -> sameOrderItem(refund.getOrderItem(), item))
+                .map(refund -> defaultMoney(refund.getAmount()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     private boolean isRefundableOrder(PlatformOrder order) {
@@ -1370,14 +1433,20 @@ public class OrderCenterService {
 
     private BigDecimal refundAmountForOrder(PlatformOrder order) {
         BigDecimal amount = order.getItems().stream()
+                .filter(item -> !isRefundClosedItem(item))
                 .map(this::refundAmountForItem)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal orderPayable = defaultMoney(order.getPayableAmount());
         if (amount.compareTo(BigDecimal.ZERO) <= 0 && order.getItems().isEmpty()) {
-            return orderPayable;
+            amount = orderPayable;
+        } else if (orderPayable.compareTo(BigDecimal.ZERO) > 0 && amount.compareTo(orderPayable) > 0) {
+            amount = orderPayable;
         }
-        if (orderPayable.compareTo(BigDecimal.ZERO) > 0 && amount.compareTo(orderPayable) > 0) {
-            return orderPayable;
+        // Items refunded earlier already consumed part of the paid amount, so a whole-order refund on a
+        // partially refunded order must never ask for more than the balance that is still refundable.
+        BigDecimal remaining = refundableAmount(order).subtract(countedRefundAmount(order));
+        if (remaining.compareTo(BigDecimal.ZERO) > 0 && amount.compareTo(remaining) > 0) {
+            return remaining;
         }
         return amount;
     }

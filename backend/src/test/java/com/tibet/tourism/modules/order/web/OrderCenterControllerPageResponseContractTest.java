@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static com.tibet.tourism.modules.admin.application.AdminAuditTestSupport.passthroughAuditService;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -35,7 +36,8 @@ class OrderCenterControllerPageResponseContractTest {
     private final OrderCenterController controller = new OrderCenterController(
             orderCenterService,
             jwtAuthSupport,
-            riskAssessmentService);
+            riskAssessmentService,
+            passthroughAuditService());
     private final ObjectMapper objectMapper = new ObjectMapper()
             .registerModule(new JavaTimeModule())
             .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);

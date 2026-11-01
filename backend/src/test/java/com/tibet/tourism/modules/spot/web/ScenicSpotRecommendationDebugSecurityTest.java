@@ -15,6 +15,8 @@ import com.tibet.tourism.common.security.TrustedProxyIpResolver;
 import com.tibet.tourism.common.security.UserDetailsServiceImpl;
 import com.tibet.tourism.common.security.UserSessionVersionService;
 import com.tibet.tourism.common.security.WebSecurityConfig;
+import com.tibet.tourism.modules.auth.application.AdminMfaPolicy;
+import com.tibet.tourism.modules.admin.application.AdminAuditLogService;
 import com.tibet.tourism.modules.recommendation.application.ColdStartOptimizationService;
 import com.tibet.tourism.modules.recommendation.application.ItemBasedRecommendationService;
 import com.tibet.tourism.modules.recommendation.application.RecommendationService;
@@ -26,8 +28,8 @@ import java.util.stream.Stream;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -48,37 +50,43 @@ class ScenicSpotRecommendationDebugSecurityTest {
     @Autowired
     private MockMvc mockMvc;
 
-    @MockBean
+    @MockitoBean
     private JwtUtils jwtUtils;
 
-    @MockBean
+    @MockitoBean
+    private AdminMfaPolicy adminMfaPolicy;
+
+    @MockitoBean
+    private AdminAuditLogService adminAuditLogService;
+
+    @MockitoBean
     private UserDetailsServiceImpl userDetailsService;
 
-    @MockBean
+    @MockitoBean
     private CsrfTokenService csrfTokenService;
 
-    @MockBean
+    @MockitoBean
     private TokenRevocationService tokenRevocationService;
 
-    @MockBean
+    @MockitoBean
     private UserSessionVersionService userSessionVersionService;
 
-    @MockBean
+    @MockitoBean
     private ScenicSpotService scenicSpotService;
 
-    @MockBean
+    @MockitoBean
     private RecommendationService recommendationService;
 
-    @MockBean
+    @MockitoBean
     private CompanionInferenceService companionInferenceService;
 
-    @MockBean
+    @MockitoBean
     private ItemBasedRecommendationService itemBasedRecommendationService;
 
-    @MockBean
+    @MockitoBean
     private ColdStartOptimizationService coldStartOptimizationService;
 
-    @MockBean
+    @MockitoBean
     private UserRepository userRepository;
 
     @ParameterizedTest

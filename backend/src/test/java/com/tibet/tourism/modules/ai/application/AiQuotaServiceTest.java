@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -221,13 +222,98 @@ class AiQuotaServiceTest {
         service.cacheRoute(cacheKey, "# route");
 
         ArgumentCaptor<String> keyCaptor = ArgumentCaptor.forClass(String.class);
-        verify(valueOperations).set(keyCaptor.capture(), any(), any(java.time.Duration.class));
+        ArgumentCaptor<String> valueCaptor = ArgumentCaptor.forClass(String.class);
+        verify(valueOperations).set(keyCaptor.capture(), valueCaptor.capture(), any(java.time.Duration.class));
         assertThat(keyCaptor.getValue())
                 .startsWith("ai:cache:route:ai-route#")
                 .doesNotContain("123456789")
                 .doesNotContain("comfort")
                 .doesNotContain("natural")
                 .doesNotContain("zh");
+        assertThat(valueCaptor.getValue())
+                .startsWith("enc:v1:")
+                .doesNotContain("# route");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void cachedRouteSurvivesTheEncryptDecryptRoundTrip() {
+        StringRedisTemplate redisTemplate = redisTemplate();
+        ValueOperations<String, String> valueOperations = mock(ValueOperations.class);
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+
+        AiQuotaService service = new AiQuotaService(provider(redisTemplate), CACHE_KEY_HASHER);
+        String cacheKey = service.buildCacheKey(123456789L, 5, "Comfort", "Natural Wonders", "zh");
+        service.cacheRoute(cacheKey, "# route");
+
+        ArgumentCaptor<String> keyCaptor = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<String> valueCaptor = ArgumentCaptor.forClass(String.class);
+        verify(valueOperations).set(keyCaptor.capture(), valueCaptor.capture(), any(java.time.Duration.class));
+
+        // Only the write side was covered before, so a broken decrypt would have gone unnoticed.
+        when(valueOperations.get(keyCaptor.getValue())).thenReturn(valueCaptor.getValue());
+        assertThat(service.getCachedRoute(cacheKey)).isEqualTo("# route");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void corruptCachedRouteIsTreatedAsAMissRatherThanPropagating() {
+        StringRedisTemplate redisTemplate = redisTemplate();
+        ValueOperations<String, String> valueOperations = mock(ValueOperations.class);
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+
+        AiQuotaService service = new AiQuotaService(provider(redisTemplate), CACHE_KEY_HASHER);
+        String cacheKey = service.buildCacheKey(123456789L, 5, "Comfort", "Natural Wonders", "zh");
+        when(valueOperations.get(any(String.class))).thenReturn("enc:v1:not-valid-ciphertext");
+
+        assertThat(service.getCachedRoute(cacheKey)).isNull();
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void releaseQuotaUsesOneAtomicRedisScript() {
+        StringRedisTemplate redisTemplate = redisTemplate();
+        ValueOperations<String, String> valueOperations = mock(ValueOperations.class);
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(redisTemplate.execute(any(DefaultRedisScript.class), anyList())).thenReturn(1L).thenReturn(0L);
+
+        AiQuotaService service = new AiQuotaService(provider(redisTemplate), CACHE_KEY_HASHER);
+        ReflectionTestUtils.setField(service, "dailyLimit", 20);
+
+        service.releaseQuota(7L);
+        service.releaseQuota(7L);
+
+        @SuppressWarnings("rawtypes")
+        ArgumentCaptor<DefaultRedisScript> scriptCaptor = ArgumentCaptor.forClass(DefaultRedisScript.class);
+        verify(redisTemplate, times(2)).execute(scriptCaptor.capture(), anyList());
+        assertThat(scriptCaptor.getValue().getScriptAsString())
+                .contains("redis.call('GET', KEYS[1])")
+                .contains("current <= 0")
+                .contains("redis.call('DECR', KEYS[1])");
+        // The script preserves the existing TTL and never uses client-side check-then-act commands.
+        verify(redisTemplate, never()).hasKey(any(String.class));
+        verify(valueOperations, never()).decrement(any(String.class));
+        verify(valueOperations, never()).increment(any(String.class));
+        verify(valueOperations, never()).set(any(String.class), any(String.class));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void releaseQuotaDoesNotResurrectAnExpiredQuotaKey() {
+        StringRedisTemplate redisTemplate = redisTemplate();
+        ValueOperations<String, String> valueOperations = mock(ValueOperations.class);
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(redisTemplate.execute(any(DefaultRedisScript.class), anyList())).thenReturn(0L);
+
+        AiQuotaService service = new AiQuotaService(provider(redisTemplate), CACHE_KEY_HASHER);
+        ReflectionTestUtils.setField(service, "dailyLimit", 20);
+
+        service.releaseQuota(7L);
+
+        verify(redisTemplate).execute(any(DefaultRedisScript.class), anyList());
+        // The script sees the missing key and returns before DECR, so it cannot recreate a no-TTL key.
+        verify(redisTemplate, never()).hasKey(any(String.class));
+        verify(valueOperations, never()).decrement(any(String.class));
     }
 
     @SuppressWarnings("unchecked")

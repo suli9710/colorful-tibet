@@ -1,4 +1,7 @@
 package com.tibet.tourism.modules.recommendation.application;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
 import com.tibet.tourism.modules.user.domain.User;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -16,6 +19,14 @@ import org.junit.jupiter.api.Test;
  * 包含评分、点击数和停留时间，覆盖热门与冷门景点混合场景。
  */
 class RecommendationAlgorithmComparisonTest {
+
+    // Indexes into the metric array returned by evaluateAlgorithm:
+    // {precision, recall, f1, coverage, diversity, novelty}
+    private static final int PRECISION = 0;
+    private static final int F1 = 2;
+    private static final int COVERAGE = 3;
+    private static final int DIVERSITY = 4;
+    private static final int NOVELTY = 5;
 
     private static final int K = 5;
     private static final Random RAND = new Random(42);
@@ -89,8 +100,19 @@ class RecommendationAlgorithmComparisonTest {
                         formatRow("纯热门推荐", popularMetrics),
                         formatRow("混合CF(User+Item)", hybridMetrics)
                 }));
-        System.out.println("分析：混合CF通过引入用户相似度计算和标签匹配，在准确率和多样性上均优于纯热门推荐。");
-        System.out.println("纯热门推荐无法提供个性化，Coverage仅依赖全局流行度，召回能力有限。\n");
+        System.out.println("分析：本样本规模过小，混合CF与纯热门在准确率、多样性上均打平，无法体现个性化差异。");
+        System.out.println("要证明混合CF的优势，需要更大、用户兴趣更分散的数据集。\n");
+
+        // The printed analysis IS the claim under test. Adding assertions showed the original claim
+        // ("准确率和多样性上均优于纯热门") is NOT supported by this fixture: precision is an exact tie
+        // (0.2833 both) and diversity differs only by floating-point accumulation noise. These are
+        // therefore no-regression guards, and the printed conclusion was corrected to match the data.
+        assertThat(hybridMetrics[PRECISION]).as("hybrid CF precision@5")
+                .isGreaterThanOrEqualTo(popularMetrics[PRECISION]);
+        assertThat(hybridMetrics[DIVERSITY]).as("hybrid CF diversity")
+                .isGreaterThanOrEqualTo(popularMetrics[DIVERSITY] - 1e-9);
+        assertThat(hybridMetrics[COVERAGE]).as("hybrid CF coverage")
+                .isGreaterThanOrEqualTo(popularMetrics[COVERAGE]);
     }
 
     // ===========================
@@ -114,6 +136,11 @@ class RecommendationAlgorithmComparisonTest {
                 }));
         System.out.println("分析：多维相似度融合Jaccard捕捉集合重叠、时间加权捕捉兴趣时效性，");
         System.out.println("相比纯余弦能更全面度量用户间相似性，提升推荐覆盖率和多样性。\n");
+
+        assertThat(multiMetrics[COVERAGE]).as("multi-dimensional coverage")
+                .isGreaterThanOrEqualTo(cosineMetrics[COVERAGE]);
+        assertThat(multiMetrics[DIVERSITY]).as("multi-dimensional diversity")
+                .isGreaterThanOrEqualTo(cosineMetrics[DIVERSITY]);
     }
 
     // ===========================
@@ -135,8 +162,16 @@ class RecommendationAlgorithmComparisonTest {
                         formatRow("无探索", noExploreMetrics),
                         formatRow("ε-greedy(ε=0.1)", exploreMetrics)
                 }));
-        System.out.println("分析：ε-greedy以10%概率探索低曝光景点，在不显著降低准确率的前提下提升新颖度。");
-        System.out.println("探索-利用平衡是推荐系统中减少'信息茧房'效应的重要手段。\n");
+        System.out.println("分析：ε-greedy以10%概率探索低曝光景点，目标是在不降低准确率的前提下提升新颖度。");
+        System.out.println("在本样本上新颖度与无探索持平——样本过小，10%的探索概率不足以体现差异。\n");
+
+        // Asserting the original claim ("提升新颖度") revealed it does not hold on this fixture:
+        // novelty is an exact tie. What the fixture does support is that exploration costs nothing,
+        // so that is what is asserted; a larger fixture would be needed to demonstrate a novelty gain.
+        assertThat(exploreMetrics[NOVELTY]).as("epsilon-greedy novelty must not regress")
+                .isGreaterThanOrEqualTo(noExploreMetrics[NOVELTY]);
+        assertThat(exploreMetrics[PRECISION]).as("epsilon-greedy precision@5 must not collapse")
+                .isGreaterThanOrEqualTo(noExploreMetrics[PRECISION] * 0.8);
     }
 
     // ===========================
@@ -163,6 +198,10 @@ class RecommendationAlgorithmComparisonTest {
         System.out.println("分析：User-Based CF基于用户相似度推荐，Item-Based CF基于物品相似度推荐。");
         System.out.println("混合方案集两者之长，通过加权融合提升整体推荐质量，");
         System.out.println("在实际部署中可根据数据稀疏度动态调整权重。\n");
+
+        assertThat(hybridMetrics[F1])
+                .as("hybrid F1@5 must be at least as good as either single strategy")
+                .isGreaterThanOrEqualTo(Math.max(userCFMetrics[F1], itemCFMetrics[F1]));
     }
 
     // ===========================

@@ -41,6 +41,7 @@ class AiGuideChatControllerTest {
                 jwtAuthSupport,
                 recaptchaService,
                 new AntibotProperties(),
+                new com.tibet.tourism.common.security.TrustedProxyIpResolver(),
                 false);
 
         controller.chat(request(), anonymousRequest("device-a"));

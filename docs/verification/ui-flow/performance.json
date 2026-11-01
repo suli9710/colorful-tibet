@@ -1,0 +1,43 @@
+{
+  "date": "2026-11-01",
+  "mode": "One local unthrottled Chromium sample per page, production build. Guest empty API fixtures; not real backend latency. LCP measured at 2.5s snapshot, layout shift sum is not session-window CLS. No field p75 or INP measured.",
+  "gate": "No existing numeric page-performance gate found in repository. Existing production build passed; no threshold was changed or introduced for this sample.",
+  "samples": [
+    {
+      "path": "/",
+      "lcp": 1396,
+      "layoutShiftSum": 0,
+      "resources": 25,
+      "domContentLoadedMs": 1292.6999999997206
+    },
+    {
+      "path": "/route-planner",
+      "lcp": 952,
+      "layoutShiftSum": 0.00018776909722222223,
+      "resources": 22,
+      "domContentLoadedMs": 881.8999999999069
+    }
+  ],
+  "assets": [
+    {
+      "name": "index-Bc6cVJg2.css",
+      "bytes": 118773,
+      "gzipBytes": 20506
+    },
+    {
+      "name": "index-COqqwosT.js",
+      "bytes": 269889,
+      "gzipBytes": 81446
+    },
+    {
+      "name": "RoutePlanner-CMZ0WsWO.js",
+      "bytes": 80019,
+      "gzipBytes": 21864
+    },
+    {
+      "name": "RoutePlanner-rRrQ525F.css",
+      "bytes": 10690,
+      "gzipBytes": 2602
+    }
+  ]
+}

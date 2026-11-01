@@ -15,9 +15,11 @@
 
 不要用 `docker-compose.yml` 承载公网生产流量；也不要把从 `.env.example` 复制出的本地 `.env` 直接用于生产。生产发布前必须用 `docker compose -f docker-compose.prod.yml config` 检查最终展开结果，确认没有 `change-me`、`replace-with-*` 或本地 profile 值残留。
 
-生产 Compose 还包含一次性的 `production-preflight` 服务。真正执行 `docker compose -f docker-compose.prod.yml up` 时，它会在 MySQL、Redis、backend、Scrapling 和 Grafana 启动前拒绝基础设施密码、应用签名/加密密钥、PII keyset、Scrapling API key、reCAPTCHA key、前端地图 key 和告警 webhook 的空值或占位值，包括 `DB_PASSWORD`、`MYSQL_ROOT_PASSWORD`、`REDIS_PASSWORD`、`GRAFANA_ADMIN_PASSWORD`、`JWT_SECRET`、`CSRF_SIGNING_SECRET`、`CACHE_KEY_HMAC_SECRET`、`ADMIN_ENCRYPTION_KEY`、`PAYMENT_CALLBACK_SECRET`、`PII_KEYS`、`PII_ACTIVE_KID`、`SUPER_ADMIN_TOTP_SECRET`、`SCRAPLING_API_KEY`、`RECAPTCHA_SITE_KEY`、`RECAPTCHA_SECRET_KEY`、`VITE_AMAP_KEY`、`VITE_AMAP_SECURITY_CODE` 和 `ALERTMANAGER_WEBHOOK_URL`，以及已设置但仍是占位值的 `MYSQL_PASSWORD`。它也会拒绝匿名 metrics、Redis 保护降级、mock 支付、demo/seed content、非 secure cookie、MySQL public key retrieval、Scrapling 匿名访问、reCAPTCHA/anti-bot 关闭、Flyway 关闭或 Hibernate DDL auto 非 `validate` 等生产危险覆盖值，并要求 `SUPER_ADMIN_TOTP_SECRET` 是至少 32 字符的 Base32 secret。`NGINX_SERVER_NAME` 必须是空格分隔 DNS host 列表，`NGINX_REDIRECT_HOST` 和 `NGINX_CERT_DOMAIN` 必须是单一 DNS host，不能是 `example.com`、带 scheme/path/port 的值或其他占位值。`upload-server.ps1` 的远端 preflight 使用同一规则，且会在拼接 Let's Encrypt 证书路径前先校验证书域名，避免绕过 Compose 直接发布。
+生产 Compose 还包含一次性的 `production-preflight` 服务。真正执行 `docker compose -f docker-compose.prod.yml up` 时，它会在 MySQL、Redis、backend、Scrapling 和 Grafana 启动前拒绝基础设施密码、应用签名/加密密钥、PII keyset、Scrapling API key、reCAPTCHA key、前端地图 key 和告警 webhook 的空值或占位值，包括 `DB_PASSWORD`、`MYSQL_ROOT_PASSWORD`、`REDIS_PASSWORD`、`GRAFANA_ADMIN_PASSWORD`、`JWT_SECRET`、`CSRF_SIGNING_SECRET`、`CACHE_KEY_HMAC_SECRET`、`METRICS_SCRAPE_TOKEN`、`ADMIN_ENCRYPTION_KEY`、`PAYMENT_CALLBACK_SECRET`、`PII_KEYS`、`PII_ACTIVE_KID`、`SUPER_ADMIN_TOTP_SECRET`、`SCRAPLING_API_KEY`、`RECAPTCHA_SITE_KEY`、`RECAPTCHA_SECRET_KEY`、`VITE_AMAP_KEY`、`VITE_AMAP_SECURITY_CODE`、`ALERTMANAGER_WEBHOOK_URL` 和 `APP_VERSION`，以及已设置但仍是占位值的 `MYSQL_PASSWORD`。它也会拒绝匿名 metrics、Redis 保护降级、mock 支付、demo/seed content、非 secure cookie、MySQL public key retrieval、Scrapling 匿名访问、reCAPTCHA/anti-bot 关闭、Flyway 关闭或 Hibernate DDL auto 非 `validate` 等生产危险覆盖值，并要求 `SUPER_ADMIN_TOTP_SECRET` 是至少 32 字符的 Base32 secret。`NGINX_SERVER_NAME` 必须是空格分隔 DNS host 列表，`NGINX_REDIRECT_HOST` 和 `NGINX_CERT_DOMAIN` 必须是单一 DNS host，不能是 `example.com`、带 scheme/path/port 的值或其他占位值。`upload-server.ps1` 的远端 preflight 使用同一规则，且会在拼接 Let's Encrypt 证书路径前先校验证书域名，避免绕过 Compose 直接发布。
 
 `TRUST_PROXY_HEADERS` 生产默认关闭，`TRUSTED_PROXY_CIDRS` 生产默认留空。只有确认 backend 的直接来源确实是受控反向代理或负载均衡器时，才可以把 `TRUST_PROXY_HEADERS=true` 并填写具体代理 IP/CIDR，例如单个 `/32` 或明确的负载均衡器子网。不要使用 `10.0.0.0/8`、`172.16.0.0/12`、`192.168.0.0/16`、`0.0.0.0/0` 或 `::/0` 这类宽范围；preflight 会拒绝这些值。
+
+反自动化行为日志默认保留 90 天，并由每日定时任务批量清理。`ANTIBOT_LOG_RETENTION_ENABLED` 在生产必须保持 `true`，`ANTIBOT_LOG_RETENTION_DAYS` 只能设置为 1–365；`ANTIBOT_LOG_CLEANUP_CRON` 和 `ANTIBOT_LOG_CLEANUP_ZONE` 用于调整清理窗口。用户账号删除流程会同步删除该用户关联的行为风控日志，避免已删除账号仍能通过稳定风控标签继续关联。
 
 生产 `scrapling` 服务使用 `no-new-privileges`、`cap_drop: [ALL]`、只读根文件系统和 `/tmp` tmpfs。Scrapling/Playwright 的临时运行态应写入 `/tmp`；不要在生产镜像运行时依赖写入 `/app` 或浏览器安装目录。
 
@@ -44,7 +46,7 @@ Docker Compose 展开变量时，宿主机环境变量和 `--env-file`/`.env` �
 | Redis | 本地 Redis 不要求密码 | `REDIS_PASSWORD` 必填 |
 | 强密钥 | 关键密钥必须非空，可用本地随机值 | `JWT_SECRET`、`CSRF_SIGNING_SECRET`、`CACHE_KEY_HMAC_SECRET`、`PII_KEYS`、`ADMIN_ENCRYPTION_KEY` 等必须为强随机生产值 |
 | 文档公开 | `PUBLIC_DOCS_ENABLED` 默认 false，可本地打开 | 默认 false，生产公开前必须有明确审批 |
-| Metrics 公开 | 应显式评估 `PUBLIC_METRICS_ENABLED` | 生产 Compose 默认 false；只有配置认证代理、独立内网 management 端口或明确 allowlist 后才可打开匿名采集 |
+| Metrics 公开 | 应显式评估 `PUBLIC_METRICS_ENABLED` | 生产 Compose 默认 false；内置 Prometheus 使用独立 `METRICS_SCRAPE_TOKEN`，只有配置认证代理、独立内网 management 端口或明确 allowlist 后才可打开匿名采集 |
 | 前端公开配置 | 可留空或使用开发 key | `VITE_AMAP_KEY`、`VITE_AMAP_SECURITY_CODE`、`VITE_RECAPTCHA_SITE_KEY` 必须使用生产配置 |
 | 反向代理 | 本地 HTTP 和 `localhost` | `NGINX_SERVER_NAME` 可包含多个域名；`NGINX_REDIRECT_HOST` 必须是单一规范 host，不带 scheme、path、port、逗号、空白或控制字符；`NGINX_CERT_DOMAIN` 和证书挂载必须真实可用 |
 
@@ -52,9 +54,9 @@ Docker Compose 展开变量时，宿主机环境变量和 `--env-file`/`.env` �
 
 ## Metrics 公开性
 
-后端 Prometheus 指标路径是 `/actuator/prometheus`。应用配置和生产 Compose 默认 `PUBLIC_METRICS_ENABLED=false`，此时该路径要求管理员权限；仓库内置 Prometheus 不能再依赖匿名抓取作为默认生产路径。
+后端 Prometheus 指标路径是 `/actuator/prometheus`。应用配置和生产 Compose 默认 `PUBLIC_METRICS_ENABLED=false`，此时该路径要求管理员权限。仓库内置 Prometheus 使用独立的 `METRICS_SCRAPE_TOKEN` Bearer 凭据抓取，不复用管理员 JWT，也不需要打开匿名指标。
 
-如需采集生产指标，应改用认证代理、防火墙 allowlist、独立内部 management 端口或其他受控采集方案；只有在发布记录中证明 backend metrics 仅对受信采集主体可达时，才可显式设置 `PUBLIC_METRICS_ENABLED=true`。
+`METRICS_SCRAPE_TOKEN` 必须是至少 64 字符的独立随机值，由 backend 与 Prometheus 共享；Compose 启动时只把它写入 Prometheus 的 `/tmp`，并通过 `credentials_file` 读取。外部 Prometheus 应使用同一专用身份、认证代理或独立内部 management 端口；只有在发布记录中证明 metrics 仅对受信采集主体可达时，才可显式设置 `PUBLIC_METRICS_ENABLED=true`。
 
 这里的“公开”指任何能连到 backend 的网络主体都可无认证读取 metrics，不等同于一定暴露到公网。生产安全边界必须同时满足：
 
@@ -67,9 +69,9 @@ Docker Compose 展开变量时，宿主机环境变量和 `--env-file`/`.env` �
 
 ## Redis 安全依赖
 
-生产限流和登录暴破保护必须使用 Redis，并在 Redis 不可用时 fail-closed。`RATE_LIMIT_REDIS_ENABLED=true`、`RATE_LIMIT_REDIS_FAIL_CLOSED=true`、`BRUTE_FORCE_REDIS_ENABLED=true`、`BRUTE_FORCE_REDIS_FAIL_CLOSED=true` 是生产 preflight 的必检项；后端启动校验也会在生产 profile、生产环境变量或云运行信号下拒绝关闭这些开关。
+生产限流、登录暴破保护和管理员 TOTP 重放保护必须使用 Redis，并在 Redis 不可用时 fail-closed。`RATE_LIMIT_REDIS_ENABLED=true`、`RATE_LIMIT_REDIS_FAIL_CLOSED=true`、`BRUTE_FORCE_REDIS_ENABLED=true`、`BRUTE_FORCE_REDIS_FAIL_CLOSED=true`、`TOTP_REPLAY_FAIL_CLOSED=true` 是生产 preflight 的必检项；后端启动校验也会在生产 profile、生产环境变量或云运行信号下拒绝关闭这些开关。TOTP 开启 fail-closed 后，Redis 未配置、原子 claim 返回不确定结果或 Redis 异常都会拒绝本次验证码，避免多实例或重启后的验证码重放窗口。
 
-本地环境仍可通过 `RATE_LIMIT_REDIS_FAIL_CLOSED=false` 和 `BRUTE_FORCE_REDIS_FAIL_CLOSED=false` 保留单机内存降级，便于 Redis 未启动时开发调试。不要把这些本地值带到生产 `.env`。
+本地环境仍可通过 `RATE_LIMIT_REDIS_FAIL_CLOSED=false`、`BRUTE_FORCE_REDIS_FAIL_CLOSED=false` 和 `TOTP_REPLAY_FAIL_CLOSED=false` 保留单机内存降级，便于 Redis 未启动时开发调试。不要把这些本地值带到生产 `.env`。
 
 ## 远程开发代理
 
@@ -112,17 +114,17 @@ MySQL healthcheck 使用 `--defaults-extra-file` 读取 root 凭据，并在每�
 - `scrapler/Dockerfile`: `python:3.11-slim`
 - `docker-compose.yml`: `mysql:8.4`, `redis:7-alpine`
 - `docker-compose.prod.yml`: `alpine:3.21`, `redis:7-alpine`, `mysql:8.4`, `prom/prometheus:v2.55.1`, `prom/alertmanager:v0.27.0`, `grafana/grafana:11.4.0`, `openzipkin/zipkin:3.4`
-- `.github/workflows/ci.yml` Docker runs: `prom/prometheus:v2.55.1`
+- `.github/workflows/ci.yml` Docker runs/services: `prom/prometheus:v2.55.1`, `mysql:8.4`
 
 轮换镜像 pin 时，在能访问 Docker Hub 的发布工作站上运行：
 
 ```powershell
-node scripts/resolve-docker-image-digests.mjs --evidence --verifier=<name-or-email> --target-platform=multi-platform-index > docker-digest-evidence.json
+node scripts/resolve-docker-image-digests.mjs --evidence --verifier=<name-or-email> --target-platform=multi-platform-index --output=docker-digest-evidence.json
 node scripts/check-supply-chain-pins.mjs --evidence-only --evidence docker-digest-evidence.json
 node scripts/resolve-docker-image-digests.mjs --markdown
 ```
 
-该脚本会通过 Docker Hub token endpoint 和 Docker Registry manifest endpoint 读取 `Docker-Content-Digest`，输出每个源文件位置对应的 `image:tag@sha256:<digest>`。把新 digest 写回上面的 Dockerfile、Compose 和 workflow 后，再运行 `npm run check:supply-chain-pins` 确认配置引用和 evidence JSON 同步。
+该脚本会通过 Docker Hub token endpoint 和 Docker Registry manifest endpoint 读取 `Docker-Content-Digest`，输出每个源文件位置对应的 `image:tag@sha256:<digest>`。`--output` 会在所有必需镜像都解析成功后，先同步临时文件再原子替换目标文件；不要用 shell 的 `>` 重定向证据文件，因为命令执行前旧文件就会被截断。把新 digest 写回上面的 Dockerfile、Compose 和 workflow 后，再运行 `npm run check:supply-chain-pins` 确认配置引用和 evidence JSON 同步。
 
 `--evidence` 输出带 `schemaVersion`、`resolver`、`generatedAt`、`verifier`、`targetPlatforms`、`lookupSource`、registry、`digestAlgorithm=sha256` 和逐项 source/image/digest 的 JSON 证据。`node scripts/check-supply-chain-pins.mjs --evidence-only --evidence docker-digest-evidence.json` 不访问外网，只校验证据是否由仓库 resolver 产出、是否覆盖所有必需镜像、digest 是否为 `sha256:<64 hex>`、`pinned` 是否等于 `image@digest`，以及同一镜像 tag 是否出现冲突 digest。`npm run check:supply-chain-pins` 默认也会校验根目录 `docker-digest-evidence.json`，所以 digest pins 和操作者证据必须一起提交。发布记录应保存该 evidence JSON；它不能替代把 verified digest 写回配置文件。
 
@@ -173,3 +175,41 @@ Docker digest evidence handling, and rollback checklist.
 - `CORS_ALLOWED_ORIGINS`、`NGINX_SERVER_NAME`、`NGINX_REDIRECT_HOST`、`NGINX_CERT_DOMAIN` 与真实域名一致，且 `NGINX_REDIRECT_HOST` 是单一 host，不包含 scheme、path、port、逗号、空白或控制字符。
 - `PUBLIC_DOCS_ENABLED` 和 `PUBLIC_METRICS_ENABLED` 已按公开性评审结论设置。
 - CI required checks 全部通过且没有被管理员绕过。
+
+### Administrator TOTP map
+
+`ADMIN_TOTP_SECRETS` is an optional deployment variable for ordinary
+administrators. Use semicolon-separated `username=Base32Secret` entries; the
+syntax-only form is `admin=<CSPRNG-generated-160-bit-Base32-secret>`, not a
+copyable shared example. Leave it empty only when the configured super-admin is
+the sole administrator. The production Compose preflight and
+`scripts/deploy-preflight.ps1` require complete 8-character Base32 blocks with
+at least 160 bits, canonical uppercase encoding, and reject low-diversity or
+published test values, duplicate usernames, obvious ascending/descending
+Base32 sequences, periodic repeated blocks, placeholders, and reused secrets,
+without printing secret values. These static checks cannot prove entropy or
+random provenance: generate every credential from 20 random bytes with an
+operating-system CSPRNG and deliver it through the approved secret manager. The
+HTTP demo generator creates a separate admin secret and writes its one-time
+`otpauth://` URI to the protected first-login file.
+
+Administrator JWTs are cryptographically bound to the TOTP credential that was
+current when the token was issued. Rotating or removing either
+`SUPER_ADMIN_TOTP_SECRET` or an `ADMIN_TOTP_SECRETS` entry therefore invalidates
+that administrator's existing JWTs as soon as the new configuration is active.
+This configuration supports one active credential per administrator, not an
+old/new overlap. For a multi-instance deployment, first stop or drain all
+administrator authentication and API traffic, atomically replace the secret in
+the shared deployment configuration, fully restart every instance, verify that
+no old instance remains, and only then restore administrator traffic. Do not use
+a rolling mixed-secret deployment: an old instance could continue accepting and
+issuing tokens bound to the superseded credential.
+
+`CACHE_KEY_HMAC_SECRET` derives both the TOTP replay-scope labels stored in Redis
+and the administrator JWT MFA-binding (`mfb`) claim. Treat its rotation with the
+same coordinated boundary: stop or drain administrator authentication and API
+traffic, atomically update the shared secret, fully restart every instance,
+confirm no process still has the old key, and then restore traffic. Never use a
+rolling mixed-key deployment for `CACHE_KEY_HMAC_SECRET`; a mixed fleet would
+disagree about replay claims and reject or accept administrator JWT bindings
+inconsistently. Plan for all existing administrator sessions to reauthenticate.

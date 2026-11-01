@@ -11,7 +11,10 @@ import routePlannerSource from './RoutePlanner.vue?raw'
 import scenicSpotDetailSource from './ScenicSpotDetail.vue?raw'
 import scenicSpotsSource from './ScenicSpots.vue?raw'
 import userProfileSource from './UserProfile.vue?raw'
-import extraMessages from '../i18n/locales/extra.json'
+import extraZh from '../i18n/locales/extra.zh.json'
+import extraBo from '../i18n/locales/extra.bo.json'
+
+const extraMessages = { zh: extraZh, bo: extraBo }
 
 const criticalViewSources = [
   ['News.vue', newsSource],

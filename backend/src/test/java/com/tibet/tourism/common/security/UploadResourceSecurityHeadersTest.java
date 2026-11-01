@@ -4,12 +4,13 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.tibet.tourism.modules.auth.application.AdminMfaPolicy;
 import com.tibet.tourism.modules.user.infra.UserRepository;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -28,22 +29,25 @@ class UploadResourceSecurityHeadersTest {
     @Autowired
     private MockMvc mockMvc;
 
-    @MockBean
+    @MockitoBean
     private JwtUtils jwtUtils;
 
-    @MockBean
+    @MockitoBean
+    private AdminMfaPolicy adminMfaPolicy;
+
+    @MockitoBean
     private UserDetailsServiceImpl userDetailsService;
 
-    @MockBean
+    @MockitoBean
     private CsrfTokenService csrfTokenService;
 
-    @MockBean
+    @MockitoBean
     private TokenRevocationService tokenRevocationService;
 
-    @MockBean
+    @MockitoBean
     private UserSessionVersionService userSessionVersionService;
 
-    @MockBean
+    @MockitoBean
     private UserRepository userRepository;
 
     @Test

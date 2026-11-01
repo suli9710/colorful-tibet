@@ -1,42 +1,46 @@
 <template>
   <div class="min-h-screen tibet-page-shell">
     <!-- Hero Section: Multi-layer Parallax -->
-    <div class="relative flex h-[calc(100svh-5rem)] min-h-[520px] items-center justify-center overflow-hidden -mt-20 sm:min-h-[680px] md:h-[calc(100vh-6rem)] md:-mt-24">
+    <div class="home-hero relative flex min-h-[620px] items-center overflow-hidden -mt-20 md:min-h-[720px] md:-mt-24">
       <!-- Layer 0: Sky gradient base -->
       <div class="absolute inset-0 z-0 bg-gradient-to-b from-tibet-dark via-tibet-brown/60 to-tibet-dark/40"></div>
 
       <!-- Layer 1: Background image -->
       <AnimatePresence :initial="false">
-        <motion.img
+        <motion.div
           :key="heroSlides[currentSlide].image"
-          :src="heroSlides[currentSlide].image"
-          :alt="heroSlides[currentSlide].title"
           :initial="{ opacity: 0 }"
-          :animate="{ opacity: 0.6 }"
+          :animate="{ opacity: 1 }"
           :exit="{ opacity: 0 }"
           :transition="{ duration: 1.05, ease: motionEase }"
           class="absolute inset-0 w-full h-full object-cover z-1 scale-[1.05]"
-        />
+        >
+          <picture class="block h-full w-full">
+            <source
+              v-if="resolveResponsiveImage(heroSlides[currentSlide].image)"
+              :srcset="resolveResponsiveImage(heroSlides[currentSlide].image)?.avif"
+              type="image/avif"
+              sizes="100vw"
+            >
+            <source
+              v-if="resolveResponsiveImage(heroSlides[currentSlide].image)"
+              :srcset="resolveResponsiveImage(heroSlides[currentSlide].image)?.webp"
+              type="image/webp"
+              sizes="100vw"
+            >
+            <img
+              :src="resolveResponsiveImage(heroSlides[currentSlide].image)?.fallback || heroSlides[currentSlide].image"
+              :alt="heroSlides[currentSlide].title"
+              class="h-full w-full object-cover"
+              decoding="async"
+              fetchpriority="high"
+            >
+          </picture>
+        </motion.div>
       </AnimatePresence>
 
-      <!-- Layer 2: Distant mountains (slowest parallax) -->
-      <motion.div class="hero-mountains-far z-2" style="bottom: 20%; height: 40%;"></motion.div>
-
-      <!-- Layer 3: Mid-ground mountains with snow -->
-      <motion.div class="hero-mountains-mid z-3" style="bottom: 10%; height: 50%;"></motion.div>
-
-      <!-- Layer 4: Foreground terrain -->
-      <motion.div class="hero-foreground z-4" style="bottom: 0; height: 30%;"></motion.div>
-
-      <!-- Layer 5: Golden light -->
-      <motion.div
-        class="hero-golden-light z-5"
-        :animate="prefersReducedMotion ? { opacity: 0.68, scale: 1 } : { opacity: [0.55, 0.95, 0.65], scale: [1, 1.05, 1] }"
-        :transition="prefersReducedMotion ? { duration: 0 } : { duration: 9, repeat: Infinity, ease: 'easeInOut' }"
-      ></motion.div>
-
-      <!-- Layer 6: Floating mist -->
-      <div class="hero-mist z-6"></div>
+      <!-- A single scrim keeps text legible without obscuring the landscape. -->
+      <div class="home-hero__scrim absolute inset-0 z-[6]" aria-hidden="true"></div>
 
       <!-- Layer 7: Prayer-flag bunting strung across the mountain pass -->
       <div class="hero-prayer-flags pointer-events-none absolute inset-x-0 top-0 z-[7] px-1 sm:px-6">
@@ -44,48 +48,49 @@
       </div>
 
       <!-- Layer 8: Content overlay -->
-      <div class="relative z-10 text-center px-4 max-w-5xl mx-auto">
+      <div class="home-hero__content relative z-10 mx-auto w-full max-w-7xl px-6 pb-16 pt-36 sm:px-12 lg:px-16">
         <div :key="`hero-content-${currentSlide}`" class="hero-content-fade">
             <div
-              class="mb-5 inline-flex items-center gap-2 rounded-full bg-tibet-red/25 px-3.5 py-2 text-xs text-tibet-yellow backdrop-blur-md border border-tibet-gold/30 sm:mb-6 sm:px-4 sm:text-sm"
+              class="mb-5 inline-flex items-center gap-2 rounded-full border border-white/40 bg-black/30 px-4 py-2 text-sm text-white sm:mb-6"
             >
               <span class="h-2 w-2 rounded-full bg-tibet-yellow animate-pulse-slow"></span>
               {{ heroSlides[currentSlide].tag }}
             </div>
             <h1
-              class="mb-5 text-3xl font-bold leading-tight text-white sm:text-5xl md:mb-6 md:text-7xl font-display"
+              class="mb-5 max-w-3xl text-4xl font-bold leading-tight text-white sm:text-5xl md:mb-6 md:text-7xl font-display"
               style="text-shadow: 0 2px 24px rgba(0,0,0,0.3);"
             >
               {{ heroSlides[currentSlide].title }}
             </h1>
             <p
-              class="mx-auto mb-8 max-w-2xl text-sm font-light leading-relaxed text-white/85 sm:text-xl md:mb-10 md:text-2xl"
+              class="mb-8 max-w-xl text-base leading-relaxed text-white sm:text-xl md:mb-10"
               style="text-shadow: 0 1px 12px rgba(0,0,0,0.2);"
             >
               {{ heroSlides[currentSlide].subtitle }}
             </p>
             <div
-              class="flex flex-col justify-center gap-3 sm:flex-row sm:gap-4"
+              class="home-hero__actions flex flex-col items-start gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4"
             >
-              <router-link to="/spots" class="tibet-btn w-full px-6 py-3.5 text-base shadow-xl will-change-transform hover:-translate-y-1 hover:scale-[1.03] active:scale-95 sm:w-auto sm:px-8 sm:py-4 sm:text-lg">
+              <router-link to="/route-planner" class="home-hero__primary inline-flex min-h-12 w-full items-center justify-center gap-3 rounded-xl px-6 py-3.5 text-base font-bold sm:w-auto">
+                {{ t('home.planTrip') }}
+                <span aria-hidden="true">→</span>
+              </router-link>
+              <router-link to="/spots" class="home-hero__secondary inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-white/70 bg-black/25 px-6 py-3.5 text-base font-semibold text-white sm:w-auto">
                 {{ t('home.startExploring') }}
               </router-link>
-              <button
-                      @click="scrollToHeatmap"
-                      class="tibet-btn-ghost w-full border-white/30 px-6 py-3.5 text-base text-white will-change-transform hover:-translate-y-1 hover:scale-[1.03] hover:border-white/50 hover:bg-white/10 hover:text-white active:scale-95 sm:w-auto sm:px-8 sm:py-4 sm:text-lg">
-                {{ t('home.viewHeatmap') }}
-              </button>
             </div>
+            <button type="button" @click="scrollToHeatmap" class="home-hero__map mt-4 inline-flex min-h-11 items-center gap-2 rounded-lg text-sm font-medium text-white underline underline-offset-4">
+              {{ t('home.viewHeatmap') }} <span aria-hidden="true">↓</span>
+            </button>
         </div>
 
         <!-- Bead-style carousel dots -->
-        <div class="mt-8 flex items-center justify-center gap-2.5 sm:mt-10">
+        <div class="mt-6 flex items-center gap-1 sm:mt-8">
           <button v-for="(slide, index) in heroSlides" :key="`${slide.image}-${index}`" type="button" @click="goToSlide(index)"
                   class="tibet-carousel-dot"
-                  :style="{ width: currentSlide === index ? '28px' : '8px', opacity: currentSlide === index ? 1 : 0.68 }"
                   :class="{ active: currentSlide === index }"
                   :aria-current="currentSlide === index ? 'true' : undefined"
-                  :aria-label="t('home.carouselDot', { index: index + 1 })"></button>
+                  :aria-label="t('home.carouselDot', { index: index + 1 })"><span aria-hidden="true"></span></button>
         </div>
       </div>
 
@@ -204,12 +209,29 @@
                :whileHover="{ y: -4, scale: 1.01 }"
                :whilePress="{ scale: 0.998 }">
             <div class="relative h-56 overflow-hidden sm:h-72">
-              <motion.img :src="spot.imageUrl" :alt="spot.name"
-                   class="w-full h-full object-cover tibet-image-hover img-fade-in will-change-transform"
-                   loading="lazy"
-                   :whileHover="{ scale: 1.08 }"
-                   :transition="{ duration: 0.65, ease: [0.16, 1, 0.3, 1] }">
-              </motion.img>
+              <picture class="block h-full w-full">
+                <source
+                  v-if="resolveResponsiveImage(spot.imageUrl)"
+                  :srcset="resolveResponsiveImage(spot.imageUrl)?.avif"
+                  type="image/avif"
+                  sizes="(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw"
+                >
+                <source
+                  v-if="resolveResponsiveImage(spot.imageUrl)"
+                  :srcset="resolveResponsiveImage(spot.imageUrl)?.webp"
+                  type="image/webp"
+                  sizes="(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw"
+                >
+                <motion.img
+                  :src="resolveResponsiveImage(spot.imageUrl)?.fallback || spot.imageUrl"
+                  :alt="spot.name"
+                  class="w-full h-full object-cover tibet-image-hover img-fade-in will-change-transform"
+                  loading="lazy"
+                  decoding="async"
+                  :whileHover="{ scale: 1.08 }"
+                  :transition="{ duration: 0.65, ease: [0.16, 1, 0.3, 1] }"
+                />
+              </picture>
               <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/15 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 ease-out-expo"></div>
               <motion.div
                 class="absolute left-0 top-0 h-full w-1/2 bg-gradient-to-r from-transparent via-white/20 to-transparent opacity-0 mix-blend-screen group-hover:opacity-100"
@@ -271,6 +293,7 @@ import api, { endpoints } from '../api'
 import PrayerFlags from '../components/PrayerFlags.vue'
 import { useAuthStore } from '../stores/auth'
 import { summarizeClientError } from '../utils/errorMonitoring'
+import { resolveResponsiveImage } from '../utils/responsiveImages'
 import {
   cardExit,
   cardInitial,
@@ -552,8 +575,40 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.home-hero {
+  isolation: isolate;
+}
+
+.home-hero__scrim {
+  background: linear-gradient(90deg, rgba(18, 25, 32, 0.82), rgba(18, 25, 32, 0.5) 48%, rgba(18, 25, 32, 0.16));
+}
+
+.home-hero__primary {
+  background: #fff8e9;
+  color: #6b1d2a;
+  transition: background-color 160ms ease, transform 160ms ease;
+}
+
+.home-hero__primary:hover {
+  background: #fff;
+  transform: translateY(-2px);
+}
+
+.home-hero__secondary:hover {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.home-hero__actions a:focus-visible,
+.home-hero__map:focus-visible,
+.tibet-carousel-dot:focus-visible {
+  outline: 3px solid white;
+  outline-offset: 4px;
+}
+
 /* Drape the prayer-flag bunting like a string tied between two poles. */
 .hero-prayer-flags {
+  top: 5.75rem;
+  opacity: 0.7;
   transform: rotate(-1.5deg);
   transform-origin: top center;
   filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.25));
@@ -569,14 +624,43 @@ onUnmounted(() => {
 }
 
 .tibet-carousel-dot {
-  transition: width 220ms ease, opacity 220ms ease, transform 160ms ease;
+  display: inline-flex;
+  width: 44px;
+  height: 44px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
-.tibet-carousel-dot:hover {
-  transform: scale(1.18);
+.tibet-carousel-dot span {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #fff;
+  opacity: 0.65;
+  transition: width 160ms ease;
 }
 
-.tibet-carousel-dot:active {
-  transform: scale(0.85);
+.tibet-carousel-dot.active {
+  background: transparent;
+  box-shadow: none;
+}
+
+.tibet-carousel-dot.active span {
+  width: 28px;
+  opacity: 1;
+  background: #f2c94c;
+}
+
+@media (max-width: 639px) {
+  .home-hero__content {
+    padding-top: 11rem;
+    padding-bottom: 3rem;
+  }
+  .home-hero__scrim {
+    background: linear-gradient(90deg, rgba(18, 25, 32, 0.78), rgba(18, 25, 32, 0.48));
+  }
 }
 </style>

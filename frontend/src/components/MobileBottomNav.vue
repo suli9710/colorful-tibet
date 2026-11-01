@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { Bot, Compass, Home, MapPinned, UserRound } from 'lucide-vue-next'
+import { Route, Compass, Home, MapPinned, UserRound } from 'lucide-vue-next'
 import { useAuthStore } from '../stores/auth'
 
 const route = useRoute()
@@ -43,9 +43,9 @@ const tabs = computed(() => [
   },
   {
     key: 'ai',
-    label: t('mobileNav.ai', 'AI'),
+    label: t('mobileNav.plan'),
     to: '/route-planner',
-    icon: Bot,
+    icon: Route,
     active: route.path.startsWith('/route-planner') || route.path.startsWith('/route')
   },
   {
@@ -85,7 +85,7 @@ const tabs = computed(() => [
             <a
               :href="href"
               class="mobile-bottom-nav__tab relative flex min-h-[56px] min-w-0 flex-col items-center justify-center gap-1 rounded-2xl px-1 py-2 text-[10px] font-semibold leading-none transition active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tibet-gold/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
-              :class="tab.active ? 'text-tibet-red' : 'text-tibet-brown/62'"
+              :class="tab.active ? 'text-tibet-red' : 'text-tibet-brown'"
               :aria-current="tab.active ? 'page' : undefined"
               :aria-label="getTabAriaLabel(tab.label, tab.active)"
               :title="getTabTitle(tab.label, tab.active)"

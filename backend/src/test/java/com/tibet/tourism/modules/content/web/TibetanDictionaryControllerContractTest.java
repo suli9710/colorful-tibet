@@ -14,6 +14,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static com.tibet.tourism.modules.admin.application.AdminAuditTestSupport.passthroughAuditService;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -56,7 +57,8 @@ class TibetanDictionaryControllerContractTest {
 
     @BeforeEach
     void setUp() {
-        controller = new TibetanDictionaryController(dictionaryRepository, translationService);
+        controller = new TibetanDictionaryController(
+                dictionaryRepository, translationService, passthroughAuditService());
 
         LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
         validator.afterPropertiesSet();

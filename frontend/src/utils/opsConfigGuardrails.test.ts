@@ -55,16 +55,26 @@ describe('ops configuration guardrails', () => {
     }
   })
 
-  it('keeps production proxy trust disabled unless operators opt into explicit CIDRs', () => {
+  it('trusts exactly one pinned reverse proxy so per-IP limits do not collapse', () => {
     const envExample = readRepoFile('.env.example')
     const prodCompose = readRepoFile('docker-compose.prod.yml')
 
-    expect(envValue(envExample, 'TRUST_PROXY_HEADERS')).toBe('false')
-    expect(envValue(envExample, 'TRUSTED_PROXY_CIDRS')).toBe('')
-    expect(prodCompose).toContain('TRUST_PROXY_HEADERS=${TRUST_PROXY_HEADERS:-false}')
-    expect(prodCompose).toContain('TRUSTED_PROXY_CIDRS=${TRUSTED_PROXY_CIDRS:-}')
-    expect(prodCompose).not.toMatch(/TRUSTED_PROXY_CIDRS=\$\{TRUSTED_PROXY_CIDRS:-[^}\n]*(?:10\.0\.0\.0\/8|172\.16\.0\.0\/12|192\.168\.0\.0\/16)/)
+    // The backend's TCP peer is always the nginx container. Leaving proxy trust off makes every
+    // caller resolve to that one address, collapsing per-IP rate limiting, brute-force lockout and
+    // the anonymous AI quota into a single global bucket - which lets one attacker lock out every
+    // account. Trusting it is only safe because nginx overwrites X-Forwarded-For with $remote_addr.
+    expect(envValue(envExample, 'TRUST_PROXY_HEADERS')).toBe('true')
+    expect(prodCompose).toContain('TRUST_PROXY_HEADERS=${TRUST_PROXY_HEADERS:-true}')
+
+    // ...and only when the trusted range names that proxy exactly, never a broad private range.
+    const envCidrs = envValue(envExample, 'TRUSTED_PROXY_CIDRS')
+    expect(envCidrs).toMatch(/^(\d{1,3}\.){3}\d{1,3}\/32$/)
+    expect(prodCompose).toMatch(/TRUSTED_PROXY_CIDRS=\$\{TRUSTED_PROXY_CIDRS:-[^}\n]*\/32\}/)
+    expect(prodCompose).not.toMatch(/TRUSTED_PROXY_CIDRS=\$\{TRUSTED_PROXY_CIDRS:-[^}\n]*(?:0\.0\.0\.0\/0|10\.0\.0\.0\/8|172\.16\.0\.0\/12|192\.168\.0\.0\/16)/)
     expect(prodCompose).toContain('TRUSTED_PROXY_CIDRS must not trust broad private ranges')
+
+    // The /32 above is only stable because the proxy container has a pinned address.
+    expect(prodCompose).toContain('ipv4_address: ${FRONTEND_CONTAINER_IP:-172.28.0.10}')
   })
 
   it('runs production preflight before services that consume infrastructure secrets', () => {
@@ -79,6 +89,7 @@ describe('ops configuration guardrails', () => {
       'ADMIN_ENCRYPTION_KEY',
       'CSRF_SIGNING_SECRET',
       'CACHE_KEY_HMAC_SECRET',
+      'METRICS_SCRAPE_TOKEN',
       'PAYMENT_CALLBACK_SECRET',
       'PII_KEYS',
       'PII_ACTIVE_KID',
@@ -88,7 +99,8 @@ describe('ops configuration guardrails', () => {
       'RECAPTCHA_SECRET_KEY',
       'VITE_AMAP_KEY',
       'VITE_AMAP_SECURITY_CODE',
-      'ALERTMANAGER_WEBHOOK_URL'
+      'ALERTMANAGER_WEBHOOK_URL',
+      'APP_VERSION'
     ] as const
 
     expect(prodCompose).toContain('production-preflight:')
@@ -104,6 +116,7 @@ describe('ops configuration guardrails', () => {
     expect(uploadServer).toContain('must be a single DNS host without scheme, path, port, comma, whitespace, or control characters')
     expect(uploadServer).toContain('for secret_name in \\')
     expect(uploadServer).toContain('CACHE_KEY_HMAC_SECRET must be at least 64 characters')
+    expect(uploadServer).toContain('METRICS_SCRAPE_TOKEN must be at least 64 characters')
     expect(uploadServer).toContain('TRUSTED_PROXY_CIDRS must not trust broad private ranges')
   })
 
@@ -207,6 +220,7 @@ describe('ops configuration guardrails', () => {
     const requiredFragments = [
       'Supply-chain Pinning',
       'node scripts/resolve-docker-image-digests.mjs --markdown',
+      '--output=docker-digest-evidence.json',
       'scripts/validate-workflow-yaml.mjs',
       'workflow tool install',
       '34e114876b0b11c390a56381ad16ebd13914f8d5',
@@ -240,7 +254,23 @@ describe('ops configuration guardrails', () => {
       expect(docs, fragment).toContain(fragment)
     }
     expect(checklist).toContain('node scripts/resolve-docker-image-digests.mjs --markdown')
+    expect(checklist).toContain('--output=docker-digest-evidence.json')
+    expect(checklist).not.toMatch(/>\s*docker-digest-evidence\.json/)
     expect(resolver).toContain('https://auth.docker.io/token')
     expect(resolver).toContain('https://registry-1.docker.io/v2/')
+    expect(resolver).toContain('writeOutputAtomically')
+  })
+
+  it('wires production browser errors to a versioned same-origin endpoint', () => {
+    const frontendDockerfile = readRepoFile('frontend', 'Dockerfile')
+    const prodCompose = readRepoFile('docker-compose.prod.yml')
+    const monitoringSource = readRepoFile('frontend', 'src', 'utils', 'errorMonitoring.ts')
+
+    expect(frontendDockerfile).toContain('ARG VITE_FRONTEND_ERROR_REPORT_URL=/api/client-errors')
+    expect(frontendDockerfile).toContain('ARG VITE_APP_VERSION=unknown')
+    expect(prodCompose).toContain('VITE_FRONTEND_ERROR_REPORT_URL=${VITE_FRONTEND_ERROR_REPORT_URL:-/api/client-errors}')
+    expect(prodCompose).toContain('VITE_APP_VERSION=${APP_VERSION:?APP_VERSION is required in production}')
+    expect(monitoringSource).toContain('url.origin === window.location.origin')
+    expect(monitoringSource).toContain("url.pathname.startsWith('/api/')")
   })
 })

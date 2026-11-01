@@ -60,7 +60,7 @@ class AuthControllerTest {
         ResponseEntity<?> response = controller.authenticateUser(request, new MockHttpServletRequest());
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
-        assertThat(response.getHeaders().containsKey(HttpHeaders.RETRY_AFTER)).isFalse();
+        assertThat(response.getHeaders().containsHeader(HttpHeaders.RETRY_AFTER)).isFalse();
         assertThat(response.getBody()).isInstanceOf(Map.class);
 
         @SuppressWarnings("unchecked")

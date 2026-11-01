@@ -85,4 +85,16 @@ public interface TravelQuestionRepository extends JpaRepository<TravelQuestion, 
     @Modifying
     @Query("UPDATE TravelQuestion q SET q.answerCount = CASE WHEN q.answerCount > 0 THEN q.answerCount - 1 ELSE 0 END, q.version = q.version + 1 WHERE q.id = :id")
     int decrementAnswerCount(@Param("id") Long id);
+
+    /** Recomputes like_count from the surviving rows after a bulk delete of one user's likes. */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE TravelQuestion q SET q.likeCount = (SELECT COUNT(ql) FROM QuestionLike ql WHERE ql.question.id = q.id), "
+            + "q.version = q.version + 1 WHERE q.id IN :ids")
+    void recountLikes(@Param("ids") java.util.Collection<Long> ids);
+
+    /** Recomputes answer_count from the surviving rows after a bulk delete of one user's answers. */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE TravelQuestion q SET q.answerCount = (SELECT COUNT(a) FROM TravelAnswer a WHERE a.question.id = q.id), "
+            + "q.version = q.version + 1 WHERE q.id IN :ids")
+    void recountAnswers(@Param("ids") java.util.Collection<Long> ids);
 }

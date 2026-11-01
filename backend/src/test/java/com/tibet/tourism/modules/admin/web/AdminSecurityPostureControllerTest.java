@@ -13,12 +13,13 @@ import com.tibet.tourism.common.security.TrustedProxyIpResolver;
 import com.tibet.tourism.common.security.UserDetailsServiceImpl;
 import com.tibet.tourism.common.security.UserSessionVersionService;
 import com.tibet.tourism.common.security.WebSecurityConfig;
+import com.tibet.tourism.modules.auth.application.AdminMfaPolicy;
 import com.tibet.tourism.modules.admin.application.AdminSecurityPostureService;
 import com.tibet.tourism.modules.user.infra.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -34,25 +35,28 @@ class AdminSecurityPostureControllerTest {
     @Autowired
     private MockMvc mockMvc;
 
-    @MockBean
+    @MockitoBean
     private JwtUtils jwtUtils;
 
-    @MockBean
+    @MockitoBean
+    private AdminMfaPolicy adminMfaPolicy;
+
+    @MockitoBean
     private UserDetailsServiceImpl userDetailsService;
 
-    @MockBean
+    @MockitoBean
     private CsrfTokenService csrfTokenService;
 
-    @MockBean
+    @MockitoBean
     private TokenRevocationService tokenRevocationService;
 
-    @MockBean
+    @MockitoBean
     private UserSessionVersionService userSessionVersionService;
 
-    @MockBean
+    @MockitoBean
     private UserRepository userRepository;
 
-    @MockBean
+    @MockitoBean
     private AdminSecurityPostureService securityPostureService;
 
     @Test

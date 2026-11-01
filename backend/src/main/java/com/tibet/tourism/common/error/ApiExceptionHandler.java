@@ -1,12 +1,18 @@
 package com.tibet.tourism.common.error;
 
 import com.tibet.tourism.common.security.SensitiveLogSanitizer;
+import com.tibet.tourism.common.security.AdminAccessDeniedAuditEvent;
+import com.tibet.tourism.common.security.AdminAccessDeniedAuditPublisher;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import java.util.Locale;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -39,6 +45,16 @@ public class ApiExceptionHandler {
             "\u6570\u636e\u5df2\u88ab\u5176\u4ed6\u64cd\u4f5c\u4fee\u6539\uff0c\u8bf7\u5237\u65b0\u540e\u91cd\u8bd5";
     private static final String INTERNAL_ERROR_MESSAGE =
             "\u670d\u52a1\u5668\u5904\u7406\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5";
+    private final AdminAccessDeniedAuditPublisher accessDeniedAuditPublisher;
+
+    public ApiExceptionHandler() {
+        this.accessDeniedAuditPublisher = null;
+    }
+
+    @Autowired
+    ApiExceptionHandler(ObjectProvider<AdminAccessDeniedAuditPublisher> auditPublisherProvider) {
+        this.accessDeniedAuditPublisher = auditPublisherProvider.getIfAvailable();
+    }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, String>> handleValidation(MethodArgumentNotValidException exception) {
@@ -94,7 +110,8 @@ public class ApiExceptionHandler {
     }
 
     @ExceptionHandler(AccessDeniedException.class)
-    public ResponseEntity<Map<String, String>> handleAccessDenied() {
+    public ResponseEntity<Map<String, String>> handleAccessDenied(HttpServletRequest request) {
+        publishAccessDeniedAudit(request);
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", RESOURCE_ACCESS_DENIED_MESSAGE));
     }
 
@@ -119,6 +136,14 @@ public class ApiExceptionHandler {
         logger.warn("Optimistic lock conflict: {}", SensitiveLogSanitizer.exceptionSummary(ex));
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(Map.of("error", OPTIMISTIC_LOCK_MESSAGE));
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<Map<String, String>> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
+        // A violated unique/foreign-key constraint is a conflict the caller can retry, not a server
+        // fault. Reporting it as 500 also hid concurrent duplicate submissions behind a generic error.
+        logger.warn("Data integrity conflict: {}", SensitiveLogSanitizer.exceptionSummary(ex));
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", CONFLICT_MESSAGE));
     }
 
     @ExceptionHandler(AsyncRequestNotUsableException.class)
@@ -163,6 +188,21 @@ public class ApiExceptionHandler {
         if (logger.isDebugEnabled()) {
             logger.debug("Client disconnected before API response completed: {}",
                     SensitiveLogSanitizer.exceptionSummary(throwable));
+        }
+    }
+
+    private void publishAccessDeniedAudit(HttpServletRequest request) {
+        if (accessDeniedAuditPublisher == null) {
+            return;
+        }
+        try {
+            accessDeniedAuditPublisher.publish(
+                    request,
+                    AdminAccessDeniedAuditEvent.Source.METHOD_SECURITY);
+        } catch (RuntimeException exception) {
+            // Method authorization has already denied the operation; preserve its 403 response.
+            logger.warn("Administrator method-denial audit failed: source=method_security, error={}",
+                    SensitiveLogSanitizer.exceptionSummary(exception));
         }
     }
 }

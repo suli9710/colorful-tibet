@@ -3,6 +3,7 @@ package com.tibet.tourism.modules.hotel.web;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
+import static com.tibet.tourism.modules.admin.application.AdminAuditTestSupport.passthroughAuditService;
 
 import com.tibet.tourism.common.security.antibot.RiskAssessmentService;
 import com.tibet.tourism.modules.hotel.application.HotelBookingService;
@@ -51,7 +52,7 @@ class HotelBookingControllerSecurityTest {
                 .when(hotelBookingService)
                 .deleteBooking(user, 99L);
         HotelBookingController controller = new HotelBookingController(
-                hotelBookingService, userRepository, riskAssessmentService);
+                hotelBookingService, userRepository, riskAssessmentService, passthroughAuditService());
 
         ResponseEntity<?> response = controller.deleteBooking(99L);
 

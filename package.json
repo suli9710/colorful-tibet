@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "check": "npm run check:backend && npm run check:frontend && npm run check:scrapler",
+    "check": "npm run check:backend && npm run check:frontend && npm run check:scrapler && npm run check:supply-chain-pins && npm run test:ops",
     "check:frontend": "npm --prefix frontend run typecheck && npm --prefix frontend run test -- --run && npm --prefix frontend run build",
     "check:backend": "mvn -q -f backend/pom.xml -DskipTests compile && mvn -q -f backend/pom.xml test",
     "check:scrapler": "cd scrapler && python -m pytest -q",

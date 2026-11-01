@@ -87,6 +87,18 @@ class JwtUtilsSecurityTest {
     }
 
     @Test
+    void acceptsHexEncodedProductionSecretFromOpensslRand() {
+        // `openssl rand -hex 32` is the documented way to mint these. Its 64 hex characters are all in
+        // the Base64 alphabet, so the Base64 branch decoded them to 48 bytes and refused the secret
+        // outright - despite it carrying 256 bits of entropy - without ever reaching the entropy check.
+        String hexSecret = "3f8a1c9d0e7b6452af31c8d95e0b7a24fd6c83915ea27b40c9d15e83a7620fb4";
+
+        JwtUtils jwtUtils = jwtUtils(hexSecret, 86_400_000, true);
+
+        assertThatCode(jwtUtils::validateJwtConfiguration).doesNotThrowAnyException();
+    }
+
+    @Test
     void rejectsLowEntropyProductionSecret() {
         JwtUtils jwtUtils = jwtUtils("a".repeat(64), 86_400_000, true);
 
@@ -110,6 +122,31 @@ class JwtUtilsSecurityTest {
 
         assertThat(jwtUtils.validateJwtToken(token)).isTrue();
         assertThat(jwtUtils.getSessionVersionFromJwtToken(token)).isEqualTo(7L);
+        assertThat(jwtUtils.isMfaVerified(token)).isFalse();
+
+        String mfaBinding = "a1b2c3d4e5f60718293a4b5c6d7e8f90";
+        String mfaToken = jwtUtils.generateJwtToken(authentication, 7L, true, mfaBinding);
+        assertThat(jwtUtils.validateJwtToken(mfaToken)).isTrue();
+        assertThat(jwtUtils.isMfaVerified(mfaToken)).isTrue();
+        assertThat(jwtUtils.getMfaBindingFromJwtToken(mfaToken)).isEqualTo(mfaBinding);
+        assertThat(jwtUtils.getMfaBindingFromJwtToken(token)).isEmpty();
+    }
+
+    @Test
+    void refusesToMintMfaVerifiedTokenWithoutOpaqueCredentialBinding() {
+        JwtUtils jwtUtils = jwtUtils("b".repeat(64), 86_400_000, false);
+        jwtUtils.validateJwtConfiguration();
+        var principal = org.springframework.security.core.userdetails.User
+                .withUsername("administrator")
+                .password("encoded")
+                .roles("ADMIN")
+                .build();
+        var authentication = new UsernamePasswordAuthenticationToken(
+                principal, null, principal.getAuthorities());
+
+        assertThatThrownBy(() -> jwtUtils.generateJwtToken(authentication, 1L, true, ""))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("opaque credential binding");
     }
 
     @Test

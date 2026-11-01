@@ -23,6 +23,8 @@ import com.tibet.tourism.common.security.TrustedProxyIpResolver;
 import com.tibet.tourism.common.security.UserDetailsServiceImpl;
 import com.tibet.tourism.common.security.UserSessionVersionService;
 import com.tibet.tourism.common.security.WebSecurityConfig;
+import com.tibet.tourism.modules.auth.application.AdminMfaPolicy;
+import com.tibet.tourism.modules.admin.application.AdminAuditLogService;
 import com.tibet.tourism.modules.recommendation.application.ColdStartOptimizationService;
 import com.tibet.tourism.modules.recommendation.application.ItemBasedRecommendationService;
 import com.tibet.tourism.modules.recommendation.application.RecommendationService;
@@ -38,8 +40,8 @@ import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -59,37 +61,43 @@ class ScenicSpotCurrentUserRecommendationTest {
     @Autowired
     private MockMvc mockMvc;
 
-    @MockBean
+    @MockitoBean
     private JwtUtils jwtUtils;
 
-    @MockBean
+    @MockitoBean
+    private AdminMfaPolicy adminMfaPolicy;
+
+    @MockitoBean
+    private AdminAuditLogService adminAuditLogService;
+
+    @MockitoBean
     private UserDetailsServiceImpl userDetailsService;
 
-    @MockBean
+    @MockitoBean
     private CsrfTokenService csrfTokenService;
 
-    @MockBean
+    @MockitoBean
     private TokenRevocationService tokenRevocationService;
 
-    @MockBean
+    @MockitoBean
     private UserSessionVersionService userSessionVersionService;
 
-    @MockBean
+    @MockitoBean
     private ScenicSpotService scenicSpotService;
 
-    @MockBean
+    @MockitoBean
     private RecommendationService recommendationService;
 
-    @MockBean
+    @MockitoBean
     private CompanionInferenceService companionInferenceService;
 
-    @MockBean
+    @MockitoBean
     private ItemBasedRecommendationService itemBasedRecommendationService;
 
-    @MockBean
+    @MockitoBean
     private ColdStartOptimizationService coldStartOptimizationService;
 
-    @MockBean
+    @MockitoBean
     private UserRepository userRepository;
 
     @Test
@@ -242,6 +250,12 @@ class ScenicSpotCurrentUserRecommendationTest {
         when(jwtUtils.validateJwtToken(USER_TOKEN)).thenReturn(true);
         when(userSessionVersionService.tokenMatchesCurrentSession(USER_TOKEN)).thenReturn(true);
         when(jwtUtils.getUserNameFromJwtToken(USER_TOKEN)).thenReturn(appUser.getUsername());
+        if (appUser.getRole() == User.Role.ADMIN) {
+            String binding = "0123456789abcdef0123456789abcdef";
+            when(jwtUtils.isMfaVerified(USER_TOKEN)).thenReturn(true);
+            when(jwtUtils.getMfaBindingFromJwtToken(USER_TOKEN)).thenReturn(binding);
+            when(adminMfaPolicy.matchesCurrentBinding(appUser.getUsername(), binding)).thenReturn(true);
+        }
         when(userDetailsService.loadUserByUsername(appUser.getUsername()))
                 .thenReturn(new org.springframework.security.core.userdetails.User(
                         appUser.getUsername(),

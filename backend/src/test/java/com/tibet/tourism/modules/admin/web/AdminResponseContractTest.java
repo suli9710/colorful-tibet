@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.tibet.tourism.modules.admin.application.AdminAuditLogService;
 import com.tibet.tourism.modules.community.infra.CommentLikeRepository;
 import com.tibet.tourism.modules.community.infra.CommentRepository;
 import com.tibet.tourism.modules.content.application.TibetanTranslationService;
@@ -59,6 +60,7 @@ class AdminResponseContractTest {
     @Mock private HeritageEventRepository eventRepository;
     @Mock private HeritageLikeRepository likeRepository;
     @Mock private HeritageCommentRepository heritageCommentRepository;
+    @Mock private AdminAuditLogService auditLogService;
 
     @Test
     void adminScenicSpotListDoesNotExposeEntityGraphOrSensitiveFields() throws Exception {
@@ -82,7 +84,8 @@ class AdminResponseContractTest {
                 commentLikeRepository,
                 bookingRepository,
                 userVisitHistoryRepository,
-                translationService);
+                translationService,
+                auditLogService);
 
         String json = json(controller.getAllSpots(PageRequest.of(0, 10)).getBody());
 
@@ -107,7 +110,7 @@ class AdminResponseContractTest {
         news.setCreatedAt(LocalDateTime.parse("2026-02-03T04:05:06"));
         when(newsRepository.findAll(any(Pageable.class))).thenReturn(pageOf(news));
 
-        AdminNewsController controller = new AdminNewsController(newsRepository, translationService);
+        AdminNewsController controller = new AdminNewsController(newsRepository, translationService, auditLogService);
 
         String json = json(controller.getAllNews(PageRequest.of(0, 10)).getBody());
 
@@ -144,7 +147,8 @@ class AdminResponseContractTest {
         when(roomTypeRepository.findByHotelIdOrderBySortOrderAsc(3L)).thenReturn(List.of(roomType));
 
         AdminHotelController controller = new AdminHotelController(hotelRepository, roomTypeRepository,
-                org.mockito.Mockito.mock(com.tibet.tourism.modules.hotel.infra.HotelBookingRepository.class));
+                org.mockito.Mockito.mock(com.tibet.tourism.modules.hotel.infra.HotelBookingRepository.class),
+                auditLogService);
 
         String hotelsJson = json(controller.getAllHotels(PageRequest.of(0, 10)).getBody());
         String roomTypesJson = json(controller.getRoomTypes(3L).getBody());
@@ -198,7 +202,8 @@ class AdminResponseContractTest {
                 inheritorRepository,
                 eventRepository,
                 likeRepository,
-                heritageCommentRepository);
+                heritageCommentRepository,
+                auditLogService);
 
         String itemsJson = json(controller.getAllItems(PageRequest.of(0, 10)).getBody());
         String inheritorsJson = json(controller.getInheritors(5L).getBody());

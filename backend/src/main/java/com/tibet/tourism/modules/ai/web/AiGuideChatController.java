@@ -1,6 +1,7 @@
 package com.tibet.tourism.modules.ai.web;
 
 import com.tibet.tourism.common.security.JwtAuthSupport;
+import com.tibet.tourism.common.security.TrustedProxyIpResolver;
 import com.tibet.tourism.common.security.PiiMasker;
 import com.tibet.tourism.common.security.antibot.AntibotProperties;
 import com.tibet.tourism.common.security.antibot.RecaptchaService;
@@ -34,6 +35,7 @@ public class AiGuideChatController {
     private final JwtAuthSupport jwtAuthSupport;
     private final RecaptchaService recaptchaService;
     private final AntibotProperties antibotProperties;
+    private final TrustedProxyIpResolver trustedProxyIpResolver;
     private final boolean anonymousRemoteAiEnabled;
 
     public AiGuideChatController(
@@ -42,6 +44,7 @@ public class AiGuideChatController {
             JwtAuthSupport jwtAuthSupport,
             RecaptchaService recaptchaService,
             AntibotProperties antibotProperties,
+            TrustedProxyIpResolver trustedProxyIpResolver,
             @Value("${app.security.guide-chat.anonymous-remote-ai-enabled:${GUIDE_CHAT_ANON_REMOTE_AI_ENABLED:false}}")
             boolean anonymousRemoteAiEnabled) {
         this.aiGuideChatService = aiGuideChatService;
@@ -49,6 +52,7 @@ public class AiGuideChatController {
         this.jwtAuthSupport = jwtAuthSupport;
         this.recaptchaService = recaptchaService;
         this.antibotProperties = antibotProperties;
+        this.trustedProxyIpResolver = trustedProxyIpResolver;
         this.anonymousRemoteAiEnabled = anonymousRemoteAiEnabled;
     }
 
@@ -133,7 +137,9 @@ public class AiGuideChatController {
     }
 
     private String resolveAnonymousClientKey(HttpServletRequest request) {
-        String remoteAddr = request.getRemoteAddr();
+        // request.getRemoteAddr() is the reverse proxy for every caller, which would leave the quota
+        // keyed on the User-Agent alone - trivially rotated for unlimited free AI usage.
+        String remoteAddr = trustedProxyIpResolver.resolveClientIp(request);
         String userAgent = request.getHeader("User-Agent");
         return "ip#" + PiiMasker.shortHash(remoteAddr)
                 + ":ua#" + PiiMasker.shortHash(userAgent);

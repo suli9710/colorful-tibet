@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static com.tibet.tourism.modules.admin.application.AdminAuditTestSupport.passthroughAuditService;
 
 import com.tibet.tourism.common.security.antibot.RiskAssessmentService;
 import com.tibet.tourism.modules.hotel.application.HotelBookingService;
@@ -41,7 +42,7 @@ class HotelPublicReadContractTest {
     @BeforeEach
     void setUp() {
         HotelBookingController controller = new HotelBookingController(
-                hotelBookingService, userRepository, riskAssessmentService);
+                hotelBookingService, userRepository, riskAssessmentService, passthroughAuditService());
         mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
     }
 

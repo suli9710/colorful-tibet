@@ -1,0 +1,910 @@
+{
+  "routeTitles": {
+    "scenicSpotDetail": "གཟིགས་སྐོར་ས་གནས་ཞིབ་ཕྲ།",
+    "routeDetail": "འགྲུལ་ལམ་ཞིབ་ཕྲ།",
+    "hotelDetail": "མགྲོན་ཁང་ཞིབ་ཕྲ།",
+    "notFound": "ཤོག་ངོས་མ་རྙེད།"
+  },
+  "home": {
+    "carouselDot": "འཁོར་སྟོན་པར་ཨང {index} ལ་བསྒྱུར།",
+    "highRatingSpot": "སྐར་མ་མཐོ་བའི་ས་གནས།",
+    "popularSpot": "ཁྱབ་ཆེན་ས་གནས།",
+    "selectedForYou": "ཁྱེད་ལ་བདམས་པ།"
+  },
+  "common": {
+    "refresh": "བསྐྱར་གསོ།",
+    "retry": "བསྐྱར་ཚོད།",
+    "create": "གསར་བཟོ།",
+    "add": "སྣོན་པ།",
+    "update": "གསར་སྒྱུར།",
+    "enabled": "སྤྱོད་བཞིན།",
+    "disabled": "སྤྱོད་མེད།",
+    "unknown": "མ་ཤེས།",
+    "unknownLocation": "གནས་ཡུལ་མ་ཤེས།",
+    "consult": "འདྲི་རྩད།",
+    "items": "ཚན།",
+    "countUnit": "ཚན།",
+    "peopleUnit": "མི།",
+    "hotelsUnit": "ཁང་།",
+    "imagesUnit": "པར།",
+    "nightsUnit": "མཚན།",
+    "timesUnit": "ཐེངས།",
+    "expandAll": "ཚང་མར་ལྟ།",
+    "collapse": "བསྡུ།",
+    "upload": "ཡར་སྤྲོད།",
+    "back": "ཕྱིར་ལོག",
+    "clear": "སུབ།"
+  },
+  "news": {
+    "searchPlaceholder": "སྲིད་ཇུས། བྱེད་སྒོ། གསལ་བསྒྲགས་འཚོལ།",
+    "categoryFilter": "གསར་འགྱུར་རིགས་དབྱེ།",
+    "loadingLabel": "གསར་འགྱུར་འཇུག་བཞིན་པ།",
+    "loadErrorTitle": "གསར་འགྱུར་འཇུག་མ་ཐུབ།",
+    "retryLoad": "གསར་འགྱུར་བསྐྱར་འཇུག",
+    "emptyTitle": "མཐུན་པའི་གསར་འགྱུར་མེད།",
+    "noSummary": "ནང་དོན་ད་དུང་ཁ་སྐོང་བྱེད་བཞིན་ཡོད།",
+    "paginationLabel": "གསར་འགྱུར་ཤོག་བགོས།",
+    "emptyMessage": "ད་ལྟ་སྟོན་རྒྱུའི་ཡུལ་སྐོར་གསར་འགྱུར་མེད། རྗེས་སུ་བསྐྱར་ལྟ་གནང་།",
+    "noSearchMessage": "ད་ལྟའི་ཆ་རྐྱེན་འོག་གསར་འགྱུར་མ་རྙེད། འཚོལ་ཚིག་སུབ་པའམ་རིགས་དབྱེ་བརྗེ་རོགས།",
+    "resultSummaryWithKeyword": "{base} · འཚོལ་ཚིག “{keyword}”",
+    "viewCountWithCount": "{count} ཐེངས་ཀློག",
+    "metaLine": "{date} · {views}"
+  },
+  "routeDetail": {
+    "loadingRoute": "འགྲུལ་ལམ་ཞིབ་ཕྲ་འཇུག་བཞིན་པ།",
+    "commentsLoading": "དཔྱད་གཞི་འཇུག་བཞིན་པ།",
+    "commentsLoadFailed": "དཔྱད་གཞི་འཇུག་མ་ཐུབ། རྗེས་སུ་བསྐྱར་ཚོད་གནང་རོགས།",
+    "loadFailed": "འགྲུལ་ལམ་ཞིབ་ཕྲ་འཇུག་མ་ཐུབ། རྗེས་སུ་བསྐྱར་ཚོད་གནང་རོགས།"
+  },
+  "orderCenter": {
+    "noPlatformPaymentBadge": "ལས་སྟེགས་འདིས་དངུལ་མི་ལེན།",
+    "title": "འདྲི་རྩད་ཐོ་གཞུང་ལྟེ་གནས།",
+    "subtitle": "ས་གནས། མགྲོན་ཁང་། འགྲུལ་ལམ་ཚན་པའི་འདྲི་རྩད་འདོད་འདུན་འདིར་བསྡུས་ཡོད། ཉོ་སྒྲུབ། འཛིན་ཤོག སྡོད་འཛུལ། ཞབས་ཞུ་རྗེས་མ་བཅས་ཚད་ལྡན་གྱི་ཕྱི་ཕྱོགས་ལས་སྟེགས་ལ་གཞི་བཅོལ་དགོས།",
+    "continuePlanning": "འཆར་འགོད་མུ་མཐུད།",
+    "searchPlaceholder": "འདྲི་རྩད་ཨང་ངམ་གནད་བསྡུས་འཚོལ།",
+    "loading": "འདྲི་རྩད་ཐོ་འཇུག་བཞིན་པ།",
+    "loadErrorTitle": "འདྲི་རྩད་ཐོ་འཇུག་མ་ཐུབ།",
+    "emptyTitle": "འདྲི་རྩད་ཐོ་ད་དུང་མེད།",
+    "emptyDescription": "ས་གནས། མགྲོན་ཁང་། AI འགྲུལ་ལམ་ཤོག་ངོས་ནས་འདྲི་རྩད་སྤྲད་རྗེས། འདིར་ཞབས་ཞུ་དང་ཕྱི་ཕྱོགས་ངེས་བརྟན་གནས་ཚུལ་མངོན།",
+    "createItinerary": "འགྲུལ་ལམ་བཟོ།",
+    "browseHotels": "མགྲོན་ཁང་ལ་ལྟ།",
+    "defaultProductSummary": "ཡུལ་སྐོར་འདྲི་རྩད།",
+    "referencePrice": "བསྡུར་རིན།",
+    "confirmationStatus": "ངེས་བརྟན་གནས་ཚུལ།",
+    "createdAt": "བཟོས་པའི་དུས་ཚོད།",
+    "noFilteredResults": "ད་ལྟའི་ཆ་རྐྱེན་འོག་འདྲི་རྩད་ཐོ་མེད།",
+    "clearFilters": "ཆ་རྐྱེན་སུབ།",
+    "paginationLabel": "འདྲི་རྩད་ཐོ་ཤོག་བགོས།",
+    "closeDetail": "འདྲི་རྩད་ཞིབ་ཕྲ་ཁ་རྒྱག",
+    "detailLoading": "འདྲི་རྩད་ཞིབ་ཕྲ་འཇུག་བཞིན་པ།",
+    "reloadDetail": "ཞིབ་ཕྲ་བསྐྱར་འཇུག",
+    "itemsTitle": "འདྲི་རྩད་ཚན་པ།",
+    "standardConsultation": "ཚད་ལྡན་འདྲི་རྩད།",
+    "quantity": "གྲངས་ཚད {count}",
+    "noItemDetails": "ཚན་པའི་ཞིབ་ཕྲ་ད་དུང་མེད། ཞིབ་ཕྲ་བསྐྱར་འཇུག་གམ་ཞབས་ཞུ་/ཕྱི་ཕྱོགས་ངེས་བརྟན་ལ་གཞི་བཅོལ་རོགས།",
+    "vouchersTitle": "དཔང་ཡིག་དང་ངེས་བརྟན།",
+    "voucherDetails": "དཔང་ཡིག་ཞིབ་ཕྲ།",
+    "voucherCount": "དཔང་ཡིག {count}",
+    "noVouchers": "དཔང་ཡིག་ད་དུང་མེད། ལས་སྟེགས་འདིས་འཛིན་ཤོག་མི་སྤྲོད། དཔང་ཡིག་ཕྱི་ཕྱོགས་ལས་སྟེགས་ལ་གཞི་བཅོལ།",
+    "thirdPartyTitle": "ཕྱི་ཕྱོགས་ཐོ།",
+    "thirdPartyDetails": "ཕྱི་ཕྱོགས་ཐོ།",
+    "thirdPartyCount": "ཕྱི་ཕྱོགས་ཐོ {count}",
+    "noThirdPartyConfirmations": "ཕྱི་ཕྱོགས་ངེས་བརྟན་ད་དུང་མེད། མཆོང་སའི་ལས་སྟེགས་སམ་ཞབས་ཞུའི་ལན་ལ་གཞི་བཅོལ།",
+    "platformDisclaimer": "ལས་སྟེགས་འདིས་འདྲི་རྩད་འདོད་འདུན་དང་མཆོང་སྦྲེལ་ཐོ་ཁོ་ན་ཉར། ནང་ཁུལ་དངུལ་ལེན། དངུལ་ཉར། འཛིན་ཤོག དཔྱ་འཛིན་ཞབས་ཞུ་མི་བྱེད།",
+    "cancelConsultation": "འདྲི་རྩད་ཆ་མེད།",
+    "deleteRecord": "ཐོ་སུབ།",
+    "deleting": "སུབ་བཞིན་པ།",
+    "cancelReason": "ཆ་མེད་རྒྱུ་མཚན།",
+    "cancelReasonPlaceholder": "འདེམས་ཆོག ཞབས་ཞུ་ལས་སྣེར་སྟབས་བདེ་བཟོ།",
+    "collapse": "བསྡུ།",
+    "processing": "སྒྲུབ་བཞིན་པ།",
+    "confirmCancel": "ཆ་མེད་ངེས་པར་དུ།",
+    "pendingDate": "ཚེས་གྲངས་ངེས་བརྟན་དགོས།",
+    "dateRangeSeparator": "ནས།",
+    "detailFallback": "ཞིབ་ཕྲར་ལྟས་ནས་ཚན་པ་ཤེས།",
+    "orderCardAria": "འདྲི་རྩད་ཞིབ་ཕྲར་ལྟ། {summary}",
+    "loadFailed": "འདྲི་རྩད་ཐོ་འཇུག་མ་ཐུབ།",
+    "detailLoadFailed": "འདྲི་རྩད་ཞིབ་ཕྲ་འཇུག་མ་ཐུབ།",
+    "cancelSubmitted": "ཆ་མེད་རེ་ཞུ་སྤྲད་ཟིན།",
+    "actionFailed": "བྱ་སྒོ་མ་ཐུབ། རྗེས་སུ་བསྐྱར་ཚོད་གནང་།",
+    "deleteConfirm": "འདྲི་རྩད་ཐོ {orderNo} སུབ་དགོས་སམ། སུབ་རྗེས་ཐོ་གཞུང་ནས་མི་སྟོན།",
+    "deleteSuccess": "ཁ་རྒྱག་ཟིན་པའི་འདྲི་རྩད་ཐོ་སུབ་ཟིན།",
+    "deleteFailed": "འདྲི་རྩད་ཐོ་སུབ་མ་ཐུབ། རྗེས་སུ་བསྐྱར་ཚོད་གནང་།",
+    "status": {
+      "pendingPayment": "ངེས་བརྟན་བསྒུག",
+      "paid": "ཕྱི་ཕྱོགས་ངེས་བརྟན།",
+      "confirmed": "ངེས་བརྟན་ཟིན།",
+      "cancelled": "ཆ་མེད་ཟིན།",
+      "refundPending": "ཞབས་ཞུ་རྗེས་མ་གྲོས་མོལ།",
+      "refunded": "ཁ་རྒྱག་ཟིན།",
+      "expired": "དུས་ཡོལ་ཟིན།",
+      "unknown": "མ་ཤེས།"
+    },
+    "confirmation": {
+      "unpaid": "ཕྱི་ཕྱོགས་ངེས་བརྟན་བསྒུག",
+      "paid": "ཕྱི་ཕྱོགས་ངེས་བརྟན་ཟིན།",
+      "partiallyRefunded": "ཞབས་ཞུ་རྗེས་མ་གྲོས་མོལ།",
+      "refunded": "ཁ་རྒྱག་ཟིན།",
+      "failed": "ལས་སྟེགས་ནང་དངུལ་ལེན་མེད།",
+      "unknown": "གནས་ཚུལ་མ་ཤེས།"
+    },
+    "tabs": {
+      "all": "ཡོངས།",
+      "pending": "ངེས་བརྟན་བསྒུག",
+      "confirmed": "ངེས་བརྟན་ཟིན།",
+      "afterSale": "ཞབས་ཞུ་རྗེས་མ།",
+      "closed": "ཁ་རྒྱག་ཟིན།"
+    },
+    "stats": {
+      "all": "འདྲི་རྩད་ཡོངས།",
+      "allHint": "ས་གནས། མགྲོན་ཁང་། འགྲུལ་ལམ་ཚན་པ།",
+      "pending": "ངེས་བརྟན་བསྒུག",
+      "pendingHint": "ཞབས་ཞུ་སམ་ཕྱི་ཕྱོགས་ངེས་བརྟན་བསྒུག",
+      "confirmed": "ངེས་བརྟན་ཟིན།",
+      "confirmedHint": "ཕྱི་ཕྱོགས་སམ་ཞབས་ཞུས་ལན་སྤྲད་ཟིན།",
+      "archive": "ཡིག་ཚགས་གནས་ཚུལ།",
+      "archiveHint": "ངེས་བརྟན་ཟིན / ཁ་རྒྱག་ཟིན"
+    },
+    "itemTypes": {
+      "scenicSpot": "ས་གནས་འཛིན་ཤོག",
+      "hotelRoom": "མགྲོན་ཁང་ཁང་རིགས།",
+      "routePackage": "ཡུལ་སྐོར་འགྲུལ་ལམ།"
+    },
+    "voucherStatus": {
+      "issued": "སྤྲད་ཟིན།",
+      "consumed": "སྤྱད་ཟིན།",
+      "cancelled": "ཆ་མེད་ཟིན།"
+    },
+    "transactionStatus": {
+      "pending": "ངེས་བརྟན་བསྒུག",
+      "success": "ངེས་བརྟན་ཟིན།",
+      "failed": "ངེས་བརྟན་མ་ཐུབ།",
+      "refunded": "ཁ་རྒྱག་ཟིན།"
+    }
+  },
+  "hotel": {
+    "bookable": "ཐོ་འགོད་ཆོག",
+    "apiHotelDescription": "{name} གནས་ཡུལ། {location}། ཁ་པར། {phone}",
+    "noPhone": "ད་སྔ་མེད།",
+    "roomType": "ཁང་རིགས།",
+    "nights": "མཚན་གྲངས།",
+    "total": "ཁྱོན་བསྡོམས།",
+    "checkInRequired": "ནང་སྡོད་དང་ཕྱིར་ཐོན་ཚེས་གྲངས་འདེམས་རོགས།",
+    "guestNameRequired": "ཐོ་འགོད་མཁན་གྱི་མིང་འབྲི་རོགས།",
+    "phoneRequired": "འབྲེལ་བའི་ཁ་པར་འབྲི་རོགས།",
+    "securityVerificationFailed": "བདེ་འཇགས་ར་སྤྲོད་འཇུག་མ་ཐུབ། ཤོག་ངོས་བསྐྱར་སྒྲིག་བྱས་ནས་བསྐྱར་ཚོད་ལྟ་གནང་རོགས།",
+    "noRoomTypes": "ཁང་རིགས་ཆ་འཕྲིན་མེད།"
+  },
+  "profile": {
+    "commentImageAlt": "དཔྱད་གཞིའི་པར།"
+  },
+  "favorites": {
+    "title": "ངའི་ཉར་ཚགས།",
+    "subtitle": "ཉར་ཚགས་བྱས་པའི་འགྲུལ་ལམ།",
+    "empty": "ད་དུང་འགྲུལ་ལམ་ཉར་ཚགས་མེད།",
+    "goExplore": "འགྲུལ་ལམ་འཚོལ།",
+    "unknownRoute": "མ་ཤེས་པའི་འགྲུལ་ལམ།",
+    "remove": "ཉར་ཚགས་ཆ་མེད།",
+    "operationFailed": "བྱ་སྒོ་མ་ཐུབ།"
+  },
+  "upload": {
+    "pasteUrl": "ཡང་ན་པར་གྱི URL སྦྱར།",
+    "selectImageFile": "པར་གྱི་ཡིག་ཆ་འདེམས་རོགས།",
+    "imageTooLarge": "པར་ཆེ་ཚད 5MB ལས་མི་བརྒལ་དགོས།",
+    "missingUploadUrl": "ཡར་སྤྲོད་མཐུད་ཁ་ནས་པར་གནས་མ་ཕྱིར་སྤྲད།",
+    "uploadFailed": "ཡར་སྤྲོད་མ་ཐུབ། བསྐྱར་ཚོད་གནང་།",
+    "previewAlt": "པར་སྔོན་ལྟ།",
+    "imageLoadFailed": "པར་འཇུག་མ་ཐུབ།",
+    "changeImage": "པར་བརྗེ།",
+    "removeImage": "པར་སུབ།",
+    "uploading": "ཡར་སྤྲོད་བཞིན་པ་...",
+    "chooseOrDrag": "པར་འདེམས་པའམ་འདྲུད་ནས་ཡར་སྤྲོད།",
+    "formatHint": "JPG, PNG, WebP། 5MB ནང་།"
+  },
+  "privacy": {
+    "title": "གསང་བའི་སྲིད་ཇུས།",
+    "lastUpdated": "མཐའ་མཇུག་གསར་སྒྱུར། 2025 ལོའི་ཟླ 11 པ།",
+    "sections": [
+      {
+        "title": "གླེང་སློང་།",
+        "paragraphs": [
+          "བོད་ཀྱི་ཚོན་མདངས་ཡུལ་སྐོར་དྲ་ཚིགས་ཀྱིས་ཁྱེད་ཀྱི་གསང་བའི་སྲུང་སྐྱོབ་ལ་ཧ་ཅང་གལ་ཆེན་དུ་བརྩི། སྲིད་ཇུས་འདིས་ང་ཚོས་ཇི་ལྟར་མི་སྒེར་གྱི་ཆ་འཕྲིན་བསྡུ། སྤྱོད། ཉར། སྲུང་བྱེད་པ་གསལ་བཤད་བྱེད།"
+        ]
+      },
+      {
+        "title": "དང་པོ། ང་ཚོས་བསྡུ་བའི་ཆ་འཕྲིན།",
+        "blocks": [
+          {
+            "title": "1.1 ཐོ་འགོད་ཆ་འཕྲིན།",
+            "text": "ཁྱེད་ཀྱིས་ཐོ་འགོད་སྐབས་སྤྱོད་མིང་། གློག་འཕྲིན། ཁ་པར་ཨང་སོགས་བསྡུ་སྲིད།"
+          },
+          {
+            "title": "1.2 སྤྱོད་སྟངས་ཆ་འཕྲིན།",
+            "text": "དྲ་ངོས་ལྟ་སྐོར། མནན་ཐེངས། སྒྲིག་ཆས་དང IP གནས་སོགས་བསྡུ་སྲིད།"
+          },
+          {
+            "title": "1.3 ནང་དོན་ཆ་འཕྲིན།",
+            "text": "དཔྱད་གཏམ་སྤེལ་བ། འགྲུལ་ལམ་བཤེར་བ། པར་ཡར་སྤྲོད་སོགས་སྐབས་ཁྱེད་ཀྱིས་སྤྲད་པའི་ནང་དོན་བསྡུ་སྲིད།"
+          },
+          {
+            "title": "1.4 གནས་ཡུལ་ཆ་འཕྲིན།",
+            "text": "ཁྱེད་ཀྱི་མོས་མཐུན་ཡོད་ན། ཉེ་འཁོར་གྱི་གཟིགས་སྐོར་ས་གནས་འོས་སྦྱོར་སོགས་ལ་གནས་ཡུལ་ཆ་འཕྲིན་སྤྱོད་སྲིད།"
+          }
+        ]
+      },
+      {
+        "title": "གཉིས་པ། ཆ་འཕྲིན་སྤྱོད་དོན།",
+        "list": [
+          "ཞབས་ཞུ་སྤྲོད། ཉམས་གསོ། ལེགས་སྒྱུར།",
+          "ཐོ་འགོད་དང་ནང་འཛུལ་སྒྲིག་སྐྱོང་།",
+          "ཞབས་ཞུའི་བརྡ་ཐོ་དང་བདེ་འཇགས་དྲན་སྐུལ།",
+          "མི་སྒེར་ཅན་གྱི་ནང་དོན་འོས་སྦྱོར།",
+          "གྲངས་ཐོ་དཔྱད་ཞིབ་དང་སྤུས་ཚད་ལེགས་སྒྱུར།"
+        ]
+      },
+      {
+        "title": "གསུམ་པ། ཆ་འཕྲིན་བཤེར་བ་དང་ཕྱིར་སྟོན།",
+        "paragraphs": [
+          "ང་ཚོས་ཁྱེད་ཀྱི་མི་སྒེར་ཆ་འཕྲིན་ཕྱི་ཕྱོགས་ལ་ཚོང་བའམ་གླ་གཏོང་མི་བྱེད། དགོས་ངེས་དང་ཁྲིམས་མཐུན་སྐབས་ཁོ་ནར་བཤེར་སྲིད།"
+        ]
+      },
+      {
+        "title": "བཞི་པ། ཆ་འཕྲིན་བདེ་འཇགས།",
+        "paragraphs": [
+          "ང་ཚོས་གསང་སྡོམ། འཛུལ་སྤྱོད་ཚོད་འཛིན། བདེ་འཇགས་ཞིབ་བཤེར་སོགས་སྤྱད་ནས་ཆ་འཕྲིན་སྲུང་བྱེད། འོན་ཀྱང་དྲ་རྒྱའི་སྐྱེལ་འདྲེན་ལ་བརྒྱ་ཆ་བརྒྱའི་བདེ་འཇགས་འགན་ལེན་མེད།"
+        ]
+      },
+      {
+        "title": "ལྔ་པ། ཁྱེད་ཀྱི་ཐོབ་ཐང་།",
+        "paragraphs": [
+          "ཁྱེད་ལ་མི་སྒེར་ཆ་འཕྲིན་ལ་ལྟ་བ། བཅོས་པ། སུབ་པ། མོས་མཐུན་ཕྱིར་འཐེན་པ་སོགས་ཀྱི་ཐོབ་ཐང་ཡོད།"
+        ]
+      },
+      {
+        "title": "དྲུག་པ། Cookie དང་རྗེས་འདེད་ལག་རྩལ།",
+        "paragraphs": [
+          "ང་ཚོས Cookie དང་འདྲ་བའི་ལག་རྩལ་སྤྱད་ནས་ལྟ་སྐོར་ཉམས་མྱོང་ལེགས་སུ་གཏོང་།"
+        ]
+      },
+      {
+        "title": "བདུན་པ། ན་གཞོན་སྲུང་སྐྱོབ།",
+        "paragraphs": [
+          "ཞབས་ཞུ་འདི་གཙོ་བོ་མི་རྒན་པར་ཁ་ཕྱོགས། ན་གཞོན་ཡིན་ན་ཕ་མའམ་སྐྱོང་མཁན་དང་མཉམ་དུ་སྤྱོད་རོགས།"
+        ]
+      },
+      {
+        "title": "བརྒྱད་པ། སྲིད་ཇུས་གསར་སྒྱུར།",
+        "paragraphs": [
+          "ང་ཚོས་དུས་དང་བསྟུན་ནས་སྲིད་ཇུས་འདི་གསར་སྒྱུར་བྱ་སྲིད།"
+        ]
+      },
+      {
+        "title": "དགུ་པ། ང་ཚོར་འབྲེལ་བ།",
+        "paragraphs": [
+          "གསང་བའི་སྲིད་ཇུས་འདིར་དྲི་བ་ཡོད་ན་གཤམ་གྱི་ཐབས་ལམ་བརྒྱུད་འབྲེལ་བ་གནང་རོགས།"
+        ],
+        "contact": true
+      }
+    ]
+  },
+  "terms": {
+    "sections": [
+      {
+        "title": "གླེང་སློང་།",
+        "paragraphs": [
+          "བོད་ཀྱི་ཚོན་མདངས་ཡུལ་སྐོར་དྲ་ཚིགས་སྤྱོད་པར་དགའ་བསུ་ཞུ། ཞབས་ཞུ་སྤྱོད་སྔོན་གཤམ་གྱི་ཞབས་ཞུའི་ཁྱད་ཆོད་ཞིབ་ཀློག་གནང་རོགས།"
+        ]
+      },
+      {
+        "title": "དང་པོ། ཞབས་ཞུའི་གསལ་བཤད།",
+        "paragraphs": [
+          "དྲ་ཚིགས་འདིས་བོད་ཡུལ་སྐོར་ཆ་འཕྲིན། གཟིགས་སྐོར་ས་གནས་ལམ་སྟོན། འགྲུལ་ལམ་འཆར་འགོད། སྤྱི་ཚོགས་བརྗེ་རེས་སོགས་སྤྲོད།"
+        ],
+        "list": [
+          "གཟིགས་སྐོར་ས་གནས་ཆ་འཕྲིན།",
+          "AI འགྲུལ་ལམ་འཆར་འགོད།",
+          "སྤྱི་ཚོགས་ནང་དོན་བཤེར་བ།",
+          "རིག་གནས་ཤུལ་བཞག་འགྲེམས་སྟོན།",
+          "ཡུལ་སྐོར་གསར་འགྱུར།"
+        ]
+      },
+      {
+        "title": "གཉིས་པ། སྤྱོད་མཁན་ཐོ་ཁོངས།",
+        "blocks": [
+          {
+            "title": "2.1 ཐོ་འགོད།",
+            "text": "ཁྱད་ལས་ཁ་ཤས་སྤྱོད་པར་ཐོ་འགོད་དགོས།"
+          },
+          {
+            "title": "2.2 ཐོ་ཁོངས་བདེ་འཇགས།",
+            "text": "ཁྱེད་རང་གི་གསང་ཚིག་དང་ཐོ་ཁོངས་བདེ་འཇགས་སྲུང་འགན་ཁྱེད་ལ་ཡོད།"
+          }
+        ]
+      },
+      {
+        "title": "གསུམ་པ། སྤྱོད་སྤྱོད་ཚད་གཞི།",
+        "paragraphs": [
+          "ཞབས་ཞུ་སྤྱོད་སྐབས་ཁྲིམས་སྲོལ་སྲུང་དགོས། གཞན་གྱི་ཐོབ་ཐང་ལ་བརྩི་དགོས། ཁྲིམས་འགལ་དང་གནོད་འཚེའི་ནང་དོན་སྤེལ་མི་ཆོག"
+        ]
+      },
+      {
+        "title": "བཞི་པ། ཤེས་བྱའི་ཐོབ་ཐང་།",
+        "paragraphs": [
+          "དྲ་ཚིགས་ཀྱི་ནང་དོན་དང་ཇུས་འགོད་སོགས་ཤེས་བྱའི་ཐོབ་ཐང་གིས་སྲུང་བྱེད།"
+        ]
+      },
+      {
+        "title": "ལྔ་པ། ཞབས་ཞུ་བསྒྱུར་བ་དང་མཚམས་འཇོག",
+        "paragraphs": [
+          "ང་ཚོས་དུས་གང་ཡང་ཞབས་ཞུ་བསྒྱུར་བའམ་མཚམས་འཇོག་བྱ་ཐུབ།"
+        ]
+      },
+      {
+        "title": "དྲུག་པ། འགན་མི་འཁུར་བའི་གསལ་བསྒྲགས།",
+        "paragraphs": [
+          "དྲ་ཚིགས་ཀྱི་ཆ་འཕྲིན་ནི་ལྟ་སྤྱོད་ཁོ་ན་ཡིན། ཡུལ་སྐོར་བྱ་སྒོར་ཉེན་ཁ་ཡོད་སྲིད་པས་རང་གི་གནས་ཚུལ་ལ་བསྟུན་ནས་ཐག་གཅོད་གནང་རོགས།"
+        ]
+      },
+      {
+        "title": "བདུན་པ། ཕྱི་ཕྱོགས་འབྲེལ་ཐག",
+        "paragraphs": [
+          "དྲ་ཚིགས་འདིར་ཕྱི་ཕྱོགས་དྲ་ཚིགས་ཀྱི་འབྲེལ་ཐག་ཡོད་སྲིད། དེ་ཚོའི་ནང་དོན་ལ་ང་ཚོས་འགན་མི་འཁུར།"
+        ]
+      },
+      {
+        "title": "བརྒྱད་པ། གུན་གསབ།",
+        "paragraphs": [
+          "ཁྱེད་ཀྱིས་ཁྱད་ཆོད་འགལ་བའམ་ཞབས་ཞུ་སྤྱོད་པའི་རྐྱེན་གྱི་གྱོང་གུན་ལ་འགན་ཁུར་དགོས།"
+        ]
+      },
+      {
+        "title": "དགུ་པ། ཁྲིམས་སྤྱོད་དང་རྩོད་གཞི།",
+        "paragraphs": [
+          "ཁྱད་ཆོད་འདི་ཀྲུང་ཧྭ་མི་དམངས་སྤྱི་མཐུན་རྒྱལ་ཁབ་ཀྱི་ཁྲིམས་ལུགས་ལ་བསྟུན།"
+        ]
+      },
+      {
+        "title": "བཅུ་པ། ཁྱད་ཆོད་བཟོ་བཅོས།",
+        "paragraphs": [
+          "ང་ཚོས་ཁྱད་ཆོད་འདི་དུས་དང་བསྟུན་ནས་བཟོ་བཅོས་བྱ་སྲིད།"
+        ]
+      },
+      {
+        "title": "བཅུ་གཅིག ང་ཚོར་འབྲེལ་བ།",
+        "paragraphs": [
+          "ཞབས་ཞུའི་ཁྱད་ཆོད་ལ་དྲི་བ་ཡོད་ན་གཤམ་གྱི་ཐབས་ལམ་བརྒྱུད་འབྲེལ་བ་གནང་རོགས།"
+        ],
+        "contact": true
+      }
+    ]
+  },
+  "questionDetail": {
+    "backToCommunity": "སྤྱི་ཚོགས་ལ་ཕྱིར་ལོག",
+    "anonymousUser": "མིང་མེད་སྤྱོད་མཁན།",
+    "viewCount": "{count} ཐེངས་བལྟས།",
+    "deleteQuestion": "དྲི་བ་སུབ།",
+    "questionNotFound": "དྲི་བ་མ་རྙེད།",
+    "loadingQuestion": "དྲི་བའི་ཞིབ་ཕྲ་འཇུག་བཞིན་ཡོད།",
+    "loadingAnswers": "ལན་འཇུག་བཞིན་ཡོད།",
+    "loadFailed": "དྲི་བའི་ཞིབ་ཕྲ་འཇུག་མ་ཐུབ། རྗེས་སུ་བསྐྱར་ཚོད།",
+    "retryLoad": "དྲི་བ་བསྐྱར་འཇུག",
+    "answersLoadFailed": "ལན་ཐོ་འཇུག་མ་ཐུབ། རྗེས་སུ་བསྐྱར་ཚོད།",
+    "retryAnswers": "ལན་བསྐྱར་འཇུག",
+    "answerFailed": "ལན་སྤྲོད་མ་ཐུབ། ཏོག་ཙམ་རྗེས་སུ་བསྐྱར་ཚོད།",
+    "acceptFailed": "ལན་ལེན་མ་ཐུབ།",
+    "confirmDelete": "དྲི་བ་འདི་སུབ་ངེས་ཡིན་ནམ།",
+    "deleteFailed": "སུབ་མ་ཐུབ།",
+    "likeQuestionAction": "དྲི་བར་དགའ་རྟགས་སྤྲོད།",
+    "unlikeQuestionAction": "དྲི་བའི་དགའ་རྟགས་ཕྱིར་འཐེན།",
+    "likedState": "ད་ལྟ་དགའ་རྟགས་སྤྲད་ཟིན།",
+    "notLikedState": "ད་ལྟ་དགའ་རྟགས་སྤྲད་མེད།",
+    "likeQuestionAria": "{action} {state} དགའ་རྟགས་ {count} ཐེངས།"
+  },
+  "routePlanner": {
+    "daysUnit": "ཉིན།",
+    "emptyTitle": "ཁྱེད་ཀྱི་བོད་འགྲུལ་རང་སྒྲིག",
+    "emptyDescription": "གཡོན་ཕྱོགས་ནས་ཉིན་གྲངས། འགྲོ་སོང་། དགའ་ཞེན་འདེམས་རྗེས AI ཡིས་ཁྱེད་ལ་འགྲུལ་ལམ་བཟོ།",
+    "budgetDesc": {
+      "economy": "འགྲོ་སོང་ཉུང་བའི་སྡོད་ཁང་དང་འགྲིམ་འགྲུལ།",
+      "comfort": "སྤུས་ཚད་དང་རིན་ཐང་མཐུན་པའི་ཉམས་མྱོང་།",
+      "luxury": "མཐོ་རིམ་མགྲོན་ཁང་དང་ཆེད་སྤྱོད་འཁོར་ལོ།"
+    },
+    "preferenceDesc": {
+      "natural": "གངས་རི་དང་མཚོ་གཙོ།",
+      "cultural": "དགོན་པ་དང་རིག་གནས་གཏིང་ཟབ།",
+      "photography": "ཉི་འོད་གསེར་མདོག་དང་པར་ལེན།",
+      "relaxation": "ཉིང་ཁྲིའི་ངལ་གསོ་ཉམས་མྱོང་།"
+    },
+    "budgetShort": {
+      "economy": "དཔལ་འབྱོར།",
+      "comfort": "བདེ་སྡོད།",
+      "luxury": "རྒྱས་སྤྲོས།"
+    },
+    "resumeAiGenerationAria": "AI འགྲུལ་ལམ་གསར་བཟོ་བསྐྱར་མཐུད།",
+    "resumingGeneration": "བསྐྱར་མཐུད་བཞིན་པ་...",
+    "resumeGeneration": "བསྐྱར་མཐུད།",
+    "dismissErrorAria": "འགྲུལ་ལམ་འཆར་སྒྲིག་ནོར་བརྡ་ཁ་རྒྱག",
+    "dismissError": "ཤེས་སོང་།",
+    "decreaseDaysAria": "འཆར་སྒྲིག་ཉིན་གྲངས་ཉུང་དུ་གཏོང་།",
+    "increaseDaysAria": "འཆར་སྒྲིག་ཉིན་གྲངས་མང་དུ་གཏོང་།",
+    "daysCounterUnit": "ཉིན།",
+    "daysValueCompact": "{count} ཉིན།",
+    "daysValueSpaced": "{count} ཉིན།",
+    "daysValueAria": "འཆར་སྒྲིག་ཉིན་གྲངས། {count} ཉིན།",
+    "quickPresetAria": "{label} མགྱོགས་སྒྲིག་སྤྱོད། {days}། {budget}",
+    "formDraftHint": "ཉིན་གྲངས། འགྲོ་སོང་། དགའ་ཞེན་ཁོ་ན་གནས་སྐབས་ཉར་བ་ཡིན། གསར་བཟོའི་ནང་དོན་ས་གནས་ཟིན་བྲིས་ལ་མི་ཉར།",
+    "pauseGenerationAria": "AI འགྲུལ་ལམ་གསར་བཟོ་སྒུག་པ་མཚམས་འཇོག",
+    "pauseWaiting": "སྒུག་པ་མཚམས་འཇོག",
+    "pauseWaitingHint": "སྒུག་པ་མཚམས་འཇོག་ནས་ད་ལྟའི་ཆ་ཤས་ཉར་ཆོག རྗེས་སུ་ཞབས་ཞུའི་གནས་ཚུལ་ནས་བསྐྱར་མཐུད་དམ་བསྐྱར་གསར་བཟོ་ཆོག",
+    "currentPlan": "ད་ལྟའི་འཆར་གཞི།",
+    "generatedRouteSummary": "འགྲུལ་ལམ་བསྡུས་དོན་གྲུབ་ཟིན།",
+    "pendingRouteParams": "འགྲུལ་ལམ་གསར་བཟོའི་གྲངས་ཐོ་སྒུག་བཞིན།",
+    "collapseFullText": "ཆ་ཚང་བསྡུ།",
+    "expandFullText": "ཆ་ཚང་ཕྱེ།",
+    "collapseRouteFullTextAria": "འགྲུལ་ལམ་ཆ་ཚང་བསྡུ།",
+    "expandRouteFullTextAria": "འགྲུལ་ལམ་ཆ་ཚང་ཕྱེ།",
+    "routeDayJumpAria": "{day} {title} ལ་མཆོང་།",
+    "progressAria": "{label}། {percent}%",
+    "metaSeparator": " · ",
+    "statDays": "ཉིན་གྲངས།",
+    "statBudget": "འགྲོ་སོང་།",
+    "statPreference": "དགའ་ཞེན།",
+    "statLength": "རིང་ཚད།",
+    "charsValue": "{count} ཡིག",
+    "routeDayFallbackTitle": "ཉིན་དེའི་འགྲུལ་ལམ།",
+    "routeDayFallbackSummary": "ཞིབ་ཕྲ་ཤེས་བར་འགྲུལ་ལམ་ཆ་ཚང་ལ་ལྟ།",
+    "bookableItineraryGeneratingTitle": "ཐོ་འགོད་ཆོག་པའི་འགྲུལ་ལམ་གསར་བཟོ་བཞིན།",
+    "bookableItineraryMeta": "{version} · {days} · {price}",
+    "bookableItineraryGeneratingMeta": "ས་གནས། མགྲོན་ཁང་། འཛིན་བྱང་། འགྲོ་སོང་བཅས་མཐུན་སྦྱོར་བཞིན།",
+    "consultationRecords": "བློ་འདྲི་ཟིན་ཐོ།",
+    "itineraryVersionGenerating": "གསར་བཟོ་བཞིན།",
+    "bookableItineraryLoading": "AI སྐུལ་སློང་དེ་རིན་གོང་འགྲུལ་ལམ་ལ་སྒྱུར་བཞིན།",
+    "quoteTotalEstimated": "སྔོན་དཔག་ཁྱོན།",
+    "quoteBookable": "ཕྱི་ཕྱོགས་ནས་ཐོ་འགོད་ཆོག",
+    "quoteInformational": "འགྲིམ་འགྲུལ་དང་ཟ་མའི་སྔོན་དཔག",
+    "bookingSubmitted": "སྤྲད་ཟིན།",
+    "alternativesPrefix": "ཚབ་བརྗེ་ཆོག་པ། {alternatives}",
+    "bookingOpening": "ཕྱེ་བཞིན།",
+    "thirdPartyBooking": "ཕྱི་ཕྱོགས་ལ་སོང་།",
+    "travelKitTitle": "བོད་གཏིང་ཟབ་འགྲུལ་སྐྱོད་ཐུམ།",
+    "travelKitMeta": "{risk} · མཐོ་ཚད་མཐོ་ཤོས {altitude} · ས་ཚིགས {pins} མེད་དྲ་ཐུམ།",
+    "travelKitGeneratingMeta": "ས་མཐོ། སྲོལ་ལུགས། ཚིག་ཐུང་། དྲན་སྐུལ་བཅས་གསར་བཟོ་བཞིན།",
+    "travelKitDownloadAria": "བོད་གཏིང་ཟབ་འགྲུལ་སྐྱོད་མེད་དྲ་ཐུམ་ཕབ་ལེན།",
+    "offlinePackageShort": "མེད་དྲ་ཐུམ།",
+    "travelKitLoading": "བོད་ས་ཆའི་ཞབས་ཞུ་གསར་བཟོ་བཞིན།",
+    "highlandAdaptation": "ས་མཐོར་འཚམས་སྒྲིག",
+    "offlineTravelKit": "མེད་དྲ་འགྲུལ་ཐུམ།",
+    "offlineTravelKitDesc": "ས་ཚིགས། ཛ་དྲག་ཁ་པར། འཛིན་ཤོག་དྲན་སྐུལ། མེད་དྲ་ཐོ་གཞུང་བཅས་ཐུམ་བཟོས་ཟིན།",
+    "sustainableTravel": "རྒྱུན་མཐུད་འགྲུལ་སྐྱོད།",
+    "sustainableTravelDesc": "ས་གནས་ལམ་སྟོན། ལམ་མཉམ་སྒྲིག ཁོར་ཡུག་ལ་ཤུལ་མེད་གྲོས་འདེབས།",
+    "dailyHighlandPace": "ཉིན་རེའི་ས་མཐོའི་གོམ་ཚད།",
+    "dayAltitudeMeta": "D{day} · {altitude}",
+    "realtimeAlerts": "དུས་ཐོག་དྲན་སྐུལ།",
+    "culturalEtiquetteAssistant": "རིག་གནས་སྲོལ་ལུགས་རོགས་རམ།",
+    "avoidTip": "འཛེམ་དགོས། {tip}",
+    "phrasebookTitle": "བོད་རྒྱ་དབྱིན་ལམ་སྟོན་ཚིག་ཐུང་།",
+    "offlineSustainableChecklist": "མེད་དྲ་དང་རྒྱུན་མཐུད་ཐོ་གཞུང་།",
+    "offlinePreparation": "མེད་དྲ་གྲ་སྒྲིག",
+    "lowImpactTravel": "ཤུགས་རྐྱེན་ཉུང་བའི་འགྲུལ་སྐྱོད།",
+    "altitudeMeters": "{count}m",
+    "itineraryVersionOptions": {
+      "cheaper": "རིན་གོང་ཉུང་བ།",
+      "relaxed": "དལ་བ།",
+      "hidden": "མི་མང་མིན་པ།",
+      "family": "རྒན་པ་དང་བྱིས་པ།"
+    },
+    "itineraryVersionGeneratingAria": "{label} པར་གཞིའི་འགྲུལ་ལམ་གསར་བཟོ་བཞིན།",
+    "itineraryVersionGenerateAria": "{label} པར་གཞིའི་འགྲུལ་ལམ་གསར་བཟོ།",
+    "riskLabels": {
+      "extreme": "ཉེན་ཁ་ཧ་ཅང་ཆེ།",
+      "high": "ས་མཐོ།",
+      "medium": "ས་མཐོ་འབྲིང་།",
+      "low": "ས་མཐོ་ཉུང་།"
+    },
+    "alertLabels": {
+      "high": "གལ་ཆེ།",
+      "medium": "དྲན་སྐུལ།",
+      "low": "བརྡ་ལན།"
+    },
+    "itemTypes": {
+      "scenicSpot": "ས་གནས།",
+      "hotel": "མགྲོན་ཁང་།",
+      "transport": "འགྲིམ་འགྲུལ།",
+      "meal": "ཟ་མ།",
+      "experience": "ཉམས་མྱོང་།",
+      "note": "དྲན་ཐོ།"
+    },
+    "externalBookingOpeningAria": "{title} གྱི་ཕྱི་ཕྱོགས་ཐོ་འགོད་ཕྱེ་བཞིན།",
+    "externalBookingOpenAria": "{title} གྱི་ཕྱི་ཕྱོགས་ཐོ་འགོད་ཕྱེ།",
+    "planningPulseGeneratedDayNodes": "ཉིན་རེའི་སྒྲིག་གནས་ {count} བསྒྲིགས་ཟིན།",
+    "planningPulseGeneratedRouteReady": "འགྲུལ་ལམ་གྱི་གཙོ་ཡིག་གྲུབ་ཟིན། གཡས་ཕྱོགས་ནས་ཆ་ཚང་ལྟ་ཆོག",
+    "planningPulseDaysPreference": "{days} འགྲུལ་ལམ། {preference} ལ་ཕྱོགས།",
+    "planningPulseBudget": "འགྲོ་སོང་རིམ་པ {budget} ཡིན་པས། སྡོད་ཁང་དང་ཉམས་མྱོང་ཚད་མཐུན་སྒྲིག་བྱེད།",
+    "planningPulseBookable": "གསར་བཟོ་རྗེས་ཐོ་འགོད་ཆོག་པའི་འགྲུལ་ལམ། རིན་གོང་། ས་མཐོ་འགྲུལ་ཐུམ་ལ་ལྟ་ཆོག",
+    "bookableItineraryGeneratedStatus": "{version} འགྲུལ་ལམ་གསར་བཟོ་ཟིན། རིན་གོང་ལྟ་ཞིང་གནས་ཚིགས་ཐོ་འགོད་ཆོག",
+    "bookableVersionFallback": "ཐོ་འགོད་ཆོག",
+    "pausedWithSavedContent": "སྒུག་པ་མཚམས་བཞག ད་ལྟའི་ནང་དོན་ {chars} ཡིག་ཉར་ཡོད། བསྐྱར་མཐུད་དམ་བསྐྱར་གསར་བཟོ་ཆོག",
+    "pausedWithoutContent": "སྒུག་པ་མཚམས་བཞག བསྐྱར་མཐུད་དམ་བསྐྱར་གསར་བཟོ་ཆོག",
+    "pausedWithSavedContentAndActions": "སྒུག་པ་མཚམས་བཞག ད་ལྟའི་ནང་དོན་ {chars} ཡིག་ཉར་ཡོད། བསྐྱར་མཐུད། ཆ་ཤས་བཤུས་པ། ཡང་ན་བསྐྱར་གསར་བཟོ་ཆོག",
+    "pausedWithoutContentServerProcessing": "སྒུག་པ་མཚམས་བཞག བསྐྱར་མཐུད་དམ་བསྐྱར་གསར་བཟོ་ཆོག ཞབས་ཞུ་ཆས་ད་དུང་རེ་ཞུ་འདི་སྒྲིག་བཞིན་ཡོད་སྲིད།",
+    "resumeGenerationStarting": "AI འགྲུལ་ལམ་གསར་བཟོ་བསྐྱར་མཐུད་བཞིན་པ་...",
+    "resumeGenerationFailed": "གསར་བཟོ་བསྐྱར་མཐུད་མ་ཐུབ། རྗེས་སུ་བསྐྱར་ཚོད།",
+    "externalBookingOpened": "ཕྱི་ཕྱོགས་ལས་སྟེགས་ཕྱེ་ཟིན། ཆོག་མཆན་ཡོད་པའི་ལས་སྟེགས་ནས་ཐོ་འགོད་གཏན་འཁེལ་དམ་བློ་འདྲི་མུ་མཐུད་གནང་།",
+    "externalBookingBlocked": "བཤེར་ཆས་ཀྱིས་ཕྱི་ཕྱོགས་སྒེའུ་ཁུང་བཀག་སོང་། སྒེའུ་ཁུང་ཕྱེ་ཆོག་པར་བྱས་ནས་བསྐྱར་ཚོད།",
+    "communityBudget": {
+      "economy": "དཔལ་འབྱོར།",
+      "comfort": "བདེ་སྡོད།",
+      "luxury": "རྒྱས་སྤྲོས།"
+    },
+    "communityPreference": {
+      "natural": "རང་བྱུང་ཡུལ་ལྗོངས།",
+      "cultural": "རིག་གནས་ལོ་རྒྱུས།",
+      "photography": "གཏིང་ཟབ་པར་ལེན།",
+      "relaxation": "ངལ་གསོ་སྐྱིད་སྡོད།"
+    },
+    "finalFailure": "འགྲུལ་ལམ་བཟོ་མ་ཐུབ། ཞིབ་བཤེར་བྱས་ནས་བསྐྱར་ཚོད།"
+  },
+  "community": {
+    "publishFailedRetry": "སྤེལ་མ་ཐུབ། ཏོག་ཙམ་རྗེས་སུ་བསྐྱར་ཚོད།",
+    "officialRoute": "གཞུང་ཕྱོགས་འོས་སྦྱོར།",
+    "userSharedRoute": "སྤྱོད་མཁན་མཉམ་སྤྱོད།"
+  },
+  "admin": {
+    "title": "རྒྱབ་སྐྱོར་དོ་དམ་པང་།",
+    "subtitle": "གྲངས་ཐོ་སྤྱི་ལྟ་དང་ལས་སྐྱོང་རྩིས་ཐོ།",
+    "totalUsers": "སྤྱོད་མཁན་ཁྱོན།",
+    "totalOrders": "མངགས་ཐོ་ཁྱོན།",
+    "totalRevenue": "ཡོང་འབབ་ཁྱོན།",
+    "hotelOrders": "མགྲོན་ཁང་མངགས་ཐོ།",
+    "loadingHotelOrders": "མགྲོན་ཁང་མངགས་ཐོ་འཇུག་བཞིན་པ་...",
+    "hotelOrdersLoadFailed": "མགྲོན་ཁང་མངགས་ཐོ་འཇུག་མ་ཐུབ། རྗེས་སུ་བསྐྱར་ཚོད།",
+    "retryHotelOrders": "མགྲོན་ཁང་མངགས་ཐོ་བསྐྱར་འཇུག",
+    "changeHotelOrderStatus": "མངགས་ཐོ {id} ཡི་གནས་ཚུལ་བསྒྱུར།",
+    "orderId": "མངགས་ཐོ ID",
+    "user": "སྤྱོད་མཁན།",
+    "hotelAndRoom": "མགྲོན་ཁང / ཁང་རིགས།",
+    "checkInOut": "ནང་སྡོད - ཕྱིར་ཐོན།",
+    "booker": "ཐོ་འགོད་མཁན།",
+    "amount": "དངུལ་འབོར།",
+    "status": "གནས་ཚུལ།",
+    "orderedAt": "མངགས་དུས།",
+    "action": "བྱ་སྒོ།",
+    "unknownHotel": "མ་ཤེས་པའི་མགྲོན་ཁང་།",
+    "toDate": "{date} བར།",
+    "noHotelOrders": "མགྲོན་ཁང་མངགས་ཐོ་མེད།",
+    "expandHotelOrders": "གོང་གི་མཚན་བྱང་ལ་མནན་ནས་མངགས་ཐོ་ཚང་མར་ལྟ། ཁྱོན {count} ཚན།",
+    "latestOrders": "ཉེ་ཆར་མངགས་ཐོ།",
+    "hotel": "མགྲོན་ཁང་།",
+    "spot": "གཟིགས་སྐོར་ས་གནས།",
+    "noOrders": "མངགས་ཐོ་མེད།",
+    "popularSpots": "ཁྱབ་ཆེན་གཟིགས་སྐོར་ས་གནས།",
+    "visits": "{count} ཐེངས།",
+    "spotManagement": "གཟིགས་སྐོར་ས་གནས་དོ་དམ།",
+    "loadingSpots": "ས་གནས་གྲངས་ཐོ་འཇུག་བཞིན་པ་...",
+    "spotsLoadFailed": "ས་གནས་ཐོ་འཇུག་མ་ཐུབ། རྗེས་སུ་བསྐྱར་ཚོད།",
+    "loadFailed": "འཇུག་མ་ཐུབ།",
+    "listUnavailable": "འཇུག་མ་ཐུབ།",
+    "noSpotData": "ས་གནས་གྲངས་ཐོ་མེད།",
+    "clickEdit": "མནན་ནས་བཟོ་བཅོས།",
+    "editArrow": "བཟོ་བཅོས →",
+    "expandSpots": "གོང་གི་མཚན་བྱང་ལ་མནན་ནས་ས་གནས་དོ་དམ། ཁྱོན {count} ཚན།",
+    "userManagement": "སྤྱོད་མཁན་དོ་དམ།",
+    "loadingUsers": "སྤྱོད་མཁན་ཐོ་འཇུག་བཞིན་པ་...",
+    "usersLoadFailed": "སྤྱོད་མཁན་ཐོ་འཇུག་མ་ཐུབ། རྗེས་སུ་བསྐྱར་ཚོད།",
+    "retryUsers": "སྤྱོད་མཁན་ཐོ་བསྐྱར་འཇུག",
+    "username": "སྤྱོད་མིང་།",
+    "password": "གསང་ཚིག",
+    "nickname": "མིང་འདོགས།",
+    "city": "གྲོང་ཁྱེར།",
+    "ipAddress": "IP གནས།",
+    "lastLogin": "མཐའ་མཇུག་ནང་འཛུལ།",
+    "registeredAt": "ཐོ་འགོད་དུས།",
+    "bcryptHash": "BCrypt ཧ་ཤི།",
+    "passwordHashTitle": "གསང་ཚིག BCrypt ཧ་ཤི་ཁོ་ན་ཉར། ཡི་གེ་གསལ་བཤད་ལྟ་མི་ཐུབ།",
+    "neverLoggedIn": "ད་སྔ་ནང་འཛུལ་མེད།",
+    "role": "འགན་ཁུར།",
+    "adminRole": "དོ་དམ་པ།",
+    "userRole": "སྤྱོད་མཁན་དཀྱུས་མ།",
+    "setAdmin": "དོ་དམ་པར་བསྒྲིག",
+    "unsetAdmin": "དོ་དམ་པ་ཕྱིར་འཐེན།",
+    "notOperable": "བྱ་སྒོ་མི་ཆོག",
+    "locked": "བཀག་སྡོམ།",
+    "unlock": "བཀག་སྡོམ་གཏོང་།",
+    "confirmUnlock": "{name} ཡི་ནང་འཛུལ་བཀག་སྡོམ་གཏོང་རྒྱུར་གཏན་ཁེལ་རེད་པས།",
+    "unlockSuccess": "{name} ཡི་ནང་འཛུལ་བཀག་སྡོམ་བཏང་ཟིན།",
+    "newsManagement": "ཡུལ་སྐོར་གསར་འགྱུར་དོ་དམ།",
+    "createNews": "+ གསར་བཟོ།",
+    "loadingNews": "གསར་འགྱུར་གྲངས་ཐོ་འཇུག་བཞིན་པ་...",
+    "newsLoadFailed": "གསར་འགྱུར་ཐོ་འཇུག་མ་ཐུབ། རྗེས་སུ་བསྐྱར་ཚོད།",
+    "viewCount": "ལྟ་ཐེངས། {count}",
+    "views": "ལྟ་ཐེངས།",
+    "noNews": "གསར་འགྱུར་མེད།",
+    "expandNews": "གོང་གི་མཚན་བྱང་ལ་མནན་ནས་གསར་འགྱུར་ཚང་མར་ལྟ། ཁྱོན {count} ཚན།",
+    "carouselManagement": "འཁོར་སྟོན་པར་དོ་དམ།",
+    "loadingCarousels": "འཁོར་སྟོན་པར་འཇུག་བཞིན་པ་...",
+    "carouselsLoadFailed": "འཁོར་སྟོན་པར་ཐོ་འཇུག་མ་ཐུབ། རྗེས་སུ་བསྐྱར་ཚོད།",
+    "noCarousels": "འཁོར་སྟོན་པར་མེད།",
+    "addCarousel": "+ སྣོན།",
+    "routeManagement": "འགྲུལ་ལམ་དོ་དམ།",
+    "loadingRoutes": "འགྲུལ་ལམ་འཇུག་བཞིན་པ་...",
+    "routesLoadFailed": "འགྲུལ་ལམ་ཐོ་འཇུག་མ་ཐུབ། རྗེས་སུ་བསྐྱར་ཚོད།",
+    "routeSource": "འབྱུང་ཁུངས།",
+    "officialRoute": "གཞུང་ཕྱོགས་འོས་སྦྱོར།",
+    "userSharedRoute": "སྤྱོད་མཁན་མཉམ་སྤྱོད།",
+    "officialAuthor": "བོད་ཀྱི་ཚོན་མདངས་གཞུང་ཕྱོགས།",
+    "routeStats": "མཉམ་འབྲེལ།",
+    "communityManagement": "སྤྱི་ཚོགས་ནང་དོན་དོ་དམ།",
+    "communityRoutes": "མཉམ་སྤྱོད་འགྲུལ་ལམ།",
+    "communityQuestions": "དྲི་བ།",
+    "communityComments": "མཆན།",
+    "communitySpotComments": "ས་གནས་མཆན།",
+    "communityAnswers": "ལན།",
+    "loadingCommunity": "སྤྱི་ཚོགས་ནང་དོན་འཇུག་བཞིན་པ་...",
+    "loadCommunityFailed": "སྤྱི་ཚོགས་ནང་དོན་འཇུག་མ་ཐུབ།",
+    "loadCommunityPartialFailed": "སྤྱི་ཚོགས་ནང་དོན་ཁ་ཤས་འཇུག་མ་ཐུབ། ཡང་བསྐྱར་གསར་སྒྱུར་གནང་།",
+    "expandCommunity": "གོང་གི་མཚན་བྱང་ལ་མནན་ནས་སྤྱི་ཚོགས་ནང་དོན་དོ་དམ། ཁྱོན {count} ཚན།",
+    "communityAuthor": "སྤེལ་མཁན།",
+    "communitySource": "ཁོངས་གཏོགས་ནང་དོན།",
+    "communityMeta": "ཆ་འཕྲིན།",
+    "communityCounts": "ལྟ {views} · དགའ {likes} · མཆན {comments}",
+    "communityQuestionCounts": "ལན {answers} · དགའ {likes}",
+    "communityEditTitle": "སྤྱི་ཚོགས་ནང་དོན་བཟོ་བཅོས།",
+    "communityTypeRoute": "འགྲུལ་ལམ།",
+    "communityTypeQuestion": "དྲི་བ།",
+    "communityTypeComment": "མཆན།",
+    "communityTypeSpotComment": "ས་གནས་མཆན།",
+    "communityTypeAnswer": "ལན།",
+    "communityTitlePlaceholder": "མཚན་བྱང་འཇུག",
+    "communityContentPlaceholder": "སྤྱི་ཚོགས་ནང་དོན་འཇུག...",
+    "noCommunityRoutes": "མཉམ་སྤྱོད་འགྲུལ་ལམ་མེད།",
+    "noCommunityQuestions": "སྤྱི་ཚོགས་དྲི་བ་མེད།",
+    "noCommunityComments": "མཆན་མེད།",
+    "noCommunitySpotComments": "ས་གནས་མཆན་མེད།",
+    "noCommunityAnswers": "ལན་མེད།",
+    "confirmDeleteCommunityItem": "{type} འདི་སུབ་ངེས་ཡིན་ནམ། བསྐྱར་གསོ་མི་ཐུབ།",
+    "createdAt": "གསར་བཟོ་དུས།",
+    "budget": "འགྲོ་སོང་།",
+    "preference": "དགའ་ཕྱོགས།",
+    "tags": "མཚོན་རྟགས།",
+    "tagsPlaceholder": "མཚོན་རྟགས་མང་པོ་ན་དབྱིན་ཡིག་གི་ཚེག་བར་སྤྱོད།",
+    "resolved": "ཐག་བཅད་ཟིན།",
+    "unresolved": "ཐག་མ་བཅད།",
+    "accepted": "ངོས་ལེན་ཟིན།",
+    "notAccepted": "ངོས་མ་ལེན།",
+    "markResolved": "ཐག་བཅད་ཟིན་པར་རྟགས་རྒྱག",
+    "markAccepted": "ངོས་ལེན་ཟིན་པར་རྟགས་རྒྱག",
+    "addNew": "+ གསར་སྣོན།",
+    "name": "མིང་།",
+    "days": "ཉིན་གྲངས།",
+    "price": "རིན་གོང་།",
+    "difficulty": "དཀའ་ཚད།",
+    "temperature": "དྲོད་ཚད།",
+    "geography": "ས་ཁམས།",
+    "daysValue": "{count} ཉིན།",
+    "hotelManagement": "མགྲོན་ཁང་དོ་དམ།",
+    "loadingHotels": "མགྲོན་ཁང་འཇུག་བཞིན་པ་...",
+    "hotelsLoadFailed": "མགྲོན་ཁང་ཐོ་འཇུག་མ་ཐུབ། རྗེས་སུ་བསྐྱར་ཚོད།",
+    "addHotel": "+ མགྲོན་ཁང་གསར་སྣོན།",
+    "roomManagement": "ཁང་རིགས་དོ་དམ།",
+    "roomTypesCount": "{count} ཁང་རིགས།",
+    "loading": "འཇུག་བཞིན་པ་...",
+    "noRoomTypes": "ཁང་རིགས་མེད། གཤམ་ནས་སྣོན་རོགས།",
+    "pricePerNightWithCapacity": "¥{price} / མཚན · {capacity} མི།",
+    "roomNamePlaceholder": "མིང་།",
+    "capacityPlaceholder": "མི།",
+    "roomTypes": "ཁང་རིགས།",
+    "noHotels": "མགྲོན་ཁང་གྲངས་ཐོ་མེད།",
+    "addFirstHotel": "+ མགྲོན་ཁང་དང་པོ་སྣོན།",
+    "expandHotels": "གོང་གི་མཚན་བྱང་ལ་མནན་ནས་མགྲོན་ཁང་དོ་དམ། ཁྱོན {count} ཁང་།",
+    "editOrCreateCarousel": "{mode} འཁོར་སྟོན་པར།",
+    "editOrCreateRoute": "{mode} འགྲུལ་ལམ།",
+    "editOrCreateHotel": "{mode} མགྲོན་ཁང་།",
+    "titleLabel": "མཚན་བྱང་།",
+    "subtitleLabel": "མཚན་བྱང་ཕལ་པ།",
+    "tagLabel": "མཚོན་རྟགས།",
+    "image": "པར།",
+    "linkUrl": "འབྲེལ་ཐག URL",
+    "sortOrder": "གོ་རིམ།",
+    "routeName": "མིང་།",
+    "easy": "སླ་པོ།",
+    "medium": "འབྲིང་།",
+    "hard": "དཀའ་པོ།",
+    "geographyPlaceholder": "དཔེར་ན། ས་མཐོའི་གཙང་རོང་།",
+    "temperaturePlaceholder": "དཔེར་ན། 15°C - 25°C",
+    "description": "གསལ་བཤད།",
+    "location": "གནས་ཡུལ།",
+    "phone": "ཁ་པར།",
+    "priceRange": "རིན་གོང་ཁྱབ་ཁོངས།",
+    "rating": "སྐར་གྲངས།",
+    "likesCount": "དགའ {count}",
+    "facilities": "སྒྲིག་ཆས།",
+    "facilitiesPlaceholder": "WiFi, འཁོར་འཇོག་ས། ཟ་ཁང་...",
+    "editNewsTitle": "གསར་འགྱུར་བཟོ་བཅོས།",
+    "createNewsTitle": "གསར་འགྱུར་གསར་བཟོ།",
+    "content": "ནང་དོན།",
+    "titlePlaceholder": "གསར་འགྱུར་མཚན་བྱང་འཇུག",
+    "contentPlaceholder": "གསར་འགྱུར་ནང་དོན་འཇུག...",
+    "currentWordCount": "མིག་སྔའི་ཡིག་གྲངས། {count}",
+    "category": "རིགས།",
+    "selectCategory": "རིགས་འདེམས།",
+    "categoryPolicy": "སྲིད་ཇུས།",
+    "categoryEvent": "བྱ་འགུལ།",
+    "categoryNotice": "བརྡ་ཐོ།",
+    "saveEditing": "བཟོ་བཅོས་ཉར།",
+    "saving": "ཉར་བཞིན་པ་...",
+    "editSpotInfo": "ས་གནས་ཆ་འཕྲིན་བཟོ་བཅོས།",
+    "spotName": "ས་གནས་མིང་།",
+    "currentCover": "མིག་སྔའི་ཁ་བྱང་པར།",
+    "newImage": "པར་གསར་པ།",
+    "ticketPriceYuan": "འཛིན་ཤོག་རིན་གོང་།",
+    "current": "མིག་སྔ།",
+    "ticketPlaceholder": "བཟོ་བཅོས་མེད་ན་སྟོང་པར་བཞག",
+    "ticketHint": "དྲན་སྐུལ། འཛིན་ཤོག་རིན་གོང་གསར་པ་འཇུག མི་བཟོ་ན་སྟོང་པར་བཞག",
+    "fetchPrice": "རིན་གོང་ལེན་པ།",
+    "fetchingPrices": "ལེན་བཞིན་པ་...",
+    "batchFetchPrices": "མང་པོའི་རིན་གོང་ལེན་པ།",
+    "priceFetched": "{name} རིན་གོང་ལེན་ཐུབ། ¥{price}",
+    "priceFetchFailed": "{name} རིན་གོང་ལེན་མ་ཐུབ།",
+    "confirmBatchFetch": "ས་གནས་ཚང་མའི་རིན་གོང་མང་པོར་ལེན་རྒྱུར་ངོས་འཛིན་བྱེད་དམ།",
+    "batchFetchDone": "མང་པོ་ལེན་ཚར། ལེགས་གྲུབ་ {updated} མ་ཐུབ་ {failed}",
+    "batchFetchFailed": "མང་པོ་ལེན་མ་ཐུབ། ཏོག་ཙམ་རྗེས་སུ་བསྐྱར་ཚོད།",
+    "spotIntro": "ས་གནས་ངོ་སྤྲོད།",
+    "spotIntroPlaceholder": "ས་གནས་ངོ་སྤྲོད་འཇུག...",
+    "analyticsLoadFailed": "རྩིས་ཐོ་པང་འཇུག་མ་ཐུབ། ཏོག་ཙམ་རྗེས་སུ་བསྐྱར་ཚོད།",
+    "malformedResponse": "ལན་གྱི་གྲངས་ཐོ་རྣམ་པ་ནོར། འབྱོར་བ། {type}",
+    "serverError": "ཞབས་ཞུའི་ནོར་འཁྲུལ། ({status})",
+    "unknownError": "མ་ཤེས་པའི་ནོར་འཁྲུལ།",
+    "fillOneField": "ཉུང་མཐར་ནང་དོན་གཅིག་བཟོ་བཅོས་གནང་།",
+    "spotUpdateSuccess": "ས་གནས་ཆ་འཕྲིན་གསར་སྒྱུར་ལེགས་གྲུབ།",
+    "updateFailed": "གསར་སྒྱུར་མ་ཐུབ།",
+    "confirmRoleChange": "སྤྱོད་མཁན་འདི {role} ལ་བསྒྲིག་ངེས་ཡིན་ནམ།",
+    "operationSuccess": "བྱ་སྒོ་ལེགས་གྲུབ།",
+    "operationFailed": "བྱ་སྒོ་མ་ཐུབ།",
+    "confirmDeleteUser": "སྤྱོད་མཁན \"{name}\" སུབ་ངེས་ཡིན་ནམ། བསྐྱར་གསོ་མི་ཐུབ།",
+    "userDeleted": "སྤྱོད་མཁན \"{name}\" སུབ་ཟིན།",
+    "deleteFailed": "སུབ་མ་ཐུབ།",
+    "statusUpdateFailed": "གནས་ཚུལ་གསར་སྒྱུར་མ་ཐུབ།",
+    "statusUpdateFailedInline": "གནས་ཚུལ་གསར་སྒྱུར་མ་ཐུབ། སྔར་གྱི་གནས་ཚུལ་ལ་ཕྱིར་སྤོས་ཡོད།",
+    "confirmDeleteOrder": "མངགས་ཐོ་འདི་སུབ་ངེས་ཡིན་ནམ།",
+    "deleteSuccess": "སུབ་ལེགས་གྲུབ།",
+    "notLoggedIn": "ནང་འཛུལ་མེད། སྔོན་ལ་ནང་འཛུལ་གནང་།",
+    "loginExpired": "ནང་འཛུལ་དུས་ཡོལ། བསྐྱར་ནང་འཛུལ་གནང་།",
+    "noAdminPermission": "ཁྱེད་ལ་དོ་དམ་པའི་དབང་ཆ་མེད།",
+    "unauthorizedAdmin": "དབང་མ་སྤྲད། དོ་དམ་པའི་ཐོ་ཁོངས་ནས་ནང་འཛུལ་གནང་།",
+    "forbiddenAdmin": "འཛུལ་མི་ཆོག ཁྱེད་ལ་དོ་དམ་དབང་ཆ་མེད།",
+    "fetchNewsFailed": "གསར་འགྱུར་ཐོ་འཇུག་མ་ཐུབ། {message}",
+    "connectionFailed": "རྒྱབ་ཞབས་ལ་འབྲེལ་མ་ཐུབ། ཞབས་ཞུ་འགོ་འཛུགས་ཡོད་མེད་ཞིབ་བཤེར་གནང་།",
+    "fillNewsFields": "མཚན་བྱང་། ནང་དོན། རིགས་བཅས་འབྲི་རོགས།",
+    "newsUpdateSuccess": "གསར་འགྱུར་གསར་སྒྱུར་ལེགས་གྲུབ།",
+    "newsCreateSuccess": "གསར་འགྱུར་གསར་བཟོ་ལེགས་གྲུབ།",
+    "confirmDeleteNews": "གསར་འགྱུར་འདི་སུབ་ངེས་ཡིན་ནམ། བསྐྱར་གསོ་མི་ཐུབ།",
+    "saveSuccess": "ཉར་ལེགས་གྲུབ།",
+    "saveFailed": "ཉར་མ་ཐུབ།",
+    "confirmDelete": "སུབ་ངེས་ཡིན་ནམ།",
+    "addFailed": "སྣོན་མ་ཐུབ།",
+    "confirmDeleteRoomType": "ཁང་རིགས་འདི་སུབ་ངེས་ཡིན་ནམ།",
+    "statusLabel": {
+      "PENDING": "ངེས་སྒུག",
+      "CONFIRMED": "ངེས་ཟིན།",
+      "CANCELLED": "ཆ་མེད།"
+    },
+    "securityPosture": {
+      "title": "བདེ་འཇགས་གནས་ཚུལ།",
+      "subtitle": "ཐོན་སྤྱོད་གྲ་སྒྲིག བདེ་འཇགས་སྲུང་སྐྱོབ། གཙོ་བོའི་ཞབས་ཞུ་ཞིབ་བཤེར།",
+      "loading": "བདེ་འཇགས་གནས་ཚུལ་འཇུག་བཞིན་པ་...",
+      "loadFailed": "བདེ་འཇགས་གནས་ཚུལ་འཇུག་མ་ཐུབ།",
+      "score": "གྲ་སྒྲིག་སྐར་གྲངས།",
+      "updatedAt": "ཞིབ་བཤེར་དུས། {time}",
+      "configured": "སྒྲིག་ཟིན།",
+      "missing": "མ་ཚང་།",
+      "findings": "བདེ་འཇགས་རྙེད་དོན།",
+      "dependencies": "གཙོ་བོའི་ཞབས་ཞུ།",
+      "status": {
+        "READY": "ཐོན་སྤྱོད་གྲ་སྒྲིག",
+        "DEGRADED": "བཙན་སྲུང་དགོས།",
+        "BLOCKED": "འགོག་དགོས།"
+      },
+      "groups": {
+        "environment": "འཁོར་ཡུག",
+        "exposure": "ཕྱིར་མངོན།",
+        "auth": "ཐོབ་ཐང་དང་མཚམས།",
+        "protection": "སྔོན་སྲུང་།"
+      },
+      "items": {
+        "activeProfiles": "འགུལ་སྒྲིག",
+        "strictSecrets": "གསང་ཚིག་བཙན་པོ།",
+        "publicDocs": "སྤྱི་བསྒྲགས་ཡིག་ཆ།",
+        "publicMetrics": "སྤྱི་བསྒྲགས་རྩིས་ཐོ།",
+        "cors": "CORS དཀར་ཐོ།",
+        "jwt": "JWT མཚན་རྟགས།",
+        "csrf": "CSRF མཚན་རྟགས།",
+        "totp": "དོ་དམ་གཉིས་པ།",
+        "cookie": "Cookie SameSite",
+        "rateLimit": "API ཚད་བཀག",
+        "bruteForce": "ནང་འཛུལ་སྲུང་བ།",
+        "antibot": "འཕྲུལ་མི་སྲུང་བ།",
+        "pii": "PII གསང་སྡོམ།"
+      },
+      "dependency": {
+        "database": "གྲངས་མཛོད།",
+        "redis": "Redis",
+        "scrapling": "རིན་གོང་འཚོལ་བ།",
+        "ai": "AI ཞབས་ཞུ།",
+        "payment": "ཕྱི་ཕྱོགས་ཕྱིར་མཆོང་།"
+      },
+      "dependencyStatus": {
+        "UP": "རྒྱུན་ལྡན།",
+        "DOWN": "ནོར་འཁྲུལ།",
+        "OUT_OF_SERVICE": "མཚམས་བཞག",
+        "UNKNOWN": "མ་ཤེས།",
+        "DISABLED": "སྤྱོད་མེད།"
+      },
+      "findingStatus": {
+        "PASS": "བརྒྱུད།",
+        "WARN": "དོ་སྣང་།",
+        "FAIL": "མ་ཐུབ།",
+        "INFO": "གནས་ཚུལ།"
+      },
+      "finding": {
+        "PUBLIC_DOCS_ENABLED": "OpenAPI ཡིག་ཆའི་ཐོབ་ཐང་།",
+        "PUBLIC_METRICS_ENABLED": "Prometheus རྩིས་ཐོའི་ཐོབ་ཐང་།",
+        "JWT_CONFIGURED": "JWT གསང་ཚིག་སྒྲིག་སྟངས།",
+        "CSRF_CONFIGURED": "CSRF གསང་ཚིག་སྒྲིག་སྟངས།",
+        "RATE_LIMITING": "API ཚད་བཀག་སྲུང་སྐྱོབ།",
+        "PII_KEYS": "མི་སྒེར་ཆ་འཕྲིན་གསང་སྡོམ།",
+        "PAYMENT_CALLBACK": "ཕྱི་ཕྱོགས་ཕྱིར་མཆོང་མཚན་རྟགས།",
+        "SCRAPLING_HEALTH": "རིན་གོང་ཞབས་ཞུ་སྒྲིག་སྟངས།"
+      }
+    },
+    "analytics": {
+      "title": "ལས་སྐྱོང་དཔྱད་ཞིབ་པང་།",
+      "subtitle": "ས་གནས། མངགས་ཐོ། སྤྱོད་མཁན། གསར་འགྱུར་གྱི་རྩ་བའི་དཔྱད་གྲངས།",
+      "updatedAt": "གྲངས་ཐོ་གསར་སྒྱུར་དུས། {time}",
+      "realtime": "དུས་ཐོག་རྩིས་ཐོ།",
+      "loading": "ལས་སྐྱོང་དཔྱད་ཞིབ་གྲངས་ཐོ་འཇུག་བཞིན་པ་...",
+      "spotCategories": {
+        "NATURAL": "རང་བྱུང་ཡུལ་ལྗོངས།",
+        "HISTORICAL": "ལོ་རྒྱུས་རིག་གནས།",
+        "CULTURAL": "རིག་གནས་ཉམས་མྱོང་།",
+        "UNCLASSIFIED": "རིགས་མ་དབྱེ།"
+      },
+      "summary": {
+        "userCount": "སྤྱོད་མཁན་ཁྱོན།",
+        "userHint": "ལས་སྟེགས་ཐོ་འགོད་སྤྱོད་མཁན།",
+        "orderCount": "མངགས་ཐོ་ཁྱོན།",
+        "orderHint": "ངེས་ཟིན་པའི་ས་གནས + མགྲོན་ཁང་མངགས་ཐོ།",
+        "revenue": "ཡོང་འབབ་ཁྱོན།",
+        "revenueHint": "ངེས་ཟིན་པའི་མངགས་ཐོའི་ཡོང་འབབ།",
+        "spotCount": "ས་གནས་ཁྱོན།",
+        "spotHint": "མིག་སྔའི་ས་གནས་ཐོན་ཁུངས།"
+      },
+      "charts": {
+        "orderRevenueTrend": "མངགས་ཐོ་དང་ཡོང་འབབ་འཕེལ་རིམ།",
+        "lastSixMonths": "ཟླ་དྲུག་ཉེ་ཆར།",
+        "categoryShare": "ས་གནས་རིགས་བགོས།",
+        "currentSpotData": "མིག་སྔའི་ས་གནས་གྲངས་ཐོ་ལྟར།",
+        "touristCityDistribution": "ཡུལ་སྐོར་བའི་ཡོང་ཁུངས་ཁྱབ་ཚུལ།",
+        "registeredCityDistribution": "ཐོ་འགོད་གྲོང་ཁྱེར་ལྟར།",
+        "popularSpotVisits": "ཁྱབ་ཆེན་ས་གནས་ལྟ་ཐེངས།",
+        "topEight": "མདུན་གྲལ་བརྒྱད།",
+        "newsAndUserGrowth": "གསར་འགྱུར་དང་སྤྱོད་མཁན་འཕེལ་ཚད།",
+        "userGrowthTrend": "སྤྱོད་མཁན་འཕེལ་ཚད་ཀྱི་འཁྱོག་ཐིག",
+        "newsPublishTrend": "གསར་འགྱུར་སྤེལ་ཚུལ་འཕེལ་རིམ།",
+        "orders": "མངགས་ཐོ་གྲངས།",
+        "revenue": "ཡོང་འབབ།",
+        "month": "ཟླ་བ།",
+        "visits": "ལྟ་ཐེངས།",
+        "spot": "ས་གནས།",
+        "userGrowth": "སྤྱོད་མཁན་འཕེལ་ཚད།",
+        "newsPublished": "གསར་འགྱུར་སྤེལ་གྲངས།",
+        "quantity": "གྲངས་ཚད།",
+        "tourists": "ཡུལ་སྐོར་བ།",
+        "unknownCity": "མ་ཤེས་པའི་གྲོང་ཁྱེར།"
+      }
+    }
+  },
+  "footer": {
+    "phone": "19532458802",
+    "email": "lengzhehao{'@'}gmail.com"
+  }
+}

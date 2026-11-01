@@ -27,6 +27,18 @@ class RequestRateLimitFilterTest {
         configureDefaults(filter);
     }
 
+    @Test
+    void inMemoryFallbackHasHardMaximumSize() {
+        assertThat(filter.inMemoryMaximumSize()).isEqualTo(20_000);
+    }
+
+    @Test
+    void clientErrorReportsHaveDedicatedAbuseLimit() throws Exception {
+        assertThat(doFilter(apiRequest("POST", "/api/client-errors")).getStatus()).isEqualTo(200);
+        assertThat(doFilter(apiRequest("POST", "/api/client-errors")).getStatus()).isEqualTo(200);
+        assertThat(doFilter(apiRequest("POST", "/api/client-errors")).getStatus()).isEqualTo(429);
+    }
+
     private void setField(String name, Object value) throws Exception {
         setField(filter, name, value);
     }
@@ -53,6 +65,8 @@ class RequestRateLimitFilterTest {
         setField(targetFilter, "guideChatWindowSeconds", 300L);
         setField(targetFilter, "uploadRequests", 5);
         setField(targetFilter, "uploadWindowSeconds", 60L);
+        setField(targetFilter, "clientErrorRequests", 2);
+        setField(targetFilter, "clientErrorWindowSeconds", 60L);
         setField(targetFilter, "adminRequests", 8);
         setField(targetFilter, "adminWindowSeconds", 60L);
         setField(targetFilter, "trustProxyHeaders", false);
@@ -509,17 +523,47 @@ class RequestRateLimitFilterTest {
     }
 
     @Test
-    @DisplayName("sliding window prevents 2x burst at window boundary")
-    void slidingWindowPreventsBoundaryBurst() throws Exception {
-        setField("defaultRequests", 10);
-        setField("defaultWindowSeconds", 2L);
+    @DisplayName("sliding window still enforces the limit after a long idle gap")
+    void slidingWindowEnforcesLimitAfterIdleGap() {
+        // The window used to advance by exactly one window per call, so after idling N windows the
+        // next N requests each re-entered the reset branch and were admitted regardless of the limit.
+        RequestRateLimitFilter.LimitRule rule =
+                new RequestRateLimitFilter.LimitRule("default", 2, 1_000L, false);
+        RequestRateLimitFilter.RateWindow window = new RequestRateLimitFilter.RateWindow(0L);
 
-        for (int i = 0; i < 10; i++) {
-            doFilter(apiRequest("GET", "/api/spots"));
+        assertThat(window.tryAcquire(rule, 0L).allowed()).isTrue();
+        assertThat(window.tryAcquire(rule, 10L).allowed()).isTrue();
+        assertThat(window.tryAcquire(rule, 20L).allowed()).isFalse();
+
+        // Idle for 10 whole windows, then burst: the first two are allowed for the fresh window and
+        // the third must still be refused.
+        long afterIdle = 10_000L;
+        assertThat(window.tryAcquire(rule, afterIdle).allowed()).isTrue();
+        assertThat(window.tryAcquire(rule, afterIdle + 1).allowed()).isTrue();
+        assertThat(window.tryAcquire(rule, afterIdle + 2).allowed()).isFalse();
+        assertThat(window.tryAcquire(rule, afterIdle + 3).allowed()).isFalse();
+    }
+
+    @Test
+    @DisplayName("sliding window weights the previous window instead of resetting on the boundary")
+    void slidingWindowWeightsPreviousWindowAcrossOneBoundary() {
+        RequestRateLimitFilter.LimitRule rule =
+                new RequestRateLimitFilter.LimitRule("default", 4, 1_000L, false);
+        RequestRateLimitFilter.RateWindow window = new RequestRateLimitFilter.RateWindow(0L);
+
+        for (int i = 0; i < 4; i++) {
+            assertThat(window.tryAcquire(rule, 900L).allowed()).isTrue();
         }
 
-        MockHttpServletResponse firstAfterWindow = doFilter(apiRequest("GET", "/api/spots"));
-        assertThat(firstAfterWindow.getHeader("X-RateLimit-Remaining")).isNotNull();
+        // Just past the boundary the previous window is still weighted at ~99%, so the caller gets a
+        // sliver of allowance rather than a whole fresh window - a naive reset would grant all 4 again.
+        int allowedRightAfterBoundary = 0;
+        for (long t = 1_010L; t < 1_020L; t++) {
+            if (window.tryAcquire(rule, t).allowed()) {
+                allowedRightAfterBoundary++;
+            }
+        }
+        assertThat(allowedRightAfterBoundary).isEqualTo(1);
     }
 
     @Test

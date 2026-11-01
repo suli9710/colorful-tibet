@@ -1,11 +1,12 @@
 package com.tibet.tourism.common.security;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.Expiry;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.Date;
 import java.util.HexFormat;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,7 +25,38 @@ public class TokenRevocationService {
 
     private final StringRedisTemplate redisTemplate;
     private final JwtUtils jwtUtils;
-    private final Map<String, Long> revokedTokenExpirations = new ConcurrentHashMap<>();
+    private final Cache<String, Long> revokedTokenExpirations = Caffeine.newBuilder()
+            .maximumSize(MAX_IN_MEMORY_REVOKED_TOKENS)
+            .expireAfter(new Expiry<String, Long>() {
+                @Override
+                public long expireAfterCreate(String key, Long expiresAt, long currentTime) {
+                    return remainingNanos(expiresAt);
+                }
+
+                @Override
+                public long expireAfterUpdate(
+                        String key,
+                        Long expiresAt,
+                        long currentTime,
+                        long currentDuration) {
+                    return remainingNanos(expiresAt);
+                }
+
+                @Override
+                public long expireAfterRead(
+                        String key,
+                        Long expiresAt,
+                        long currentTime,
+                        long currentDuration) {
+                    return currentDuration;
+                }
+
+                private long remainingNanos(Long expiresAt) {
+                    long remainingMillis = Math.max(1, expiresAt - System.currentTimeMillis());
+                    return TimeUnit.MILLISECONDS.toNanos(remainingMillis);
+                }
+            })
+            .build();
 
     @Value("${app.security.jwt-revocation.redis-enabled:true}")
     private boolean redisEnabled;
@@ -50,7 +82,6 @@ public class TokenRevocationService {
 
         String tokenHash = hashToken(token);
         revokedTokenExpirations.put(tokenHash, expiresAt);
-        evictExpiredInMemory();
 
         if (redisEnabled && redisTemplate != null) {
             try {
@@ -72,12 +103,12 @@ public class TokenRevocationService {
         }
 
         String tokenHash = hashToken(token);
-        Long localExpiresAt = revokedTokenExpirations.get(tokenHash);
+        Long localExpiresAt = revokedTokenExpirations.getIfPresent(tokenHash);
         if (localExpiresAt != null) {
             if (localExpiresAt > System.currentTimeMillis()) {
                 return true;
             }
-            revokedTokenExpirations.remove(tokenHash, localExpiresAt);
+            revokedTokenExpirations.invalidate(tokenHash);
         }
 
         if (redisEnabled && redisTemplate != null) {
@@ -101,12 +132,8 @@ public class TokenRevocationService {
         return false;
     }
 
-    private void evictExpiredInMemory() {
-        if (revokedTokenExpirations.size() < MAX_IN_MEMORY_REVOKED_TOKENS) {
-            return;
-        }
-        long now = System.currentTimeMillis();
-        revokedTokenExpirations.entrySet().removeIf(entry -> entry.getValue() <= now);
+    long inMemoryMaximumSize() {
+        return revokedTokenExpirations.policy().eviction().orElseThrow().getMaximum();
     }
 
     private String hashToken(String token) {

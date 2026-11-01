@@ -122,6 +122,7 @@ print(json.dumps({
     "paymentCallbackSecret": b64(48),
     "scraplingApiKey": token(32),
     "superAdminTotpSecret": b32(20),
+    "adminTotpSecret": b32(20),
     "seedAdminPassword": token(24),
     "seedSuperAdminPassword": token(24),
     "seedUserPassword": token(24),
@@ -181,9 +182,11 @@ TRUSTED_PROXY_CIDRS=
 CORS_ALLOWED_ORIGINS=$corsOrigin
 PUBLIC_DOCS_ENABLED=false
 SEED_CONTENT_ENABLED=true
-SEED_DEMO_USERS=false
+SEED_DEMO_USERS=true
 SUPER_ADMIN_USERNAME=lzh
 SUPER_ADMIN_TOTP_SECRET=$($Secrets.superAdminTotpSecret)
+ADMIN_TOTP_SECRETS=admin=$($Secrets.adminTotpSecret)
+TOTP_REPLAY_FAIL_CLOSED=false
 SEED_DEMO_ADMIN_PASSWORD=$($Secrets.seedAdminPassword)
 SEED_DEMO_SUPER_ADMIN_PASSWORD=$($Secrets.seedSuperAdminPassword)
 SEED_DEMO_USER_PASSWORD=$($Secrets.seedUserPassword)
@@ -269,6 +272,7 @@ TOTP URI: otpauth://totp/ColorfulTibet:lzh?secret=$($Secrets.superAdminTotpSecre
 
 Admin username: admin
 Admin password: $($Secrets.seedAdminPassword)
+Admin TOTP URI (scan with an authenticator app): otpauth://totp/ColorfulTibet:admin?secret=$($Secrets.adminTotpSecret)&issuer=ColorfulTibet
 
 Demo user username: user1
 Demo user password: $($Secrets.seedUserPassword)
@@ -303,6 +307,13 @@ ALLOW_DOCKER_BOOTSTRAP=__ALLOW_DOCKER_BOOTSTRAP__
 DOCKER_INSTALL_SCRIPT_SHA256=__DOCKER_INSTALL_SCRIPT_SHA256__
 DOCKER_INSTALL_VERSION=__DOCKER_INSTALL_VERSION__
 ALLOWED_PROJECT_ROOT="/opt/colorful-tibet"
+
+# The uploads sit in world-readable /tmp and carry every application secret plus the super-admin
+# first-login credentials. Remove them however this script exits, not only on the success path.
+cleanup_uploads() {
+  rm -f "$ARCHIVE" "$ENV_UPLOAD" "$LOGIN_UPLOAD" /tmp/colorful-tibet-http-deploy.sh /tmp/get-docker.sh
+}
+trap cleanup_uploads EXIT INT TERM
 
 validate_project_dir() {
   if [ -z "$PROJECT_DIR" ] || [ "${PROJECT_DIR#/}" = "$PROJECT_DIR" ]; then
@@ -529,7 +540,6 @@ if ! curl -fsSI --max-time 20 "$SITE_URL" | head -n 12; then
   echo "WARNING: local SiteUrl check failed from the server." >&2
 fi
 
-rm -f "$ARCHIVE" "$ENV_UPLOAD" "$LOGIN_UPLOAD" /tmp/colorful-tibet-http-deploy.sh /tmp/get-docker.sh
 echo "HTTP demo deployment completed."
 '@
 
@@ -644,14 +654,24 @@ except (paramiko.BadHostKeyException, paramiko.SSHException) as exc:
 try:
     sftp = client.open_sftp()
     try:
-        for local_path, remote_path in [
-            (args.archive, args.remote_archive),
-            (args.env_file, args.remote_env),
-            (args.login_file, args.remote_login),
-            (args.script_file, args.remote_script),
+        for local_path, remote_path, secret in [
+            (args.archive, args.remote_archive, False),
+            (args.env_file, args.remote_env, True),
+            (args.login_file, args.remote_login, True),
+            (args.script_file, args.remote_script, False),
         ]:
             print(f"Uploading {local_path} -> {remote_path}", flush=True)
+            if secret:
+                # /tmp is world-readable and sftp.put creates with the remote umask (usually 0644), so
+                # the generated .env and the super-admin first-login file would be readable by every
+                # local account for the whole upload. Create the file empty, lock it down, and only
+                # then write the contents: sftp.put truncates but does not reset the mode.
+                with sftp.open(remote_path, "wb"):
+                    pass
+                sftp.chmod(remote_path, 0o600)
             sftp.put(local_path, remote_path)
+            if secret:
+                sftp.chmod(remote_path, 0o600)
     finally:
         sftp.close()
 

@@ -2,14 +2,10 @@ package com.tibet.tourism.modules.spot.application;
 
 import com.tibet.tourism.common.error.ResourceNotFoundException;
 import com.tibet.tourism.modules.spot.domain.ScenicSpot;
-import com.tibet.tourism.modules.spot.domain.SpotPriceObservation;
 import com.tibet.tourism.modules.spot.infra.ScenicSpotRepository;
-import com.tibet.tourism.modules.spot.infra.SpotPriceObservationRepository;
 import com.tibet.tourism.modules.spot.web.dto.PriceInfo;
 import java.math.BigDecimal;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class SingleSpotPriceUpdateService {
@@ -19,19 +15,20 @@ public class SingleSpotPriceUpdateService {
 
     private final ScenicSpotRepository scenicSpotRepository;
     private final PriceFetchService priceFetchService;
-    private final SpotPriceObservationRepository priceObservationRepository;
+    private final PriceUpdatePersistenceService priceUpdatePersistenceService;
 
     public SingleSpotPriceUpdateService(
             ScenicSpotRepository scenicSpotRepository,
             PriceFetchService priceFetchService,
-            SpotPriceObservationRepository priceObservationRepository) {
+            PriceUpdatePersistenceService priceUpdatePersistenceService) {
         this.scenicSpotRepository = scenicSpotRepository;
         this.priceFetchService = priceFetchService;
-        this.priceObservationRepository = priceObservationRepository;
+        this.priceUpdatePersistenceService = priceUpdatePersistenceService;
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public PriceUpdateService.PriceUpdateResult updateSpotPrice(Long spotId, boolean forceUpdate) {
+        // Repository reads complete before the external provider call. Persistence happens in a
+        // separate short transaction so a slow provider never holds a JDBC connection or row lock.
         ScenicSpot spot = scenicSpotRepository.findById(spotId)
                 .orElseThrow(() -> new ResourceNotFoundException("Scenic spot not found"));
 
@@ -53,42 +50,13 @@ public class SingleSpotPriceUpdateService {
 
         boolean publishablePrice = priceFetchService.isPublishablePrice(priceInfo);
         if (!publishablePrice) {
-            savePriceObservation(
-                    spot,
-                    priceInfo,
-                    false,
-                    SpotPriceObservation.Status.REVIEW_REQUIRED,
-                    "Reference-only or below publish confidence");
+            priceUpdatePersistenceService.saveReviewObservation(spotId, priceInfo);
             return new PriceUpdateService.PriceUpdateResult(
                     false,
                     SKIPPED_REFERENCE_PRICE + ": fetched price is reference-only or below publish confidence",
                     priceInfo);
         }
 
-        spot.setTicketPrice(priceInfo.getBasePrice());
-        if (priceInfo.getPeakSeasonPrice() != null) {
-            spot.setPeakSeasonPrice(priceInfo.getPeakSeasonPrice());
-        }
-        if (priceInfo.getOffSeasonPrice() != null) {
-            spot.setOffSeasonPrice(priceInfo.getOffSeasonPrice());
-        }
-
-        scenicSpotRepository.save(spot);
-        savePriceObservation(spot, priceInfo, true, SpotPriceObservation.Status.PUBLISHED, "Published to scenic spot");
-        return new PriceUpdateService.PriceUpdateResult(true, "PRICE_UPDATED", priceInfo);
-    }
-
-    private void savePriceObservation(
-            ScenicSpot spot,
-            PriceInfo priceInfo,
-            boolean publishable,
-            SpotPriceObservation.Status status,
-            String reviewReason) {
-        priceObservationRepository.save(SpotPriceObservation.from(
-                spot,
-                priceInfo,
-                publishable,
-                status,
-                reviewReason));
+        return priceUpdatePersistenceService.publishFetchedPrice(spotId, forceUpdate, priceInfo);
     }
 }

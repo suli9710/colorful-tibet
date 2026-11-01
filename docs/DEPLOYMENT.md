@@ -85,7 +85,8 @@ PII_KEYS=v1:replace-with-base64-32-byte-key
 PII_ACTIVE_KID=v1
 PII_ENCRYPTION_KEY=replace-with-at-least-64-random-characters-for-local-dev
 SUPER_ADMIN_USERNAME=lzh
-SUPER_ADMIN_TOTP_SECRET=JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP
+SUPER_ADMIN_TOTP_SECRET=<paste-a-new-CSPRNG-generated-160-bit-Base32-secret>
+ADMIN_TOTP_SECRETS=
 
 REQUIRE_STRONG_SECRETS=false
 COOKIE_SECURE=false
@@ -100,6 +101,10 @@ SCRAPLING_HOST_PORT=8000
 SCRAPLING_API_KEY=local-scrapling-dev-secret
 SCRAPLING_ALLOW_UNAUTHENTICATED=false
 ```
+
+`ADMIN_TOTP_SECRETS` 可留空（仅有超级管理员时），否则使用分号分隔的
+`username=Base32Secret` 条目为每个普通管理员配置独立密钥。生产 preflight
+会拒绝占位值、格式错误、重复用户名或复用密钥；不会在日志中打印密钥。
 
 生成本地随机密钥的 PowerShell 示例：
 
@@ -121,7 +126,7 @@ $bytes = New-Object byte[] 32
 
 - 本地 `REQUIRE_STRONG_SECRETS=false`，但 Compose 仍要求关键变量非空。
 - `PII_KEYS` 格式必须是 `kid:base64-32-byte-key`，例如 `v1:xxxx`。
-- `SUPER_ADMIN_TOTP_SECRET` 本地可先使用示例 Base32 值，真实联调二次认证时再替换为认证器 App 中的密钥。
+- `SUPER_ADMIN_TOTP_SECRET` 不提供可复制的固定示例。请通过认证器、密码管理器或受控部署脚本为每个管理员独立生成至少 20 个随机字节的 canonical uppercase Base32 密钥，再把值写入本地 secret 配置；不要复用文档或测试向量。
 - AI Key 可以留空；没有 `DOUBAO_API_KEY` 或 `ARK_API_KEY` 时，AI 路线相关功能应使用本地兜底逻辑或返回可理解的错误。
 - `SCRAPLING_API_KEY` 同时传给 backend 和 scrapling；只有 loopback-only 本地调试才可以临时设置 `SCRAPLING_ALLOW_UNAUTHENTICATED=true`。
 
@@ -303,7 +308,8 @@ $env:PAYMENT_CALLBACK_SECRET = "replace-with-at-least-64-random-characters-for-l
 $env:PII_KEYS = "v1:replace-with-base64-32-byte-key"
 $env:PII_ACTIVE_KID = "v1"
 $env:PII_ENCRYPTION_KEY = "replace-with-at-least-64-random-characters-for-local-dev"
-$env:SUPER_ADMIN_TOTP_SECRET = "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP"
+$env:SUPER_ADMIN_TOTP_SECRET = "<paste-a-new-CSPRNG-generated-160-bit-Base32-secret>"
+$env:ADMIN_TOTP_SECRETS = ""
 $env:REQUIRE_STRONG_SECRETS = "false"
 $env:COOKIE_SECURE = "false"
 $env:PUBLIC_DOCS_ENABLED = "true"

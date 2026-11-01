@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static com.tibet.tourism.modules.admin.application.AdminAuditTestSupport.passthroughAuditService;
 
 import com.tibet.tourism.common.security.JwtAuthSupport;
 import com.tibet.tourism.common.security.antibot.RiskAssessmentService;
@@ -31,7 +32,8 @@ class OrderCenterControllerPrivacyTest {
     private final OrderCenterController controller = new OrderCenterController(
             orderCenterService,
             jwtAuthSupport,
-            riskAssessmentService);
+            riskAssessmentService,
+            passthroughAuditService());
     private final MockHttpServletRequest httpRequest = new MockHttpServletRequest();
     private User user;
 

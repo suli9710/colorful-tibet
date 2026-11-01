@@ -138,4 +138,16 @@ public interface SharedRouteRepository extends JpaRepository<SharedRoute, Long>,
     @Modifying
     @Query("UPDATE SharedRoute r SET r.commentCount = CASE WHEN r.commentCount > 0 THEN r.commentCount - 1 ELSE 0 END, r.version = r.version + 1 WHERE r.id = :id")
     int decrementCommentCount(@Param("id") Long id);
+
+    /** Recomputes like_count from the surviving rows after a bulk delete of one user's likes. */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE SharedRoute r SET r.likeCount = (SELECT COUNT(rl) FROM RouteLike rl WHERE rl.route.id = r.id), "
+            + "r.version = r.version + 1 WHERE r.id IN :ids")
+    void recountLikes(@Param("ids") java.util.Collection<Long> ids);
+
+    /** Recomputes comment_count from the surviving rows after a bulk delete of one user's comments. */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE SharedRoute r SET r.commentCount = (SELECT COUNT(rc) FROM RouteComment rc WHERE rc.route.id = r.id), "
+            + "r.version = r.version + 1 WHERE r.id IN :ids")
+    void recountComments(@Param("ids") java.util.Collection<Long> ids);
 }

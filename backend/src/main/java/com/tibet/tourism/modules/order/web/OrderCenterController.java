@@ -4,6 +4,7 @@ import com.tibet.tourism.common.security.antibot.BehaviorData;
 import com.tibet.tourism.common.security.antibot.RiskAssessmentService;
 import com.tibet.tourism.common.security.antibot.RiskResult;
 import com.tibet.tourism.common.security.JwtAuthSupport;
+import com.tibet.tourism.modules.admin.application.AdminAuditLogService;
 import com.tibet.tourism.modules.order.application.OrderCenterService;
 import com.tibet.tourism.modules.order.domain.Invoice;
 import com.tibet.tourism.modules.order.web.dto.CancelOrderRequest;
@@ -36,13 +37,16 @@ public class OrderCenterController {
     private final OrderCenterService orderCenterService;
     private final JwtAuthSupport jwtAuthSupport;
     private final RiskAssessmentService riskAssessmentService;
+    private final AdminAuditLogService auditLogService;
 
     public OrderCenterController(OrderCenterService orderCenterService,
                                  JwtAuthSupport jwtAuthSupport,
-                                 RiskAssessmentService riskAssessmentService) {
+                                 RiskAssessmentService riskAssessmentService,
+                                 AdminAuditLogService auditLogService) {
         this.orderCenterService = orderCenterService;
         this.jwtAuthSupport = jwtAuthSupport;
         this.riskAssessmentService = riskAssessmentService;
+        this.auditLogService = auditLogService;
     }
 
     @PostMapping("/api/orders")
@@ -127,6 +131,14 @@ public class OrderCenterController {
                                           @PathVariable Long refundId,
                                           @Valid @RequestBody RefundReviewRequest request,
                                           HttpServletRequest httpRequest) {
+        return auditLogService.capture("order_refund", refundId, "order_refund_review",
+                () -> reviewRefundInternal(orderId, refundId, request, httpRequest));
+    }
+
+    private ResponseEntity<?> reviewRefundInternal(Long orderId,
+                                                   Long refundId,
+                                                   RefundReviewRequest request,
+                                                   HttpServletRequest httpRequest) {
         User user = jwtAuthSupport.resolveCurrentUser(httpRequest);
         try {
             return ResponseEntity.ok(orderCenterService.reviewRefund(user, orderId, refundId, request));

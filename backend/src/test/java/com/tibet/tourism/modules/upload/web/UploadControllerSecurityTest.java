@@ -3,6 +3,9 @@ package com.tibet.tourism.modules.upload.web;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.nullable;
 
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
@@ -11,6 +14,7 @@ import com.tibet.tourism.common.api.ApiErrorResponder;
 import com.tibet.tourism.common.security.JwtAuthSupport;
 import com.tibet.tourism.common.security.LoginAttemptService;
 import com.tibet.tourism.modules.admin.application.AdminUserService;
+import com.tibet.tourism.modules.admin.application.AdminAuditLogService;
 import com.tibet.tourism.modules.admin.web.AdminUserController;
 import com.tibet.tourism.modules.community.web.CommentController;
 import com.tibet.tourism.modules.upload.application.FileStorageService;
@@ -19,6 +23,7 @@ import com.tibet.tourism.modules.user.infra.UserRepository;
 import com.tibet.tourism.modules.user.web.CurrentUserController;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Map;
+import java.util.function.Supplier;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -47,6 +52,9 @@ class UploadControllerSecurityTest {
     private AdminUserService adminUserService;
 
     @Mock
+    private AdminAuditLogService auditLogService;
+
+    @Mock
     private JwtAuthSupport jwtAuthSupport;
 
     @Mock
@@ -56,10 +64,15 @@ class UploadControllerSecurityTest {
     private ApiErrorResponder apiErrorResponder;
 
     @Test
+    @SuppressWarnings("unchecked")
     void adminUploadReturnsBadRequestWhenStorageRejectsFile() throws Exception {
         MultipartFile file = multipart("payload.svg", "image/svg+xml");
         AdminUserController controller = new AdminUserController(
-                userRepository, loginAttemptService, fileStorageService, adminUserService);
+                userRepository, loginAttemptService, fileStorageService, adminUserService, auditLogService);
+
+        when(auditLogService.capture(
+                anyString(), nullable(Long.class), anyString(), any(Supplier.class)))
+                .thenAnswer(invocation -> ((Supplier<ResponseEntity<?>>) invocation.getArgument(3)).get());
 
         when(fileStorageService.storeAdminImage(file))
                 .thenThrow(new IllegalArgumentException("Unsupported image content type"));

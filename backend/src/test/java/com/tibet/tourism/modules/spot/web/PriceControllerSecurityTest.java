@@ -21,9 +21,9 @@ import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.test.util.ReflectionTestUtils;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
+import static com.tibet.tourism.modules.admin.application.AdminAuditTestSupport.passthroughAuditService;
 
 @ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class PriceControllerSecurityTest {
@@ -44,11 +44,12 @@ class PriceControllerSecurityTest {
 
     @BeforeEach
     void setUp() {
-        controller = new PriceController();
-        ReflectionTestUtils.setField(controller, "priceFetchService", priceFetchService);
-        ReflectionTestUtils.setField(controller, "priceUpdateService", priceUpdateService);
-        ReflectionTestUtils.setField(controller, "priceBatchUpdateJobService", priceBatchUpdateJobService);
-        ReflectionTestUtils.setField(controller, "scenicSpotRepository", scenicSpotRepository);
+        controller = new PriceController(
+                priceFetchService,
+                priceUpdateService,
+                priceBatchUpdateJobService,
+                scenicSpotRepository,
+                passthroughAuditService());
     }
 
     @Test

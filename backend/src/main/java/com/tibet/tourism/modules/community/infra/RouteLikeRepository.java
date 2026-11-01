@@ -1,4 +1,5 @@
 package com.tibet.tourism.modules.community.infra;
+import java.util.List;
 import com.tibet.tourism.modules.community.domain.RouteLike;
 import com.tibet.tourism.modules.community.domain.SharedRoute;
 import com.tibet.tourism.modules.user.domain.User;
@@ -46,4 +47,8 @@ public interface RouteLikeRepository extends JpaRepository<RouteLike, Long> {
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("DELETE FROM RouteLike rl WHERE rl.route.id = :routeId AND rl.user.id = :userId")
     int deleteByRouteIdAndUserId(@Param("routeId") Long routeId, @Param("userId") Long userId);
+
+    /** Shared routes (owned by other users) whose like_count must be recomputed after this user's likes are deleted. */
+    @Query("SELECT DISTINCT rl.route.id FROM RouteLike rl WHERE rl.user.id = :userId")
+    List<Long> findLikedRouteIdsByUserId(@Param("userId") Long userId);
 }

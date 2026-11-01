@@ -8,8 +8,10 @@ import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static com.tibet.tourism.modules.admin.application.AdminAuditTestSupport.passthroughAuditService;
 
 import com.tibet.tourism.common.security.antibot.RiskAssessmentService;
+import com.tibet.tourism.modules.admin.application.AdminAuditLogService;
 import com.tibet.tourism.modules.hotel.application.HotelBookingPiiAccessGuard;
 import com.tibet.tourism.modules.hotel.application.HotelBookingPiiAuditService;
 import com.tibet.tourism.modules.hotel.application.HotelBookingService;
@@ -134,8 +136,10 @@ class HotelBookingPiiMethodSecurityTest {
         @Bean
         HotelBookingController hotelBookingController(HotelBookingService hotelBookingService,
                                                       UserRepository userRepository,
-                                                      RiskAssessmentService riskAssessmentService) {
-            return new HotelBookingController(hotelBookingService, userRepository, riskAssessmentService);
+                                                      RiskAssessmentService riskAssessmentService,
+                                                      AdminAuditLogService auditLogService) {
+            return new HotelBookingController(
+                    hotelBookingService, userRepository, riskAssessmentService, auditLogService);
         }
 
         @Bean
@@ -157,6 +161,11 @@ class HotelBookingPiiMethodSecurityTest {
         @Bean
         RiskAssessmentService riskAssessmentService() {
             return mock(RiskAssessmentService.class);
+        }
+
+        @Bean
+        AdminAuditLogService auditLogService() {
+            return passthroughAuditService();
         }
 
         @Bean

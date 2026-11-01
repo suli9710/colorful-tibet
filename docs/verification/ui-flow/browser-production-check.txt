@@ -1,0 +1,19 @@
+
+> colorful-tibet-frontend@0.0.0 test:e2e
+> playwright test --workers=1
+
+
+Running 8 tests using 1 worker
+
+(node:23424) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 1 [chromium] › tests\e2e\app-smoke.spec.ts:25:1 › carousel remains paused until the user resumes it (3.4s)
+  ok 2 [chromium] › tests\e2e\app-smoke.spec.ts:41:1 › boots, lazy-loads Tibetan, persists locale, and navigates (4.6s)
+  ok 3 [chromium] › tests\e2e\planner-flow.spec.ts:37:1 › review preserves notes, confirms replacement, exports notes and saves once (4.1s)
+  ok 4 [chromium] › tests\e2e\planner-flow.spec.ts:76:1 › generation deduplicates and missing quote can retry without replacing itinerary (4.0s)
+  ok 5 [chromium] › tests\e2e\planner-flow.spec.ts:91:1 › preferences survive refresh; offline generation is disabled (5.8s)
+  ok 6 [chromium] › tests\e2e\planner-flow.spec.ts:105:1 › review reflows on desktop, tablet, mobile, narrow and 200% content zoom (4.0s)
+  ok 7 [chromium] › tests\e2e\planner-state.spec.ts:5:1 › editing next-trip preferences leaves the existing itinerary, notes and export metadata intact (3.1s)
+  ok 8 [chromium] › tests\e2e\planner-state.spec.ts:29:1 › a delayed response for the previous itinerary cannot replace the new itinerary details (4.1s)
+
+  8 passed (33.9s)

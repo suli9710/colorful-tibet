@@ -270,6 +270,122 @@ reject_placeholder_secret_if_present() {
   fi
 }
 
+is_sequential_base32_pattern() {
+  printf '%s\n' "$1" | awk '
+    BEGIN { alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567" }
+    {
+      ascending = 1
+      descending = 1
+      for (i = 2; i <= length($0) && (ascending || descending); i++) {
+        previous = index(alphabet, substr($0, i - 1, 1)) - 1
+        current = index(alphabet, substr($0, i, 1)) - 1
+        if (current != (previous + 1) % 32) ascending = 0
+        if (current != (previous + 31) % 32) descending = 0
+      }
+      exit (ascending || descending) ? 0 : 1
+    }
+  '
+}
+
+is_periodic_totp_pattern() {
+  printf '%s\n' "$1" | awk '
+    {
+      size = length($0)
+      for (period = 1; period <= int(size / 2); period++) {
+        if (size % period != 0) continue
+        repeated = 1
+        for (i = period + 1; i <= size; i++) {
+          if (substr($0, i, 1) != substr($0, ((i - 1) % period) + 1, 1)) {
+            repeated = 0
+            break
+          }
+        }
+        if (repeated) exit 0
+      }
+      exit 1
+    }
+  '
+}
+
+is_strong_totp_secret() {
+  local secret="$1"
+  local distinct_count
+  if ! printf '%s' "$secret" | grep -Eq '^[A-Z2-7]{32,}$'; then
+    return 1
+  fi
+  if [ $(( ${#secret} % 8 )) -ne 0 ]; then
+    return 1
+  fi
+  case "$secret" in
+    GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ|JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP|MZXW6YTBOJQXGZJAMZXXE3DEMF2GK3LQ|NBSWY3DPEB3W64TMMQXG6ZRAMZXXE3DE|MFRGGZDFMZTWQ2LKMFRGGZDFMZTWQ2LK)
+      return 1
+      ;;
+  esac
+  distinct_count=$(printf '%s' "$secret" | fold -w 1 | sort -u | wc -l | tr -d '[:space:]')
+  if [ "$distinct_count" -lt 8 ]; then
+    return 1
+  fi
+  if is_sequential_base32_pattern "$secret" || is_periodic_totp_pattern "$secret"; then
+    return 1
+  fi
+  return 0
+}
+
+validate_admin_totp_secrets_value() {
+  local value="$1"
+  local super_username="$2"
+  local super_secret="$3"
+  [ -z "$value" ] && return 0
+  case "$value" in
+    *[[:cntrl:]]*|';'*|*';'|*';;'*)
+      echo "Refusing deployment: ADMIN_TOTP_SECRETS must use semicolon-separated username=Base32Secret entries without empty or control-character entries." >&2
+      exit 1
+      ;;
+  esac
+
+  super_username=$(printf '%s' "$super_username" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' | tr '[:upper:]' '[:lower:]')
+  seen_users="|$super_username|"
+  seen_secrets="|$super_secret|"
+  old_ifs="$IFS"
+  IFS=';'
+  for entry in $value; do
+    IFS="$old_ifs"
+    username=${entry%%=*}
+    secret=${entry#*=}
+    username=$(printf '%s' "$username" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
+    secret=$(printf '%s' "$secret" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
+    if ! printf '%s' "$entry" | grep -q '=' || ! printf '%s' "$username" | grep -Eq '^[A-Za-z0-9_-]{3,64}$'; then
+      echo "Refusing deployment: ADMIN_TOTP_SECRETS contains an invalid username=Base32Secret entry." >&2
+      exit 1
+    fi
+    username_key=$(printf '%s' "$username" | tr '[:upper:]' '[:lower:]')
+    case "$seen_users" in
+      *"|$username_key|"*)
+        echo "Refusing deployment: ADMIN_TOTP_SECRETS contains a duplicate or super-admin username." >&2
+        exit 1
+        ;;
+    esac
+    if [ -z "$secret" ] || is_placeholder_secret "$secret"; then
+      echo "Refusing deployment: ADMIN_TOTP_SECRETS contains an empty or placeholder secret." >&2
+      exit 1
+    fi
+    if ! is_strong_totp_secret "$secret"; then
+      echo "Refusing deployment: each ADMIN_TOTP_SECRETS secret must be a high-entropy Base32 secret in complete 8-character blocks with at least 32 characters." >&2
+      exit 1
+    fi
+    case "$seen_secrets" in
+      *"|$secret|"*)
+        echo "Refusing deployment: ADMIN_TOTP_SECRETS secrets must be independent." >&2
+        exit 1
+        ;;
+    esac
+    seen_users="$seen_users$username_key|"
+    seen_secrets="$seen_secrets$secret|"
+    IFS="$old_ifs"
+  done
+  IFS="$old_ifs"
+}
+
 require_exact_env() {
   local name="$1"
   local expected="$2"
@@ -293,16 +409,19 @@ for secret_name in \
   ADMIN_ENCRYPTION_KEY \
   CSRF_SIGNING_SECRET \
   CACHE_KEY_HMAC_SECRET \
+  METRICS_SCRAPE_TOKEN \
   PAYMENT_CALLBACK_SECRET \
   PII_KEYS \
   PII_ACTIVE_KID \
   SUPER_ADMIN_TOTP_SECRET \
   SCRAPLING_API_KEY \
+  ALERT_LOG_TOKEN \
   RECAPTCHA_SITE_KEY \
   RECAPTCHA_SECRET_KEY \
   VITE_AMAP_KEY \
   VITE_AMAP_SECURITY_CODE \
-  ALERTMANAGER_WEBHOOK_URL; do
+  ALERTMANAGER_WEBHOOK_URL \
+  APP_VERSION; do
   require_real_secret "$secret_name"
 done
 reject_placeholder_secret_if_present MYSQL_PASSWORD
@@ -326,13 +445,30 @@ require_exact_env RATE_LIMIT_REDIS_ENABLED true
 require_exact_env RATE_LIMIT_REDIS_FAIL_CLOSED true
 require_exact_env BRUTE_FORCE_REDIS_ENABLED true
 require_exact_env BRUTE_FORCE_REDIS_FAIL_CLOSED true
+require_exact_env TOTP_REPLAY_FAIL_CLOSED true
 require_exact_env ANTIBOT_ENABLED true
 require_exact_env RECAPTCHA_ENABLED true
 require_exact_env REGISTRATION_RECAPTCHA_REQUIRED true
 require_exact_env SCRAPLING_ALLOW_UNAUTHENTICATED false
+require_exact_env SERVER_FORWARD_HEADERS_STRATEGY none
+require_exact_env TRUST_PROXY_HEADERS true
 
 TRUST_PROXY_HEADERS_VALUE=$(get_env_value TRUST_PROXY_HEADERS | tr '[:upper:]' '[:lower:]')
 TRUSTED_PROXY_CIDRS_VALUE=$(get_env_value TRUSTED_PROXY_CIDRS | tr -d '[:space:]')
+FRONTEND_CONTAINER_IP_VALUE=$(get_env_value FRONTEND_CONTAINER_IP | tr -d '[:space:]')
+if [ -z "$FRONTEND_CONTAINER_IP_VALUE" ]; then
+  echo "Refusing deployment: FRONTEND_CONTAINER_IP must be explicit." >&2
+  exit 1
+fi
+METRICS_SCRAPE_TOKEN_VALUE=$(get_env_value METRICS_SCRAPE_TOKEN)
+if [ "${#METRICS_SCRAPE_TOKEN_VALUE}" -lt 64 ]; then
+  echo "Refusing deployment: METRICS_SCRAPE_TOKEN must be at least 64 characters." >&2
+  exit 1
+fi
+if [ "$TRUSTED_PROXY_CIDRS_VALUE" != "$FRONTEND_CONTAINER_IP_VALUE/32" ]; then
+  echo "Refusing deployment: TRUSTED_PROXY_CIDRS must exactly match FRONTEND_CONTAINER_IP/32." >&2
+  exit 1
+fi
 if [ "$TRUST_PROXY_HEADERS_VALUE" = "true" ]; then
   if [ -z "$TRUSTED_PROXY_CIDRS_VALUE" ]; then
     echo "Refusing deployment: TRUSTED_PROXY_CIDRS must be explicit when TRUST_PROXY_HEADERS=true." >&2
@@ -365,10 +501,16 @@ if grep -qx 'SEED_DEMO_SUPER_ADMIN_PASSWORD=031224' "$PROJECT_DIR/.env"; then
   exit 1
 fi
 
-if ! grep -Eq '^SUPER_ADMIN_TOTP_SECRET=[A-Z2-7]{32,}$' "$PROJECT_DIR/.env"; then
-  echo "Refusing deployment: SUPER_ADMIN_TOTP_SECRET must be a Base32 secret with at least 32 characters." >&2
+SUPER_ADMIN_TOTP_SECRET_VALUE=$(get_env_value SUPER_ADMIN_TOTP_SECRET)
+if ! is_strong_totp_secret "$SUPER_ADMIN_TOTP_SECRET_VALUE"; then
+  echo "Refusing deployment: SUPER_ADMIN_TOTP_SECRET must be a high-entropy Base32 secret in complete 8-character blocks with at least 32 characters." >&2
   exit 1
 fi
+
+ADMIN_TOTP_SECRETS_VALUE=$(get_env_value ADMIN_TOTP_SECRETS)
+SUPER_ADMIN_USERNAME_VALUE=$(get_env_value SUPER_ADMIN_USERNAME)
+SUPER_ADMIN_USERNAME_VALUE=${SUPER_ADMIN_USERNAME_VALUE:-lzh}
+validate_admin_totp_secrets_value "$ADMIN_TOTP_SECRETS_VALUE" "$SUPER_ADMIN_USERNAME_VALUE" "$SUPER_ADMIN_TOTP_SECRET_VALUE"
 
 if grep -Eiq '^SPRING_JPA_HIBERNATE_DDL_AUTO=update$' "$PROJECT_DIR/.env"; then
   echo "Refusing deployment: production must not use SPRING_JPA_HIBERNATE_DDL_AUTO=update." >&2
@@ -455,6 +597,16 @@ find "$PROJECT_DIR/data" "$PROJECT_DIR/logs" -type f -exec chmod 640 {} +
 cd "$PROJECT_DIR"
 docker compose -f "$COMPOSE_FILE" config --quiet
 
+BACKEND_HOST_PORT=$(get_env_value BACKEND_HOST_PORT)
+FRONTEND_HOST_PORT=$(get_env_value FRONTEND_HOST_PORT)
+EXTERNAL_TLS_PROXY=$(get_env_value EXTERNAL_TLS_PROXY | tr '[:upper:]' '[:lower:]')
+BACKEND_HOST_PORT=${BACKEND_HOST_PORT:-8080}
+FRONTEND_HOST_PORT=${FRONTEND_HOST_PORT:-80}
+EXTERNAL_TLS_PROXY=${EXTERNAL_TLS_PROXY:-false}
+case "$BACKEND_HOST_PORT" in ''|*[!0-9]*) echo "Invalid BACKEND_HOST_PORT: $BACKEND_HOST_PORT" >&2; exit 1 ;; esac
+case "$FRONTEND_HOST_PORT" in ''|*[!0-9]*) echo "Invalid FRONTEND_HOST_PORT: $FRONTEND_HOST_PORT" >&2; exit 1 ;; esac
+case "$EXTERNAL_TLS_PROXY" in true|false) ;; *) echo "EXTERNAL_TLS_PROXY must be true or false." >&2; exit 1 ;; esac
+
 echo "Building and starting containers..."
 COMPOSE_PROGRESS=plain BUILDKIT_PROGRESS=plain docker compose -f "$COMPOSE_FILE" up -d --build
 
@@ -484,10 +636,14 @@ wait_for_health colorful-tibet-backend 360
 wait_for_health colorful-tibet-frontend 180
 
 docker exec colorful-tibet-frontend nginx -t
-curl -fsS http://127.0.0.1:8080/actuator/health/readiness
+curl -fsS "http://127.0.0.1:$BACKEND_HOST_PORT/actuator/health/readiness"
 echo ""
-curl -fsS http://127.0.0.1:80/health
-curl -fsS -I "$SITE_URL" | head -n 12
+curl -fsS "http://127.0.0.1:$FRONTEND_HOST_PORT/health"
+if [ "$EXTERNAL_TLS_PROXY" = "true" ]; then
+  echo "External site check deferred to the host TLS proxy."
+else
+  curl -fsS -I "$SITE_URL" | head -n 12
+fi
 
 echo "Pruning unused Docker build cache..."
 docker builder prune -af >/dev/null 2>&1 || true

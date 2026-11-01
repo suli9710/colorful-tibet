@@ -1,6 +1,7 @@
 package com.tibet.tourism.modules.ai.application;
 import com.tibet.tourism.common.security.CacheKeyHasher;
 import com.tibet.tourism.common.security.ProductionSafetyValidator;
+import com.tibet.tourism.common.security.RedisPayloadCipher;
 import java.time.Duration;
 import java.time.format.DateTimeFormatter;
 import java.time.LocalDate;
@@ -39,9 +40,18 @@ public class AiQuotaService {
             end
             return {1, math.max(limit - current, 0)}
             """, List.class);
+    private static final DefaultRedisScript<Long> RELEASE_QUOTA_SCRIPT = new DefaultRedisScript<>("""
+            local current = tonumber(redis.call('GET', KEYS[1]))
+            if not current or current <= 0 then
+                return 0
+            end
+            redis.call('DECR', KEYS[1])
+            return 1
+            """, Long.class);
 
     private final StringRedisTemplate redisTemplate;
     private final CacheKeyHasher cacheKeyHasher;
+    private final RedisPayloadCipher redisPayloadCipher;
     private final boolean productionSafetyRequired;
 
     @Value("${app.security.ai-quota.daily-limit:${AI_DAILY_QUOTA_PER_USER:20}}")
@@ -57,14 +67,22 @@ public class AiQuotaService {
     @Autowired
     public AiQuotaService(ObjectProvider<StringRedisTemplate> redisTemplateProvider,
                           CacheKeyHasher cacheKeyHasher,
+                          RedisPayloadCipher redisPayloadCipher,
                           Environment environment) {
         this.redisTemplate = redisTemplateProvider.getIfAvailable();
         this.cacheKeyHasher = cacheKeyHasher;
+        this.redisPayloadCipher = redisPayloadCipher;
         this.productionSafetyRequired = ProductionSafetyValidator.isProductionSafetyRequired(environment);
     }
 
     AiQuotaService(ObjectProvider<StringRedisTemplate> redisTemplateProvider, CacheKeyHasher cacheKeyHasher) {
-        this(redisTemplateProvider, cacheKeyHasher, null);
+        this(redisTemplateProvider, cacheKeyHasher, new RedisPayloadCipher("local-cache-key-hmac-secret"), null);
+    }
+
+    AiQuotaService(ObjectProvider<StringRedisTemplate> redisTemplateProvider,
+                   CacheKeyHasher cacheKeyHasher,
+                   Environment environment) {
+        this(redisTemplateProvider, cacheKeyHasher, new RedisPayloadCipher("local-cache-key-hmac-secret"), environment);
     }
 
     public record QuotaConsumptionResult(boolean allowed, int remaining) {}
@@ -141,6 +159,33 @@ public class AiQuotaService {
         tryConsumeQuota(userId);
     }
 
+    /**
+     * Hands a consumed unit back when accepted work could not start, such as executor rejection.
+     * Best effort: never drops below zero, never resurrects an expired key, and never fails the caller.
+     */
+    public void releaseQuota(Long userId) {
+        if (userId == null || dailyLimit <= 0) {
+            return;
+        }
+        String dateKey = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE);
+        String key = quotaKey(dateKey, userId);
+
+        if (redisTemplate != null) {
+            try {
+                // GET + conditional DECR must be one Redis operation. A separate hasKey/DECR pair can
+                // race with key expiry and recreate the daily counter at -1 without a TTL.
+                redisTemplate.execute(RELEASE_QUOTA_SCRIPT, List.of(key));
+            } catch (Exception e) {
+                log.warn("Redis quota release failed; in-memory counter still adjusted: {}",
+                        AiLogPrivacy.exceptionSummary(e));
+            }
+        }
+        AtomicInteger counter = fallbackQuota.get(key);
+        if (counter != null) {
+            counter.updateAndGet(used -> Math.max(0, used - 1));
+        }
+    }
+
     public int getRemainingQuota(Long userId) {
         if (userId == null) {
             return dailyLimit;
@@ -176,7 +221,7 @@ public class AiQuotaService {
         if (redisTemplate != null) {
             try {
                 String val = redisTemplate.opsForValue().get(CACHE_KEY_PREFIX + cacheKey);
-                return val == null ? null : val.toString();
+                return val == null ? null : redisPayloadCipher.decrypt(val.toString());
             } catch (Exception e) {
                 log.warn("Redis cache read failed: {}", AiLogPrivacy.exceptionSummary(e));
             }
@@ -193,7 +238,7 @@ public class AiQuotaService {
         if (redisTemplate != null) {
             try {
                 redisTemplate.opsForValue().set(
-                        CACHE_KEY_PREFIX + cacheKey, content, Duration.ofSeconds(cacheTtlSeconds));
+                        CACHE_KEY_PREFIX + cacheKey, redisPayloadCipher.encrypt(content), Duration.ofSeconds(cacheTtlSeconds));
                 return;
             } catch (Exception e) {
                 log.warn("Redis cache write failed: {}", AiLogPrivacy.exceptionSummary(e));

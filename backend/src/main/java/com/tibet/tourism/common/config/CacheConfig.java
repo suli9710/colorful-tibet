@@ -9,6 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.cache.annotation.CachingConfigurer;
+import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.concurrent.ConcurrentMapCacheManager;
@@ -23,6 +24,7 @@ import org.springframework.data.redis.serializer.RedisSerializationContext.Seria
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
 @Configuration
+@EnableCaching
 public class CacheConfig implements CachingConfigurer {
 
     private static final Logger logger = LoggerFactory.getLogger(CacheConfig.class);

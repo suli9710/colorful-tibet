@@ -9,6 +9,7 @@ public class AntibotProperties {
     private Fingerprint fingerprint = new Fingerprint();
     private Behavior behavior = new Behavior();
     private Risk risk = new Risk();
+    private Retention retention = new Retention();
 
     public static class Recaptcha {
         private boolean enabled = false;
@@ -80,6 +81,21 @@ public class AntibotProperties {
         public void setBlockThreshold(int blockThreshold) { this.blockThreshold = blockThreshold; }
     }
 
+    public static class Retention {
+        private boolean enabled = true;
+        private int days = 90;
+
+        public boolean isEnabled() { return enabled; }
+        public void setEnabled(boolean enabled) { this.enabled = enabled; }
+        public int getDays() { return days; }
+        public void setDays(int days) {
+            if (days < 1 || days > 365) {
+                throw new IllegalArgumentException("Behavior log retention days must be between 1 and 365");
+            }
+            this.days = days;
+        }
+    }
+
     public boolean isEnabled() { return enabled; }
     public void setEnabled(boolean enabled) { this.enabled = enabled; }
     public Recaptcha getRecaptcha() { return recaptcha; }
@@ -90,4 +106,6 @@ public class AntibotProperties {
     public void setBehavior(Behavior behavior) { this.behavior = behavior; }
     public Risk getRisk() { return risk; }
     public void setRisk(Risk risk) { this.risk = risk; }
+    public Retention getRetention() { return retention; }
+    public void setRetention(Retention retention) { this.retention = retention; }
 }

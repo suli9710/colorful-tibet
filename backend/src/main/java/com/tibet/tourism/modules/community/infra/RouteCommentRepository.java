@@ -50,4 +50,8 @@ public interface RouteCommentRepository extends JpaRepository<RouteComment, Long
     @Modifying
     @Query("DELETE FROM RouteComment rc WHERE rc.route.author.id = :userId")
     void deleteByRouteAuthorId(@Param("userId") Long userId);
+
+    /** Shared routes (owned by other users) whose comment_count must be recomputed after this user's comments are deleted. */
+    @Query("SELECT DISTINCT rc.route.id FROM RouteComment rc WHERE rc.user.id = :userId")
+    List<Long> findCommentedRouteIdsByUserId(@Param("userId") Long userId);
 }

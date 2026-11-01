@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -136,6 +137,56 @@ class AiRouteGenerationJobServiceTest {
     }
 
     @Test
+    void fallbackRouteIsNeverCachedUnderTheRealRouteKey() {
+        Executor directExecutor = Runnable::run;
+        AiRouteGenerationJobService service = new AiRouteGenerationJobService(
+                aiRouteService,
+                aiQuotaService,
+                aiRouteRecordService,
+                directExecutor,
+                new ObjectMapper()
+        );
+
+        User user = new User();
+        user.setId(7L);
+        AiRouteGenerateRequest request = new AiRouteGenerateRequest();
+        request.setDays(5);
+        request.setBudget("comfort");
+        request.setPreference("natural");
+
+        when(aiQuotaService.buildCacheKey(7L, 5, "comfort", "natural", "zh")).thenReturn("cache-key");
+        when(aiQuotaService.getCachedRoute("cache-key")).thenReturn(null);
+        when(aiQuotaService.tryConsumeQuota(7L)).thenReturn(new AiQuotaService.QuotaConsumptionResult(true, 19));
+        when(aiRouteRecordService.createRunningRecord(eq(user), any(), eq(5), eq("comfort"), eq("natural"), eq("zh")))
+                .thenReturn(record(108L));
+        when(aiRouteRecordService.recordCompletedRoute(
+                eq(user), any(), eq(5), eq("comfort"), eq("natural"), eq("zh"), anyString()))
+                .thenReturn(record(108L));
+
+        doAnswer(invocation -> {
+            AiRouteService.RouteStreamListener listener = invocation.getArgument(5);
+            // This is what AiRouteService.emitFallbackRoute does when the upstream model is
+            // unavailable: it signals the fallback and then emits the canned local itinerary.
+            listener.onFallback();
+            listener.onDelta("# 本地兜底行程");
+            listener.onDone("# 本地兜底行程");
+            return "# 本地兜底行程";
+        }).when(aiRouteService).streamRouteToListener(
+                eq(5), eq("comfort"), eq("natural"), eq(user), eq("zh"),
+                any(AiRouteService.RouteStreamListener.class));
+
+        AiRouteJobSnapshot snapshot = service.startJob(request, user, "zh");
+
+        assertEquals("COMPLETED", snapshot.status());
+        // Caching the template under the real route key would serve it to every later request for the
+        // same parameters, long after the model recovered.
+        verify(aiQuotaService, never()).cacheRoute(anyString(), anyString());
+        // ...and the quota unit stays spent: refunding every fallback would make the daily quota
+        // unlimited exactly while the model is down.
+        verify(aiQuotaService, never()).releaseQuota(anyLong());
+    }
+
+    @Test
     void startJobRethrowsAndRollsBackWhenGenerationPoolRejects() {
         Executor rejectingExecutor = command -> {
             throw new RejectedExecutionException("ai generation pool saturated");
@@ -167,6 +218,9 @@ class AiRouteGenerationJobServiceTest {
         // The half-started job is rolled back to a FAILED record rather than left RUNNING.
         verify(aiRouteRecordService).recordFailedRoute(
                 eq(user), any(), eq(5), eq("comfort"), eq("natural"), eq("zh"), anyString());
+        // The quota unit was taken before the job was queued, so a rejected submission must hand it
+        // back; otherwise a transient 503 permanently burns part of the user's daily allowance.
+        verify(aiQuotaService).releaseQuota(7L);
     }
 
     @Test
@@ -739,7 +793,7 @@ class AiRouteGenerationJobServiceTest {
     }
 
     @Test
-    void runningJobPublishesCumulativeRedisStreamEvents() {
+    void runningJobDoesNotPublishIntermediateRedisEventsBelowInitialThreshold() {
         Executor directExecutor = Runnable::run;
         RedisFixture redis = redisFixture();
         AiRouteGenerationJobService service = new AiRouteGenerationJobService(
@@ -789,15 +843,76 @@ class AiRouteGenerationJobServiceTest {
         assertEquals("COMPLETED", snapshot.status());
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, String>> eventCaptor = ArgumentCaptor.forClass(Map.class);
-        verify(redis.streamOperations(), times(4)).add(
+        verify(redis.streamOperations(), times(2)).add(
                 eq("ai:route-job:events:" + snapshot.jobId()), eventCaptor.capture());
         List<Map<String, String>> events = eventCaptor.getAllValues();
-        assertEquals("replace", events.get(0).get("type"));
-        assertTrue(events.get(0).get("event").contains("\"content\":\"# Fresh\""));
-        assertEquals("replace", events.get(1).get("type"));
-        assertTrue(events.get(1).get("event").contains("\"content\":\"# Fresh route\""));
-        assertEquals("snapshot", events.get(2).get("type"));
-        assertEquals("done", events.get(3).get("type"));
+        // These two short deltas stay under the initial publish threshold, so only the terminal
+        // events reach the stream - and they still carry the full content, encrypted.
+        assertEquals("snapshot", events.get(0).get("type"));
+        assertTrue(events.get(0).get("event").startsWith("enc:v1:"));
+        assertFalse(events.get(0).get("event").contains("# Fresh route"));
+        assertEquals("done", events.get(1).get("type"));
+        assertTrue(events.get(1).get("event").startsWith("enc:v1:"));
+        assertFalse(events.get(1).get("event").contains("# Fresh route"));
+    }
+
+    @Test
+    void runningJobPublishesCumulativeContentAtGeometricThresholds() {
+        Executor directExecutor = Runnable::run;
+        RedisFixture redis = redisFixture();
+        AiRouteGenerationJobService service = new AiRouteGenerationJobService(
+                aiRouteService,
+                aiQuotaService,
+                aiRouteRecordService,
+                directExecutor,
+                objectMapper(),
+                provider(redis.template())
+        );
+
+        User user = new User();
+        user.setId(7L);
+        AiRouteGenerateRequest request = new AiRouteGenerateRequest();
+        request.setDays(5);
+        request.setBudget("comfort");
+        request.setPreference("natural");
+
+        String chunk = "x".repeat(400);
+        String fullContent = chunk.repeat(16);
+        when(aiQuotaService.buildCacheKey(7L, 5, "comfort", "natural", "zh")).thenReturn("cache-key");
+        when(aiQuotaService.getCachedRoute("cache-key")).thenReturn(null);
+        when(redis.valueOperations().setIfAbsent(
+                eq("ai:route-job:start:cache-key"), anyString(), any(Duration.class)))
+                .thenReturn(true);
+        when(aiQuotaService.tryConsumeQuota(7L)).thenReturn(new AiQuotaService.QuotaConsumptionResult(true, 19));
+        when(aiRouteRecordService.createRunningRecord(eq(user), any(), eq(5), eq("comfort"), eq("natural"), eq("zh")))
+                .thenReturn(record(107L));
+        when(aiRouteRecordService.recordCompletedRoute(
+                eq(user), any(), eq(5), eq("comfort"), eq("natural"), eq("zh"), eq(fullContent)))
+                .thenReturn(record(107L));
+
+        doAnswer(invocation -> {
+            AiRouteService.RouteStreamListener listener = invocation.getArgument(5);
+            for (int i = 0; i < 16; i++) {
+                listener.onDelta(chunk);
+            }
+            listener.onDone(fullContent);
+            return fullContent;
+        }).when(aiRouteService).streamRouteToListener(
+                eq(5), eq("comfort"), eq("natural"), eq(user), eq("zh"),
+                any(AiRouteService.RouteStreamListener.class));
+
+        AiRouteJobSnapshot snapshot = service.startJob(request, user, "zh");
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, String>> eventCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(redis.streamOperations(), times(7)).add(
+                eq("ai:route-job:events:" + snapshot.jobId()), eventCaptor.capture());
+        List<Map<String, String>> events = eventCaptor.getAllValues();
+        // Sixteen fixed-size chunks produce only five intermediate cumulative events
+        // (400, 800, 1600, 3200, 6400) rather than one event per chunk. Their combined payload is
+        // bounded by twice the final route length, eliminating the previous O(n²) write growth.
+        assertEquals(List.of("replace", "replace", "replace", "replace", "replace", "snapshot", "done"),
+                events.stream().map(event -> event.get("type")).toList());
     }
 
     @Test

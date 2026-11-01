@@ -79,8 +79,10 @@ public class AiRouteController {
                     if (!normalizedCached.equals(cached.trim())) {
                         aiQuotaService.cacheRoute(cacheKey, normalizedCached);
                     }
-                    aiRouteRecordService.recordCompletedRoute(
-                            currentUser, null, days, safeRequest.getBudget(), safeRequest.getPreference(), locale, normalizedCached);
+                    // Refresh the user's existing record for these parameters rather than inserting a
+                    // new full-content row: this path runs on every repeat request for a cached route.
+                    aiRouteRecordService.recordCachedRoute(
+                            currentUser, days, safeRequest.getBudget(), safeRequest.getPreference(), locale, normalizedCached);
                     return ResponseEntity.ok(Map.of("content", normalizedCached, "cached", true));
                 }
                 logger.warn("Ignoring invalid cached AI route content for sync endpoint: days={}", days);

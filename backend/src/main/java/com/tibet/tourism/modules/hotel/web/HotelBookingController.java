@@ -4,6 +4,7 @@ import com.tibet.tourism.common.security.antibot.BehaviorData;
 import com.tibet.tourism.common.security.antibot.RiskAssessmentService;
 import com.tibet.tourism.common.security.antibot.RiskResult;
 import com.tibet.tourism.common.validation.InputSanitizer;
+import com.tibet.tourism.modules.admin.application.AdminAuditLogService;
 import com.tibet.tourism.modules.hotel.application.HotelBookingService;
 import com.tibet.tourism.modules.hotel.domain.HotelBooking;
 import com.tibet.tourism.modules.hotel.web.dto.HotelBookingRequest;
@@ -54,13 +55,16 @@ public class HotelBookingController {
     private final HotelBookingService hotelBookingService;
     private final UserRepository userRepository;
     private final RiskAssessmentService riskAssessmentService;
+    private final AdminAuditLogService auditLogService;
 
     public HotelBookingController(HotelBookingService hotelBookingService,
                                   UserRepository userRepository,
-                                  RiskAssessmentService riskAssessmentService) {
+                                  RiskAssessmentService riskAssessmentService,
+                                  AdminAuditLogService auditLogService) {
         this.hotelBookingService = hotelBookingService;
         this.userRepository = userRepository;
         this.riskAssessmentService = riskAssessmentService;
+        this.auditLogService = auditLogService;
     }
 
     @GetMapping("/room-types/{hotelId}")
@@ -171,6 +175,11 @@ public class HotelBookingController {
     @PutMapping("/{id}/status")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> updateStatus(@PathVariable Long id, @RequestBody Map<String, String> payload) {
+        return auditLogService.capture("hotel_booking", id, "hotel_booking_status_update",
+                () -> updateStatusInternal(id, payload));
+    }
+
+    private ResponseEntity<?> updateStatusInternal(Long id, Map<String, String> payload) {
         User user = getCurrentUser();
         if (user == null) {
             return ResponseEntity.status(401).body(Map.of("error", ERROR_NOT_AUTHENTICATED));
@@ -193,6 +202,11 @@ public class HotelBookingController {
     @DeleteMapping("/{id}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<?> cancelBooking(@PathVariable Long id) {
+        return auditLogService.captureIfAdmin("hotel_booking", id, "hotel_booking_cancel",
+                () -> cancelBookingInternal(id));
+    }
+
+    private ResponseEntity<?> cancelBookingInternal(Long id) {
         User user = getCurrentUser();
         if (user == null) {
             return ResponseEntity.status(401).body(Map.of("error", ERROR_NOT_AUTHENTICATED));
@@ -213,6 +227,11 @@ public class HotelBookingController {
     @DeleteMapping("/{id}/permanent")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<?> deleteBooking(@PathVariable Long id) {
+        return auditLogService.captureIfAdmin("hotel_booking", id, "hotel_booking_permanent_delete",
+                () -> deleteBookingInternal(id));
+    }
+
+    private ResponseEntity<?> deleteBookingInternal(Long id) {
         User user = getCurrentUser();
         if (user == null) {
             return ResponseEntity.status(401).body(Map.of("error", ERROR_NOT_AUTHENTICATED));

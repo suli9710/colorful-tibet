@@ -3,9 +3,12 @@ package com.tibet.tourism.modules.route.web;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.tibet.tourism.common.security.JwtAuthSupport;
+import com.tibet.tourism.common.security.antibot.RiskAssessmentService;
+import com.tibet.tourism.common.security.antibot.RiskResult;
 import com.tibet.tourism.modules.route.application.ItineraryService;
 import com.tibet.tourism.modules.route.web.dto.itinerary.BookItineraryItemRequest;
 import com.tibet.tourism.modules.user.domain.User;
@@ -31,12 +34,20 @@ class ItineraryControllerPrivacyTest {
     private JwtAuthSupport jwtAuthSupport;
     @Mock
     private HttpServletRequest request;
+    @Mock
+    private RiskAssessmentService riskAssessmentService;
 
     private ItineraryController controller;
 
     @BeforeEach
     void setUp() {
-        controller = new ItineraryController(itineraryService, jwtAuthSupport);
+        controller = new ItineraryController(itineraryService, jwtAuthSupport, riskAssessmentService);
+    }
+
+    private ResponseEntity<?> bookItemAllowingRisk(long itineraryId, long itemId) {
+        when(riskAssessmentService.assess(any(), any(), any(), any(), any(), any()))
+                .thenReturn(RiskResult.allow());
+        return controller.bookItem(itineraryId, itemId, new BookItineraryItemRequest(), null, null, null, request);
     }
 
     @Test
@@ -61,7 +72,7 @@ class ItineraryControllerPrivacyTest {
         when(itineraryService.bookItem(eq(user), eq(11L), eq(22L), any(BookItineraryItemRequest.class)))
                 .thenThrow(new IllegalArgumentException(rawMessage));
 
-        ResponseEntity<?> response = controller.bookItem(11L, 22L, new BookItineraryItemRequest(), request);
+        ResponseEntity<?> response = bookItemAllowingRisk(11L, 22L);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertBodyError(response, "Booking request could not be processed")
@@ -77,13 +88,29 @@ class ItineraryControllerPrivacyTest {
         when(itineraryService.bookItem(eq(user), eq(11L), eq(22L), any(BookItineraryItemRequest.class)))
                 .thenThrow(new SecurityException(rawMessage));
 
-        ResponseEntity<?> response = controller.bookItem(11L, 22L, new BookItineraryItemRequest(), request);
+        ResponseEntity<?> response = bookItemAllowingRisk(11L, 22L);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
         assertBodyError(response, "Itinerary action is not allowed")
                 .doesNotContain(rawMessage, "alice@example.com");
         assertThat(output).contains("type=SecurityException", "messageHash=")
                 .doesNotContain(rawMessage, "alice@example.com");
+    }
+
+    @Test
+    void bookItemIsGatedByTheSameAntibotCheckAsTheDirectBookingEndpoints() {
+        authenticatedUser();
+        when(riskAssessmentService.assess(any(), any(), any(), any(), any(), any()))
+                .thenReturn(new RiskResult(0.9, 0.9, 0.9, 0.9, RiskResult.Decision.BLOCK));
+
+        ResponseEntity<?> response = controller.bookItem(
+                11L, 22L, new BookItineraryItemRequest(), null, null, null, request);
+
+        // Without this gate the itinerary endpoint was simply the unguarded way to create the same
+        // spot and hotel bookings that /api/bookings and /api/hotel-bookings protect.
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertBodyError(response, "Security validation failed");
+        verifyNoInteractions(itineraryService);
     }
 
     private User authenticatedUser() {

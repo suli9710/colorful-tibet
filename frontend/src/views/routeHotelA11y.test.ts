@@ -96,7 +96,9 @@ describe('route planner and hotel flow UX accessibility guardrails', () => {
     expect(routePlannerSource).toContain('name="route-preference"')
     expect(routePlannerSource).toContain('aria-controls="route-planner-days-value"')
     expect(routePlannerSource).toContain('role="progressbar"')
-    expect(routePlannerSource).toContain(':aria-valuenow="routeGenerationProgressPercent"')
+    // Unknown server progress must not announce a fabricated percentage.
+    expect(routePlannerSource).not.toContain(':aria-valuenow="routeGenerationProgressPercent"')
+    expect(routePlannerSource).toContain(':aria-valuetext="t(\'plannerFlow.progressUnknown\')"')
     expect(routePlannerSource).toContain(':aria-expanded="resultExpanded"')
     expect(routePlannerSource).toContain(':aria-label="getExternalBookingAriaLabel(item)"')
   })

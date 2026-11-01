@@ -63,6 +63,13 @@ describe('auth and account accessibility safeguards', () => {
     expect(userProfileSource).toContain('if (uploadingAvatar.value) return')
   })
 
+  it('keeps ordinary login available when the third-party reCAPTCHA script is unavailable', () => {
+    expect(loginSource).toContain('const getOptionalLoginRecaptchaToken = async () => {')
+    expect(loginSource).toContain("return await getRecaptchaToken('login')")
+    expect(loginSource).toContain("console.warn('Login reCAPTCHA unavailable; continuing with server-side risk controls:'")
+    expect(loginSource).toContain('const recaptchaToken = await getOptionalLoginRecaptchaToken()')
+  })
+
   it('keeps auth/profile action button text from overflowing on small screens', () => {
     for (const source of [loginSource, registerSource, userProfileSource]) {
       expect(source).toContain('whitespace-normal break-words')

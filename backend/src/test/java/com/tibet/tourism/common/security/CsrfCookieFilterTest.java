@@ -18,7 +18,7 @@ class CsrfCookieFilterTest {
     @BeforeEach
     void setUp() {
         csrfTokenService = new CsrfTokenService(SECRET);
-        csrfCookieFilter = new CsrfCookieFilter(csrfTokenService, "http://localhost:5173");
+        csrfCookieFilter = new CsrfCookieFilter(csrfTokenService, new TrustedProxyIpResolver(), "http://localhost:5173");
     }
 
     @Test
@@ -140,7 +140,7 @@ class CsrfCookieFilterTest {
 
     @Test
     void wildcardAllowedOriginDoesNotAuthorizeCsrfOrigin() throws Exception {
-        CsrfCookieFilter filter = new CsrfCookieFilter(csrfTokenService, "https://*.example.com,https://app.example.com");
+        CsrfCookieFilter filter = new CsrfCookieFilter(csrfTokenService, new TrustedProxyIpResolver(), "https://*.example.com,https://app.example.com");
         String csrfToken = csrfTokenService.generateToken(SESSION_TOKEN);
         MockHttpServletRequest request = apiRequest("POST", "/api/auth/me/change-password");
         request.setCookies(

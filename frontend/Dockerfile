@@ -1,5 +1,5 @@
 # 多阶段构建：先构建前端，再使用nginx服务
-FROM node:22-alpine@sha256:968df39aedcea65eeb078fb336ed7191baf48f972b4479711397108be0966920 AS builder
+FROM node:22-alpine@sha256:16e22a550f3863206a3f701448c45f7912c6896a62de43add43bb9c86130c3e2 AS builder
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
@@ -12,16 +12,20 @@ ARG VITE_RECAPTCHA_MODE=v3
 ARG VITE_RECAPTCHA_SITE_KEY=
 ARG VITE_AMAP_KEY=
 ARG VITE_AMAP_SECURITY_CODE=
+ARG VITE_FRONTEND_ERROR_REPORT_URL=/api/client-errors
+ARG VITE_APP_VERSION=unknown
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 ENV VITE_RECAPTCHA_ENABLED=$VITE_RECAPTCHA_ENABLED
 ENV VITE_RECAPTCHA_MODE=$VITE_RECAPTCHA_MODE
 ENV VITE_RECAPTCHA_SITE_KEY=$VITE_RECAPTCHA_SITE_KEY
 ENV VITE_AMAP_KEY=$VITE_AMAP_KEY
 ENV VITE_AMAP_SECURITY_CODE=$VITE_AMAP_SECURITY_CODE
+ENV VITE_FRONTEND_ERROR_REPORT_URL=$VITE_FRONTEND_ERROR_REPORT_URL
+ENV VITE_APP_VERSION=$VITE_APP_VERSION
 
 RUN npm run build
 
-FROM nginx:alpine@sha256:8b1e78743a03dbb2c95171cc58639fef29abc8816598e27fb910ed2e621e589a
+FROM nginx:alpine@sha256:4a73073bd557c65b759505da037898b61f1be6cbcc3c2c3aeac22d2a470c1752
 RUN apk add --no-cache gettext \
     && apk upgrade --no-cache \
     && mkdir -p /etc/nginx/certs /var/cache/nginx /var/run /run \
@@ -38,6 +42,8 @@ ENV NGINX_SERVER_NAME=localhost
 ENV NGINX_REDIRECT_HOST=localhost
 ENV NGINX_CERT_DOMAIN=localhost
 ENV NGINX_HTTP_ONLY=false
+ENV NGINX_REAL_IP_FROM=
+ENV NGINX_REAL_IP_HEADER=X-Forwarded-For
 
 RUN printf '%s\n' \
     '#!/bin/sh' \
@@ -78,7 +84,28 @@ RUN printf '%s\n' \
     '    done' \
     '}' \
     '' \
+    "cidr_pattern='^([0-9]{1,3}[.]){3}[0-9]{1,3}(/[0-9]{1,2})?\$|^[0-9A-Fa-f:]+(/[0-9]{1,3})?\$'" \
+    '' \
+    'render_real_ip() {' \
+    '    : > /etc/nginx/conf.d/real-ip.conf' \
+    '    [ -n "${NGINX_REAL_IP_FROM:-}" ] || return 0' \
+    '    real_ip_header_name="${NGINX_REAL_IP_HEADER:-X-Forwarded-For}"' \
+    '    case "$real_ip_header_name" in' \
+    '        X-Forwarded-For|X-Real-IP|CF-Connecting-IP|True-Client-IP|proxy_protocol) ;;' \
+    '        *) fail "NGINX_REAL_IP_HEADER must be one of X-Forwarded-For, X-Real-IP, CF-Connecting-IP, True-Client-IP, proxy_protocol." ;;' \
+    '    esac' \
+    "    set -- \$(printf '%s' \"\$NGINX_REAL_IP_FROM\" | tr ',' ' ')" \
+    '    [ "$#" -gt 0 ] || fail "NGINX_REAL_IP_FROM must contain at least one address or CIDR."' \
+    '    for trusted_cidr do' \
+    "        printf '%s' \"\$trusted_cidr\" | grep -Eq \"\$cidr_pattern\" || fail \"NGINX_REAL_IP_FROM entries must be IPv4/IPv6 addresses or CIDRs, comma or space separated.\"" \
+    '        echo "set_real_ip_from $trusted_cidr;" >> /etc/nginx/conf.d/real-ip.conf' \
+    '    done' \
+    '    echo "real_ip_header $real_ip_header_name;" >> /etc/nginx/conf.d/real-ip.conf' \
+    '    echo "real_ip_recursive on;" >> /etc/nginx/conf.d/real-ip.conf' \
+    '}' \
+    '' \
     'require_server_names "$NGINX_SERVER_NAME"' \
+    'render_real_ip' \
     'if [ "$NGINX_HTTP_ONLY" = "true" ]; then' \
     "    envsubst '\$NGINX_SERVER_NAME \$NGINX_CERT_DOMAIN \$NGINX_REDIRECT_HOST' < /etc/nginx/http.conf.template > /etc/nginx/conf.d/default.conf" \
     'else' \
@@ -93,7 +120,7 @@ RUN printf '%s\n' \
     '    done' \
     "    envsubst '\$NGINX_SERVER_NAME \$NGINX_CERT_DOMAIN \$NGINX_REDIRECT_HOST' < /etc/nginx/default.conf.template > /etc/nginx/conf.d/default.conf" \
     'fi' \
-    "nginx -g 'daemon off;'" \
+    "exec nginx -g 'daemon off;'" \
     > /usr/local/bin/render-nginx-config \
     && chmod 755 /usr/local/bin/render-nginx-config
 

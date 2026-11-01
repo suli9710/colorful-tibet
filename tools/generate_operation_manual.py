@@ -487,7 +487,7 @@ def build_doc():
     add_command_block(doc, [
         "SEED_DEMO_USERS=true",
         "SUPER_ADMIN_USERNAME=lzh",
-        "SUPER_ADMIN_TOTP_SECRET=JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP",
+        "SUPER_ADMIN_TOTP_SECRET=<paste-a-new-CSPRNG-generated-160-bit-Base32-secret>",
         "SEED_DEMO_ADMIN_PASSWORD=Admin@Colorful2026",
         "SEED_DEMO_SUPER_ADMIN_PASSWORD=Lzh@Colorful2026",
         "SEED_DEMO_USER_PASSWORD=User@Colorful2026",

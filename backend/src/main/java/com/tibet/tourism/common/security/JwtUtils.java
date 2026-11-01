@@ -1,14 +1,18 @@
 package com.tibet.tourism.common.security;
+
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import jakarta.annotation.PostConstruct;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.Collection;
 import java.util.Date;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Pattern;
 import javax.crypto.SecretKey;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,6 +39,9 @@ public class JwtUtils {
     private static final String DEV_SECRET_MARKER = "dev-only";
     private static final String CHANGE_ME_MARKER = "change-me";
     private static final String SESSION_VERSION_CLAIM = "sv";
+    private static final String AUTHENTICATION_METHODS_CLAIM = "amr";
+    private static final String MFA_BINDING_CLAIM = "mfb";
+    private static final Pattern OPAQUE_MFA_BINDING = Pattern.compile("^[0-9a-f]{32}$");
 
     @Value("${jwt.secret}")
     private String jwtSecret;
@@ -96,17 +103,30 @@ public class JwtUtils {
     }
 
     public String generateJwtToken(Authentication authentication) {
-        return generateJwtToken(authentication, 0L);
+        return generateJwtToken(authentication, 0L, false, "");
     }
 
     public String generateJwtToken(Authentication authentication, long sessionVersion) {
+        return generateJwtToken(authentication, sessionVersion, false, "");
+    }
+
+    public String generateJwtToken(
+            Authentication authentication,
+            long sessionVersion,
+            boolean mfaVerified,
+            String mfaBinding) {
         UserDetails userPrincipal = (UserDetails) authentication.getPrincipal();
+        String normalizedMfaBinding = requireMfaBinding(mfaVerified, mfaBinding);
 
         return Jwts.builder()
                 .issuer(jwtIssuer)
                 .audience().add(jwtAudience).and()
                 .subject(userPrincipal.getUsername())
                 .claim(SESSION_VERSION_CLAIM, Math.max(0L, sessionVersion))
+                .claim(AUTHENTICATION_METHODS_CLAIM, mfaVerified
+                        ? List.of("pwd", "otp")
+                        : List.of("pwd"))
+                .claim(MFA_BINDING_CLAIM, normalizedMfaBinding)
                 .id(UUID.randomUUID().toString())
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + jwtExpirationMs))
@@ -135,6 +155,27 @@ public class JwtUtils {
             }
         }
         return 0L;
+    }
+
+    /** Returns true only for tokens explicitly minted after a successful OTP verification. */
+    public boolean isMfaVerified(String token) {
+        Object value = parseClaims(token).getPayload().get(AUTHENTICATION_METHODS_CLAIM);
+        if (!(value instanceof Collection<?> methods)) {
+            return false;
+        }
+        boolean passwordVerified = methods.stream().anyMatch("pwd"::equals);
+        boolean otpVerified = methods.stream().anyMatch("otp"::equals);
+        return passwordVerified && otpVerified;
+    }
+
+    /** Returns the opaque credential label from a signed token, or an empty value if absent. */
+    public String getMfaBindingFromJwtToken(String token) {
+        Object value = parseClaims(token).getPayload().get(MFA_BINDING_CLAIM);
+        if (!(value instanceof String binding)) {
+            return "";
+        }
+        String normalized = binding.trim();
+        return OPAQUE_MFA_BINDING.matcher(normalized).matches() ? normalized : "";
     }
 
     public boolean validateJwtToken(String authToken) {
@@ -178,12 +219,47 @@ public class JwtUtils {
         return normalized;
     }
 
+    private String requireMfaBinding(boolean mfaVerified, String mfaBinding) {
+        if (!mfaVerified) {
+            return null;
+        }
+        String normalized = mfaBinding == null ? "" : mfaBinding.trim();
+        if (!OPAQUE_MFA_BINDING.matcher(normalized).matches()) {
+            throw new IllegalArgumentException(
+                    "MFA-verified JWT requires a valid opaque credential binding");
+        }
+        return normalized;
+    }
+
     private boolean hasStrongRandomMaterial(String secret) {
+        // Hex first: every hex character is also a Base64 character, so `openssl rand -hex 32` - the
+        // 64-character form MIN_PROD_SECRET_LENGTH and .env.example both ask for - used to be parsed
+        // as Base64, decode to 48 bytes, fail the 64-byte rule and be refused outright, even though it
+        // carries 256 bits of entropy. Hex also tops out at exactly 4.0 bits/char, so the entropy
+        // fallback could never accept it either.
+        if (isHexSecret(secret)) {
+            return distinctCharacterCount(secret) >= 12;
+        }
+
+        // A successful Base64 decode proves strength; failing it is not by itself a reason to reject.
         byte[] decoded = decodeBase64Secret(secret);
-        if (decoded != null) {
-            return decoded.length >= MIN_RANDOM_SECRET_BYTES && hasByteVariety(decoded);
+        if (decoded != null && decoded.length >= MIN_RANDOM_SECRET_BYTES && hasByteVariety(decoded)) {
+            return true;
         }
         return shannonEntropy(secret) >= MIN_PROD_SECRET_ENTROPY_BITS_PER_CHAR && distinctCharacterCount(secret) >= 16;
+    }
+
+    /** True for a pure hexadecimal string of even length, i.e. a faithful byte encoding. */
+    private boolean isHexSecret(String secret) {
+        if (secret.length() % 2 != 0) {
+            return false;
+        }
+        for (int i = 0; i < secret.length(); i++) {
+            if (Character.digit(secret.charAt(i), 16) < 0) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private byte[] decodeBase64Secret(String secret) {

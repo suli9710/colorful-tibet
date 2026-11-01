@@ -170,8 +170,7 @@ public class HotelBookingService {
             orderCenterService.createFromLegacyHotelBooking(saved);
         } else if (previousStatus != HotelBooking.Status.CANCELLED
                 && saved.getStatus() == HotelBooking.Status.CANCELLED) {
-            orderCenterService.cancelLegacyMirror(user, "LEGACY_HOTEL_BOOKING", saved.getId(),
-                    "Admin cancelled hotel booking");
+            requireLegacyMirrorCancelled(user, saved.getId(), "Admin cancelled hotel booking");
         }
         return saved;
     }
@@ -183,10 +182,11 @@ public class HotelBookingService {
             throw new NoSuchElementException("Booking not found");
         }
 
+        // Resolve the mirror first: when it refuses because the customer already paid, this whole
+        // transaction rolls back instead of leaving a CANCELLED booking under a CONFIRMED/PAID order.
+        requireLegacyMirrorCancelled(user, booking.getId(), "旧酒店预订取消");
         transitionStatus(booking, HotelBooking.Status.CANCELLED);
-        HotelBooking saved = hotelBookingRepository.save(booking);
-        orderCenterService.cancelLegacyMirror(user, "LEGACY_HOTEL_BOOKING", saved.getId(), "旧酒店预订取消");
-        return saved;
+        return hotelBookingRepository.save(booking);
     }
 
     @Transactional
@@ -209,8 +209,18 @@ public class HotelBookingService {
         booking.setDeletedAt(LocalDateTime.now());
         hotelBookingRepository.save(booking);
         if (shouldCancelMirror) {
-            orderCenterService.cancelLegacyMirror(user, "LEGACY_HOTEL_BOOKING", booking.getId(),
-                    "Admin deleted active hotel booking");
+            requireLegacyMirrorCancelled(user, booking.getId(), "Admin deleted active hotel booking");
+        }
+    }
+
+    /**
+     * Cancels the unified-order mirror and fails the caller when it refuses. cancelLegacyMirror
+     * returns false only for an already-paid order, and cancelling the booking anyway would strip the
+     * customer's booking while the order stays CONFIRMED/PAID with no refund record.
+     */
+    private void requireLegacyMirrorCancelled(User actor, Long bookingId, String reason) {
+        if (!orderCenterService.cancelLegacyMirror(actor, "LEGACY_HOTEL_BOOKING", bookingId, reason)) {
+            throw new IllegalStateException("该预订对应的订单已支付，请改用退款流程");
         }
     }
 
@@ -293,10 +303,15 @@ public class HotelBookingService {
                 break;
             }
             staleBookings.forEach(booking -> {
-                transitionStatus(booking, HotelBooking.Status.CANCELLED);
-                hotelBookingRepository.save(booking);
-                orderCenterService.cancelLegacyMirror(null, "LEGACY_HOTEL_BOOKING",
+                // Resolve the mirror order first. It refuses cancellation once the customer has paid,
+                // and this booking must then adopt that outcome instead of being cancelled underneath a
+                // CONFIRMED/PAID order. Either way the booking leaves PENDING, so the sweep terminates.
+                boolean mirrorCancelled = orderCenterService.cancelLegacyMirror(null, "LEGACY_HOTEL_BOOKING",
                         booking.getId(), "Legacy hotel booking hold expired");
+                transitionStatus(
+                        booking,
+                        mirrorCancelled ? HotelBooking.Status.CANCELLED : HotelBooking.Status.CONFIRMED);
+                hotelBookingRepository.save(booking);
             });
             if (staleBookings.size() < STALE_PENDING_BOOKING_BATCH_SIZE) {
                 break;

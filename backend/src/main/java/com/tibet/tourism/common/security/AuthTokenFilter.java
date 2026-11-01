@@ -1,5 +1,6 @@
 package com.tibet.tourism.common.security;
 
+import com.tibet.tourism.modules.auth.application.AdminMfaPolicy;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -24,16 +25,27 @@ public class AuthTokenFilter extends OncePerRequestFilter {
     private final UserDetailsService userDetailsService;
     private final TokenRevocationService tokenRevocationService;
     private final UserSessionVersionService userSessionVersionService;
+    private final AdminMfaPolicy adminMfaPolicy;
 
     public AuthTokenFilter(
             JwtUtils jwtUtils,
             UserDetailsService userDetailsService,
             TokenRevocationService tokenRevocationService,
             UserSessionVersionService userSessionVersionService) {
+        this(jwtUtils, userDetailsService, tokenRevocationService, userSessionVersionService, null);
+    }
+
+    public AuthTokenFilter(
+            JwtUtils jwtUtils,
+            UserDetailsService userDetailsService,
+            TokenRevocationService tokenRevocationService,
+            UserSessionVersionService userSessionVersionService,
+            AdminMfaPolicy adminMfaPolicy) {
         this.jwtUtils = jwtUtils;
         this.userDetailsService = userDetailsService;
         this.tokenRevocationService = tokenRevocationService;
         this.userSessionVersionService = userSessionVersionService;
+        this.adminMfaPolicy = adminMfaPolicy;
     }
 
     @Override
@@ -60,13 +72,25 @@ public class AuthTokenFilter extends OncePerRequestFilter {
                 String username = jwtUtils.getUserNameFromJwtToken(jwt);
                 if (userDetailsService != null) {
                     UserDetails userDetails = userDetailsService.loadUserByUsername(username);
-                    UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                            userDetails, null, userDetails.getAuthorities());
-                    authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                    SecurityContextHolder.getContext().setAuthentication(authentication);
-                    if (path.startsWith("/api/admin/")) {
-                        logger.debug("Admin auth OK: user=user#{}, authorities={}",
-                                PiiMasker.shortHash(username), userDetails.getAuthorities());
+                    boolean administrator = userDetails.getAuthorities().stream()
+                            .anyMatch(authority -> "ROLE_ADMIN".equals(authority.getAuthority()));
+                    if (administrator && !jwtUtils.isMfaVerified(jwt)) {
+                        rejectJwt(path, "admin-mfa-required");
+                    } else if (administrator
+                            && (adminMfaPolicy == null
+                            || !adminMfaPolicy.matchesCurrentBinding(
+                                    username, jwtUtils.getMfaBindingFromJwtToken(jwt)))) {
+                        rejectJwt(path, "admin-mfa-credential-stale");
+                    } else {
+                        UsernamePasswordAuthenticationToken authentication =
+                                new UsernamePasswordAuthenticationToken(
+                                        userDetails, null, userDetails.getAuthorities());
+                        authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                        SecurityContextHolder.getContext().setAuthentication(authentication);
+                        if (path.startsWith("/api/admin/")) {
+                            logger.debug("Admin auth OK: user=user#{}, authorities={}",
+                                    PiiMasker.shortHash(username), userDetails.getAuthorities());
+                        }
                     }
                 }
             }
@@ -80,7 +104,14 @@ public class AuthTokenFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return ApiSecurityPaths.isPublicRequest(request.getMethod(), request.getServletPath());
+        if (MetricsScrapeTokenFilter.isMetricsRequest(request)
+                && SecurityContextHolder.getContext().getAuthentication() != null) {
+            return true;
+        }
+        String method = request.getMethod();
+        String path = request.getServletPath();
+        return ApiSecurityPaths.isPublicRequest(method, path)
+                && !ApiSecurityPaths.supportsOptionalAuthentication(method, path);
     }
 
     private String parseJwt(HttpServletRequest request) {

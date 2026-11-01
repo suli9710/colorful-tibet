@@ -15,6 +15,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDateTime;
 
 @Entity
@@ -22,6 +23,8 @@ import java.time.LocalDateTime;
         @Index(name = "idx_ai_route_records_user_updated", columnList = "user_id, updated_at"),
         @Index(name = "idx_ai_route_records_user_saved_updated", columnList = "user_id, manually_saved, updated_at"),
         @Index(name = "idx_ai_route_records_job", columnList = "job_id")
+}, uniqueConstraints = {
+        @UniqueConstraint(name = "uk_ai_route_records_user_job", columnNames = {"user_id", "job_id"})
 })
 public class AiRouteRecord {
 

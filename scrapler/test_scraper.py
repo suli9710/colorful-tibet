@@ -1,12 +1,13 @@
 import unittest
 from decimal import Decimal
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from scraper import (
     ScraperConfig,
     build_scrape_result,
     build_search_urls,
     extract_price_evidence,
+    fetch_with_httpx,
     scrape_price_for_spot,
     select_best_price,
     validate_target_url,
@@ -99,6 +100,23 @@ class ScraperUrlSafetyTest(unittest.TestCase):
 
         fetcher.fetch.assert_called_once_with("https://www.baidu.com/s?wd=%E5%B8%83%E8%BE%BE%E6%8B%89%E5%AE%AB")
         self.assertEqual(Decimal("200"), result.base_price)
+
+    def test_httpx_redirect_target_is_validated_before_following(self):
+        redirect = MagicMock()
+        redirect.is_redirect = True
+        redirect.headers = {"location": "http://127.0.0.1/admin"}
+        client = MagicMock()
+        client.__enter__.return_value = client
+        client.get.return_value = redirect
+
+        with patch("scraper.httpx.Client", return_value=client), patch(
+            "scraper.socket.getaddrinfo",
+            return_value=[(None, None, None, None, ("8.8.8.8", 0))],
+        ):
+            result = fetch_with_httpx("https://example.com/start", ScraperConfig())
+
+        self.assertIsNone(result)
+        client.get.assert_called_once_with("https://example.com/start")
 
     def test_config_defaults_are_bounded(self):
         config = ScraperConfig(max_sources=4, search_providers=("baidu", "bing"))

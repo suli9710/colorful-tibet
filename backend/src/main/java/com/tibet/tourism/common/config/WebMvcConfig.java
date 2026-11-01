@@ -1,4 +1,5 @@
 package com.tibet.tourism.common.config;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.net.URI;
@@ -8,6 +9,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.CacheControl;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
+import org.springframework.http.codec.json.Jackson2JsonDecoder;
+import org.springframework.http.codec.json.Jackson2JsonEncoder;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -75,9 +78,14 @@ public class WebMvcConfig implements WebMvcConfigurer {
     }
 
     @Bean
-    public WebClient.Builder webClientBuilder() {
+    public WebClient.Builder webClientBuilder(ObjectMapper objectMapper) {
         ExchangeStrategies strategies = ExchangeStrategies.builder()
-            .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(2 * 1024 * 1024))
+            .codecs(configurer -> {
+                configurer.defaultCodecs().maxInMemorySize(2 * 1024 * 1024);
+                // This custom builder does not apply Boot's preferred-json-mapper property.
+                configurer.defaultCodecs().jackson2JsonEncoder(new Jackson2JsonEncoder(objectMapper));
+                configurer.defaultCodecs().jackson2JsonDecoder(new Jackson2JsonDecoder(objectMapper));
+            })
             .build();
 
         WebClient.Builder builder = WebClient.builder().exchangeStrategies(strategies);

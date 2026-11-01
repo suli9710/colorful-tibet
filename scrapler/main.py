@@ -10,7 +10,7 @@ import secrets
 from typing import Optional
 
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, Header, HTTPException, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
@@ -29,6 +29,7 @@ logger = logging.getLogger("scrapling-service")
 
 SERVICE_VERSION = "0.3.0"
 API_KEY_HEADER = "X-Scrapling-Api-Key"
+ALERT_LOG_TOKEN_HEADER = "X-Alert-Log-Token"
 
 
 def _env_int(name: str, default: int) -> int:
@@ -118,6 +119,22 @@ def allow_request_mode_override() -> bool:
     return _env_bool("SCRAPLING_ALLOW_REQUEST_MODE_OVERRIDE", False)
 
 
+def configured_alert_log_token() -> str:
+    return (os.getenv("ALERT_LOG_TOKEN") or "").strip()
+
+
+def _tokens_match(provided: str, expected: str) -> bool:
+    """Constant-time comparison that tolerates any caller-supplied text.
+
+    secrets.compare_digest raises TypeError for str arguments containing non-ASCII characters, so
+    comparing the raw header would let an unauthenticated caller turn a 401 into an unhandled 500
+    simply by sending a non-ASCII credential.
+    """
+    if not provided or not expected:
+        return False
+    return secrets.compare_digest(provided.encode("utf-8"), expected.encode("utf-8"))
+
+
 def require_api_key(api_key: Optional[str] = Header(default=None, alias=API_KEY_HEADER)) -> None:
     expected = configured_api_key()
     if not expected:
@@ -129,11 +146,17 @@ def require_api_key(api_key: Optional[str] = Header(default=None, alias=API_KEY_
         )
 
     provided = (api_key or "").strip()
-    if not provided or not secrets.compare_digest(provided, expected):
+    if not _tokens_match(provided, expected):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Unauthorized",
         )
+
+
+def require_alert_log_token(token: Optional[str]) -> None:
+    expected = configured_alert_log_token()
+    if not _tokens_match((token or "").strip(), expected):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
 
 
 def response_from_result(result: ScrapeResult) -> PriceResponse:
@@ -191,6 +214,63 @@ async def capabilities():
         "apiKeyRequired": bool(configured_api_key()) or not allow_unauthenticated_access(),
         "requestModeOverrideAllowed": allow_request_mode_override(),
     }
+
+
+@app.post("/internal/alertmanager", include_in_schema=False)
+async def log_alertmanager_notification(
+    notification: dict,
+    token: Optional[str] = Query(default=None, min_length=32, max_length=128),
+    header_token: Optional[str] = Header(default=None, alias=ALERT_LOG_TOKEN_HEADER),
+    authorization: Optional[str] = Header(default=None),
+):
+    """Log a compact Alertmanager notification received over the Docker network.
+
+    Accepts the token as ``Authorization: Bearer <token>`` (what Alertmanager 0.27 can actually send,
+    via ``http_config.authorization.credentials``), as the ``X-Alert-Log-Token`` header, or as a
+    ``?token=`` query parameter. The query parameter is deprecated: query strings are written verbatim
+    into the uvicorn access log and into any intermediate proxy log on every delivery.
+    """
+    bearer_token = None
+    if authorization and authorization.lower().startswith("bearer "):
+        bearer_token = authorization[len("bearer ") :].strip()
+
+    supplied = bearer_token or header_token
+    if supplied is None and token is not None:
+        logger.warning(
+            "Alert log token supplied as a query parameter; send it as an Authorization: Bearer "
+            "credential or the %s header so it is not written to access logs",
+            ALERT_LOG_TOKEN_HEADER,
+        )
+        supplied = token
+
+    require_alert_log_token(supplied)
+
+    alerts = notification.get("alerts")
+    if not isinstance(alerts, list):
+        alerts = []
+
+    alert_names = sorted(
+        {
+            str(alert.get("labels", {}).get("alertname", "unknown"))[:120]
+            for alert in alerts
+            if isinstance(alert, dict) and isinstance(alert.get("labels"), dict)
+        }
+    )
+    severities = sorted(
+        {
+            str(alert.get("labels", {}).get("severity", "unknown"))[:40]
+            for alert in alerts
+            if isinstance(alert, dict) and isinstance(alert.get("labels"), dict)
+        }
+    )
+    logger.warning(
+        "alertmanager_notification status=%s alertCount=%s alertNames=%s severities=%s",
+        str(notification.get("status", "unknown"))[:32],
+        len(alerts),
+        ",".join(alert_names[:20]) or "unknown",
+        ",".join(severities[:10]) or "unknown",
+    )
+    return {"status": "logged"}
 
 
 @app.get("/health")

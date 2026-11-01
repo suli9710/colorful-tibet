@@ -143,6 +143,8 @@ class HotelBookingServiceTest {
         when(hotelBookingRepository.findByIdAndUserId(99L, user.getId())).thenReturn(Optional.of(booking));
         when(hotelBookingRepository.save(booking)).thenReturn(booking);
 
+        when(orderCenterService.cancelLegacyMirror(any(), anyString(), any(), anyString())).thenReturn(true);
+
         hotelBookingService.cancelBooking(user, 99L);
 
         assertEquals(HotelBooking.Status.CANCELLED, booking.getStatus());
@@ -183,6 +185,8 @@ class HotelBookingServiceTest {
         when(hotelBookingRepository.findStalePendingBookings(
                 eq(HotelBooking.Status.PENDING), any(LocalDateTime.class), eq(batchPage)))
                 .thenReturn(firstBatch, List.of(secondBatchBooking));
+        when(orderCenterService.cancelLegacyMirror(eq(null), eq("LEGACY_HOTEL_BOOKING"), any(), anyString()))
+                .thenReturn(true);
 
         hotelBookingService.expireStalePendingBookings();
 
@@ -196,10 +200,30 @@ class HotelBookingServiceTest {
     }
 
     @Test
+    void stalePendingSweepAdoptsThePaidOutcomeInsteadOfCancellingAPaidBooking() {
+        HotelBooking paidBooking = booking(3000L, user, HotelBooking.Status.PENDING);
+        PageRequest batchPage = PageRequest.of(0, 100);
+        when(hotelBookingRepository.findStalePendingBookings(
+                eq(HotelBooking.Status.PENDING), any(LocalDateTime.class), eq(batchPage)))
+                .thenReturn(List.of(paidBooking));
+        // The mirror order was paid before the hold expired, so it refuses cancellation.
+        when(orderCenterService.cancelLegacyMirror(eq(null), eq("LEGACY_HOTEL_BOOKING"), eq(3000L), anyString()))
+                .thenReturn(false);
+
+        hotelBookingService.expireStalePendingBookings();
+
+        // Cancelling here would leave the order CONFIRMED/PAID while its booking reads CANCELLED.
+        assertEquals(HotelBooking.Status.CONFIRMED, paidBooking.getStatus());
+        verify(hotelBookingRepository).save(paidBooking);
+    }
+
+    @Test
     void adminStatusCancelMirrorsIntoUnifiedOrderCenter() {
         HotelBooking booking = booking(99L, user, HotelBooking.Status.CONFIRMED);
         when(hotelBookingRepository.findById(99L)).thenReturn(Optional.of(booking));
         when(hotelBookingRepository.save(booking)).thenReturn(booking);
+
+        when(orderCenterService.cancelLegacyMirror(any(), anyString(), any(), anyString())).thenReturn(true);
 
         hotelBookingService.updateStatus(admin, 99L, "cancelled");
 
@@ -242,6 +266,8 @@ class HotelBookingServiceTest {
     void adminCanDeleteActiveHotelBooking() {
         HotelBooking booking = booking(99L, user, HotelBooking.Status.PENDING);
         when(hotelBookingRepository.findById(99L)).thenReturn(Optional.of(booking));
+
+        when(orderCenterService.cancelLegacyMirror(any(), anyString(), any(), anyString())).thenReturn(true);
 
         hotelBookingService.deleteBooking(admin, 99L);
 

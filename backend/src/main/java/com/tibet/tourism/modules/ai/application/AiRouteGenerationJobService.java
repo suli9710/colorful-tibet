@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.tibet.tourism.common.security.CacheKeyHasher;
 import com.tibet.tourism.common.security.ProductionSafetyValidator;
+import com.tibet.tourism.common.security.RedisPayloadCipher;
 import com.tibet.tourism.modules.ai.domain.AiRouteRecord;
 import com.tibet.tourism.modules.ai.web.dto.AiRouteGenerateRequest;
 import com.tibet.tourism.modules.user.domain.User;
@@ -51,6 +52,10 @@ public class AiRouteGenerationJobService {
     private static final Logger log = LoggerFactory.getLogger(AiRouteGenerationJobService.class);
     private static final long SSE_TIMEOUT_MILLIS = 30 * 60 * 1000L;
     private static final int RUNNING_RECORD_PERSIST_DELTA_CHARS = 1200;
+    // Start cross-instance cumulative updates at this size, then double the next threshold after
+    // every publish. That preserves replace/catch-up semantics while keeping total Redis bytes O(n).
+    // Subscribers on the generating instance still receive every delta immediately.
+    private static final int REDIS_EVENT_INITIAL_PUBLISH_CHARS = 400;
     private static final String START_LOCK_PREFIX = "ai:route-job:start:";
     private static final String PENDING_START_PREFIX = "ai:route-job:pending:";
     private static final String EVENT_STREAM_PREFIX = "ai:route-job:events:";
@@ -75,6 +80,7 @@ public class AiRouteGenerationJobService {
     private final ObjectMapper objectMapper;
     private final StringRedisTemplate redisTemplate;
     private final CacheKeyHasher cacheKeyHasher;
+    private final RedisPayloadCipher redisPayloadCipher;
     private final boolean productionSafetyRequired;
     private final Map<String, RouteJob> jobs = new ConcurrentHashMap<>();
     private final Map<String, String> activeJobByCacheKey = new ConcurrentHashMap<>();
@@ -105,6 +111,7 @@ public class AiRouteGenerationJobService {
                                        ObjectMapper objectMapper,
                                        ObjectProvider<StringRedisTemplate> redisTemplateProvider,
                                        CacheKeyHasher cacheKeyHasher,
+                                       RedisPayloadCipher redisPayloadCipher,
                                        Environment environment) {
         this.aiRouteService = aiRouteService;
         this.aiQuotaService = aiQuotaService;
@@ -115,6 +122,9 @@ public class AiRouteGenerationJobService {
         this.cacheKeyHasher = cacheKeyHasher == null
                 ? new CacheKeyHasher("local-cache-key-hmac-secret")
                 : cacheKeyHasher;
+        this.redisPayloadCipher = redisPayloadCipher == null
+                ? new RedisPayloadCipher("local-cache-key-hmac-secret")
+                : redisPayloadCipher;
         this.productionSafetyRequired = ProductionSafetyValidator.isProductionSafetyRequired(environment);
     }
 
@@ -124,7 +134,20 @@ public class AiRouteGenerationJobService {
                                 Executor taskExecutor,
                                 ObjectMapper objectMapper) {
         this(aiRouteService, aiQuotaService, aiRouteRecordService, taskExecutor, objectMapper, null,
-                new CacheKeyHasher("local-cache-key-hmac-secret"), null);
+                new CacheKeyHasher("local-cache-key-hmac-secret"),
+                new RedisPayloadCipher("local-cache-key-hmac-secret"), null);
+    }
+
+    AiRouteGenerationJobService(AiRouteService aiRouteService,
+                                AiQuotaService aiQuotaService,
+                                AiRouteRecordService aiRouteRecordService,
+                                Executor taskExecutor,
+                                ObjectMapper objectMapper,
+                                ObjectProvider<StringRedisTemplate> redisTemplateProvider,
+                                CacheKeyHasher cacheKeyHasher,
+                                Environment environment) {
+        this(aiRouteService, aiQuotaService, aiRouteRecordService, taskExecutor, objectMapper, redisTemplateProvider,
+                cacheKeyHasher, new RedisPayloadCipher("local-cache-key-hmac-secret"), environment);
     }
 
     AiRouteGenerationJobService(AiRouteService aiRouteService,
@@ -134,7 +157,8 @@ public class AiRouteGenerationJobService {
                                 ObjectMapper objectMapper,
                                 ObjectProvider<StringRedisTemplate> redisTemplateProvider) {
         this(aiRouteService, aiQuotaService, aiRouteRecordService, taskExecutor, objectMapper, redisTemplateProvider,
-                new CacheKeyHasher("local-cache-key-hmac-secret"), null);
+                new CacheKeyHasher("local-cache-key-hmac-secret"),
+                new RedisPayloadCipher("local-cache-key-hmac-secret"), null);
     }
 
     public AiRouteJobSnapshot startJob(AiRouteGenerateRequest request, User currentUser, String locale) {
@@ -220,6 +244,10 @@ public class AiRouteGenerationJobService {
                 activeJobByCacheKey.remove(job.cacheKey, job.jobId);
                 job.fail("AI route generation failed to start");
                 recordFailedRoute(job, currentUser, "AI route generation failed to start");
+                // The quota was consumed before the job was queued. Without this, a saturated pool
+                // (surfaced as HTTP 503) would permanently burn a unit of the user's daily allowance
+                // for generation work that never ran.
+                aiQuotaService.releaseQuota(job.userId);
                 releaseStartLock(job);
             }
             throw e;
@@ -389,6 +417,7 @@ public class AiRouteGenerationJobService {
     }
 
     private void runJob(RouteJob job, User currentUser, String locale) {
+        AtomicBoolean usedFallbackRoute = new AtomicBoolean(false);
         try {
             String streamedContent = aiRouteService.streamRouteToListener(
                     job.days,
@@ -398,15 +427,28 @@ public class AiRouteGenerationJobService {
                     locale,
                     new AiRouteService.RouteStreamListener() {
                         @Override
+                        public void onFallback() {
+                            usedFallbackRoute.set(true);
+                        }
+
+                        @Override
                         public void onDelta(String text) {
                             if (text == null || text.isEmpty()) {
                                 return;
                             }
                             job.appendContent(text);
+                            // Subscribers attached to this instance get every chunk immediately.
                             notifyDeltaSubscribers(job, text);
-                            publishRedisJobEvent(job, "replace", Map.of(
-                                    "content", job.contentText(),
-                                    "text", job.contentText()));
+                            // The Redis stream keeps cumulative replace events because detached
+                            // subscribers use them for catch-up. Geometrically increasing thresholds
+                            // make the sum of those cumulative payloads linear in the final route size.
+                            String publishable = job.contentForGeometricPublish(
+                                    REDIS_EVENT_INITIAL_PUBLISH_CHARS);
+                            if (publishable != null) {
+                                publishRedisJobEvent(job, "replace", Map.of(
+                                        "content", publishable,
+                                        "text", publishable));
+                            }
                             persistRunningContentIfDue(job);
                         }
 
@@ -436,6 +478,23 @@ public class AiRouteGenerationJobService {
             if (content.isBlank()) {
                 job.fail("AI route generation returned empty content");
                 recordFailedRoute(job, currentUser, "AI route generation returned empty content");
+                publishTerminalRedisJobEvents(job);
+                notifySubscribers(job);
+                return;
+            }
+
+            if (usedFallbackRoute.get()) {
+                // The upstream model produced nothing usable and AiRouteService substituted its canned
+                // local itinerary. Caching that under the real route key would serve the template to
+                // every later request for the same parameters, so publish it for this caller only.
+                //
+                // The quota unit is deliberately NOT refunded here: when the model is unconfigured or
+                // down, every request falls back, and refunding each one would make the daily quota
+                // unlimited exactly when the service is least able to absorb load.
+                log.warn("AI route job completed with local fallback content: jobId={}, user={}, days={}",
+                        job.jobId, AiLogPrivacy.userRef(job.userId), job.days);
+                recordCompletedRoute(job, currentUser, content);
+                job.complete(content);
                 publishTerminalRedisJobEvents(job);
                 notifySubscribers(job);
                 return;
@@ -717,6 +776,14 @@ public class AiRouteGenerationJobService {
         RouteJob latestJob = refreshRecordBackedJob(job);
         sendEvent(emitter, "snapshot", latestJob.snapshot());
 
+        if (latestJob.isTerminal()) {
+            // The DB-backed job already finished. Starting the relay would occupy a bounded
+            // aiGenerationExecutor thread on a blocking Redis read for the full stream lifetime while
+            // the client waits for events that will never arrive.
+            sendTerminalEvents(emitter, latestJob);
+            return;
+        }
+
         if (latestJob.routeRecordId == null && latestEvent == null) {
             sendInterruptedEvent(emitter, "running-record-not-ready");
             emitter.complete();
@@ -863,7 +930,7 @@ public class AiRouteGenerationJobService {
         }
         String streamKey = eventStreamKey(job.jobId);
         try {
-            String eventJson = eventJson(type, payload);
+            String eventJson = redisPayloadCipher.encrypt(eventJson(type, payload));
             RecordId recordId = streamOperations().add(streamKey, Map.of(
                     EVENT_FIELD_TYPE, type,
                     EVENT_FIELD_JSON, eventJson));
@@ -902,7 +969,13 @@ public class AiRouteGenerationJobService {
         if (!StringUtils.hasText(type) || !StringUtils.hasText(eventJson)) {
             return null;
         }
-        return new RedisJobEvent(record.getId().getValue(), type, eventJson);
+        try {
+            return new RedisJobEvent(record.getId().getValue(), type, redisPayloadCipher.decrypt(eventJson));
+        } catch (IllegalStateException exception) {
+            log.warn("Discarding unreadable AI route Redis event: type={}, reason={}",
+                    type, AiLogPrivacy.exceptionSummary(exception));
+            return null;
+        }
     }
 
     private boolean isTerminalRedisEvent(RedisJobEvent event) {
@@ -1036,6 +1109,7 @@ public class AiRouteGenerationJobService {
         private volatile Instant updatedAt;
         private volatile StartLockHandle startLock;
         private int persistedContentLength;
+        private int nextCumulativePublishLength = REDIS_EVENT_INITIAL_PUBLISH_CHARS;
         private final boolean detachedDistributed;
 
         private RouteJob(long userId, String cacheKey, int days, String budget, String preference,
@@ -1127,6 +1201,7 @@ public class AiRouteGenerationJobService {
             content.setLength(0);
             content.append(newContent);
             updatedAt = Instant.now();
+            nextCumulativePublishLength = nextGeometricPublishLength(content.length());
         }
 
         synchronized void fail(String message) {
@@ -1160,6 +1235,33 @@ public class AiRouteGenerationJobService {
 
         synchronized void markContentPersisted() {
             persistedContentLength = content.length();
+        }
+
+        /**
+         * Returns cumulative content when the next geometrically increasing threshold is reached.
+         * Published lengths at least double (for example 400, 800, 1600...), so the sum of all
+         * intermediate cumulative payloads is bounded by a constant multiple of the final content.
+         */
+        synchronized String contentForGeometricPublish(int initialPublishChars) {
+            int initialThreshold = Math.max(1, initialPublishChars);
+            if (nextCumulativePublishLength < initialThreshold) {
+                nextCumulativePublishLength = initialThreshold;
+            }
+            if (content.length() < nextCumulativePublishLength) {
+                return null;
+            }
+            nextCumulativePublishLength = nextGeometricPublishLength(content.length());
+            return content.toString();
+        }
+
+        private static int nextGeometricPublishLength(int currentLength) {
+            if (currentLength < REDIS_EVENT_INITIAL_PUBLISH_CHARS) {
+                return REDIS_EVENT_INITIAL_PUBLISH_CHARS;
+            }
+            if (currentLength >= Integer.MAX_VALUE / 2) {
+                return Integer.MAX_VALUE;
+            }
+            return currentLength * 2;
         }
 
         synchronized AiRouteJobSnapshot snapshot() {
