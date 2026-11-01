@@ -21,10 +21,12 @@
     {
       "source": "backend/Dockerfile:9",
       "image": "eclipse-temurin:17-jre-alpine",
-      "pinned": "eclipse-temurin:17-jre-alpine@sha256:02320dd4ce20e243dfb915c686089cf9315c763084fafbb12d5c9993aee18b57",
+      "pinned": "eclipse-temurin:17-jre-alpine@sha256:c4a33e6ddb738fe4be0a28a613ea0940cec42d25d7263c3e2238c43354cb19b0",
       "repository": "library/eclipse-temurin",
       "tag": "17-jre-alpine",
-      "digest": "sha256:02320dd4ce20e243dfb915c686089cf9315c763084fafbb12d5c9993aee18b57"
+      "digest": "sha256:c4a33e6ddb738fe4be0a28a613ea0940cec42d25d7263c3e2238c43354cb19b0",
+      "verifiedAt": "2026-11-01T08:42:29.1444770Z",
+      "verificationNote": "Revalidated this runtime tag via Docker Registry HTTP API v2; linux/amd64 config reports JRE 17.0.20.1+1. Final image security remains checked by CI after OS package upgrades."
     },
     {
       "source": "frontend/Dockerfile:2",
@@ -45,10 +47,12 @@
     {
       "source": "scrapler/Dockerfile:1",
       "image": "python:3.11-slim",
-      "pinned": "python:3.11-slim@sha256:db3ff2e1800a8581e2c48a27c3995339d47bdf046da21c7627accd3d51053a93",
+      "pinned": "python:3.11-slim@sha256:673719e071ecf27434fd2635bbd8d00f49f4fdd81f243143438a42ced8bedf60",
       "repository": "library/python",
       "tag": "3.11-slim",
-      "digest": "sha256:db3ff2e1800a8581e2c48a27c3995339d47bdf046da21c7627accd3d51053a93"
+      "digest": "sha256:673719e071ecf27434fd2635bbd8d00f49f4fdd81f243143438a42ced8bedf60",
+      "verifiedAt": "2026-11-01T08:42:33.0158667Z",
+      "verificationNote": "Revalidated only this runtime tag via Docker Registry HTTP API v2; retained Python 3.11-slim and hash-locked application dependencies. Final image security remains checked by CI after OS package upgrades."
     },
     {
       "source": "docker-compose.yml:3",

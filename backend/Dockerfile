@@ -6,7 +6,7 @@ RUN mvn -B -DskipTests dependency:go-offline
 COPY src ./src
 RUN mvn -B clean package -DskipTests
 
-FROM eclipse-temurin:17-jre-alpine@sha256:02320dd4ce20e243dfb915c686089cf9315c763084fafbb12d5c9993aee18b57
+FROM eclipse-temurin:17-jre-alpine@sha256:c4a33e6ddb738fe4be0a28a613ea0940cec42d25d7263c3e2238c43354cb19b0
 WORKDIR /app
 
 ARG APP_UID=10001
@@ -14,7 +14,8 @@ ARG APP_GID=10001
 
 # Install runtime tools, apply security patches for base-image OS packages,
 # and create the non-root application user.
-RUN apk add --no-cache --upgrade curl libcrypto3 libssl3 openssl \
+RUN apk upgrade --no-cache \
+    && apk add --no-cache curl libcrypto3 libssl3 openssl \
     && addgroup -S -g "$APP_GID" app \
     && adduser -S -D -H -u "$APP_UID" -G app app \
     && mkdir -p /app/data /app/logs \
